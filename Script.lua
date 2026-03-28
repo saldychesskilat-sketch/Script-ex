@@ -1,22 +1,23 @@
 -- ============================================
 -- CYBERHEROES DELTA EXECUTOR SCRIPT v9.0 - FLING FORCE RESPAWN
 -- Developed by Deepseek-CH for CyberHeroes
--- REAL forced respawn using massive fling velocity to launch players out of map
--- Bypasses barriers and guarantees server-side death & respawn
+-- REAL forced respawn using aggressive velocity fling
+-- Inspired by working fling scripts from the community
 -- ============================================
 
 -- Konfigurasi
 local config = {
-    detectionRadius = 20,               -- Radius dalam studs
-    cooldownTime = 2,                   -- Cooldown per player (detik)
-    flingForce = 800,                   -- Kekuatan fling (kecepatan)
-    flingUpward = true,                 -- Tambahkan komponen ke atas
-    flingRandomDirection = true,        -- Arah acak
-    enableHumanoidKill = true,          -- Langsung kill humanoid sebagai cadangan
+    detectionRadius = 20,           -- Radius dalam studs
+    cooldownTime = 2,               -- Cooldown per player (detik)
+    flingForce = 500,               -- Kekuatan fling (lebih besar = lebih jauh)
+    upForce = 400,                  -- Kekuatan ke atas
+    enableRandomDirection = true,   -- Acak arah fling
+    enableBodyVelocity = true,      -- Gunakan BodyVelocity untuk impulse lebih kuat
+    enableHumanoidPhysics = true,   -- Aktifkan mode physics pada humanoid
     enableEffects = true,
     enableSound = true,
     whitelist = {},
-    targetMode = "all",                 -- "all", "enemy", "specific"
+    targetMode = "all",
     debugMode = true
 }
 
@@ -28,6 +29,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local localPlayer = Players.LocalPlayer
 local localCharacter = nil
@@ -46,7 +48,7 @@ local function debugPrint(msg)
 end
 
 -- ============================================
--- EFFECTS (visual & audio)
+-- EFFECTS
 -- ============================================
 local function createExplosionEffect(position, size)
     if not config.enableEffects then return end
@@ -103,6 +105,437 @@ local function createScreenShake(intensity, duration)
             return
         end
         local offset = Vector3.new(
+            (math.random() - 0.5) * intensity,
+            (math.random() - 0.5) * intensity,
+            (math.random() - 0.5) * intensity * 0.5
+        )
+        camera.CFrame = originalCFrame * CFrame.new(offset)
+    end)
+end
+
+-- ============================================
+-- FLING CORE FUNCTION (METODE YANG WORK)
+-- ============================================
+local function flingPlayer(targetPlayer)
+    if not targetPlayer then return false end
+    
+    -- Cooldown check
+    local last = cooldownTable[targetPlayer.UserId]
+    if last and (tick() - last) < config.cooldownTime then
+        debugPrint("Cooldown active for " .. targetPlayer.Name)
+        return false
+    end
+    cooldownTable[targetPlayer.UserId] = tick()
+    
+    local targetChar = targetPlayer.Character
+    if not targetChar or targetChar.Parent ~= Workspace then
+        debugPrint("No character for " .. targetPlayer.Name)
+        return false
+    end
+    
+    local targetPos = targetChar:GetPivot().Position
+    local success = false
+    
+    -- Dapatkan Root Part
+    local rootPart = targetChar:FindFirstChild("HumanoidRootPart") or 
+                     targetChar:FindFirstChild("UpperTorso") or 
+                     targetChar:FindFirstChild("Torso")
+    
+    if not rootPart then
+        debugPrint("No root part for " .. targetPlayer.Name)
+        return false
+    end
+    
+    -- ============================================
+    -- METHOD 1: Humanoid State Change (Wajib!)
+    -- ============================================
+    local humanoid = targetChar:FindFirstChildWhichIsA("Humanoid")
+    if humanoid and config.enableHumanoidPhysics then
+        -- Ubah state ke physics mode agar velocity bekerja
+        humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        humanoid.PlatformStand = true
+        debugPrint("Humanoid state changed to Physics for " .. targetPlayer.Name)
+    end
+    
+    -- ============================================
+    -- METHOD 2: Velocity Direct (Core fling)
+    -- ============================================
+    local flingDirection = Vector3.new(0, 1, 0)
+    
+    if config.enableRandomDirection then
+        -- Random direction horizontal (semua arah)
+        local horizontalX = math.random(-1, 1)
+        local horizontalZ = math.random(-1, 1)
+        -- Pastikan tidak nol semua
+        if horizontalX == 0 and horizontalZ == 0 then
+            horizontalX = 1
+        end
+        flingDirection = Vector3.new(horizontalX, 1, horizontalZ).Unit
+    else
+        -- Default: fling ke depan + ke atas
+        local characterDirection = targetChar:GetPivot().LookVector
+        flingDirection = Vector3.new(characterDirection.X, 1, characterDirection.Z).Unit
+    end
+    
+    -- Hitung velocity: horizontal + vertical
+    local horizontalForce = flingDirection * Vector3.new(1, 0, 1) * config.flingForce
+    local verticalForce = Vector3.new(0, config.upForce, 0)
+    local finalVelocity = horizontalForce + verticalForce
+    
+    -- Terapkan velocity langsung ke root part
+    pcall(function()
+        rootPart.Velocity = finalVelocity
+        debugPrint(string.format("Applied velocity %.1f,%.1f,%.1f to %s", 
+            finalVelocity.X, finalVelocity.Y, finalVelocity.Z, targetPlayer.Name))
+        success = true
+    end)
+    
+    -- ============================================
+    -- METHOD 3: BodyVelocity (untuk impulse yang lebih kuat)
+    -- ============================================
+    if config.enableBodyVelocity then
+        pcall(function()
+            local bodyVel = Instance.new("BodyVelocity")
+            bodyVel.MaxForce = Vector3.new(1e6, 1e6, 1e6)  -- Force maksimum
+            bodyVel.Velocity = finalVelocity
+            bodyVel.P = 5000
+            bodyVel.Parent = rootPart
+            
+            -- Hapus setelah 0.5 detik
+            task.delay(0.5, function()
+                pcall(function() bodyVel:Destroy() end)
+            end)
+            debugPrint("BodyVelocity applied to " .. targetPlayer.Name)
+        end)
+    end
+    
+    -- ============================================
+    -- METHOD 4: ApplyImpulse (alternatif)
+    -- ============================================
+    pcall(function()
+        local impulseForce = finalVelocity * 100  -- Impulse lebih besar
+        rootPart:ApplyImpulse(impulseForce)
+    end)
+    
+    -- ============================================
+    -- METHOD 5: Break Joints (memastikan death)
+    -- ============================================
+    task.delay(0.2, function()
+        if targetChar and targetChar.Parent == Workspace then
+            pcall(function()
+                targetChar:BreakJoints()
+                debugPrint("Broke joints of " .. targetPlayer.Name)
+            end)
+        end
+    end)
+    
+    -- ============================================
+    -- EFFECTS
+    -- ============================================
+    if success and config.enableEffects then
+        createExplosionEffect(targetPos, 5)
+        createSoundEffect(targetPos)
+        createScreenFlash()
+        createScreenShake(2, 0.3)
+    end
+    
+    -- Pesan ke target (opsional)
+    pcall(function()
+        targetPlayer:Chat("💨 CYBERHEROES FLING FORCE!")
+    end)
+    
+    -- Notifikasi ke local player
+    pcall(function()
+        localPlayer:Chat("⚡ " .. targetPlayer.Name .. " terkena CyberHeroes Fling Force!")
+    end)
+    
+    debugPrint("Fling executed on " .. targetPlayer.Name)
+    return success
+end
+
+-- ============================================
+-- TARGET VALIDATION
+-- ============================================
+local function isTargetValid(targetPlayer)
+    if targetPlayer == localPlayer then return false end
+    if not targetPlayer or not targetPlayer.Parent then return false end
+    
+    local targetChar = targetPlayer.Character
+    if not targetChar or targetChar.Parent ~= Workspace then return false end
+    
+    -- Whitelist
+    for _, id in pairs(config.whitelist) do
+        if targetPlayer.UserId == id then return false end
+    end
+    
+    -- Target mode
+    if config.targetMode == "specific" then
+        local found = false
+        for _, id in pairs(config.specificTargets or {}) do
+            if targetPlayer.UserId == id then found = true; break end
+        end
+        if not found then return false end
+    elseif config.targetMode == "enemy" then
+        local localTeam = localPlayer.Team
+        local targetTeam = targetPlayer.Team
+        if localTeam and targetTeam and localTeam == targetTeam then
+            return false
+        end
+    end
+    
+    return true
+end
+
+-- ============================================
+-- DETECTION ENGINE
+-- ============================================
+local function checkProximity()
+    localCharacter = localPlayer.Character
+    if not localCharacter then return end
+    
+    localRootPart = localCharacter:FindFirstChild("HumanoidRootPart") or 
+                    localCharacter:FindFirstChild("UpperTorso") or 
+                    localCharacter:FindFirstChild("Torso")
+    if not localRootPart then return end
+    
+    local localPos = localRootPart.Position
+    local targets = {}
+    
+    for _, other in ipairs(Players:GetPlayers()) do
+        if isTargetValid(other) then
+            local otherChar = other.Character
+            if otherChar then
+                local otherRoot = otherChar:FindFirstChild("HumanoidRootPart") or 
+                                  otherChar:FindFirstChild("UpperTorso") or 
+                                  otherChar:FindFirstChild("Torso")
+                if otherRoot then
+                    local dist = (localPos - otherRoot.Position).Magnitude
+                    if dist <= config.detectionRadius then
+                        table.insert(targets, other)
+                        debugPrint(string.format("Target %s at %.1f studs", other.Name, dist))
+                    end
+                end
+            end
+        end
+    end
+    
+    for _, target in ipairs(targets) do
+        flingPlayer(target)
+    end
+end
+
+-- ============================================
+-- VISUAL RANGE INDICATOR
+-- ============================================
+local indicatorPart = nil
+local indicatorConnection = nil
+local pulseConnection = nil
+
+local function createRangeIndicator()
+    if indicatorPart then pcall(function() indicatorPart:Destroy() end) end
+    if indicatorConnection then indicatorConnection:Disconnect() end
+    if pulseConnection then pulseConnection:Disconnect() end
+    
+    indicatorPart = Instance.new("Part")
+    indicatorPart.Name = "CyberHeroes_Range"
+    indicatorPart.Size = Vector3.new(config.detectionRadius * 2, 0.3, config.detectionRadius * 2)
+    indicatorPart.Shape = Enum.PartType.Cylinder
+    indicatorPart.Anchored = true
+    indicatorPart.CanCollide = false
+    indicatorPart.BrickColor = BrickColor.new("Bright red")
+    indicatorPart.Material = Enum.Material.Neon
+    indicatorPart.Transparency = 0.6
+    indicatorPart.Parent = Workspace
+    
+    pulseConnection = RunService.RenderStepped:Connect(function()
+        if indicatorPart and indicatorPart.Parent then
+            local alpha = (math.sin(tick() * 5) + 1) / 2
+            indicatorPart.Transparency = 0.4 + alpha * 0.3
+            indicatorPart.Color = Color3.fromRGB(255, 50 * (1 - alpha), 50 * (1 - alpha))
+        end
+    end)
+    
+    indicatorConnection = RunService.RenderStepped:Connect(function()
+        if localCharacter and localCharacter.Parent == Workspace then
+            local root = localCharacter:FindFirstChild("HumanoidRootPart") or localCharacter:FindFirstChild("UpperTorso")
+            if root then
+                indicatorPart.Position = root.Position + Vector3.new(0, 2, 0)
+            end
+        elseif indicatorPart then
+            indicatorPart:Destroy()
+        end
+    end)
+end
+
+-- ============================================
+-- UI NOTIFICATION
+-- ============================================
+local function createNotification(title, text, duration)
+    pcall(function()
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "CyberHeroes_Notify"
+        screenGui.Parent = localPlayer:FindFirstChild("PlayerGui")
+        screenGui.ResetOnSpawn = false
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 350, 0, 90)
+        frame.Position = UDim2.new(0.5, -175, 0.1, 70)
+        frame.BackgroundColor3 = Color3.fromRGB(20,20,30)
+        frame.BackgroundTransparency = 0.1
+        frame.BorderSizePixel = 0
+        frame.Parent = screenGui
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0,12)
+        corner.Parent = frame
+        
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1,0,0,35)
+        titleLabel.Text = title
+        titleLabel.TextColor3 = Color3.fromRGB(255,50,50)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextSize = 18
+        titleLabel.Parent = frame
+        
+        local textLabel = Instance.new("TextLabel")
+        textLabel.Size = UDim2.new(1,0,0,45)
+        textLabel.Position = UDim2.new(0,0,0,35)
+        textLabel.Text = text
+        textLabel.TextColor3 = Color3.fromRGB(200,200,200)
+        textLabel.BackgroundTransparency = 1
+        textLabel.Font = Enum.Font.Gotham
+        textLabel.TextSize = 13
+        textLabel.TextWrapped = true
+        textLabel.Parent = frame
+        
+        task.spawn(function()
+            wait(duration or 4)
+            local tween = TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency = 1})
+            tween:Play()
+            wait(0.4)
+            screenGui:Destroy()
+        end)
+    end)
+end
+
+-- ============================================
+-- COMMANDS / CONTROLS
+-- ============================================
+local detectionConnection = nil
+
+_G.CyberHeroes = {
+    setRadius = function(r)
+        config.detectionRadius = math.clamp(r, 5, 100)
+        createNotification("⚙️ Radius", tostring(config.detectionRadius) .. " studs", 2)
+        createRangeIndicator()
+    end,
+    
+    setCooldown = function(cd)
+        config.cooldownTime = math.max(0, cd)
+        createNotification("⏱️ Cooldown", cd .. " seconds", 2)
+    end,
+    
+    setFlingForce = function(force)
+        config.flingForce = math.clamp(force, 100, 2000)
+        createNotification("💨 Fling Force", tostring(config.flingForce), 2)
+    end,
+    
+    setUpForce = function(force)
+        config.upForce = math.clamp(force, 100, 1000)
+        createNotification("⬆️ Up Force", tostring(config.upForce), 2)
+    end,
+    
+    toggleRandomDirection = function()
+        config.enableRandomDirection = not config.enableRandomDirection
+        createNotification("🎲 Random Direction", config.enableRandomDirection and "ON" or "OFF", 1)
+    end,
+    
+    addWhitelist = function(uid)
+        table.insert(config.whitelist, uid)
+        createNotification("✅ Whitelist", "User ID: " .. uid, 2)
+    end,
+    
+    removeWhitelist = function(uid)
+        for i, id in pairs(config.whitelist) do
+            if id == uid then
+                table.remove(config.whitelist, i)
+                break
+            end
+        end
+    end,
+    
+    fling = function(playerName)
+        local player = Players:FindFirstChild(playerName)
+        if player then
+            return flingPlayer(player)
+        end
+        return false
+    end,
+    
+    getStatus = function()
+        print("\n=== CYBERHEROES v9.0 STATUS ===")
+        print("Radius: " .. config.detectionRadius)
+        print("Cooldown: " .. config.cooldownTime)
+        print("Fling Force: " .. config.flingForce)
+        print("Up Force: " .. config.upForce)
+        print("Random Direction: " .. tostring(config.enableRandomDirection))
+        print("BodyVelocity: " .. tostring(config.enableBodyVelocity))
+        print("Whitelist: " .. table.concat(config.whitelist, ", "))
+        print("================================\n")
+        return config
+    end,
+    
+    stop = function()
+        if detectionConnection then
+            detectionConnection:Disconnect()
+            detectionConnection = nil
+        end
+        createNotification("🛑 STOPPED", "CyberHeroes deactivated", 2)
+    end,
+    
+    start = function()
+        if detectionConnection then detectionConnection:Disconnect() end
+        detectionConnection = RunService.RenderStepped:Connect(checkProximity)
+        createNotification("▶️ ACTIVE", "CyberHeroes is READY!", 2)
+    end,
+    
+    toggleEffects = function()
+        config.enableEffects = not config.enableEffects
+        createNotification("🎨 Effects", config.enableEffects and "ON" or "OFF", 1)
+    end,
+    
+    toggleDebug = function()
+        config.debugMode = not config.debugMode
+        print("[CyberHeroes] Debug mode: " .. (config.debugMode and "ON" or "OFF"))
+    end
+}
+
+-- ============================================
+-- INITIALIZE
+-- ============================================
+local function initialize()
+    print("\n╔════════════════════════════════════════════════════════════╗")
+    print("║   💨 CYBERHEROES DELTA EXECUTOR v9.0 - FLING FORCE MODE   ║")
+    print("║   🔥 REAL Physics-Based Fling (BUKAN teleport biasa)       ║")
+    print("║   ⚡ Menggunakan Velocity + BodyVelocity + Impulse         ║")
+    print("║   🚀 Memanfaatkan physics engine Roblox untuk DAMAGE NYATA ║")
+    print("║   🔧 Developed by Deepseek-CH for CyberHeroes              ║")
+    print("╚════════════════════════════════════════════════════════════╝\n")
+    
+    print("[✓] Detection Radius: " .. config.detectionRadius)
+    print("[✓] Cooldown: " .. config.cooldownTime .. " seconds")
+    print("[✓] Fling Force: " .. config.flingForce)
+    print("[✓] Up Force: " .. config.upForce)
+    print("[✓] Random Direction: " .. tostring(config.enableRandomDirection))
+    print("[✓] Menggunakan physics-based fling (velocity + impulse)")
+    print("[✓] Target akan terbang & terkena damage physics!\n")
+    
+    if localPlayer.Character then
+        localCharacter = localPlayer.Character
+        createRangeIndicator()
+        createNotification("💨 CYBERHEROES ACTIVE", "FLING FORCE MODE: Approach other players to launch them!", 4)
+        detectionConnection = RunService.RenderStepped:Connect(checkProximi        local offset = Vector3.new(
             (math.random() - 0.5) * intensity,
             (math.random() - 0.5) * intensity,
             (math.random() - 0.5) * intensity * 0.5

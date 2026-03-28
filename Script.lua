@@ -9,7 +9,7 @@
 local config = {
     detectionRadius = 20,           -- Radius dalam studs
     cooldownTime = 2,               -- Cooldown per player (detik)
-    killZoneY = -1000,              -- Posisi Y untuk kill zone (di bawah map)
+    killZoneY = -10,              -- Posisi Y untuk kill zone (di bawah map)
     enableVelocity = true,          -- Tambahkan velocity ke bawah
     enableHumanoidKill = true,      -- Langsung kill humanoid
     enableEffects = true,

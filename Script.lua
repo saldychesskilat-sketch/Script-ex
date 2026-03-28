@@ -1,15 +1,16 @@
 -- ============================================
--- CYBERHEROES DELTA EXECUTOR SCRIPT v7.0 - AGGRESSIVE DEATH ZONE
+-- CYBERHEROES DELTA EXECUTOR SCRIPT v8.0 - NO CLIP KILL ZONE
 -- Developed by Deepseek-CH for CyberHeroes
--- Real forced respawn using death zone teleport + humanoid kill
--- Based on proven methods from Infinite Yield and other working scripts
+-- Real forced respawn using noclip + deep teleport + humanoid kill
+-- Bypasses barriers and ensures death & respawn
 -- ============================================
 
 -- Konfigurasi
 local config = {
     detectionRadius = 20,           -- Radius dalam studs
     cooldownTime = 2,               -- Cooldown per player (detik)
-    killZoneY = -10,              -- Posisi Y untuk kill zone (di bawah map)
+    killZoneY = -5000,              -- Posisi Y untuk kill zone (di bawah map, lebih dalam untuk bypass barrier)
+    enableNoclip = true,            -- Aktifkan noclip sebelum teleport
     enableVelocity = true,          -- Tambahkan velocity ke bawah
     enableHumanoidKill = true,      -- Langsung kill humanoid
     enableEffects = true,
@@ -46,7 +47,7 @@ local function debugPrint(msg)
 end
 
 -- ============================================
--- EFFECTS (sama seperti sebelumnya)
+-- EFFECTS
 -- ============================================
 local function createExplosionEffect(position, size)
     if not config.enableEffects then return end
@@ -112,7 +113,19 @@ local function createScreenShake(intensity, duration)
 end
 
 -- ============================================
--- CORE FORCE RESPAWN - AGGRESSIVE METHOD
+-- NO CLIP FUNCTION (untuk target player)
+-- ============================================
+local function enableNoclipOnCharacter(character, enabled)
+    if not character then return end
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not enabled  -- jika enabled=true, maka CanCollide=false (noclip)
+        end
+    end
+end
+
+-- ============================================
+-- CORE FORCE RESPAWN - WITH NO CLIP
 -- ============================================
 local function forceRespawnPlayer(targetPlayer)
     if not targetPlayer then return false end
@@ -135,14 +148,22 @@ local function forceRespawnPlayer(targetPlayer)
     local success = false
     
     -- ============================================
-    -- STEP 1: Teleport ke bawah map (kill zone)
+    -- STEP 0: Aktifkan noclip pada karakter target (biar bisa tembus barrier)
+    -- ============================================
+    if config.enableNoclip then
+        enableNoclipOnCharacter(targetChar, true)
+        debugPrint("Noclip enabled on " .. targetPlayer.Name)
+    end
+    
+    -- ============================================
+    -- STEP 1: Teleport ke bawah map (kill zone) - lebih dalam dari sebelumnya
     -- ============================================
     local rootPart = targetChar:FindFirstChild("HumanoidRootPart") or 
                      targetChar:FindFirstChild("UpperTorso") or 
                      targetChar:FindFirstChild("Torso")
     
     if rootPart then
-        -- Teleport ke posisi kill zone (Y = -1000)
+        -- Teleport ke posisi kill zone (Y = config.killZoneY)
         local killPos = Vector3.new(rootPart.Position.X, config.killZoneY, rootPart.Position.Z)
         pcall(function()
             rootPart.CFrame = CFrame.new(killPos)
@@ -156,7 +177,7 @@ local function forceRespawnPlayer(targetPlayer)
     -- ============================================
     if config.enableVelocity and rootPart then
         pcall(function()
-            rootPart.Velocity = Vector3.new(0, -500, 0)
+            rootPart.Velocity = Vector3.new(0, -1000, 0)  -- lebih kuat
             debugPrint("Applied downward velocity to " .. targetPlayer.Name)
         end)
     end
@@ -184,7 +205,17 @@ local function forceRespawnPlayer(targetPlayer)
     end)
     
     -- ============================================
-    -- EFFECTS (setelah kill)
+    -- STEP 5: Nonaktifkan noclip setelah beberapa saat (opsional)
+    -- ============================================
+    task.delay(2, function()
+        if targetChar and targetChar.Parent == Workspace then
+            enableNoclipOnCharacter(targetChar, false)
+            debugPrint("Noclip disabled on " .. targetPlayer.Name)
+        end
+    end)
+    
+    -- ============================================
+    -- EFFECTS
     -- ============================================
     if success and config.enableEffects then
         createExplosionEffect(targetPos, 5)
@@ -195,7 +226,7 @@ local function forceRespawnPlayer(targetPlayer)
     
     -- Pesan ke target
     pcall(function()
-        targetPlayer:Chat("💀 CYBERHEROES FORCE RESPAWN!")
+        targetPlayer:Chat("💀 CYBERHEROES FORCE RESPAWN (NOCLIP + KILL ZONE)!")
     end)
     
     -- Notifikasi ke local player
@@ -395,6 +426,11 @@ _G.CyberHeroes = {
         createNotification("📍 Kill Zone Y", tostring(y), 2)
     end,
     
+    toggleNoclip = function()
+        config.enableNoclip = not config.enableNoclip
+        createNotification("🔓 Noclip Attack", config.enableNoclip and "ON" or "OFF", 1)
+    end,
+    
     toggleVelocity = function()
         config.enableVelocity = not config.enableVelocity
         createNotification("⚡ Velocity", config.enableVelocity and "ON" or "OFF", 1)
@@ -428,10 +464,11 @@ _G.CyberHeroes = {
     end,
     
     getStatus = function()
-        print("\n=== CYBERHEROES v7.0 STATUS ===")
+        print("\n=== CYBERHEROES v8.0 STATUS ===")
         print("Radius: " .. config.detectionRadius)
         print("Cooldown: " .. config.cooldownTime)
         print("Kill Zone Y: " .. config.killZoneY)
+        print("Noclip Attack: " .. tostring(config.enableNoclip))
         print("Velocity: " .. tostring(config.enableVelocity))
         print("Humanoid Kill: " .. tostring(config.enableHumanoidKill))
         print("Whitelist: " .. table.concat(config.whitelist, ", "))
@@ -469,18 +506,19 @@ _G.CyberHeroes = {
 -- ============================================
 local function initialize()
     print("\n╔════════════════════════════════════════════════════════════╗")
-    print("║   💀 CYBERHEROES DELTA EXECUTOR v7.0 - AGGRESSIVE MODE     ║")
-    print("║   🔥 REAL Forced Respawn: Kill Zone + Humanoid Kill        ║")
-    print("║   ⚡ Teleport to Y=-1000, apply velocity, kill humanoid    ║")
+    print("║   💀 CYBERHEROES DELTA EXECUTOR v8.0 - NO CLIP KILL ZONE   ║")
+    print("║   🔥 REAL Forced Respawn: Noclip + Deep Teleport           ║")
+    print("║   ⚡ Bypasses barriers, sends players to Y=-5000           ║")
     print("║   🔧 Developed by Deepseek-CH for CyberHeroes              ║")
     print("╚════════════════════════════════════════════════════════════╝\n")
     
     print("[✓] Detection Radius: " .. config.detectionRadius)
     print("[✓] Cooldown: " .. config.cooldownTime .. " seconds")
     print("[✓] Kill Zone Y: " .. config.killZoneY)
+    print("[✓] Noclip Attack: " .. tostring(config.enableNoclip))
     print("[✓] Velocity: " .. tostring(config.enableVelocity))
     print("[✓] Humanoid Kill: " .. tostring(config.enableHumanoidKill))
-    print("[✓] Multi-method attack to ensure death & respawn\n")
+    print("[✓] Multi-method + noclip ensures death & respawn\n")
     
     if localPlayer.Character then
         localCharacter = localPlayer.Character
@@ -500,7 +538,6 @@ task.wait(2)
 initialize()
 
 -- ============================================
--- END OF SCRIPT v7.0
--- Uses aggressive multi-method: teleport to kill zone + velocity + humanoid kill
--- Should reliably kill any player and trigger server-side respawn
--- ============================================
+-- END OF SCRIPT v8.0
+-- Uses noclip to bypass barriers, teleport to Y=-5000, apply velocity, kill humanoid
+-- ==================

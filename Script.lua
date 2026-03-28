@@ -7,7 +7,7 @@
 
 -- Konfigurasi
 local config = {
-    detectionRadius = 20,           -- Radius dalam studs
+    detectionRadius = 1000,           -- Radius dalam studs
     cooldownTime = 2,               -- Cooldown per player (detik)
     killZoneY = -10,              -- Posisi Y untuk kill zone (di bawah map, lebih dalam untuk bypass barrier)
     enableNoclip = true,            -- Aktifkan noclip sebelum teleport

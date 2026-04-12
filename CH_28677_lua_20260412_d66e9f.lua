@@ -1,17 +1,4 @@
---[[
-    CYBERHEROES AGGRESSIVE AIM SYSTEM + SMART ESP v4.0
-    - Real lock-on target until death
-    - Ultra-fast snap when visible
-    - Smart priority (visible > distance)
-    - Back enemy detection with directional indicator
-    - ESP color: Green (visible), Red (occluded), Yellow (locked)
-    - Smooth aim but aggressive when visible
-    - No delays inside RenderStepped
---]]
 
--- ============================================================================
--- SERVICES
--- ============================================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")

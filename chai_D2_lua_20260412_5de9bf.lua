@@ -1,20 +1,4 @@
---[[
-    CyberHeroes Advanced Auto Aim + ESP v2.0
-    Developed for Delta Executor
-    Features:
-    - Smart Target System (prioritas Head > UpperTorso > HumanoidRootPart)
-    - Visibility Check (Raycast dengan blacklist)
-    - Smooth Aim dengan dynamic smoothness
-    - Prediction System berdasarkan velocity
-    - FOV Circle (Drawing API)
-    - GUI Modern dengan Toggle, Slider, efek neon
-    - Optimasi performa (caching, throttling)
-    - Modular structure
---]]
 
--- ============================================================================
--- SERVICES
--- ============================================================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")

@@ -1,14 +1,4 @@
---[[
-    CyberHeroes Advanced Auto Aim + ESP v3.0 - ULTRA RESPONSIVE
-    Fixed:
-    - No blocking delays (task.wait) inside RenderStepped
-    - Instant target switching based on FOV distance
-    - Smooth aim using deltaTime lerp (frame-rate independent)
-    - Velocity-based prediction
-    - Crosshair perfectly centered with AnchorPoint
-    - Modern neon GUI with toggle animation (RightShift)
-    - Optimized raycast and ESP
---]]
+
 
 -- ============================================================================
 -- SERVICES

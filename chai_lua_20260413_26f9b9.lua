@@ -1269,7 +1269,7 @@ local function stopAutoGenerator()
 end
 
 -- ============================================================================
--- FEATURE 14: MODERN GUI WITH MINI LOGO (HORIZONTAL LANDSCAPE LAYOUT - FIXED)
+-- FEATURE 14: MODERN GUI WITH MINI LOGO (HORIZONTAL LANDSCAPE LAYOUT - PROPORTIONAL)
 -- ============================================================================
 
 -- RGB floating logo (collapsible GUI toggle)
@@ -1278,8 +1278,8 @@ local function createFloatingLogo()
     
     floatingLogo = Instance.new("ImageButton")
     floatingLogo.Name = "CyberHeroes_Logo"
-    floatingLogo.Size = UDim2.new(0, 40, 0, 40)
-    floatingLogo.Position = UDim2.new(0.5, -20, 0.85, -20)
+    floatingLogo.Size = UDim2.new(0, 45, 0, 45)
+    floatingLogo.Position = UDim2.new(0.5, -22, 0.85, -22)
     floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 5, 5)
     floatingLogo.BackgroundTransparency = 0.2
     floatingLogo.BorderSizePixel = 0
@@ -1322,11 +1322,11 @@ local function createFloatingLogo()
     return floatingLogo
 end
 
--- Toggle button dengan style neon hacker (ukuran seragam untuk horizontal layout)
+-- Toggle button dengan style neon hacker (ukuran lebih kecil agar tidak padat)
 local function createToggleButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Size = UDim2.new(0, 95, 0, 30)
+    button.Size = UDim2.new(0, 110, 0, 32)
     button.Text = text .. (initialState and " [ON]" or " [OFF]")
     button.BackgroundColor3 = initialState and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)
     button.BackgroundTransparency = 0.1
@@ -1435,7 +1435,7 @@ local function createToggleButton(parent, name, text, initialState, onChange)
     return button
 end
 
--- Main GUI - Horizontal Landscape Layout (Centered, Clean, Draggable)
+-- Main GUI - Horizontal Landscape Layout (Proporsional, Multi-Baris)
 local function createGUI()
     if screenGui then screenGui:Destroy() end
     
@@ -1444,18 +1444,18 @@ local function createGUI()
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = localPlayer:FindFirstChild("PlayerGui") or localPlayer.PlayerGui
     
-    -- Window utama (horizontal landscape layout - proporsional)
+    -- Window utama (proporsional: lebar 600, tinggi 160)
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainPanel"
-    mainFrame.Size = UDim2.new(0, 780, 0, 100)   -- Lebar 780, tinggi 100 (landscape)
-    mainFrame.Position = UDim2.new(0.5, -390, 0.5, -50)  -- Tengah layar
+    mainFrame.Size = UDim2.new(0, 620, 0, 170)
+    mainFrame.Position = UDim2.new(0.5, -310, 0.5, -85)  -- Tengah layar
     mainFrame.BackgroundColor3 = Color3.fromRGB(18, 2, 5)
     mainFrame.BackgroundTransparency = 0.05
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
     
     local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.CornerRadius = UDim.new(0, 10)
     mainCorner.Parent = mainFrame
     
     local outerStroke = Instance.new("UIStroke")
@@ -1496,29 +1496,29 @@ local function createGUI()
     
     -- Title bar (window header)
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 26)
+    titleBar.Size = UDim2.new(1, 0, 0, 28)
     titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
     titleBar.BackgroundTransparency = 0.2
     titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.CornerRadius = UDim.new(0, 10)
     titleCorner.Parent = titleBar
     
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(0.4, 0, 1, 0)
+    title.Size = UDim2.new(0.5, 0, 1, 0)
     title.Position = UDim2.new(0.02, 0, 0, 0)
     title.Text = "> CYBERHEROES v5.0_"
     title.TextColor3 = Color3.fromRGB(0, 230, 255)
     title.BackgroundTransparency = 1
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 12
+    title.TextSize = 13
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = titleBar
     
     -- Window controls (close & minimize)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 22, 0, 22)
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
     closeBtn.Position = UDim2.new(1, -28, 0, 2)
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -1529,12 +1529,12 @@ local function createGUI()
     closeBtn.TextSize = 12
     closeBtn.Parent = titleBar
     local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 3)
+    closeCorner.CornerRadius = UDim.new(0, 4)
     closeCorner.Parent = closeBtn
     
     local minimizeBtn = Instance.new("TextButton")
-    minimizeBtn.Size = UDim2.new(0, 22, 0, 22)
-    minimizeBtn.Position = UDim2.new(1, -52, 0, 2)
+    minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
+    minimizeBtn.Position = UDim2.new(1, -54, 0, 2)
     minimizeBtn.Text = "−"
     minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
     minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
@@ -1544,7 +1544,7 @@ local function createGUI()
     minimizeBtn.TextSize = 18
     minimizeBtn.Parent = titleBar
     local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 3)
+    minCorner.CornerRadius = UDim.new(0, 4)
     minCorner.Parent = minimizeBtn
     
     closeBtn.MouseButton1Click:Connect(function()
@@ -1564,29 +1564,52 @@ local function createGUI()
         print("[GUI] Window minimized. Press F to restore.")
     end)
     
-    -- Content area (horizontal layout)
+    -- Content area (menggunakan UIListLayout vertical dengan 2 baris horizontal)
     local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -10, 1, -32)
-    content.Position = UDim2.new(0, 5, 0, 30)
+    content.Size = UDim2.new(1, -16, 1, -34)
+    content.Position = UDim2.new(0, 8, 0, 32)
     content.BackgroundTransparency = 1
     content.Parent = mainFrame
     
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.FillDirection = Enum.FillDirection.Horizontal
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    listLayout.Padding = UDim.new(0, 6)
-    listLayout.Parent = content
+    -- Baris pertama (tombol pertama sampai ketujuh)
+    local row1 = Instance.new("Frame")
+    row1.Size = UDim2.new(1, 0, 0, 38)
+    row1.BackgroundTransparency = 1
+    row1.Parent = content
     
-    -- Buttons (urutkan sesuai kebutuhan, semua dalam satu baris)
-    local btnList = {
+    local row1Layout = Instance.new("UIListLayout")
+    row1Layout.FillDirection = Enum.FillDirection.Horizontal
+    row1Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    row1Layout.VerticalAlignment = Enum.VerticalAlignment.Center
+    row1Layout.Padding = UDim.new(0, 8)
+    row1Layout.Parent = row1
+    
+    -- Baris kedua (tombol kedelapan sampai keempatbelas)
+    local row2 = Instance.new("Frame")
+    row2.Size = UDim2.new(1, 0, 0, 38)
+    row2.Position = UDim2.new(0, 0, 0, 42)
+    row2.BackgroundTransparency = 1
+    row2.Parent = content
+    
+    local row2Layout = Instance.new("UIListLayout")
+    row2Layout.FillDirection = Enum.FillDirection.Horizontal
+    row2Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    row2Layout.VerticalAlignment = Enum.VerticalAlignment.Center
+    row2Layout.Padding = UDim.new(0, 8)
+    row2Layout.Parent = row2
+    
+    -- Daftar tombol (dibagi 2 baris)
+    local row1Buttons = {
         {name="autoWinEnabled", text="AUTO WIN"},
         {name="autoTaskEnabled", text="AUTO TASK"},
         {name="espEnabled", text="ESP"},
         {name="speedBoostEnabled", text="SPEED"},
         {name="stealthEnabled", text="STEALTH"},
         {name="godModeEnabled", text="GOD MODE"},
-        {name="infiniteAmmoEnabled", text="AMMO"},
+        {name="infiniteAmmoEnabled", text="AMMO"}
+    }
+    
+    local row2Buttons = {
         {name="shieldEnabled", text="SHIELD"},
         {name="tpwalkEnabled", text="TPWALK"},
         {name="noCollideEnabled", text="NO COLLIDE"},
@@ -1596,15 +1619,20 @@ local function createGUI()
         {name="restartScript", text="RESTART"}
     }
     
-    for _, btn in ipairs(btnList) do
+    for _, btn in ipairs(row1Buttons) do
         local initialState = (btn.name ~= "executeMassKill" and btn.name ~= "restartScript") and config[btn.name] or false
-        createToggleButton(content, btn.name, btn.text, initialState)
+        createToggleButton(row1, btn.name, btn.text, initialState)
+    end
+    
+    for _, btn in ipairs(row2Buttons) do
+        local initialState = (btn.name ~= "executeMassKill" and btn.name ~= "restartScript") and config[btn.name] or false
+        createToggleButton(row2, btn.name, btn.text, initialState)
     end
     
     -- Status bar (bottom)
     local statusBar = Instance.new("Frame")
-    statusBar.Size = UDim2.new(1, 0, 0, 18)
-    statusBar.Position = UDim2.new(0, 0, 1, -18)
+    statusBar.Size = UDim2.new(1, 0, 0, 20)
+    statusBar.Position = UDim2.new(0, 0, 1, -20)
     statusBar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     statusBar.BackgroundTransparency = 0.2
     statusBar.BorderSizePixel = 0
@@ -1694,7 +1722,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
-
 
 -- ============================================================================
 -- CHARACTER HANDLER & INITIALIZATION

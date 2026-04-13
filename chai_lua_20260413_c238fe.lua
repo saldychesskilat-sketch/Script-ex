@@ -1165,7 +1165,7 @@ local function stopMassKillMonitor()
 end
 
 -- ============================================================================
--- FEATURE 13: MODERN GUI WITH MINI LOGO (5x6 LAYOUT)
+-- FEATURE 13: MODERN GUI WITH MINI LOGO (COMPACT SIZE - 2x SMALLER)
 -- ============================================================================
 
 -- RGB floating logo (unchanged)
@@ -1174,8 +1174,8 @@ local function createFloatingLogo()
     
     floatingLogo = Instance.new("ImageButton")
     floatingLogo.Name = "CyberHeroes_Logo"
-    floatingLogo.Size = UDim2.new(0, 50, 0, 50)
-    floatingLogo.Position = UDim2.new(0.85, -25, 0.85, -25)
+    floatingLogo.Size = UDim2.new(0, 40, 0, 40)  -- lebih kecil
+    floatingLogo.Position = UDim2.new(0.85, -20, 0.85, -20)
     floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
     floatingLogo.BackgroundTransparency = 0.2
     floatingLogo.BorderSizePixel = 0
@@ -1190,7 +1190,7 @@ local function createFloatingLogo()
     
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(100, 70, 180)
-    stroke.Thickness = 2
+    stroke.Thickness = 1.5
     stroke.Transparency = 0.5
     stroke.Parent = floatingLogo
     
@@ -1218,28 +1218,28 @@ local function createFloatingLogo()
     return floatingLogo
 end
 
--- Toggle button (height adjusted for 5x6 layout)
+-- Toggle button (compact version)
 local function createToggleButton(parent, name, position, text, initialState, onChange)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Size = UDim2.new(0.8, 0, 0, 30)
+    button.Size = UDim2.new(0.75, 0, 0, 24)  -- lebih kecil
     button.Position = position
     button.Text = text .. (initialState and " [ON]" or " [OFF]")
     button.BackgroundColor3 = initialState and Color3.fromRGB(80, 60, 120) or Color3.fromRGB(45, 35, 65)
     button.BackgroundTransparency = 0.15
     button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextSize = 12
+    button.TextSize = 10  -- font lebih kecil
     button.Font = Enum.Font.GothamBold
     button.BorderSizePixel = 0
     button.Parent = parent
     
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 4)
     corner.Parent = button
     
     local stroke = Instance.new("UIStroke")
     stroke.Color = initialState and Color3.fromRGB(150, 100, 255) or Color3.fromRGB(80, 60, 120)
-    stroke.Thickness = 1.5
+    stroke.Thickness = 1
     stroke.Transparency = 0.4
     stroke.Parent = button
     
@@ -1293,7 +1293,6 @@ local function createToggleButton(parent, name, position, text, initialState, on
                 stopMassKillMonitor()
             end
         elseif name == "executeMassKill" then
-            -- This is a special button that executes the mass kill
             if config.massKillEnabled then
                 massTeleportAndKill()
             else
@@ -1311,7 +1310,7 @@ local function createToggleButton(parent, name, position, text, initialState, on
     return button
 end
 
--- Main GUI (compact & draggable - 5x6 layout)
+-- Main GUI (compact & draggable - 2x smaller)
 local function createGUI()
     if screenGui then screenGui:Destroy() end
     
@@ -1320,23 +1319,23 @@ local function createGUI()
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = localPlayer:FindFirstChild("PlayerGui") or localPlayer.PlayerGui
     
-    -- Main panel - 5x6 layout (width 260, height 520 for 13 buttons at 32 spacing)
+    -- Main panel - compact size (220x380)
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainPanel"
-    mainFrame.Size = UDim2.new(0, 260, 0, 520)
-    mainFrame.Position = UDim2.new(0.85, -270, 0.5, -260)
+    mainFrame.Size = UDim2.new(0, 220, 0, 380)
+    mainFrame.Position = UDim2.new(0.85, -230, 0.5, -190)
     mainFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
     mainFrame.BackgroundTransparency = 0.1
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
     
     local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 12)
+    mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
     
     local shadowStroke = Instance.new("UIStroke")
     shadowStroke.Color = Color3.fromRGB(100, 70, 180)
-    shadowStroke.Thickness = 2
+    shadowStroke.Thickness = 1.5
     shadowStroke.Transparency = 0.6
     shadowStroke.Parent = mainFrame
     
@@ -1363,34 +1362,34 @@ local function createGUI()
         end
     end)
     
-    -- Title bar
+    -- Title bar (lebih kecil)
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.Size = UDim2.new(1, 0, 0, 24)
     titleBar.BackgroundColor3 = Color3.fromRGB(35, 25, 55)
     titleBar.BackgroundTransparency = 0.2
     titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 12)
+    titleCorner.CornerRadius = UDim.new(0, 8)
     titleCorner.Parent = titleBar
     
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 1, 0)
-    title.Text = "⚡ CYBERHEROES v3.9 ⚡"
+    title.Text = "⚡ CH v3.9 ⚡"
     title.TextColor3 = Color3.fromRGB(180, 130, 255)
     title.BackgroundTransparency = 1
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 13
+    title.TextSize = 11
     title.Parent = titleBar
     
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 25, 0, 25)
-    closeBtn.Position = UDim2.new(1, -30, 0, 2)
+    closeBtn.Size = UDim2.new(0, 20, 0, 20)
+    closeBtn.Position = UDim2.new(1, -24, 0, 2)
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     closeBtn.BackgroundTransparency = 1
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 16
+    closeBtn.TextSize = 14
     closeBtn.Parent = titleBar
     closeBtn.MouseButton1Click:Connect(function()
         config.guiVisible = false
@@ -1405,69 +1404,70 @@ local function createGUI()
     
     -- Content frame
     local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -20, 1, -40)
-    content.Position = UDim2.new(0, 10, 0, 35)
+    content.Size = UDim2.new(1, -10, 1, -30)
+    content.Position = UDim2.new(0, 5, 0, 28)
     content.BackgroundTransparency = 1
     content.Parent = mainFrame
     
     local toggleY = 0
-    local toggleSpacing = 32
+    local toggleSpacing = 24
+    local btnX = 0.12  -- posisi x tombol
     
     -- Row 1
-    local autoWinBtn = createToggleButton(content, "autoWinEnabled", UDim2.new(0.1, 0, 0, toggleY), "🤖 AUTO WIN", config.autoWinEnabled)
+    local autoWinBtn = createToggleButton(content, "autoWinEnabled", UDim2.new(btnX, 0, 0, toggleY), "AUTO WIN", config.autoWinEnabled)
     toggleY = toggleY + toggleSpacing
     
-    local autoTaskBtn = createToggleButton(content, "autoTaskEnabled", UDim2.new(0.1, 0, 0, toggleY), "🎯 AUTO TASK", config.autoTaskEnabled)
+    local autoTaskBtn = createToggleButton(content, "autoTaskEnabled", UDim2.new(btnX, 0, 0, toggleY), "AUTO TASK", config.autoTaskEnabled)
     toggleY = toggleY + toggleSpacing
     
     -- Row 2
-    local espBtn = createToggleButton(content, "espEnabled", UDim2.new(0.1, 0, 0, toggleY), "👁️ ESP", config.espEnabled)
+    local espBtn = createToggleButton(content, "espEnabled", UDim2.new(btnX, 0, 0, toggleY), "ESP", config.espEnabled)
     toggleY = toggleY + toggleSpacing
     
-    local speedBoostBtn = createToggleButton(content, "speedBoostEnabled", UDim2.new(0.1, 0, 0, toggleY), "⚡ SPEED BOOST", config.speedBoostEnabled)
+    local speedBoostBtn = createToggleButton(content, "speedBoostEnabled", UDim2.new(btnX, 0, 0, toggleY), "SPEED", config.speedBoostEnabled)
     toggleY = toggleY + toggleSpacing
     
     -- Row 3
-    local stealthBtn = createToggleButton(content, "stealthEnabled", UDim2.new(0.1, 0, 0, toggleY), "🕵️ STEALTH", config.stealthEnabled)
+    local stealthBtn = createToggleButton(content, "stealthEnabled", UDim2.new(btnX, 0, 0, toggleY), "STEALTH", config.stealthEnabled)
     toggleY = toggleY + toggleSpacing
     
-    local godModeBtn = createToggleButton(content, "godModeEnabled", UDim2.new(0.1, 0, 0, toggleY), "🛡️ GOD MODE", config.godModeEnabled)
+    local godModeBtn = createToggleButton(content, "godModeEnabled", UDim2.new(btnX, 0, 0, toggleY), "GOD MODE", config.godModeEnabled)
     toggleY = toggleY + toggleSpacing
     
     -- Row 4
-    local infiniteAmmoBtn = createToggleButton(content, "infiniteAmmoEnabled", UDim2.new(0.1, 0, 0, toggleY), "🔫 INFINITE AMMO", config.infiniteAmmoEnabled)
+    local infiniteAmmoBtn = createToggleButton(content, "infiniteAmmoEnabled", UDim2.new(btnX, 0, 0, toggleY), "AMMO", config.infiniteAmmoEnabled)
     toggleY = toggleY + toggleSpacing
     
-    local shieldBtn = createToggleButton(content, "shieldEnabled", UDim2.new(0.1, 0, 0, toggleY), "🛡️ AUTO SHIELD", config.shieldEnabled)
+    local shieldBtn = createToggleButton(content, "shieldEnabled", UDim2.new(btnX, 0, 0, toggleY), "SHIELD", config.shieldEnabled)
     toggleY = toggleY + toggleSpacing
     
     -- Row 5
-    local tpwalkBtn = createToggleButton(content, "tpwalkEnabled", UDim2.new(0.1, 0, 0, toggleY), "🐌 TPWALK", config.tpwalkEnabled)
+    local tpwalkBtn = createToggleButton(content, "tpwalkEnabled", UDim2.new(btnX, 0, 0, toggleY), "TPWALK", config.tpwalkEnabled)
     toggleY = toggleY + toggleSpacing
     
-    local noCollideBtn = createToggleButton(content, "noCollideEnabled", UDim2.new(0.1, 0, 0, toggleY), "👻 NO COLLIDE", config.noCollideEnabled)
+    local noCollideBtn = createToggleButton(content, "noCollideEnabled", UDim2.new(btnX, 0, 0, toggleY), "NO COLLIDE", config.noCollideEnabled)
     toggleY = toggleY + toggleSpacing
     
     -- Row 6
-    local massKillBtn = createToggleButton(content, "massKillEnabled", UDim2.new(0.1, 0, 0, toggleY), "💀 MASS KILL", config.massKillEnabled)
+    local massKillBtn = createToggleButton(content, "massKillEnabled", UDim2.new(btnX, 0, 0, toggleY), "MASS KILL", config.massKillEnabled)
     toggleY = toggleY + toggleSpacing
     
-    local executeKillBtn = createToggleButton(content, "executeMassKill", UDim2.new(0.1, 0, 0, toggleY), "⚡ EXECUTE KILL", false)
+    local executeKillBtn = createToggleButton(content, "executeMassKill", UDim2.new(btnX, 0, 0, toggleY), "EXECUTE", false)
     toggleY = toggleY + toggleSpacing
     
     -- Row 7
-    local restartBtn = createToggleButton(content, "restartScript", UDim2.new(0.1, 0, 0, toggleY), "🔄 RESTART", false)
+    local restartBtn = createToggleButton(content, "restartScript", UDim2.new(btnX, 0, 0, toggleY), "RESTART", false)
     toggleY = toggleY + toggleSpacing
     
-    -- Status label
+    -- Status label (lebih kecil)
     local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(0.9, 0, 0, 25)
-    statusLabel.Position = UDim2.new(0.05, 0, 0, toggleY + 5)
-    statusLabel.Text = "Status: Ready"
+    statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
+    statusLabel.Position = UDim2.new(0.05, 0, 0, toggleY + 2)
+    statusLabel.Text = "Ready"
     statusLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
     statusLabel.BackgroundTransparency = 1
     statusLabel.Font = Enum.Font.Gotham
-    statusLabel.TextSize = 11
+    statusLabel.TextSize = 9
     statusLabel.Parent = content
     
     task.spawn(function()
@@ -1484,10 +1484,10 @@ local function createGUI()
                                 (config.noCollideEnabled and 1 or 0) +
                                 (config.massKillEnabled and 1 or 0)
             if activeCount > 0 then
-                statusLabel.Text = "Status: " .. activeCount .. " feature(s) active"
+                statusLabel.Text = activeCount .. " active"
                 statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
             else
-                statusLabel.Text = "Status: Idle"
+                statusLabel.Text = "Idle"
                 statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
             end
             task.wait(1)
@@ -1499,7 +1499,6 @@ local function createGUI()
         BackgroundTransparency = 0.1
     }):Play()
 end
-
 -- Keybind untuk toggle GUI
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end

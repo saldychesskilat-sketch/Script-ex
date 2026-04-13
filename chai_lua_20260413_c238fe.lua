@@ -1168,19 +1168,19 @@ end
 -- FEATURE 13: MODERN GUI WITH MINI LOGO (COMPACT SIZE - 2x SMALLER)
 -- ============================================================================
 
--- RGB floating logo (unchanged)
+-- RGB floating logo (tetap, tapi dengan warna merah/cyan dominant)
 local function createFloatingLogo()
     if floatingLogo then floatingLogo:Destroy() end
     
     floatingLogo = Instance.new("ImageButton")
     floatingLogo.Name = "CyberHeroes_Logo"
-    floatingLogo.Size = UDim2.new(0, 40, 0, 40)  -- lebih kecil
+    floatingLogo.Size = UDim2.new(0, 40, 0, 40)
     floatingLogo.Position = UDim2.new(0.85, -20, 0.85, -20)
-    floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
+    floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 5, 5)  -- merah gelap
     floatingLogo.BackgroundTransparency = 0.2
     floatingLogo.BorderSizePixel = 0
     floatingLogo.Image = "rbxasset://textures/loading/robloxlogo.png"
-    floatingLogo.ImageColor3 = Color3.fromRGB(180, 130, 255)
+    floatingLogo.ImageColor3 = Color3.fromRGB(255, 80, 80)    -- merah neon
     floatingLogo.ImageTransparency = 0.2
     floatingLogo.Parent = screenGui
     
@@ -1189,19 +1189,20 @@ local function createFloatingLogo()
     corner.Parent = floatingLogo
     
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(100, 70, 180)
+    stroke.Color = Color3.fromRGB(255, 50, 50)
     stroke.Thickness = 1.5
-    stroke.Transparency = 0.5
+    stroke.Transparency = 0.4
     stroke.Parent = floatingLogo
     
     local hue = 0
     task.spawn(function()
         while floatingLogo and floatingLogo.Parent do
             hue = (hue + 0.01) % 1
-            local color = Color3.fromHSV(hue, 1, 1)
+            -- cycle between red and cyan
+            local color = (hue < 0.5) and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 200, 255)
             floatingLogo.ImageColor3 = color
             stroke.Color = color
-            task.wait(0.05)
+            task.wait(0.1)
         end
     end)
     
@@ -1218,17 +1219,17 @@ local function createFloatingLogo()
     return floatingLogo
 end
 
--- Toggle button (compact version)
+-- Toggle button dengan style neon hacker
 local function createToggleButton(parent, name, position, text, initialState, onChange)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Size = UDim2.new(0.75, 0, 0, 24)  -- lebih kecil
+    button.Size = UDim2.new(0.7, 0, 0, 24)
     button.Position = position
     button.Text = text .. (initialState and " [ON]" or " [OFF]")
-    button.BackgroundColor3 = initialState and Color3.fromRGB(80, 60, 120) or Color3.fromRGB(45, 35, 65)
-    button.BackgroundTransparency = 0.15
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextSize = 10  -- font lebih kecil
+    button.BackgroundColor3 = initialState and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)
+    button.BackgroundTransparency = 0.1
+    button.TextColor3 = initialState and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)
+    button.TextSize = 10
     button.Font = Enum.Font.GothamBold
     button.BorderSizePixel = 0
     button.Parent = parent
@@ -1238,16 +1239,37 @@ local function createToggleButton(parent, name, position, text, initialState, on
     corner.Parent = button
     
     local stroke = Instance.new("UIStroke")
-    stroke.Color = initialState and Color3.fromRGB(150, 100, 255) or Color3.fromRGB(80, 60, 120)
+    stroke.Color = initialState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 30, 30)
     stroke.Thickness = 1
-    stroke.Transparency = 0.4
+    stroke.Transparency = 0.3
     stroke.Parent = button
+    
+    -- Glow effect (shadow-like)
+    local glow = Instance.new("UIStroke")
+    glow.Color = initialState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255, 50, 50)
+    glow.Thickness = 2
+    glow.Transparency = 0.7
+    glow.Parent = button
     
     local function updateState(state)
         button.Text = text .. (state and " [ON]" or " [OFF]")
-        button.BackgroundColor3 = state and Color3.fromRGB(80, 60, 120) or Color3.fromRGB(45, 35, 65)
-        stroke.Color = state and Color3.fromRGB(150, 100, 255) or Color3.fromRGB(80, 60, 120)
+        button.BackgroundColor3 = state and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)
+        button.TextColor3 = state and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)
+        stroke.Color = state and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 30, 30)
+        glow.Color = state and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255, 50, 50)
     end
+    
+    -- Hover effect
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), {BackgroundTransparency = 0.05}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.1}):Play()
+        TweenService:Create(glow, TweenInfo.new(0.15), {Transparency = 0.4}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), {BackgroundTransparency = 0.1}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.3}):Play()
+        TweenService:Create(glow, TweenInfo.new(0.15), {Transparency = 0.7}):Play()
+    end)
     
     button.MouseButton1Click:Connect(function()
         local newState = not (config[name] or false)
@@ -1287,11 +1309,7 @@ local function createToggleButton(parent, name, position, text, initialState, on
             if newState then startNoCollideMonitor() else stopNoCollideMonitor() end
         elseif name == "massKillEnabled" then
             config.massKillEnabled = newState
-            if newState then
-                startMassKillMonitor()
-            else
-                stopMassKillMonitor()
-            end
+            if newState then startMassKillMonitor() else stopMassKillMonitor() end
         elseif name == "executeMassKill" then
             if config.massKillEnabled then
                 massTeleportAndKill()
@@ -1305,12 +1323,17 @@ local function createToggleButton(parent, name, position, text, initialState, on
         end
         updateState(newState)
         if onChange then onChange(newState) end
+        
+        -- Klik animasi
+        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 9}):Play()
+        task.wait(0.05)
+        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 10}):Play()
     end)
     
     return button
 end
 
--- Main GUI (compact & draggable - 2x smaller)
+-- Main GUI - Cyber Hacker Window
 local function createGUI()
     if screenGui then screenGui:Destroy() end
     
@@ -1319,25 +1342,56 @@ local function createGUI()
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = localPlayer:FindFirstChild("PlayerGui") or localPlayer.PlayerGui
     
-    -- Main panel - compact size (220x380)
+    -- Window utama (background merah gelap dengan border neon)
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainPanel"
-    mainFrame.Size = UDim2.new(0, 220, 0, 380)
-    mainFrame.Position = UDim2.new(0.85, -230, 0.5, -190)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
-    mainFrame.BackgroundTransparency = 0.1
+    mainFrame.Size = UDim2.new(0, 260, 0, 400)
+    mainFrame.Position = UDim2.new(0.85, -270, 0.5, -200)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(18, 2, 5)   -- merah gelap
+    mainFrame.BackgroundTransparency = 0.05
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
     
     local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.CornerRadius = UDim.new(0, 6)
     mainCorner.Parent = mainFrame
     
-    local shadowStroke = Instance.new("UIStroke")
-    shadowStroke.Color = Color3.fromRGB(100, 70, 180)
-    shadowStroke.Thickness = 1.5
-    shadowStroke.Transparency = 0.6
-    shadowStroke.Parent = mainFrame
+    -- Outer glow (neon border)
+    local outerStroke = Instance.new("UIStroke")
+    outerStroke.Color = Color3.fromRGB(255, 50, 50)
+    outerStroke.Thickness = 2
+    outerStroke.Transparency = 0.4
+    outerStroke.Parent = mainFrame
+    
+    -- Inner shadow (gradient overlay)
+    local innerGradient = Instance.new("UIGradient")
+    innerGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 5, 10)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 0, 2))
+    })
+    innerGradient.Parent = mainFrame
+    
+    -- Garis dekorasi sudut (cyber corner)
+    local function addCornerLine(parent, position, size, rotation)
+        local line = Instance.new("Frame")
+        line.Size = size
+        line.Position = position
+        line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+        line.BackgroundTransparency = 0.6
+        line.BorderSizePixel = 0
+        line.Parent = parent
+        line.Rotation = rotation
+        return line
+    end
+    
+    addCornerLine(mainFrame, UDim2.new(0, 2, 0, 2), UDim2.new(0, 15, 0, 1), 0)
+    addCornerLine(mainFrame, UDim2.new(1, -17, 0, 2), UDim2.new(0, 15, 0, 1), 0)
+    addCornerLine(mainFrame, UDim2.new(0, 2, 1, -3), UDim2.new(0, 15, 0, 1), 0)
+    addCornerLine(mainFrame, UDim2.new(1, -17, 1, -3), UDim2.new(0, 15, 0, 1), 0)
+    addCornerLine(mainFrame, UDim2.new(0, 2, 0, 2), UDim2.new(0, 1, 0, 15), 0)
+    addCornerLine(mainFrame, UDim2.new(1, -3, 0, 2), UDim2.new(0, 1, 0, 15), 0)
+    addCornerLine(mainFrame, UDim2.new(0, 2, 1, -17), UDim2.new(0, 1, 0, 15), 0)
+    addCornerLine(mainFrame, UDim2.new(1, -3, 1, -17), UDim2.new(0, 1, 0, 15), 0)
     
     -- Draggable functionality
     local dragging = false
@@ -1362,35 +1416,59 @@ local function createGUI()
         end
     end)
     
-    -- Title bar (lebih kecil)
+    -- Title bar (window header)
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 24)
-    titleBar.BackgroundColor3 = Color3.fromRGB(35, 25, 55)
+    titleBar.Size = UDim2.new(1, 0, 0, 26)
+    titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
     titleBar.BackgroundTransparency = 0.2
     titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.CornerRadius = UDim.new(0, 6)
     titleCorner.Parent = titleBar
     
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 1, 0)
-    title.Text = "⚡ CH v3.9 ⚡"
-    title.TextColor3 = Color3.fromRGB(180, 130, 255)
+    title.Size = UDim2.new(0.6, 0, 1, 0)
+    title.Position = UDim2.new(0.05, 0, 0, 0)
+    title.Text = "> CYBERHEROES v3.9_"
+    title.TextColor3 = Color3.fromRGB(0, 230, 255)
     title.BackgroundTransparency = 1
     title.Font = Enum.Font.GothamBold
     title.TextSize = 11
+    title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = titleBar
     
+    -- Window controls
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 20, 0, 20)
-    closeBtn.Position = UDim2.new(1, -24, 0, 2)
+    closeBtn.Position = UDim2.new(1, -25, 0, 3)
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    closeBtn.BackgroundTransparency = 1
+    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+    closeBtn.BackgroundTransparency = 0.2
+    closeBtn.BorderSizePixel = 0
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 14
+    closeBtn.TextSize = 12
     closeBtn.Parent = titleBar
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 3)
+    closeCorner.Parent = closeBtn
+    
+    local minimizeBtn = Instance.new("TextButton")
+    minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+    minimizeBtn.Position = UDim2.new(1, -48, 0, 3)
+    minimizeBtn.Text = "−"
+    minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+    minimizeBtn.BackgroundTransparency = 0.2
+    minimizeBtn.BorderSizePixel = 0
+    minimizeBtn.Font = Enum.Font.GothamBold
+    minimizeBtn.TextSize = 16
+    minimizeBtn.Parent = titleBar
+    local minCorner = Instance.new("UICorner")
+    minCorner.CornerRadius = UDim.new(0, 3)
+    minCorner.Parent = minimizeBtn
+    
     closeBtn.MouseButton1Click:Connect(function()
         config.guiVisible = false
         mainFrame.Visible = false
@@ -1399,77 +1477,101 @@ local function createGUI()
             floatingLogo.Visible = true
             isLogoVisible = true
         end
-        print("[GUI] Collapsed to logo. Click logo to reopen.")
+        print("[GUI] Window closed (collapsed to logo).")
     end)
     
-    -- Content frame
+    minimizeBtn.MouseButton1Click:Connect(function()
+        config.guiVisible = false
+        mainFrame.Visible = false
+        print("[GUI] Window minimized. Press F to restore.")
+    end)
+    
+    -- Content area
     local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -10, 1, -30)
-    content.Position = UDim2.new(0, 5, 0, 28)
+    content.Size = UDim2.new(1, -12, 1, -34)
+    content.Position = UDim2.new(0, 6, 0, 30)
     content.BackgroundTransparency = 1
     content.Parent = mainFrame
     
-    local toggleY = 0
-    local toggleSpacing = 24
-    local btnX = 0.12  -- posisi x tombol
+    -- Grid layout
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 4)
+    listLayout.FillDirection = Enum.FillDirection.Vertical
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = content
     
-    -- Row 1
-    local autoWinBtn = createToggleButton(content, "autoWinEnabled", UDim2.new(btnX, 0, 0, toggleY), "AUTO WIN", config.autoWinEnabled)
-    toggleY = toggleY + toggleSpacing
+    -- Garis pemisah (separator)
+    local function addSeparator()
+        local sep = Instance.new("Frame")
+        sep.Size = UDim2.new(0.9, 0, 0, 1)
+        sep.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+        sep.BackgroundTransparency = 0.7
+        sep.BorderSizePixel = 0
+        sep.Parent = content
+    end
     
-    local autoTaskBtn = createToggleButton(content, "autoTaskEnabled", UDim2.new(btnX, 0, 0, toggleY), "AUTO TASK", config.autoTaskEnabled)
-    toggleY = toggleY + toggleSpacing
+    -- Tombol-tombol
+    local btnParams = {
+        {name="autoWinEnabled", text="AUTO WIN", state=config.autoWinEnabled},
+        {name="autoTaskEnabled", text="AUTO TASK", state=config.autoTaskEnabled},
+        {name="espEnabled", text="ESP", state=config.espEnabled},
+        {name="speedBoostEnabled", text="SPEED BOOST", state=config.speedBoostEnabled},
+        {name="stealthEnabled", text="STEALTH", state=config.stealthEnabled},
+        {name="godModeEnabled", text="GOD MODE", state=config.godModeEnabled},
+        {name="infiniteAmmoEnabled", text="INF AMMO", state=config.infiniteAmmoEnabled},
+        {name="shieldEnabled", text="SHIELD", state=config.shieldEnabled},
+        {name="tpwalkEnabled", text="TPWALK", state=config.tpwalkEnabled},
+        {name="noCollideEnabled", text="NO COLLIDE", state=config.noCollideEnabled},
+        {name="massKillEnabled", text="MASS KILL", state=config.massKillEnabled},
+        {name="executeMassKill", text="> EXECUTE", state=false},
+        {name="restartScript", text="RESTART", state=false},
+    }
     
-    -- Row 2
-    local espBtn = createToggleButton(content, "espEnabled", UDim2.new(btnX, 0, 0, toggleY), "ESP", config.espEnabled)
-    toggleY = toggleY + toggleSpacing
+    for i, btn in ipairs(btnParams) do
+        local button = createToggleButton(content, btn.name, UDim2.new(0.15, 0, 0, 0), btn.text, btn.state)
+        button.LayoutOrder = i
+        if i % 2 == 0 then
+            addSeparator()
+        end
+    end
     
-    local speedBoostBtn = createToggleButton(content, "speedBoostEnabled", UDim2.new(btnX, 0, 0, toggleY), "SPEED", config.speedBoostEnabled)
-    toggleY = toggleY + toggleSpacing
+    -- Status bar
+    local statusBar = Instance.new("Frame")
+    statusBar.Size = UDim2.new(1, 0, 0, 20)
+    statusBar.Position = UDim2.new(0, 0, 1, -20)
+    statusBar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
+    statusBar.BackgroundTransparency = 0.2
+    statusBar.BorderSizePixel = 0
+    statusBar.Parent = mainFrame
+    local statusCorner = Instance.new("UICorner")
+    statusCorner.CornerRadius = UDim.new(0, 4)
+    statusCorner.Parent = statusBar
     
-    -- Row 3
-    local stealthBtn = createToggleButton(content, "stealthEnabled", UDim2.new(btnX, 0, 0, toggleY), "STEALTH", config.stealthEnabled)
-    toggleY = toggleY + toggleSpacing
-    
-    local godModeBtn = createToggleButton(content, "godModeEnabled", UDim2.new(btnX, 0, 0, toggleY), "GOD MODE", config.godModeEnabled)
-    toggleY = toggleY + toggleSpacing
-    
-    -- Row 4
-    local infiniteAmmoBtn = createToggleButton(content, "infiniteAmmoEnabled", UDim2.new(btnX, 0, 0, toggleY), "AMMO", config.infiniteAmmoEnabled)
-    toggleY = toggleY + toggleSpacing
-    
-    local shieldBtn = createToggleButton(content, "shieldEnabled", UDim2.new(btnX, 0, 0, toggleY), "SHIELD", config.shieldEnabled)
-    toggleY = toggleY + toggleSpacing
-    
-    -- Row 5
-    local tpwalkBtn = createToggleButton(content, "tpwalkEnabled", UDim2.new(btnX, 0, 0, toggleY), "TPWALK", config.tpwalkEnabled)
-    toggleY = toggleY + toggleSpacing
-    
-    local noCollideBtn = createToggleButton(content, "noCollideEnabled", UDim2.new(btnX, 0, 0, toggleY), "NO COLLIDE", config.noCollideEnabled)
-    toggleY = toggleY + toggleSpacing
-    
-    -- Row 6
-    local massKillBtn = createToggleButton(content, "massKillEnabled", UDim2.new(btnX, 0, 0, toggleY), "MASS KILL", config.massKillEnabled)
-    toggleY = toggleY + toggleSpacing
-    
-    local executeKillBtn = createToggleButton(content, "executeMassKill", UDim2.new(btnX, 0, 0, toggleY), "EXECUTE", false)
-    toggleY = toggleY + toggleSpacing
-    
-    -- Row 7
-    local restartBtn = createToggleButton(content, "restartScript", UDim2.new(btnX, 0, 0, toggleY), "RESTART", false)
-    toggleY = toggleY + toggleSpacing
-    
-    -- Status label (lebih kecil)
     local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(0.9, 0, 0, 20)
-    statusLabel.Position = UDim2.new(0.05, 0, 0, toggleY + 2)
-    statusLabel.Text = "Ready"
-    statusLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
+    statusLabel.Size = UDim2.new(1, -10, 1, 0)
+    statusLabel.Position = UDim2.new(0, 5, 0, 0)
+    statusLabel.Text = "SYSTEM READY"
+    statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
     statusLabel.BackgroundTransparency = 1
-    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.Font = Enum.Font.GothamBold
     statusLabel.TextSize = 9
-    statusLabel.Parent = content
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = statusBar
     
+    -- LED indicator
+    local led = Instance.new("Frame")
+    led.Size = UDim2.new(0, 6, 0, 6)
+    led.Position = UDim2.new(1, -12, 0.5, -3)
+    led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    led.BackgroundTransparency = 0.2
+    led.BorderSizePixel = 0
+    led.Parent = statusBar
+    local ledCorner = Instance.new("UICorner")
+    ledCorner.CornerRadius = UDim.new(1, 0)
+    ledCorner.Parent = led
+    
+    -- Update status periodically
     task.spawn(function()
         while screenGui and screenGui.Parent do
             local activeCount = (config.autoWinEnabled and 1 or 0) + 
@@ -1484,21 +1586,25 @@ local function createGUI()
                                 (config.noCollideEnabled and 1 or 0) +
                                 (config.massKillEnabled and 1 or 0)
             if activeCount > 0 then
-                statusLabel.Text = activeCount .. " active"
-                statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+                statusLabel.Text = "ACTIVE: " .. activeCount .. " modules"
+                statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+                led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
             else
-                statusLabel.Text = "Idle"
-                statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+                statusLabel.Text = "STANDBY"
+                statusLabel.TextColor3 = Color3.fromRGB(150, 50, 50)
+                led.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
             end
             task.wait(1)
         end
     end)
     
+    -- Animasi fade in
     mainFrame.BackgroundTransparency = 0.3
-    TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-        BackgroundTransparency = 0.1
+    TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+        BackgroundTransparency = 0.05
     }):Play()
 end
+
 -- Keybind untuk toggle GUI
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end

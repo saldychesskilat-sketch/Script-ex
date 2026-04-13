@@ -1,6 +1,6 @@
 --[[
     ╔═══════════════════════════════════════════════════════════════════╗
-    ║                    CYBERHEROES DELTA EXECUTOR v4.0               ║
+    ║                                                                   ║
     ║           Auto Win + Auto Task + ESP + Speed Boost +             ║
     ║            Stealth Invisibility + GOD MODE + Infinite Ammo +     ║
     ║            Auto Shield + Tpwalk + No Collision +                 ║

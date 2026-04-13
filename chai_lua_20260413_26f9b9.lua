@@ -1269,7 +1269,7 @@ local function stopAutoGenerator()
 end
 
 -- ============================================================================
--- FEATURE 14: MODERN GUI WITH MINI LOGO (HORIZONTAL LANDSCAPE LAYOUT - PROPORTIONAL)
+-- FEATURE 14: MODERN GUI WITH MINI LOGO (HORIZONTAL LANDSCAPE LAYOUT - COMPACT)
 -- ============================================================================
 
 -- RGB floating logo (collapsible GUI toggle)
@@ -1278,8 +1278,8 @@ local function createFloatingLogo()
     
     floatingLogo = Instance.new("ImageButton")
     floatingLogo.Name = "CyberHeroes_Logo"
-    floatingLogo.Size = UDim2.new(0, 45, 0, 45)
-    floatingLogo.Position = UDim2.new(0.5, -22, 0.85, -22)
+    floatingLogo.Size = UDim2.new(0, 40, 0, 40)
+    floatingLogo.Position = UDim2.new(0.5, -20, 0.85, -20)
     floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 5, 5)
     floatingLogo.BackgroundTransparency = 0.2
     floatingLogo.BorderSizePixel = 0
@@ -1322,16 +1322,16 @@ local function createFloatingLogo()
     return floatingLogo
 end
 
--- Toggle button dengan style neon hacker (ukuran lebih kecil agar tidak padat)
+-- Toggle button dengan style neon hacker (ukuran lebih kecil)
 local function createToggleButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Size = UDim2.new(0, 110, 0, 32)
+    button.Size = UDim2.new(0, 85, 0, 26)   -- Lebar 85, tinggi 26 (lebih kecil)
     button.Text = text .. (initialState and " [ON]" or " [OFF]")
     button.BackgroundColor3 = initialState and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)
     button.BackgroundTransparency = 0.1
     button.TextColor3 = initialState and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)
-    button.TextSize = 11
+    button.TextSize = 9                     -- Ukuran font lebih kecil
     button.Font = Enum.Font.GothamBold
     button.BorderSizePixel = 0
     button.Parent = parent
@@ -1427,15 +1427,15 @@ local function createToggleButton(parent, name, text, initialState, onChange)
         updateState(newState)
         if onChange then onChange(newState) end
         
-        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 10}):Play()
+        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 8}):Play()
         task.wait(0.05)
-        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 11}):Play()
+        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 9}):Play()
     end)
     
     return button
 end
 
--- Main GUI - Horizontal Landscape Layout (Proporsional, Multi-Baris)
+-- Main GUI - Horizontal Landscape Layout (Compact, Proporsional)
 local function createGUI()
     if screenGui then screenGui:Destroy() end
     
@@ -1444,18 +1444,18 @@ local function createGUI()
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = localPlayer:FindFirstChild("PlayerGui") or localPlayer.PlayerGui
     
-    -- Window utama (proporsional: lebar 600, tinggi 160)
+    -- Window utama (ukuran lebih kecil: lebar 580, tinggi 130)
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainPanel"
-    mainFrame.Size = UDim2.new(0, 620, 0, 170)
-    mainFrame.Position = UDim2.new(0.5, -310, 0.5, -85)  -- Tengah layar
+    mainFrame.Size = UDim2.new(0, 580, 0, 130)
+    mainFrame.Position = UDim2.new(0.5, -290, 0.5, -65)  -- Tengah layar
     mainFrame.BackgroundColor3 = Color3.fromRGB(18, 2, 5)
     mainFrame.BackgroundTransparency = 0.05
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
     
     local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 10)
+    mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
     
     local outerStroke = Instance.new("UIStroke")
@@ -1496,13 +1496,13 @@ local function createGUI()
     
     -- Title bar (window header)
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 28)
+    titleBar.Size = UDim2.new(1, 0, 0, 24)
     titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
     titleBar.BackgroundTransparency = 0.2
     titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.CornerRadius = UDim.new(0, 8)
     titleCorner.Parent = titleBar
     
     local title = Instance.new("TextLabel")
@@ -1512,39 +1512,39 @@ local function createGUI()
     title.TextColor3 = Color3.fromRGB(0, 230, 255)
     title.BackgroundTransparency = 1
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 13
+    title.TextSize = 11
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = titleBar
     
     -- Window controls (close & minimize)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 24, 0, 24)
-    closeBtn.Position = UDim2.new(1, -28, 0, 2)
+    closeBtn.Size = UDim2.new(0, 20, 0, 20)
+    closeBtn.Position = UDim2.new(1, -24, 0, 2)
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
     closeBtn.BackgroundTransparency = 0.2
     closeBtn.BorderSizePixel = 0
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 12
+    closeBtn.TextSize = 11
     closeBtn.Parent = titleBar
     local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 4)
+    closeCorner.CornerRadius = UDim.new(0, 3)
     closeCorner.Parent = closeBtn
     
     local minimizeBtn = Instance.new("TextButton")
-    minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
-    minimizeBtn.Position = UDim2.new(1, -54, 0, 2)
+    minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
+    minimizeBtn.Position = UDim2.new(1, -46, 0, 2)
     minimizeBtn.Text = "−"
     minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
     minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
     minimizeBtn.BackgroundTransparency = 0.2
     minimizeBtn.BorderSizePixel = 0
     minimizeBtn.Font = Enum.Font.GothamBold
-    minimizeBtn.TextSize = 18
+    minimizeBtn.TextSize = 16
     minimizeBtn.Parent = titleBar
     local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 4)
+    minCorner.CornerRadius = UDim.new(0, 3)
     minCorner.Parent = minimizeBtn
     
     closeBtn.MouseButton1Click:Connect(function()
@@ -1564,16 +1564,16 @@ local function createGUI()
         print("[GUI] Window minimized. Press F to restore.")
     end)
     
-    -- Content area (menggunakan UIListLayout vertical dengan 2 baris horizontal)
+    -- Content area (2 baris horizontal dengan padding yang pas)
     local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -16, 1, -34)
-    content.Position = UDim2.new(0, 8, 0, 32)
+    content.Size = UDim2.new(1, -12, 1, -28)
+    content.Position = UDim2.new(0, 6, 0, 28)
     content.BackgroundTransparency = 1
     content.Parent = mainFrame
     
-    -- Baris pertama (tombol pertama sampai ketujuh)
+    -- Baris pertama
     local row1 = Instance.new("Frame")
-    row1.Size = UDim2.new(1, 0, 0, 38)
+    row1.Size = UDim2.new(1, 0, 0, 32)
     row1.BackgroundTransparency = 1
     row1.Parent = content
     
@@ -1581,13 +1581,13 @@ local function createGUI()
     row1Layout.FillDirection = Enum.FillDirection.Horizontal
     row1Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     row1Layout.VerticalAlignment = Enum.VerticalAlignment.Center
-    row1Layout.Padding = UDim.new(0, 8)
+    row1Layout.Padding = UDim.new(0, 6)
     row1Layout.Parent = row1
     
-    -- Baris kedua (tombol kedelapan sampai keempatbelas)
+    -- Baris kedua
     local row2 = Instance.new("Frame")
-    row2.Size = UDim2.new(1, 0, 0, 38)
-    row2.Position = UDim2.new(0, 0, 0, 42)
+    row2.Size = UDim2.new(1, 0, 0, 32)
+    row2.Position = UDim2.new(0, 0, 0, 36)
     row2.BackgroundTransparency = 1
     row2.Parent = content
     
@@ -1595,10 +1595,10 @@ local function createGUI()
     row2Layout.FillDirection = Enum.FillDirection.Horizontal
     row2Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     row2Layout.VerticalAlignment = Enum.VerticalAlignment.Center
-    row2Layout.Padding = UDim.new(0, 8)
+    row2Layout.Padding = UDim.new(0, 6)
     row2Layout.Parent = row2
     
-    -- Daftar tombol (dibagi 2 baris)
+    -- Daftar tombol (7 tombol per baris)
     local row1Buttons = {
         {name="autoWinEnabled", text="AUTO WIN"},
         {name="autoTaskEnabled", text="AUTO TASK"},
@@ -1631,8 +1631,8 @@ local function createGUI()
     
     -- Status bar (bottom)
     local statusBar = Instance.new("Frame")
-    statusBar.Size = UDim2.new(1, 0, 0, 20)
-    statusBar.Position = UDim2.new(0, 0, 1, -20)
+    statusBar.Size = UDim2.new(1, 0, 0, 18)
+    statusBar.Position = UDim2.new(0, 0, 1, -18)
     statusBar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     statusBar.BackgroundTransparency = 0.2
     statusBar.BorderSizePixel = 0
@@ -1648,13 +1648,13 @@ local function createGUI()
     statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
     statusLabel.BackgroundTransparency = 1
     statusLabel.Font = Enum.Font.GothamBold
-    statusLabel.TextSize = 9
+    statusLabel.TextSize = 8
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Parent = statusBar
     
     local led = Instance.new("Frame")
-    led.Size = UDim2.new(0, 6, 0, 6)
-    led.Position = UDim2.new(1, -12, 0.5, -3)
+    led.Size = UDim2.new(0, 5, 0, 5)
+    led.Position = UDim2.new(1, -10, 0.5, -2.5)
     led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     led.BackgroundTransparency = 0.2
     led.BorderSizePixel = 0

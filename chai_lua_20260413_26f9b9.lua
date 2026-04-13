@@ -1269,7 +1269,7 @@ local function stopAutoGenerator()
 end
 
 -- ============================================================================
--- FEATURE 14: MODERN GUI WITH MINI LOGO (HORIZONTAL LANDSCAPE LAYOUT)
+-- FEATURE 14: MODERN GUI WITH MINI LOGO (HORIZONTAL LANDSCAPE LAYOUT - FIXED)
 -- ============================================================================
 
 -- RGB floating logo (collapsible GUI toggle)
@@ -1279,12 +1279,12 @@ local function createFloatingLogo()
     floatingLogo = Instance.new("ImageButton")
     floatingLogo.Name = "CyberHeroes_Logo"
     floatingLogo.Size = UDim2.new(0, 40, 0, 40)
-    floatingLogo.Position = UDim2.new(0.85, -20, 0.85, -20)
-    floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 5, 5)  -- merah gelap
+    floatingLogo.Position = UDim2.new(0.5, -20, 0.85, -20)
+    floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 5, 5)
     floatingLogo.BackgroundTransparency = 0.2
     floatingLogo.BorderSizePixel = 0
     floatingLogo.Image = "https://private-user-images.githubusercontent.com/188855284/395046716-ec3d8730-8153-420a-aa42-d4595ae9e4e7.jpg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzYwODQ3ODIsIm5iZiI6MTc3NjA4NDQ4MiwicGF0aCI6Ii8xODg4NTUyODQvMzk1MDQ2NzE2LWVjM2Q4NzMwLTgxNTMtNDIwYS1hYTQyLWQ0NTk1YWU5ZTRlNy5qcGc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwNDEzJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDQxM1QxMjQ4MDJaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jMjA2Zjg4NzUzMjliOGFhMzIzZWUzOThlMjgyZTg5ZDYzMThiOWYzNDFmODVlYWI1MjY2NGM1YzRjZjUwMDFhJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZyZXNwb25zZS1jb250ZW50LXR5cGU9aW1hZ2UlMkZqcGVnIn0.9PradVNUGRSvKqt969IekjMLXxRMykd6-dNYVC-jszU"
-    floatingLogo.ImageColor3 = Color3.fromRGB(255, 80, 80)    -- merah neon
+    floatingLogo.ImageColor3 = Color3.fromRGB(255, 80, 80)
     floatingLogo.ImageTransparency = 0.2
     floatingLogo.Parent = screenGui
     
@@ -1302,7 +1302,6 @@ local function createFloatingLogo()
     task.spawn(function()
         while floatingLogo and floatingLogo.Parent do
             hue = (hue + 0.01) % 1
-            -- cycle between red and cyan
             local color = (hue < 0.5) and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 200, 255)
             floatingLogo.ImageColor3 = color
             stroke.Color = color
@@ -1323,17 +1322,16 @@ local function createFloatingLogo()
     return floatingLogo
 end
 
--- Toggle button dengan style neon hacker
-local function createToggleButton(parent, name, position, text, initialState, onChange)
+-- Toggle button dengan style neon hacker (ukuran seragam untuk horizontal layout)
+local function createToggleButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
     button.Name = name
-    button.Size = UDim2.new(0, 100, 0, 28)  -- Fixed width for horizontal layout
-    button.Position = position
+    button.Size = UDim2.new(0, 95, 0, 30)
     button.Text = text .. (initialState and " [ON]" or " [OFF]")
     button.BackgroundColor3 = initialState and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)
     button.BackgroundTransparency = 0.1
     button.TextColor3 = initialState and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)
-    button.TextSize = 10
+    button.TextSize = 11
     button.Font = Enum.Font.GothamBold
     button.BorderSizePixel = 0
     button.Parent = parent
@@ -1348,7 +1346,6 @@ local function createToggleButton(parent, name, position, text, initialState, on
     stroke.Transparency = 0.3
     stroke.Parent = button
     
-    -- Glow effect (shadow-like)
     local glow = Instance.new("UIStroke")
     glow.Color = initialState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255, 50, 50)
     glow.Thickness = 2
@@ -1363,7 +1360,6 @@ local function createToggleButton(parent, name, position, text, initialState, on
         glow.Color = state and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255, 50, 50)
     end
     
-    -- Hover effect
     button.MouseEnter:Connect(function()
         TweenService:Create(button, TweenInfo.new(0.15), {BackgroundTransparency = 0.05}):Play()
         TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.1}):Play()
@@ -1431,16 +1427,15 @@ local function createToggleButton(parent, name, position, text, initialState, on
         updateState(newState)
         if onChange then onChange(newState) end
         
-        -- Click animation
-        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 9}):Play()
-        task.wait(0.05)
         TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 10}):Play()
+        task.wait(0.05)
+        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 11}):Play()
     end)
     
     return button
 end
 
--- Main GUI - Horizontal Landscape Layout
+-- Main GUI - Horizontal Landscape Layout (Centered, Clean, Draggable)
 local function createGUI()
     if screenGui then screenGui:Destroy() end
     
@@ -1449,12 +1444,12 @@ local function createGUI()
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     screenGui.Parent = localPlayer:FindFirstChild("PlayerGui") or localPlayer.PlayerGui
     
-    -- Window utama (horizontal landscape layout - wide and short)
+    -- Window utama (horizontal landscape layout - proporsional)
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainPanel"
-    mainFrame.Size = UDim2.new(0, 700, 0, 120)  -- Wide horizontal panel
-    mainFrame.Position = UDim2.new(0.5, -350, 0.85, -60)  -- Centered, bottom of screen
-    mainFrame.BackgroundColor3 = Color3.fromRGB(18, 2, 5)   -- merah gelap
+    mainFrame.Size = UDim2.new(0, 780, 0, 100)   -- Lebar 780, tinggi 100 (landscape)
+    mainFrame.Position = UDim2.new(0.5, -390, 0.5, -50)  -- Tengah layar
+    mainFrame.BackgroundColor3 = Color3.fromRGB(18, 2, 5)
     mainFrame.BackgroundTransparency = 0.05
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
@@ -1463,14 +1458,12 @@ local function createGUI()
     mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
     
-    -- Outer glow (neon border)
     local outerStroke = Instance.new("UIStroke")
     outerStroke.Color = Color3.fromRGB(255, 50, 50)
-    outerStroke.Thickness = 2
+    outerStroke.Thickness = 1.5
     outerStroke.Transparency = 0.4
     outerStroke.Parent = mainFrame
     
-    -- Inner shadow (gradient overlay)
     local innerGradient = Instance.new("UIGradient")
     innerGradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 5, 10)),
@@ -1496,14 +1489,14 @@ local function createGUI()
     mainFrame.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, 
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
                                           startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
     
     -- Title bar (window header)
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 24)
+    titleBar.Size = UDim2.new(1, 0, 0, 26)
     titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
     titleBar.BackgroundTransparency = 0.2
     titleBar.BorderSizePixel = 0
@@ -1525,8 +1518,8 @@ local function createGUI()
     
     -- Window controls (close & minimize)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 20, 0, 20)
-    closeBtn.Position = UDim2.new(1, -25, 0, 2)
+    closeBtn.Size = UDim2.new(0, 22, 0, 22)
+    closeBtn.Position = UDim2.new(1, -28, 0, 2)
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
@@ -1540,15 +1533,15 @@ local function createGUI()
     closeCorner.Parent = closeBtn
     
     local minimizeBtn = Instance.new("TextButton")
-    minimizeBtn.Size = UDim2.new(0, 20, 0, 20)
-    minimizeBtn.Position = UDim2.new(1, -48, 0, 2)
+    minimizeBtn.Size = UDim2.new(0, 22, 0, 22)
+    minimizeBtn.Position = UDim2.new(1, -52, 0, 2)
     minimizeBtn.Text = "−"
     minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
     minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
     minimizeBtn.BackgroundTransparency = 0.2
     minimizeBtn.BorderSizePixel = 0
     minimizeBtn.Font = Enum.Font.GothamBold
-    minimizeBtn.TextSize = 16
+    minimizeBtn.TextSize = 18
     minimizeBtn.Parent = titleBar
     local minCorner = Instance.new("UICorner")
     minCorner.CornerRadius = UDim.new(0, 3)
@@ -1571,41 +1564,41 @@ local function createGUI()
         print("[GUI] Window minimized. Press F to restore.")
     end)
     
-    -- Content area (horizontal layout using UIListLayout)
+    -- Content area (horizontal layout)
     local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -10, 1, -30)
-    content.Position = UDim2.new(0, 5, 0, 28)
+    content.Size = UDim2.new(1, -10, 1, -32)
+    content.Position = UDim2.new(0, 5, 0, 30)
     content.BackgroundTransparency = 1
     content.Parent = mainFrame
     
-    -- Horizontal list layout for buttons
     local listLayout = Instance.new("UIListLayout")
     listLayout.FillDirection = Enum.FillDirection.Horizontal
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    listLayout.Padding = UDim.new(0, 8)
+    listLayout.Padding = UDim.new(0, 6)
     listLayout.Parent = content
     
-    -- Buttons configuration (all features in one horizontal row)
-    local btnParams = {
-        {name="autoWinEnabled", text="AUTO WIN", state=config.autoWinEnabled},
-        {name="autoTaskEnabled", text="AUTO TASK", state=config.autoTaskEnabled},
-        {name="espEnabled", text="ESP", state=config.espEnabled},
-        {name="speedBoostEnabled", text="SPEED", state=config.speedBoostEnabled},
-        {name="stealthEnabled", text="STEALTH", state=config.stealthEnabled},
-        {name="godModeEnabled", text="GOD MODE", state=config.godModeEnabled},
-        {name="infiniteAmmoEnabled", text="AMMO", state=config.infiniteAmmoEnabled},
-        {name="shieldEnabled", text="SHIELD", state=config.shieldEnabled},
-        {name="tpwalkEnabled", text="TPWALK", state=config.tpwalkEnabled},
-        {name="noCollideEnabled", text="NO COLLIDE", state=config.noCollideEnabled},
-        {name="massKillEnabled", text="MASS KILL", state=config.massKillEnabled},
-        {name="executeMassKill", text="EXECUTE", state=false},
-        {name="autoGeneratorEnabled", text="AUTO GEN", state=config.autoGeneratorEnabled},
-        {name="restartScript", text="RESTART", state=false},
+    -- Buttons (urutkan sesuai kebutuhan, semua dalam satu baris)
+    local btnList = {
+        {name="autoWinEnabled", text="AUTO WIN"},
+        {name="autoTaskEnabled", text="AUTO TASK"},
+        {name="espEnabled", text="ESP"},
+        {name="speedBoostEnabled", text="SPEED"},
+        {name="stealthEnabled", text="STEALTH"},
+        {name="godModeEnabled", text="GOD MODE"},
+        {name="infiniteAmmoEnabled", text="AMMO"},
+        {name="shieldEnabled", text="SHIELD"},
+        {name="tpwalkEnabled", text="TPWALK"},
+        {name="noCollideEnabled", text="NO COLLIDE"},
+        {name="massKillEnabled", text="MASS KILL"},
+        {name="executeMassKill", text="EXECUTE"},
+        {name="autoGeneratorEnabled", text="AUTO GEN"},
+        {name="restartScript", text="RESTART"}
     }
     
-    for _, btn in ipairs(btnParams) do
-        local button = createToggleButton(content, btn.name, UDim2.new(0, 0, 0, 0), btn.text, btn.state)
+    for _, btn in ipairs(btnList) do
+        local initialState = (btn.name ~= "executeMassKill" and btn.name ~= "restartScript") and config[btn.name] or false
+        createToggleButton(content, btn.name, btn.text, initialState)
     end
     
     -- Status bar (bottom)
@@ -1631,7 +1624,6 @@ local function createGUI()
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Parent = statusBar
     
-    -- LED indicator
     local led = Instance.new("Frame")
     led.Size = UDim2.new(0, 6, 0, 6)
     led.Position = UDim2.new(1, -12, 0.5, -3)
@@ -1702,6 +1694,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
+
 
 -- ============================================================================
 -- CHARACTER HANDLER & INITIALIZATION

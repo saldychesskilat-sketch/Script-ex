@@ -1736,13 +1736,146 @@ end
 -- ============================================================================
 -- RESTORE FEATURE STATE (setelah GUI recreate, fitur tetap aktif sesuai config)
 -- ============================================================================
+-- Fungsi restoreFeatureStates yang benar (tidak kosong)
 local function restoreFeatureStates()
-    -- Fungsi ini dipanggil setelah startAllSystems untuk memastikan state sesuai config
-    -- Karena startAllSystems sudah dipanggil di init, kita hanya perlu memastikan tidak ada double start.
-    -- Namun jika ada fitur yang harus diaktifkan ulang karena GUI recreate, tidak perlu karena state sudah di config.
-    print("[State] Feature states restored from persistent config")
+    print("[State] Restoring feature states from persistent config...")
+    
+    -- Auto Win
+    if config.autoWinEnabled and not autoWinConnection then
+        startAutoWin()
+        print("[State] Auto Win restarted")
+    elseif not config.autoWinEnabled and autoWinConnection then
+        stopAutoWin()
+    end
+    
+    -- Auto Task
+    if config.autoTaskEnabled and not currentTaskConnection then
+        startAutoTask()
+        print("[State] Auto Task restarted")
+    elseif not config.autoTaskEnabled and currentTaskConnection then
+        stopAutoTask()
+    end
+    
+    -- Speed Boost
+    if config.speedBoostEnabled and not currentBoostConnection then
+        startSpeedBoostMonitor()
+        print("[State] Speed Boost restarted")
+    elseif not config.speedBoostEnabled and currentBoostConnection then
+        stopSpeedBoostMonitor()
+    end
+    
+    -- Stealth
+    if config.stealthEnabled and not stealthConnection then
+        startStealthMonitor()
+        print("[State] Stealth restarted")
+    elseif not config.stealthEnabled and stealthConnection then
+        stopStealthMonitor()
+    end
+    
+    -- God Mode
+    if config.godModeEnabled and not godModeConnection then
+        startGodMode()
+        print("[State] God Mode restarted")
+    elseif not config.godModeEnabled and godModeConnection then
+        stopGodMode()
+    end
+    
+    -- Infinite Ammo
+    if config.infiniteAmmoEnabled and not infiniteAmmoConnection then
+        startInfiniteAmmo()
+        print("[State] Infinite Ammo restarted")
+    elseif not config.infiniteAmmoEnabled and infiniteAmmoConnection then
+        stopInfiniteAmmo()
+    end
+    
+    -- Auto Shield
+    if config.shieldEnabled and not shieldConnection then
+        startShieldMonitor()
+        print("[State] Auto Shield restarted")
+    elseif not config.shieldEnabled and shieldConnection then
+        stopShieldMonitor()
+    end
+    
+    -- Tpwalk
+    if config.tpwalkEnabled and not tpwalkConnection then
+        startTpwalkMonitor()
+        print("[State] Tpwalk restarted")
+    elseif not config.tpwalkEnabled and tpwalkConnection then
+        stopTpwalkMonitor()
+    end
+    
+    -- No Collide
+    if config.noCollideEnabled and not noCollideConnection then
+        startNoCollideMonitor()
+        print("[State] No Collide restarted")
+    elseif not config.noCollideEnabled and noCollideConnection then
+        stopNoCollideMonitor()
+    end
+    
+    -- Mass Kill
+    if config.massKillEnabled and not massKillLoopConnection then
+        startMassKillLoop()
+        print("[State] Mass Kill restarted")
+    elseif not config.massKillEnabled and massKillLoopConnection then
+        stopMassKillLoop()
+    end
+    
+    -- Auto Generator
+    if config.autoGeneratorEnabled and not autoGeneratorLoopConnection then
+        startAutoGeneratorLoop()
+        print("[State] Auto Generator restarted")
+    elseif not config.autoGeneratorEnabled and autoGeneratorLoopConnection then
+        stopAutoGeneratorLoop()
+    end
+    
+    -- Auto Skill Check
+    if config.autoSkillCheckEnabled and not autoSkillCheckConnection then
+        startAutoSkillCheck()
+        print("[State] Auto Skill Check restarted")
+    elseif not config.autoSkillCheckEnabled and autoSkillCheckConnection then
+        stopAutoSkillCheck()
+    end
+    
+    -- Auto Aim
+    if config.autoAimEnabled and not autoAimConnection then
+        startAutoAim()
+        print("[State] Auto Aim restarted")
+    elseif not config.autoAimEnabled and autoAimConnection then
+        stopAutoAim()
+    end
+    
+    -- ESP
+    if config.espEnabled then
+        updateAllESP()
+        print("[State] ESP restarted")
+    end
+    
+    print("[State] Feature state restoration complete")
 end
 
+-- Dan panggil fungsi ini di dalam ensureGUIPersistent setelah GUI direcovery
+local function ensureGUIPersistent()
+    task.spawn(function()
+        while isScriptRunning do
+            if not screenGui or not screenGui.Parent then
+                print("[Recovery] Recreating main GUI...")
+                createGUI()
+                restoreFeatureStates()  -- <-- Tambahkan baris ini
+            end
+            if not config.guiVisible and (not floatingLogo or not floatingLogo.Parent) then
+                print("[Recovery] Recreating floating logo...")
+                floatingLogo = createFloatingLogo()
+                floatingLogo.Visible = true
+                isLogoVisible = true
+            end
+            if not teleportButtonGui or not teleportButtonGui.Parent then
+                print("[Recovery] Recreating teleport button...")
+                createPermanentTeleportButton()
+            end
+            task.wait(2)
+        end
+    end)
+end
 -- ============================================================================
 -- CHARACTER HANDLER & INITIALIZATION
 -- ============================================================================

@@ -732,20 +732,41 @@ end
 -- ============================================================================
 -- FEATURE 12: MASS KILL LOOP (RANDOM SURVIVOR, TELEPORT BEHIND, LOCK CAMERA, PRESS E)
 -- ============================================================================
+-- VirtualInputManager untuk klik kiri (universal hit)
+local vim = game:GetService("VirtualInputManager")
+
+-- Fungsi hit menggunakan mouse click (lebih reliable daripada E)
+local function hit()
+    pcall(function()
+        vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+        task.wait(0.02)
+        vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    end)
+end
+
+-- Mendapatkan daftar semua player yang benar-benar survivor (bukan killer, tidak dalam lobby)
 local function getAllSurvivors()
     local survivors = {}
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             local char = player.Character
-            if char then
+            if char and char.Parent == Workspace then
                 local isKiller = false
+                -- Cek team
                 if player.Team then
-                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
+                    local teamName = player.Team.Name:lower()
+                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                        isKiller = true
+                    end
                 end
+                -- Cek weapon (killer biasanya bawa senjata)
                 if not isKiller then
                     local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon") or tool.Name:lower():find("sword")) then
+                        isKiller = true
+                    end
                 end
+                -- Jika bukan killer, maka dia survivor
                 if not isKiller then
                     table.insert(survivors, player)
                 end
@@ -755,6 +776,7 @@ local function getAllSurvivors()
     return survivors
 end
 
+-- Mass kill loop utama (random survivor, teleport behind, lock camera, face target, hit)
 local function massKillLoop()
     if not config.massKillEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
@@ -762,33 +784,51 @@ local function massKillLoop()
     local survivors = getAllSurvivors()
     if #survivors == 0 then return end
 
-    -- Pilih survivor secara acak
+    -- Pilih target survivor secara acak
     local target = survivors[math.random(1, #survivors)]
     if target and target.Character then
         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso")
         if targetRoot then
-            -- Teleport ke belakang target
+            -- 1. Lock kamera ke target (untuk akurasi hit)
+            lockCameraTo(targetRoot.Position)
+            
+            -- 2. Teleport ke belakang target (jarak 2 studs)
             local targetCFrame = targetRoot.CFrame
             local behindPos = targetCFrame.Position - targetCFrame.LookVector * 2
             teleportTo(behindPos)
+            
+            -- 3. Tunggu sebentar agar posisi sinkron
+            task.wait(0.15)
+            
+            -- 4. Hadapkan karakter ke target (sangat penting agar hit mengenai)
+            localRootPart.CFrame = CFrame.new(localRootPart.Position, targetRoot.Position)
+            
+            -- 5. Tunggu sedikit agar orientasi stabil
             task.wait(0.05)
-            -- Lock kamera ke target
-            lockCameraTo(targetRoot.Position)
-            -- Press E untuk hit
-            simulatePressE()
-            print("[MassKill] Attacked " .. target.Name .. " (random)")
+            
+            -- 6. Lakukan hit (spam 3x untuk memastikan kena)
+            for i = 1, 3 do
+                hit()
+                task.wait(0.05)
+            end
+            
+            print("[MassKill] Attacked " .. target.Name .. " (random survivor)")
         end
     end
-    task.wait(0.15) -- loop cepat tapi tidak overload
+    
+    -- Delay 2 detik sebelum loop berikutnya (sesuai request)
+    task.wait(2)
 end
 
+-- Start/stop functions (tetap sama, hanya mengganti loop)
 local function startMassKillLoop()
     if massKillLoopConnection then return end
     massKillLoopConnection = RunService.Heartbeat:Connect(function()
         massKillLoop()
     end)
-    print("[MassKill] Mass kill loop started (random target, teleport behind, lock camera)")
+    print("[MassKill] Mass kill loop started (random survivor, mouse hit, lock camera, face target, delay 2s)")
 end
+
 local function stopMassKillLoop()
     if massKillLoopConnection then
         massKillLoopConnection:Disconnect()

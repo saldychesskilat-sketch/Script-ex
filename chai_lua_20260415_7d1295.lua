@@ -819,34 +819,140 @@ local function performHit(targetPlayer, targetRoot)
 end
 
 -- ============================================================================
--- OPTIMIZED MASS KILL LOOP (dengan retry dan timing optimal)
+-- UPGRADED HIT SYSTEM: MULTI-METHOD + RETRY + TARGET VALIDATION
 -- ============================================================================
 
--- Mendapatkan semua survivor (tidak berubah)
-local function getAllSurvivors()
-    local survivors = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then
-                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
-                end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                end
-                if not isKiller then
-                    table.insert(survivors, player)
+-- Utility: arahkan karakter menghadap target
+local function faceTarget(targetPosition)
+    if not localRootPart then return end
+    local currentPos = localRootPart.Position
+    local direction = (targetPosition - currentPos).Unit
+    local lookCFrame = CFrame.lookAt(currentPos, targetPosition)
+    pcall(function()
+        localRootPart.CFrame = lookCFrame
+    end)
+end
+
+-- Cari RemoteEvent attack otomatis (cache agar tidak scan ulang terus)
+local cachedAttackRemote = nil
+local function findAttackRemote()
+    if cachedAttackRemote then return cachedAttackRemote end
+    local containers = {ReplicatedStorage, Workspace, game:GetService("Lighting")}
+    for _, container in ipairs(containers) do
+        for _, v in ipairs(container:GetDescendants()) do
+            if v:IsA("RemoteEvent") then
+                local name = v.Name:lower()
+                if name:find("attack") or name:find("damage") or name:find("hit") or name:find("slash") or name:find("melee") then
+                    cachedAttackRemote = v
+                    print("[HitSystem] Found attack remote:", v.Name)
+                    return v
                 end
             end
         end
     end
-    return survivors
+    return nil
 end
 
--- Mass kill loop utama (upgraded)
+-- Multi hit method (gabungan semua teknik)
+local function executeHitMethods(targetPlayer, targetRoot)
+    if not targetRoot or not targetPlayer.Character then return false end
+    
+    local success = false
+    local character = localPlayer.Character
+    if not character then return false end
+    
+    -- 1. Tool Activation (jika player memegang tool)
+    local tool = character:FindFirstChildWhichIsA("Tool")
+    if tool then
+        pcall(function()
+            tool:Activate()
+            success = true
+        end)
+        task.wait(0.03)
+    end
+    
+    -- 2. Mouse Click universal
+    pcall(function()
+        local viewport = camera.ViewportSize
+        local center = Vector2.new(viewport.X/2, viewport.Y/2)
+        VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 0)
+        task.wait(0.02)
+        VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 0)
+        success = true
+    end)
+    task.wait(0.03)
+    
+    -- 3. Key Press E (fallback umum)
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.02)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        success = true
+    end)
+    task.wait(0.03)
+    
+    -- 4. RemoteEvent attack (advanced)
+    local attackRemote = findAttackRemote()
+    if attackRemote then
+        pcall(function()
+            -- Coba berbagai format parameter
+            attackRemote:FireServer()
+            task.wait(0.02)
+            attackRemote:FireServer(targetPlayer)
+            task.wait(0.02)
+            attackRemote:FireServer(targetRoot.Position)
+            task.wait(0.02)
+            attackRemote:FireServer(targetPlayer.Character)
+            success = true
+        end)
+    end
+    
+    return success
+end
+
+-- Perform hit dengan retry & step system
+local function performHit(targetPlayer, targetRoot)
+    if not targetPlayer or not targetRoot then return false end
+    
+    -- Validasi target masih hidup
+    local humanoid = targetPlayer.Character and targetPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        print("[HitSystem] Target already dead, skipping")
+        return false
+    end
+    
+    -- Step 1: Lock camera ke target
+    lockCameraTo(targetRoot.Position)
+    task.wait(0.05)
+    
+    -- Step 2: Teleport ke belakang target (sudah dilakukan di massKillLoop, tapi kita ulang untuk safety)
+    local targetCFrame = targetRoot.CFrame
+    local behindPos = targetCFrame.Position - targetCFrame.LookVector * 2
+    teleportTo(behindPos)
+    task.wait(0.08)
+    
+    -- Step 3: Hadapkan karakter ke target
+    faceTarget(targetRoot.Position)
+    task.wait(0.05)
+    
+    -- Step 4: Multi hit dengan retry (2-3 kali percobaan)
+    local hitSuccess = false
+    for attempt = 1, 3 do
+        hitSuccess = executeHitMethods(targetPlayer, targetRoot)
+        if hitSuccess then
+            print("[HitSystem] Hit successful on attempt", attempt)
+            break
+        end
+        task.wait(0.08) -- delay antar retry
+    end
+    
+    if not hitSuccess then
+        print("[HitSystem] All hit methods failed for", targetPlayer.Name)
+    end
+    return hitSuccess
+end
+
+-- REPLACE massKillLoop yang lama dengan yang baru
 local function massKillLoop()
     if not config.massKillEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
@@ -854,58 +960,24 @@ local function massKillLoop()
     local survivors = getAllSurvivors()
     if #survivors == 0 then return end
 
-    -- Pilih target secara acak
     local target = survivors[math.random(1, #survivors)]
     if target and target.Character then
         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso")
-        if targetRoot and targetRoot.Parent then
-            -- Validasi target masih hidup
-            local targetHumanoid = target.Character:FindFirstChildOfClass("Humanoid")
-            if targetHumanoid and targetHumanoid.Health > 0 then
-                -- Lock camera ke target
-                lockCameraTo(targetRoot.Position)
-                task.wait(0.02)
-                
-                -- Teleport ke belakang target (2 studs)
-                local targetCFrame = targetRoot.CFrame
-                local behindPos = targetCFrame.Position - targetCFrame.LookVector * 2
-                teleportTo(behindPos)
-                task.wait(0.08)
-                
-                -- Hadapkan karakter ke target
-                localRootPart.CFrame = CFrame.new(localRootPart.Position, targetRoot.Position)
-                task.wait(0.05)
-                
-                -- Lakukan hit dengan retry (maks 3 kali)
-                local hitDone = false
-                for attempt = 1, 3 do
-                    if performHit(target, targetRoot) then
-                        hitDone = true
-                        break
-                    end
-                    task.wait(0.1)
-                end
-                
-                if hitDone then
-                    print("[MassKill] Successfully attacked " .. target.Name)
-                else
-                    print("[MassKill] Failed to hit " .. target.Name)
-                end
-            end
+        if targetRoot then
+            -- Gunakan sistem hit yang sudah di-upgrade
+            performHit(target, targetRoot)
         end
     end
-    
-    -- Delay antar target (0.2 - 0.4 detik, tidak terlalu cepat)
-    task.wait(0.3)
+    task.wait(0.25) -- delay antar target (optimal)
 end
 
--- Fungsi start/stop (tetap sama, hanya mengganti isi loop)
+-- Fungsi start/stop tetap sama (tidak perlu diubah)
 local function startMassKillLoop()
     if massKillLoopConnection then return end
     massKillLoopConnection = RunService.Heartbeat:Connect(function()
         massKillLoop()
     end)
-    print("[MassKill] Mass kill loop started (upgraded hit system)")
+    print("[MassKill] Mass kill loop started (UPGRADED HIT SYSTEM)")
 end
 
 local function stopMassKillLoop()

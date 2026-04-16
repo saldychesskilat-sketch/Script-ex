@@ -1163,6 +1163,57 @@ local function GetActionTarget()
     return current
 end
 
+local function TriggerMobileButton()
+    local b = GetActionTarget()
+    if b and b:IsA("GuiObject") then
+        local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
+        local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
+        pcall(function()
+            VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy)
+            task.wait(0.01)
+            VirtualInputManager:SendTouchEvent(TouchID, 2, cx, cy)
+        end)
+    end
+end
+
+local function InitializeAutobuy()
+    task.spawn(function()
+        local playerGui = localPlayer:FindFirstChild("PlayerGui")
+        if not playerGui then return end
+        local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
+        if not prompt then
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)
+        end
+        local check = prompt and prompt:FindFirstChild("Check")
+        if not check then return end
+        local line = check:FindFirstChild("Line")
+        local goal = check:FindFirstChild("Goal")
+        if not line or not goal then return end
+        if VisibilityConnection then VisibilityConnection:Disconnect() end
+        VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
+            if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then
+                if HeartbeatConnection then HeartbeatConnection:Disconnect() end
+                HeartbeatConnection = RunService.Heartbeat:Connect(function()
+                    local lr = line.Rotation % 360
+                    local gr = goal.Rotation % 360
+                    local ss = (gr + 101) % 360
+                    local se = (gr + 115) % 360
+                    local inRange = false
+                    if ss > se then
+                        if lr >= ss or lr <= se then inRange = true end
+                    else
+                        if lr >= ss and lr <= se then inRange = true end
+                    end
+                    if inRange then
+                        TriggerMobileButton()
+                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
+                    end
+                end)
+            elseif HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
+        end)
+    end)
+end
+
 local function startAutoSkillCheck()
     if autoSkillCheckConnection then return end
     autoSkillCheckConnection = RunService.Heartbeat:Connect(function()
@@ -1182,8 +1233,8 @@ local function startAutoSkillCheck()
             end
         end
     end)
-    initializeSkillCheckHandler()
-    print("[AutoSkillCheck] Auto skill check started (bypasses QTE)")
+    InitializeAutobuy()
+    print("[AutoSkillCheck] Auto skill check started")
 end
 local function stopAutoSkillCheck()
     if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end

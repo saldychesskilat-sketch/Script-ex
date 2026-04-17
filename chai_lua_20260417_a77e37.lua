@@ -1280,7 +1280,6 @@ local function stopAutoSkillCheck()
     if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
     print("[AutoSkillCheck] Auto skill check stopped")
 end
-
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================

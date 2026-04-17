@@ -1664,6 +1664,10 @@ local function createSidebarItem(parent, text, icon, active)
 end
 
 local function createFloatingLogo()
+    if floatingLogo and floatingLogo.Parent then
+        -- Sudah ada, langsung return
+        return floatingLogo
+    end
     if floatingLogo then floatingLogo:Destroy() end
     floatingLogo = Instance.new("ImageButton")
     floatingLogo.Name = "CyberHeroes_Logo"
@@ -1676,6 +1680,7 @@ local function createFloatingLogo()
     floatingLogo.ImageColor3 = Color3.fromRGB(255, 80, 80)
     floatingLogo.ImageTransparency = 0.2
     floatingLogo.Parent = CoreGui
+    floatingLogo.Visible = false  -- Awalnya tidak terlihat
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = floatingLogo
@@ -1694,12 +1699,12 @@ local function createFloatingLogo()
             task.wait(0.1)
         end
     end)
+    -- Event untuk membuka GUI saat logo diklik
     floatingLogo.MouseButton1Click:Connect(function()
         if mainFrame then
             mainFrame.Visible = true
-            config.guiVisible = true
             floatingLogo.Visible = false
-            isLogoVisible = false
+            config.guiVisible = true
         end
     end)
     return floatingLogo

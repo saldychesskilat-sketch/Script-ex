@@ -1827,13 +1827,13 @@ local function createGUI()
 
     local function hideGuiAndShowLogo()
         config.guiVisible = false
-        mainFrame.Visible = false
-        if not isLogoVisible then
-            if floatingLogo then floatingLogo:Destroy() end
-            floatingLogo = createFloatingLogo()
-            floatingLogo.Visible = true
-            isLogoVisible = true
+        if mainFrame then mainFrame.Visible = false end
+            -- Pastikan floatingLogo sudah ada dan terlihat
+        if not floatingLogo then
+        createFloatingLogo()
         end
+            floatingLogo.Visible = true
+        isLogoVisible = true
     end
 
     minimizeBtn.MouseButton1Click:Connect(hideGuiAndShowLogo)
@@ -2098,12 +2098,16 @@ local function ensureGUIPersistent()
                 restoreFeatureStates()
             end
             if not config.guiVisible and (not floatingLogo or not floatingLogo.Parent) then
-                print("[Recovery] Recreating floating logo...")
-                if floatingLogo then floatingLogo:Destroy() end
-                floatingLogo = createFloatingLogo()
-                floatingLogo.Visible = true
-                isLogoVisible = true
-            end
+                    print("[Recovery] Recreating floating logo...")
+                    createFloatingLogo()  -- fungsi ini sudah aman, tidak destroy jika sudah ada
+                    floatingLogo.Visible = true
+                    isLogoVisible = true
+                end
+                    -- 4. Di dalam fungsi init(), setelah createGUI(), tambahkan:
+                if not floatingLogo then
+                    createFloatingLogo()
+                end
+                    floatingLogo.Visible = false  
             if not teleportButtonGui or not teleportButtonGui.Parent then
                 print("[Recovery] Recreating teleport button...")
                 createPermanentTeleportButton()

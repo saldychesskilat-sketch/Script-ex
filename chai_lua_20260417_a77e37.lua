@@ -198,7 +198,7 @@ end
 local function getFinishlinePosition()
     local finishline = nil
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj.Name == "fininsh line" then
+        if obj.Name == "Fininshline" then
             finishline = obj
             break
         end

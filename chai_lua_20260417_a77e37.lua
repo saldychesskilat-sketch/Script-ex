@@ -195,6 +195,8 @@ end
 -- ============================================================================
 -- FEATURE 1: AUTO WIN (TELEPORT TO FININSHLINE - FIXED)
 -- ============================================================================
+-- ==================== FUNGSI PENCARI POSISI ====================
+
 local function getFinishlinePosition()
     local finishline = nil
     for _, obj in ipairs(Workspace:GetDescendants()) do
@@ -213,6 +215,27 @@ local function getFinishlinePosition()
     return nil
 end
 
+-- ** FUNGSI BARU: Mencari posisi carlobby **
+local function getCarlobbyPosition()
+    local carlobby = nil
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj.Name == "carlobby" then
+            carlobby = obj
+            break
+        end
+    end
+    if carlobby then
+        if carlobby:IsA("BasePart") then
+            return carlobby.Position
+        elseif carlobby:FindFirstChildWhichIsA("BasePart") then
+            return carlobby:FindFirstChildWhichIsA("BasePart").Position
+        end
+    end
+    return nil
+end
+
+-- ==================== FUNGSI TELEPORTASI ====================
+
 local function teleportToFinishline()
     local finishPos = getFinishlinePosition()
     if finishPos and localRootPart then
@@ -222,18 +245,57 @@ local function teleportToFinishline()
     return false
 end
 
+-- ** FUNGSI BARU: Teleport ke carlobby **
+local function teleportToCarlobby()
+    local lobbyPos = getCarlobbyPosition()
+    if lobbyPos and localRootPart then
+        teleportTo(lobbyPos)
+        return true
+    end
+    return false
+end
+
+-- ==================== AUTO WIN DENGAN DELAY & LOBBY ====================
+
+local autoWinConnection = nil
+local isAutoWinBusy = false   -- ** FLAG untuk mencegah tumpang tindih **
+
 local function startAutoWin()
     if autoWinConnection then return end
     autoWinConnection = RunService.Heartbeat:Connect(function()
         if not config.autoWinEnabled then return end
         if not getLocalCharacter() then return end
-        teleportToFinishline()
-        task.wait(0.5)
+        if isAutoWinBusy then return end   -- jika sedang dalam proses teleport + tunggu, lewati
+
+        isAutoWinBusy = true
+        task.spawn(function()
+            -- 1. Teleport ke finishline
+            local success = teleportToFinishline()
+            if success then
+                print("[AutoWin] Teleport ke Fininshline berhasil. Menunggu 5 detik...")
+                task.wait(5)   -- tunggu 5 detik
+                -- 2. Teleport ke carlobby
+                local lobbySuccess = teleportToCarlobby()
+                if lobbySuccess then
+                    print("[AutoWin] Teleport ke carlobby berhasil.")
+                else
+                    print("[AutoWin] Gagal teleport ke carlobby (objek tidak ditemukan atau tidak valid).")
+                end
+            else
+                print("[AutoWin] Gagal teleport ke Fininshline.")
+            end
+            isAutoWinBusy = false
+        end)
     end)
-    print("[AutoWin] Auto win started (teleport to fininshline)")
+    print("[AutoWin] Auto win started (teleport ke finishline -> tunggu 5 detik -> teleport ke carlobby)")
 end
+
 local function stopAutoWin()
-    if autoWinConnection then autoWinConnection:Disconnect(); autoWinConnection = nil end
+    if autoWinConnection then 
+        autoWinConnection:Disconnect()
+        autoWinConnection = nil
+    end
+    isAutoWinBusy = false
     print("[AutoWin] Auto win stopped")
 end
 

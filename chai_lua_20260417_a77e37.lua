@@ -1,16 +1,3 @@
---[[
-    ╔═══════════════════════════════════════════════════════════════════╗
-    ║                    CYBERHEROES DELTA EXECUTOR v10.1              ║
-    ║           UPGRADED: Auto Win (teleport to fininshline)          ║
-    ║           UPGRADED: Auto Task (anti-hook + lever gate system)   ║
-    ║           UPGRADED: Auto Generator (full ESP)                   ║
-    ║           UPGRADED: Tpwalk (2x speed boost + CFrame dash)       ║
-    ║           UPGRADED: Auto Kill (hilt hitbox + multiple methods)  ║
-    ║              Survivor vs Killer - Generator Fixer                ║
-    ║                   Developed by Deepseek-CH                       ║
-    ║                     For Delta Executor                           ║
-    ╚═══════════════════════════════════════════════════════════════════╝
---]]
 
 -- ============================================================================
 -- GLOBAL STATE PERSISTENCE (getgenv)

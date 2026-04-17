@@ -1540,7 +1540,7 @@ local function createSettingsContent()
     local chatLabel = Instance.new("TextLabel")
     chatLabel.Size = UDim2.new(1, -10, 0, 20)
     chatLabel.Position = UDim2.new(0, 5, 0, 0.2)
-    chatLabel.Text = "FAKE REPORT CHAT"
+    chatLabel.Text = "REPORT CHAT"
     chatLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     chatLabel.BackgroundTransparency = 1
     chatLabel.Font = Enum.Font.GothamBold
@@ -1565,7 +1565,7 @@ local function createSettingsContent()
     chatInput = Instance.new("TextBox")
     chatInput.Size = UDim2.new(0.7, 0, 0, 25)
     chatInput.Position = UDim2.new(0.05, 0, 0.38, 0)
-    chatInput.PlaceholderText = "Type fake report..."
+    chatInput.PlaceholderText = "Type report..."
     chatInput.Text = ""
     chatInput.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     chatInput.BackgroundTransparency = 0.3
@@ -1597,7 +1597,7 @@ local function createSettingsContent()
         if msg == "" then return end
         local newMsg = Instance.new("TextLabel")
         newMsg.Size = UDim2.new(1, 0, 0, 16)
-        newMsg.Text = "[Fake] " .. msg
+        newMsg.Text = "[user] " .. msg
         newMsg.TextColor3 = Color3.fromRGB(200, 200, 200)
         newMsg.BackgroundTransparency = 1
         newMsg.Font = Enum.Font.Gotham

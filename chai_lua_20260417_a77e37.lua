@@ -198,7 +198,7 @@ end
 local function getFinishlinePosition()
     local finishline = nil
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj.Name == "fininshline" then
+        if obj.Name == "fininsh line" then
             finishline = obj
             break
         end
@@ -566,7 +566,7 @@ local function applySpeedBoost()
     if not localHumanoid then return end
     if boostDebounce then return end
     boostDebounce = true
-    if config.originalWalkSpeed == 16 then config.originalWalkSpeed = localHumanoid.WalkSpeed end
+    if config.originalWalkSpeed == 32 then config.originalWalkSpeed = localHumanoid.WalkSpeed end
     localHumanoid.WalkSpeed = config.originalWalkSpeed + config.boostAmount
     isSpeedBoostActive = true
     task.wait(config.boostDuration)
@@ -1773,7 +1773,7 @@ local function createGUI()
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(0.5, 0, 1, 0)
     title.Position = UDim2.new(0.02, 0, 0, 0)
-    title.Text = "CYBERHEROES v10.1"
+    title.Text = "CYBERHEROES script by kemi"
     title.TextColor3 = config.guiThemeColor
     title.BackgroundTransparency = 1
     title.Font = Enum.Font.GothamBold

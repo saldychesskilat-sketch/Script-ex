@@ -978,29 +978,38 @@ end
 -- ============================================================================
 -- FEATURE 12: MASS KILL LOOP (USING HILT HITBOX - IMPROVED)
 -- ============================================================================
-local function getAllSurvivors()
-    local survivors = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then
-                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
-                end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                end
-                if not isKiller then
-                    table.insert(survivors, player)
-                end
-            end
-        end
-    end
-    return survivors
+
+-- Simulasi tekan tombol E (untuk interaksi)
+local function simulatePressE()
+    pcall(function()
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
+    -- Alternatif: klik kanan (bukan kiri)
+    pcall(function()
+        VirtualUser:Button2Down(Vector2.new(500, 500))
+        task.wait(0.05)
+        VirtualUser:Button2Up(Vector2.new(500, 500))
+    end)
 end
 
+-- Simulasi klik kanan pada posisi tertentu (misal pada hilt)
+local function simulateRightClickAt(position)
+    if not position then return end
+    pcall(function()
+        local screenPoint = camera:WorldToScreenPoint(position)
+        if screenPoint.Z > 0 then
+            local x, y = screenPoint.X, screenPoint.Y
+            -- button index 1 = right click (0=left, 1=right, 2=middle)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 1, true, game, 0)
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(x, y, 1, false, game, 0)
+        end
+    end)
+end
+
+-- Cari hilt hitbox (nama persis mengandung "hilt")
 local function findHiltHitbox()
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj.Name:lower():find("hilt") then
@@ -1010,6 +1019,7 @@ local function findHiltHitbox()
     return nil
 end
 
+-- Hit survivor dengan berbagai metode termasuk simulasi tombol (prioritas click kanan)
 local function hitSurvivorWithHilt(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then return false end
     local targetChar = targetPlayer.Character
@@ -1019,32 +1029,42 @@ local function hitSurvivorWithHilt(targetPlayer)
     local hilt = findHiltHitbox()
     local hitSuccess = false
 
-    -- Method 1: Direct health manipulation
+    -- Method 1: Direct health manipulation (paling cepat)
     pcall(function() humanoid.Health = 0 end)
     hitSuccess = true
 
     -- Method 2: BreakJoints
     pcall(function() targetChar:BreakJoints() end)
 
-    -- Method 3: Activate tool if hilt is a tool
-    if hilt and hilt:IsA("Tool") then
-        pcall(function() hilt:Activate() end)
-        hitSuccess = true
-    end
-
-    -- Method 4: ClickDetector / ProximityPrompt on hilt
+    -- Method 3: Jika hilt ditemukan, coba klik kanan / interaksi
     if hilt then
+        -- Coba aktivasi tool
+        if hilt:IsA("Tool") then
+            pcall(function() hilt:Activate() end)
+            hitSuccess = true
+        end
+        -- Coba click detector (umumnya left click, tapi tetap dicoba)
         local clickDetector = hilt:FindFirstChildWhichIsA("ClickDetector")
         if clickDetector and clickDetector.Enabled then
             pcall(function() clickDetector:FireClick() end)
             hitSuccess = true
         end
+        -- Coba proximity prompt (biasanya E, tapi bisa juga)
         local proximityPrompt = hilt:FindFirstChildWhichIsA("ProximityPrompt")
         if proximityPrompt and proximityPrompt.Enabled then
             pcall(function() proximityPrompt:Hold(); task.wait(0.1); proximityPrompt:Release() end)
             hitSuccess = true
         end
+        -- Simulasi klik kanan pada posisi hilt (prioritas utama)
+        if hilt:IsA("BasePart") then
+            simulateRightClickAt(hilt.Position)
+            hitSuccess = true
+        end
     end
+
+    -- Method 4: Simulasi tekan tombol E (interaksi umum)
+    simulatePressE()
+    hitSuccess = true
 
     -- Method 5: RemoteEvent brute force
     for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
@@ -1060,6 +1080,7 @@ local function hitSurvivorWithHilt(targetPlayer)
     return hitSuccess
 end
 
+-- Mass kill loop (step by step, satu target per iterasi, dengan delay)
 local function massKillLoop()
     if not config.massKillEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
@@ -1067,6 +1088,7 @@ local function massKillLoop()
     local survivors = getAllSurvivors()
     if #survivors == 0 then return end
 
+    -- Ambil satu target (random atau terdekat, biar tidak overload)
     local target = survivors[math.random(1, #survivors)]
     if target and target.Character then
         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso")
@@ -1075,21 +1097,23 @@ local function massKillLoop()
             task.wait(0.05)
             lockCameraTo(targetRoot.Position)
             if hitSurvivorWithHilt(target) then
-                print("[MassKill] Hit " .. target.Name .. " using hilt hitbox")
+                print("[MassKill] Hit " .. target.Name .. " using combined methods (right click priority)")
             else
                 simulatePressE()
                 print("[MassKill] Attacked " .. target.Name .. " (fallback)")
             end
         end
     end
-    task.wait(0.15)
+    task.wait(0.2)  -- Delay lebih panjang agar tidak spam
 end
 
+-- Start/stop function (tetap sama)
 local function startMassKillLoop()
     if massKillLoopConnection then return end
     massKillLoopConnection = RunService.Heartbeat:Connect(massKillLoop)
-    print("[MassKill] Mass kill loop started (using hilt hitbox + multiple hit methods)")
+    print("[MassKill] Mass kill loop started (using UserInputService simulation with RIGHT CLICK)")
 end
+
 local function stopMassKillLoop()
     if massKillLoopConnection then
         massKillLoopConnection:Disconnect()

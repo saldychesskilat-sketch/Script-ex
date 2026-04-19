@@ -610,45 +610,66 @@ end
 -- ============================================================================
 -- FEATURE 4: SPEED BOOST ON DAMAGE (UNCHANGED)
 -- ============================================================================
-local function isPlayerNearby(maxDistance)
+local function isKiller(player)
+    if not player then return false end
+
+    -- Deteksi berdasarkan Team
+    if player.Team and player.Team.Name then
+        local name = player.Team.Name:lower()
+        if name:find("killer") or name:find("monster") or name:find("enemy") then
+            return true
+        end
+    end
+
+    -- Fallback: cek tool
+    if player.Character then
+        local tool = player.Character:FindFirstChildWhichIsA("Tool")
+        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function getKillerDistance()
+    local closestDistance = math.huge
+
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character then
+        if player ~= localPlayer and isKiller(player) and player.Character then
             local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
             if targetRoot and localRootPart then
                 local distance = (targetRoot.Position - localRootPart.Position).Magnitude
-                if distance <= maxDistance then
-                    return true
+                if distance < closestDistance then
+                    closestDistance = distance
                 end
             end
         end
     end
-    return false
+
+    return closestDistance
 end
 
 local function applySpeedBoost()
     if not config.speedBoostEnabled then return end
     if not localHumanoid then return end
-    if boostDebounce then return end
-
-    boostDebounce = true
 
     -- Simpan speed asli
     if not config.originalWalkSpeed then
         config.originalWalkSpeed = localHumanoid.WalkSpeed
     end
 
-    -- 1.5x speed
-    localHumanoid.WalkSpeed = config.originalWalkSpeed * 2
+    -- Aktifkan boost
+    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5
     isSpeedBoostActive = true
+end
 
-    task.wait(3)
-
-    if localHumanoid then
+local function removeSpeedBoost()
+    if not localHumanoid then return end
+    if config.originalWalkSpeed then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
     end
-
     isSpeedBoostActive = false
-    boostDebounce = false
 end
 
 local function startSpeedBoostMonitor()
@@ -658,9 +679,19 @@ local function startSpeedBoostMonitor()
         if not config.speedBoostEnabled then return end
         if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
 
-        -- Trigger jika ada player dalam 10 studs
-        if isPlayerNearby(20) then
-            applySpeedBoost()
+        local distance = getKillerDistance()
+
+        -- 🔥 Aktif jika < 30 studs
+        if distance <= 30 then
+            if not isSpeedBoostActive then
+                applySpeedBoost()
+            end
+
+        -- 🔻 Nonaktif jika > 40 studs (biar nggak flicker)
+        elseif distance >= 40 then
+            if isSpeedBoostActive then
+                removeSpeedBoost()
+            end
         end
     end)
 end
@@ -671,10 +702,9 @@ local function stopSpeedBoostMonitor()
         currentBoostConnection = nil
     end
 
-    if localHumanoid and config.originalWalkSpeed then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
-    end
+    removeSpeedBoost()
 end
+
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================

@@ -260,7 +260,7 @@ local function startAutoWin()
             local success = teleportToFinishline()
             if success then
                 print("[AutoWin] Teleport ke Fininshline berhasil. Menunggu 5 detik...")
-                task.wait(5)   -- tunggu 5 detik
+                task.wait(50000)   -- tunggu 5 detik
                 -- 2. Teleport ke carlobby
                 local lobbySuccess = teleportToCarlobby()
                 if lobbySuccess then
@@ -610,36 +610,71 @@ end
 -- ============================================================================
 -- FEATURE 4: SPEED BOOST ON DAMAGE (UNCHANGED)
 -- ============================================================================
+local function isPlayerNearby(maxDistance)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot and localRootPart then
+                local distance = (targetRoot.Position - localRootPart.Position).Magnitude
+                if distance <= maxDistance then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function applySpeedBoost()
     if not config.speedBoostEnabled then return end
     if not localHumanoid then return end
     if boostDebounce then return end
+
     boostDebounce = true
-    if config.originalWalkSpeed == 32 then config.originalWalkSpeed = localHumanoid.WalkSpeed end
-    localHumanoid.WalkSpeed = config.originalWalkSpeed + config.boostAmount
+
+    -- Simpan speed asli
+    if not config.originalWalkSpeed then
+        config.originalWalkSpeed = localHumanoid.WalkSpeed
+    end
+
+    -- 1.5x speed
+    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5
     isSpeedBoostActive = true
-    task.wait(config.boostDuration)
-    if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end
+
+    task.wait(3)
+
+    if localHumanoid then
+        localHumanoid.WalkSpeed = config.originalWalkSpeed
+    end
+
     isSpeedBoostActive = false
     boostDebounce = false
 end
 
 local function startSpeedBoostMonitor()
     if currentBoostConnection then return end
-    local lastHealth = 100
+
     currentBoostConnection = RunService.Heartbeat:Connect(function()
         if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid then return end
-        if lastHealth == 100 then lastHealth = localHumanoid.Health end
-        if localHumanoid.Health < lastHealth then applySpeedBoost() end
-        lastHealth = localHumanoid.Health
+        if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
+
+        -- Trigger jika ada player dalam 10 studs
+        if isPlayerNearby(10) then
+            applySpeedBoost()
+        end
     end)
 end
-local function stopSpeedBoostMonitor()
-    if currentBoostConnection then currentBoostConnection:Disconnect(); currentBoostConnection = nil end
-    if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end
-end
 
+local function stopSpeedBoostMonitor()
+    if currentBoostConnection then
+        currentBoostConnection:Disconnect()
+        currentBoostConnection = nil
+    end
+
+    if localHumanoid and config.originalWalkSpeed then
+        localHumanoid.WalkSpeed = config.originalWalkSpeed
+    end
+end
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================

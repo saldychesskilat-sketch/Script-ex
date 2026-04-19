@@ -608,70 +608,92 @@ local function startESP()
 end
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST ON DAMAGE (UNCHANGED)
+-- UPGRADE SPEED BOOST (DETEKSI KILLER LEBIH AKURAT)
 -- ============================================================================
+
+-- Fungsi deteksi killer yang lebih robust
 local function isKiller(player)
     if not player then return false end
 
     -- Deteksi berdasarkan Team
     if player.Team and player.Team.Name then
-        local name = player.Team.Name:lower()
-        if name:find("killer") or name:find("monster") or name:find("enemy") then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
             return true
         end
     end
 
-    -- Fallback: cek tool
+    -- Fallback: cek tool di karakter
     if player.Character then
         local tool = player.Character:FindFirstChildWhichIsA("Tool")
-        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-            return true
+        if tool then
+            local toolName = tool.Name:lower()
+            if toolName:find("knife") or toolName:find("weapon") or toolName:find("sword") or toolName:find("axe") then
+                return true
+            end
         end
+    end
+
+    -- Fallback tambahan: cek nama player (untuk game yang tidak pakai team)
+    local playerName = player.Name:lower()
+    if playerName:find("killer") or playerName:find("monster") then
+        return true
     end
 
     return false
 end
 
+-- Dapatkan jarak terdekat ke killer (atau math.huge jika tidak ada)
 local function getKillerDistance()
-    local closestDistance = math.huge
+    if not localRootPart then return math.huge end
+    local closest = math.huge
+    local localPos = localRootPart.Position
 
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and isKiller(player) and player.Character then
-            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-            if targetRoot and localRootPart then
-                local distance = (targetRoot.Position - localRootPart.Position).Magnitude
-                if distance < closestDistance then
-                    closestDistance = distance
+        if player ~= localPlayer and isKiller(player) then
+            local char = player.Character
+            if char then
+                local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if targetRoot then
+                    local dist = (targetRoot.Position - localPos).Magnitude
+                    if dist < closest then
+                        closest = dist
+                    end
                 end
             end
         end
     end
-
-    return closestDistance
+    return closest
 end
 
+-- Terapkan speed boost (1.5x kecepatan asli)
 local function applySpeedBoost()
     if not config.speedBoostEnabled then return end
     if not localHumanoid then return end
 
-    -- Simpan speed asli
+    -- Simpan speed asli jika belum
     if not config.originalWalkSpeed then
         config.originalWalkSpeed = localHumanoid.WalkSpeed
     end
 
     -- Aktifkan boost
-    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5
+    local newSpeed = config.originalWalkSpeed * 1.5
+    localHumanoid.WalkSpeed = newSpeed
     isSpeedBoostActive = true
+    print("[SpeedBoost] Activated. Speed: " .. newSpeed)
 end
 
+-- Hapus speed boost (kembali ke asli)
 local function removeSpeedBoost()
     if not localHumanoid then return end
     if config.originalWalkSpeed then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
     end
     isSpeedBoostActive = false
+    print("[SpeedBoost] Deactivated. Speed restored: " .. tostring(config.originalWalkSpeed))
 end
 
+-- Monitor jarak killer
 local function startSpeedBoostMonitor()
     if currentBoostConnection then return end
 
@@ -679,15 +701,22 @@ local function startSpeedBoostMonitor()
         if not config.speedBoostEnabled then return end
         if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
 
+        -- Cek apakah player masih hidup (health > 0)
+        if localHumanoid.Health <= 0 then
+            if isSpeedBoostActive then
+                removeSpeedBoost()
+            end
+            return
+        end
+
         local distance = getKillerDistance()
 
-        -- 🔥 Aktif jika < 30 studs
+        -- Aktifkan jika jarak <= 30 studs
         if distance <= 30 then
             if not isSpeedBoostActive then
                 applySpeedBoost()
             end
-
-        -- 🔻 Nonaktif jika > 40 studs (biar nggak flicker)
+        -- Nonaktifkan jika jarak >= 40 studs (histeresis)
         elseif distance >= 40 then
             if isSpeedBoostActive then
                 removeSpeedBoost()
@@ -696,12 +725,12 @@ local function startSpeedBoostMonitor()
     end)
 end
 
+-- Stop monitor
 local function stopSpeedBoostMonitor()
     if currentBoostConnection then
         currentBoostConnection:Disconnect()
         currentBoostConnection = nil
     end
-
     removeSpeedBoost()
 end
 

@@ -666,7 +666,56 @@ local function getKillerDistance()
     return closest
 end
 
--- Terapkan speed boost (1.5x kecepatan asli)
+-- Efek GUI animasi (partikel dan teks)
+local speedBoostEffectGui = nil
+local speedBoostEffectLabel = nil
+
+local function createSpeedBoostEffect()
+    if speedBoostEffectGui and speedBoostEffectGui.Parent then return end
+    if not CoreGui then CoreGui = game:GetService("CoreGui") end
+
+    speedBoostEffectGui = Instance.new("ScreenGui")
+    speedBoostEffectGui.Name = "CyberHeroes_SpeedBoostEffect"
+    speedBoostEffectGui.ResetOnSpawn = false
+    speedBoostEffectGui.Parent = CoreGui
+
+    -- Frame background transparan dengan efek glow
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 200, 0, 50)
+    frame.Position = UDim2.new(0.5, -100, 0.85, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+    frame.BackgroundTransparency = 0.8
+    frame.BorderSizePixel = 0
+    frame.Parent = speedBoostEffectGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    speedBoostEffectLabel = Instance.new("TextLabel")
+    speedBoostEffectLabel.Size = UDim2.new(1, 0, 1, 0)
+    speedBoostEffectLabel.Text = "⚡ TPWALK ACTIVE ⚡"
+    speedBoostEffectLabel.TextColor3 = Color3.fromRGB(0, 230, 255)
+    speedBoostEffectLabel.BackgroundTransparency = 1
+    speedBoostEffectLabel.Font = Enum.Font.GothamBold
+    speedBoostEffectLabel.TextSize = 14
+    speedBoostEffectLabel.TextScaled = true
+    speedBoostEffectLabel.Parent = frame
+
+    -- Animasi pulse
+    local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local tween = TweenService:Create(frame, tweenInfo, {BackgroundTransparency = 0.5})
+    tween:Play()
+end
+
+local function destroySpeedBoostEffect()
+    if speedBoostEffectGui then
+        speedBoostEffectGui:Destroy()
+        speedBoostEffectGui = nil
+        speedBoostEffectLabel = nil
+    end
+end
+
+-- Terapkan speed boost (tpwalk style: speed + dash effect)
 local function applySpeedBoost()
     if not config.speedBoostEnabled then return end
     if not localHumanoid then return end
@@ -676,11 +725,34 @@ local function applySpeedBoost()
         config.originalWalkSpeed = localHumanoid.WalkSpeed
     end
 
-    -- Aktifkan boost
-    local newSpeed = config.originalWalkSpeed * 1.5
+    -- Aktifkan boost kecepatan (tpwalk: gerak cepat)
+    local newSpeed = config.originalWalkSpeed * 2.0  -- 2x speed, lebih terasa
     localHumanoid.WalkSpeed = newSpeed
     isSpeedBoostActive = true
-    print("[SpeedBoost] Activated. Speed: " .. newSpeed)
+
+    -- Efek dash (teleport kecil ke depan) untuk memberikan sensasi tpwalk
+    if localRootPart then
+        local forward = localRootPart.CFrame.LookVector
+        local newPos = localRootPart.Position + forward * 2
+        pcall(function() localRootPart.CFrame = CFrame.new(newPos) end)
+    end
+
+    -- Tambahkan efek partikel di sekitar karakter
+    if localCharacter then
+        local particles = Instance.new("ParticleEmitter")
+        particles.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        particles.Rate = 100
+        particles.Lifetime = NumberRange.new(0.3)
+        particles.Speed = NumberRange.new(2, 5)
+        particles.Color = ColorSequence.new(Color3.fromRGB(0, 200, 255))
+        particles.Parent = localRootPart or localCharacter
+        Debris:AddItem(particles, 0.5)
+    end
+
+    -- Tampilkan GUI animasi
+    createSpeedBoostEffect()
+
+    print("[TPWalk] Activated. Speed: " .. newSpeed)
 end
 
 -- Hapus speed boost (kembali ke asli)
@@ -690,7 +762,11 @@ local function removeSpeedBoost()
         localHumanoid.WalkSpeed = config.originalWalkSpeed
     end
     isSpeedBoostActive = false
-    print("[SpeedBoost] Deactivated. Speed restored: " .. tostring(config.originalWalkSpeed))
+
+    -- Hapus GUI efek
+    destroySpeedBoostEffect()
+
+    print("[TPWalk] Deactivated. Speed restored: " .. tostring(config.originalWalkSpeed))
 end
 
 -- Monitor jarak killer

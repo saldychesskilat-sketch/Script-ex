@@ -708,7 +708,7 @@ local function applyTpwalkBoost()
     -- Efek dash ringan (teleport kecil ke depan)
     if localRootPart then
         local forward = localRootPart.CFrame.LookVector
-        local newPos = localRootPart.Position + forward * 1.5
+        local newPos = localRootPart.Position + forward * 2.1
         pcall(function() localRootPart.CFrame = CFrame.new(newPos) end)
     end
     -- Tampilkan efek GUI

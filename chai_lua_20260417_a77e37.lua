@@ -638,7 +638,7 @@ local function applySpeedBoost()
     end
 
     -- 1.5x speed
-    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5
+    localHumanoid.WalkSpeed = config.originalWalkSpeed * 2
     isSpeedBoostActive = true
 
     task.wait(3)

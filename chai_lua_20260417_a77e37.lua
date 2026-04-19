@@ -659,7 +659,7 @@ local function startSpeedBoostMonitor()
         if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
 
         -- Trigger jika ada player dalam 10 studs
-        if isPlayerNearby(10) then
+        if isPlayerNearby(20) then
             applySpeedBoost()
         end
     end)

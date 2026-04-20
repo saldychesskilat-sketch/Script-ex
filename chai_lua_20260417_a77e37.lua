@@ -608,183 +608,139 @@ local function startESP()
 end
 
 -- ============================================================================
--- UPGRADE SPEED BOOST (DETEKSI KILLER LEBIH AKURAT)
+-- UPGRADE: TAMBAHKAN FUNGSI DETEKSI KILLER, JARAK, DAN TPWALK (FALLBACK)
 -- ============================================================================
--- Variabel untuk efek GUI
-local tpwalkGui = nil
-local tpwalkEffectConnection = nil
-local speedLines = {}
+-- Bagian ini ditambahkan DI BAWAH fungsi-fungsi yang sudah ada.
+-- Jangan menghapus atau mengubah kode di atas.
 
--- Fungsi membuat efek GUI modern untuk TPWalk
-local function createTpwalkEffect()
-    if tpwalkGui then
-        tpwalkGui:Destroy()
-        tpwalkGui = nil
+-- ============================================================================
+-- 1. FUNGSI DETEKSI KILLER (TAMBAHAN)
+-- ============================================================================
+local function isKiller(player)
+    if not player then return false end
+    -- Cek Team
+    if player.Team and player.Team.Name then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            return true
+        end
     end
-    tpwalkGui = Instance.new("ScreenGui")
-    tpwalkGui.Name = "CyberHeroes_TpwalkEffect"
-    tpwalkGui.ResetOnSpawn = false
-    tpwalkGui.Parent = CoreGui
-
-    -- Frame utama semi-transparan dengan gradien
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(1, 0, 1, 0)
-    mainFrame.BackgroundTransparency = 0.85
-    mainFrame.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = tpwalkGui
-    local gradient = Instance.new("UIGradient")
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 150, 200)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 50, 100))
-    })
-    gradient.Rotation = 45
-    gradient.Parent = mainFrame
-
-    -- Teks indikator
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(0, 200, 0, 30)
-    textLabel.Position = UDim2.new(0.5, -100, 0.85, 0)
-    textLabel.Text = "⚡ TPWALK ACTIVE ⚡"
-    textLabel.TextColor3 = Color3.fromRGB(0, 230, 255)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.TextSize = 16
-    textLabel.TextScaled = true
-    textLabel.Parent = tpwalkGui
-    -- Animasi fade in/out (pulse)
-    local textTween = TweenService:Create(textLabel, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
-        TextTransparency = 0.5
-    })
-    textTween:Play()
-
-    -- Garis kecepatan di sisi kiri dan kanan (effek motion)
-    for i = 1, 6 do
-        local line = Instance.new("Frame")
-        line.Size = UDim2.new(0, 4, 0, 30 + i*10)
-        line.Position = UDim2.new(i % 2 == 0 and 0.02 or 0.96, 0, 0.5, -15 - i*5)
-        line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-        line.BackgroundTransparency = 0.6
-        line.BorderSizePixel = 0
-        line.Parent = tpwalkGui
-        table.insert(speedLines, line)
-        -- Animasi garis bergerak
-        local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, true)
-        local moveTween = TweenService:Create(line, tweenInfo, {Position = UDim2.new(line.Position.X.Scale, line.Position.X.Offset, 0.5, -15 - i*5 + 20)})
-        moveTween:Play()
+    -- Cek Tool di karakter
+    if player.Character then
+        local tool = player.Character:FindFirstChildWhichIsA("Tool")
+        if tool then
+            local toolName = tool.Name:lower()
+            if toolName:find("knife") or toolName:find("weapon") then
+                return true
+            end
+        end
     end
-
-    -- Glow pinggiran layar (efek cahaya)
-    local glow = Instance.new("Frame")
-    glow.Size = UDim2.new(1, 0, 1, 0)
-    glow.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-    glow.BackgroundTransparency = 0.9
-    glow.BorderSizePixel = 0
-    glow.Parent = tpwalkGui
-    local glowTween = TweenService:Create(glow, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
-        BackgroundTransparency = 0.7
-    })
-    glowTween:Play()
+    return false
 end
 
--- Hapus efek GUI
-local function destroyTpwalkEffect()
-    if tpwalkGui then
-        tpwalkGui:Destroy()
-        tpwalkGui = nil
-    end
-    speedLines = {}
-end
-
--- Terapkan TPWalk (kecepatan 1.5x)
-local function applyTpwalkBoost()
-    if not config.tpwalkEnabled then return end
-    if isTpwalkActive then return end
-    if not localHumanoid then return end
-    if originalTpwalkSpeed == 16 then originalTpwalkSpeed = localHumanoid.WalkSpeed end
-    local boostSpeed = originalTpwalkSpeed * 1.5   -- 1.5x speed, bukan 2x
-    localHumanoid.WalkSpeed = boostSpeed
-    isTpwalkActive = true
-    -- Efek dash ringan (teleport kecil ke depan)
-    if localRootPart then
-        local forward = localRootPart.CFrame.LookVector
-        local newPos = localRootPart.Position + forward * 2.1
-        pcall(function() localRootPart.CFrame = CFrame.new(newPos) end)
-    end
-    -- Tampilkan efek GUI
-    createTpwalkEffect()
-    print("[Tpwalk] Activated. Speed: " .. boostSpeed)
-end
-
--- Hapus TPWalk (kembali normal)
-local function removeTpwalkBoost()
-    if not isTpwalkActive then return end
-    if localHumanoid then
-        localHumanoid.WalkSpeed = originalTpwalkSpeed
-    end
-    isTpwalkActive = false
-    destroyTpwalkEffect()
-    print("[Tpwalk] Deactivated. Speed restored: " .. originalTpwalkSpeed)
-end
-
--- Cek jarak killer dan trigger TPWalk (histeresis: aktif <=30, nonaktif >=40)
-local function checkTpwalkProximity()
-    if not config.tpwalkEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
+-- ============================================================================
+-- 2. FUNGSI GET JARAK KILLER TERDEKAT (TAMBAHAN)
+-- ============================================================================
+local function getKillerDistance()
+    if not localRootPart then return math.huge end
     local localPos = localRootPart.Position
-    local nearestKillerDistance = math.huge
+    local closest = math.huge
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
+        if player ~= localPlayer and isKiller(player) then
             local char = player.Character
             if char then
-                local isKiller = false
-                if player.Team then
-                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
-                end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                        isKiller = true
-                    end
-                end
-                if isKiller then
-                    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if rootPart then
-                        local distance = (localPos - rootPart.Position).Magnitude
-                        if distance < nearestKillerDistance then
-                            nearestKillerDistance = distance
-                        end
+                local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if targetRoot then
+                    local dist = (targetRoot.Position - localPos).Magnitude
+                    if dist < closest then
+                        closest = dist
                     end
                 end
             end
         end
     end
-    if nearestKillerDistance <= 30 then
-        if not isTpwalkActive then
-            applyTpwalkBoost()
-        end
-    elseif nearestKillerDistance >= 40 then
-        if isTpwalkActive then
-            removeTpwalkBoost()
-        end
-    end
+    return closest
 end
 
--- Start/stop monitor TPWalk
-local function startTpwalkMonitor()
+-- ============================================================================
+-- 3. SISTEM TPWALK (FALLBACK) - BERBASIS CFrame
+-- ============================================================================
+local isTpwalkActive = false
+local tpwalkConnection = nil
+local tpwalkCooldown = false
+
+local function applyTPWalk()
+    if not config.speedBoostEnabled then return end          -- menggunakan config yang sama
+    if not localHumanoid or not localRootPart then return end
+    if tpwalkCooldown then return end
+
+    local moveDir = localHumanoid.MoveDirection
+    if moveDir.Magnitude < 0.1 then return end   -- tidak bergerak, jangan teleport
+
+    -- Gerakkan CFrame searah MoveDirection sejauh 1.5 studs
+    localRootPart.CFrame = localRootPart.CFrame + (moveDir.Unit * 1.5)
+    isTpwalkActive = true
+
+    -- Cooldown singkat agar tidak terlalu cepat (0.2 detik)
+    tpwalkCooldown = true
+    task.wait(0.2)
+    tpwalkCooldown = false
+end
+
+-- ============================================================================
+-- 4. MONITOR TPWALK (JIKA SPEED BOOST UTAMA TIDAK EFEKTIF)
+-- ============================================================================
+-- Fungsi ini akan berjalan paralel dengan speed boost utama.
+-- Diaktifkan berdasarkan jarak killer (≤ 30 studs)
+local function startTpwalkFallback()
     if tpwalkConnection then return end
-    tpwalkConnection = RunService.Heartbeat:Connect(checkTpwalkProximity)
-    print("[Tpwalk] Monitor started (1.5x speed when killer ≤ 30 studs)")
+    tpwalkConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled then return end
+        if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
+
+        -- Cek jarak killer
+        local killerDist = getKillerDistance()
+        if killerDist <= 30 then
+            -- Hanya gunakan TPWalk jika speed boost tidak aktif (opsional)
+            -- Atau bisa digunakan sebagai pelengkap. Kita jalankan TPWalk sebagai fallback.
+            applyTPWalk()
+        end
+    end)
+    print("[TPWalkFallback] Monitoring started (active when killer distance ≤ 30 studs)")
 end
 
-local function stopTpwalkMonitor()
+local function stopTpwalkFallback()
     if tpwalkConnection then
         tpwalkConnection:Disconnect()
         tpwalkConnection = nil
     end
-    removeTpwalkBoost()
-    print("[Tpwalk] Monitor stopped")
+    isTpwalkActive = false
+    print("[TPWalkFallback] Monitoring stopped")
 end
+
+-- ============================================================================
+-- 5. MODIFIKASI FUNGSI START/STOP SPEED BOOST MONITOR (TAMBAHKAN TPWALK)
+-- ============================================================================
+-- Simpan fungsi asli sementara agar bisa di-override dengan aman
+local originalStartSpeedBoostMonitor = startSpeedBoostMonitor
+local originalStopSpeedBoostMonitor = stopSpeedBoostMonitor
+
+-- Override startSpeedBoostMonitor untuk juga memulai TPWalk fallback
+function startSpeedBoostMonitor()
+    if currentBoostConnection then return end
+    originalStartSpeedBoostMonitor()
+    startTpwalkFallback()
+end
+
+-- Override stopSpeedBoostMonitor untuk juga menghentikan TPWalk fallback
+function stopSpeedBoostMonitor()
+    originalStopSpeedBoostMonitor()
+    stopTpwalkFallback()
+end
+
+-- ============================================================================
+-- CATATAN: PASTIKAN FUNGSI `getLocalCharacter()` dan variabel `config`, `localRootPart`, `localHumanoid` sudah didefinisikan di script asli.
+-- ============================================================================
 
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)

@@ -1444,12 +1444,9 @@ local function stopAutoGeneratorLoop()
     print("[AutoGenerator] Auto generator stopped")
 end
 
-
--- ============================================================================
--- UPGRADED AUTO SKILL CHECK (HIGHER ACCURACY - EARLY ZONE)
--- ============================================================================
-
--- Mendapatkan target GUI tombol skill check
+----------------_----------------------
+-- Skull check
+-----------------------------------------
 local function GetActionTarget()
     local current = localPlayer:FindFirstChild("PlayerGui")
     if not current then return nil end
@@ -1459,7 +1456,6 @@ local function GetActionTarget()
     return current
 end
 
--- Simulasi sentuhan pada tombol mobile (skill check)
 local function TriggerMobileButton()
     local b = GetActionTarget()
     if b and b:IsA("GuiObject") then
@@ -1473,98 +1469,6 @@ local function TriggerMobileButton()
     end
 end
 
--- === UPGRADE 1: Menggunakan area penekanan lebih awal (sedikit di belakang goal) ===
--- Area target: dari goal+100 derajat hingga goal+108 derajat (awal zona hijau)
-local function isAngleInEarlyZone(angle, goalAngle)
-    local startAngle = (goalAngle + 100) % 360
-    local endAngle   = (goalAngle + 108) % 360
-    if startAngle <= endAngle then
-        return angle >= startAngle and angle <= endAngle
-    else
-        return angle >= startAngle or angle <= endAngle
-    end
-end
-
--- Fungsi auto skill check dengan prediksi waktu (akurasi tinggi)
-local function startAutoSkillCheck()
-    if autoSkillCheckConnection then return end
-    
-    local lastPressTime = 0
-    local pressCooldown = 0.25
-    
-    autoSkillCheckConnection = RunService.Stepped:Connect(function()
-        if not config.autoSkillCheckEnabled then return end
-        if not getLocalCharacter() then return end
-        
-        local playerGui = localPlayer:FindFirstChild("PlayerGui")
-        if not playerGui then return end
-        
-        local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
-        if not prompt then return end
-        
-        local check = prompt:FindFirstChild("Check")
-        if not check or not check.Visible then return end
-        
-        local line = check:FindFirstChild("Line")
-        local goal = check:FindFirstChild("Goal")
-        if not line or not goal then return end
-        
-        local lineRot = line.Rotation % 360
-        local goalRot = goal.Rotation % 360
-        
-        -- Jika jarum sudah di area awal (100-108), langsung tekan
-        if isAngleInEarlyZone(lineRot, goalRot) then
-            if tick() - lastPressTime > pressCooldown then
-                TriggerMobileButton()
-                lastPressTime = tick()
-                line._lastRot = nil
-                line._lastTime = nil
-            end
-        else
-            -- Prediksi waktu menuju area awal (target = goal+104)
-            local targetCenter = (goalRot + 104) % 360
-            if not line._lastRot then
-                line._lastRot = lineRot
-                line._lastTime = tick()
-                return
-            end
-            
-            local now = tick()
-            local deltaTime = now - line._lastTime
-            if deltaTime <= 0 then return end
-            
-            local deltaRot = (lineRot - line._lastRot) % 360
-            if deltaRot > 180 then deltaRot = deltaRot - 360 end
-            if deltaRot == 0 then return end
-            
-            local rotSpeed = deltaRot / deltaTime
-            local diffToCenter = (targetCenter - lineRot) % 360
-            if diffToCenter > 180 then diffToCenter = diffToCenter - 360 end
-            
-            if diffToCenter * deltaRot > 0 then
-                local timeToTarget = diffToCenter / rotSpeed
-                if timeToTarget > 0 and timeToTarget < 0.15 then
-                    task.delay(timeToTarget, function()
-                        if check and check.Visible then
-                            TriggerMobileButton()
-                            lastPressTime = tick()
-                        end
-                    end)
-                    line._lastRot = nil
-                    line._lastTime = nil
-                    return
-                end
-            end
-            line._lastRot = lineRot
-            line._lastTime = now
-        end
-    end)
-    
-    InitializeAutobuy()
-    print("[AutoSkillCheck] Auto skill check started (early zone: 100-108 deg)")
-end
-
--- === UPGRADE 2: Fallback menggunakan event Visible dengan area awal yang sama ===
 local function InitializeAutobuy()
     task.spawn(function()
         local playerGui = localPlayer:FindFirstChild("PlayerGui")
@@ -1579,55 +1483,58 @@ local function InitializeAutobuy()
         local goal = check:FindFirstChild("Goal")
         if not line or not goal then return end
         if VisibilityConnection then VisibilityConnection:Disconnect() end
-        
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end
                 HeartbeatConnection = RunService.Heartbeat:Connect(function()
-                    if not check.Visible then
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
-                        return
-                    end
                     local lr = line.Rotation % 360
                     local gr = goal.Rotation % 360
-                    local startAngle = (gr + 100) % 360
-                    local endAngle   = (gr + 108) % 360
-                    local inEarlyZone = false
-                    if startAngle <= endAngle then
-                        if lr >= startAngle and lr <= endAngle then inEarlyZone = true end
+                    local ss = (gr + 115) % 360
+                    local se = (gr + 120) % 360
+                    local inRange = false
+                    if ss > se then
+                        if lr >= ss or lr <= se then inRange = true end
                     else
-                        if lr >= startAngle or lr <= endAngle then inEarlyZone = true end
+                        if lr >= ss and lr <= se then inRange = true end
                     end
-                    if inEarlyZone then
+                    if inRange then
                         TriggerMobileButton()
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                     end
                 end)
-            elseif HeartbeatConnection then
-                HeartbeatConnection:Disconnect()
-                HeartbeatConnection = nil
-            end
+            elseif HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
         end)
     end)
 end
 
--- Fungsi untuk menghentikan auto skill check (tetap)
+local function startAutoSkillCheck()
+    if autoSkillCheckConnection then return end
+    autoSkillCheckConnection = RunService.Heartbeat:Connect(function()
+        if not config.autoSkillCheckEnabled then return end
+        if not getLocalCharacter() then return end
+        local playerGui = localPlayer:FindFirstChild("PlayerGui")
+        if playerGui then
+            for _, gui in ipairs(playerGui:GetDescendants()) do
+                if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+                    local name = gui.Name:lower()
+                    if name:find("skill") or name:find("check") or name:find("qte") or name:find("repair") then
+                        if gui.Visible and gui.Active then
+                            pcall(function() gui:FireClick() end)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    InitializeAutobuy()
+    print("[AutoSkillCheck] Auto skill check started")
+end
 local function stopAutoSkillCheck()
-    if autoSkillCheckConnection then
-        autoSkillCheckConnection:Disconnect()
-        autoSkillCheckConnection = nil
-    end
-    if VisibilityConnection then
-        VisibilityConnection:Disconnect()
-        VisibilityConnection = nil
-    end
-    if HeartbeatConnection then
-        HeartbeatConnection:Disconnect()
-        HeartbeatConnection = nil
-    end
+    if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end
+    if VisibilityConnection then VisibilityConnection:Disconnect(); VisibilityConnection = nil end
+    if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
     print("[AutoSkillCheck] Auto skill check stopped")
 end
-
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================

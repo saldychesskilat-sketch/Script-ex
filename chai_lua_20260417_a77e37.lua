@@ -1446,170 +1446,9 @@ end
 
 
 -- ============================================================================
--- AUTO SKILL CHECK - HIGH ACCURACY (98-100%) dengan prediksi waktu
+-- MODIFIED AUTO SKILL CHECK (with 0.3 sec delay before triggering)
 -- ============================================================================
 
-local autoSkillCheckConnection = nil
-local VisibilityConnection = nil
-local HeartbeatConnection = nil
-local TouchID = 8822
-local ActionPath = "Survivor-mob.Controls.action.check"
-
--- Fungsi untuk mendapatkan target GUI skill check
-local function GetActionTarget()
-    local current = localPlayer:FindFirstChild("PlayerGui")
-    if not current then return nil end
-    for segment in string.gmatch(ActionPath, "[^%.]+") do
-        current = current and current:FindFirstChild(segment)
-    end
-    return current
-end
-
--- Fungsi untuk mensimulasikan sentuhan pada tombol mobile (skill check)
-local function TriggerMobileButton()
-    local b = GetActionTarget()
-    if b and b:IsA("GuiObject") then
-        local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
-        local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
-        pcall(function()
-            VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy)
-            task.wait(0.01)
-            VirtualInputManager:SendTouchEvent(TouchID, 2, cx, cy)
-        end)
-    end
-end
-
--- Variabel untuk prediksi
-local lastLineRot = nil
-local lastTime = nil
-local scheduled = false
-local scheduledTask = nil
-
--- Fungsi utama auto skill check dengan prediksi waktu
-local function startAutoSkillCheck()
-    if autoSkillCheckConnection then return end
-    
-    -- Reset variabel prediksi
-    lastLineRot = nil
-    lastTime = nil
-    scheduled = false
-    if scheduledTask then task.cancel(scheduledTask) end
-    
-    autoSkillCheckConnection = RunService.Heartbeat:Connect(function()
-        if not config.autoSkillCheckEnabled then return end
-        if not getLocalCharacter() then return end
-        
-        local playerGui = localPlayer:FindFirstChild("PlayerGui")
-        if not playerGui then return end
-        
-        -- Cari GUI skill check
-        local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
-        if not prompt then return end
-        
-        local check = prompt:FindFirstChild("Check")
-        if not check or not check.Visible then
-            -- Reset prediksi jika skill check tidak aktif
-            lastLineRot = nil
-            lastTime = nil
-            scheduled = false
-            if scheduledTask then task.cancel(scheduledTask); scheduledTask = nil end
-            return
-        end
-        
-        local line = check:FindFirstChild("Line")
-        local goal = check:FindFirstChild("Goal")
-        if not line or not goal then return end
-        
-        local lineRot = line.Rotation % 360
-        local goalRot = goal.Rotation % 360
-        
-        -- Area target: dari goalRot + 101 hingga goalRot + 115 (lebar 14 derajat)
-        -- Titik tengah = goalRot + 108
-        local targetStart = (goalRot + 101) % 360
-        local targetEnd   = (goalRot + 115) % 360
-        local targetCenter = (goalRot + 108) % 360
-        
-        -- Cek apakah jarum sudah di dalam area
-        local function isInRange(rot)
-            if targetStart <= targetEnd then
-                return rot >= targetStart and rot <= targetEnd
-            else
-                return rot >= targetStart or rot <= targetEnd
-            end
-        end
-        
-        -- Hitung jarak sudut terpendek dari posisi sekarang ke target center
-        local function angleDifference(from, to)
-            local diff = (to - from) % 360
-            if diff > 180 then diff = diff - 360 end
-            return diff
-        end
-        
-        local currentDiff = angleDifference(lineRot, targetCenter)
-        local absDiff = math.abs(currentDiff)
-        
-        -- Jika sudah di dalam area, langsung tekan dengan sedikit delay untuk memastikan tepat di tengah
-        if isInRange(lineRot) then
-            -- Jika sudah terjadwal, batalkan karena kita akan tekan sekarang
-            if scheduledTask then
-                task.cancel(scheduledTask)
-                scheduledTask = nil
-                scheduled = false
-            end
-            -- Tekan segera (atau dengan delay minimal untuk presisi)
-            TriggerMobileButton()
-            lastLineRot = nil  -- reset untuk siklus berikutnya
-            lastTime = nil
-            return
-        end
-        
-        -- Prediksi waktu menuju target center
-        local now = tick()
-        if lastLineRot and lastTime then
-            local deltaTime = now - lastTime
-            if deltaTime > 0 then
-                -- Hitung kecepatan rotasi (derajat per detik)
-                local deltaRot = angleDifference(lastLineRot, lineRot)
-                local rotSpeed = deltaRot / deltaTime
-                
-                if rotSpeed > 0 then
-                    -- Waktu yang diperlukan untuk mencapai target center
-                    local timeToTarget = absDiff / rotSpeed
-                    -- Hanya jika waktu positif dan tidak terlalu besar (dalam rentang prediksi)
-                    if timeToTarget > 0 and timeToTarget < 0.2 and not scheduled then
-                        -- Jadwalkan penekanan tepat saat mencapai target center, dengan offset +0.005 detik
-                        scheduled = true
-                        scheduledTask = task.delay(timeToTarget + 0.005, function()
-                            if config.autoSkillCheckEnabled then
-                                -- Cek ulang apakah masih dalam area setelah delay
-                                local newLineRot = line.Rotation % 360
-                                if isInRange(newLineRot) then
-                                    TriggerMobileButton()
-                                else
-                                    -- Fallback: jika lewat, coba tekan dengan toleransi
-                                    TriggerMobileButton()
-                                end
-                            end
-                            scheduled = false
-                            scheduledTask = nil
-                        end)
-                    end
-                end
-            end
-        end
-        
-        -- Simpan data untuk frame berikutnya
-        lastLineRot = lineRot
-        lastTime = now
-    end)
-    
-    -- Inisialisasi fallback (untuk berjaga-jaga jika prediksi gagal)
-    InitializeAutobuy()
-    
-    print("[AutoSkillCheck] Auto skill check started (precision prediction mode - ~99% accuracy)")
-end
-
--- Fallback dengan metode sederhana (hanya untuk berjaga-jaga jika prediksi tidak aktif)
 local function InitializeAutobuy()
     task.spawn(function()
         local playerGui = localPlayer:FindFirstChild("PlayerGui")
@@ -1624,27 +1463,22 @@ local function InitializeAutobuy()
         local goal = check:FindFirstChild("Goal")
         if not line or not goal then return end
         if VisibilityConnection then VisibilityConnection:Disconnect() end
-        
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end
                 HeartbeatConnection = RunService.Heartbeat:Connect(function()
-                    if not check.Visible then
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
-                        return
-                    end
                     local lr = line.Rotation % 360
                     local gr = goal.Rotation % 360
-                    local targetStart = (gr + 101) % 360
-                    local targetEnd   = (gr + 115) % 360
-                    local function isInRange(r)
-                        if targetStart <= targetEnd then
-                            return r >= targetStart and r <= targetEnd
-                        else
-                            return r >= targetStart or r <= targetEnd
-                        end
+                    local ss = (gr + 101) % 360
+                    local se = (gr + 115) % 360
+                    local inRange = false
+                    if ss > se then
+                        if lr >= ss or lr <= se then inRange = true end
+                    else
+                        if lr >= ss and lr <= se then inRange = true end
                     end
-                    if isInRange(lr) then
+                    if inRange then
+                        task.wait(0.3)  -- ADDED DELAY before sending the touch
                         TriggerMobileButton()
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                     end
@@ -1654,7 +1488,96 @@ local function InitializeAutobuy()
     end)
 end
 
--- Fungsi stop
+local function startAutoSkillCheck()
+    if autoSkillCheckConnection then return end
+    
+    local lastPressTime = 0
+    local pressCooldown = 0.25
+    
+    autoSkillCheckConnection = RunService.Stepped:Connect(function()
+        if not config.autoSkillCheckEnabled then return end
+        if not getLocalCharacter() then return end
+        
+        local playerGui = localPlayer:FindFirstChild("PlayerGui")
+        if not playerGui then return end
+        
+        local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
+        if not prompt then return end
+        
+        local check = prompt:FindFirstChild("Check")
+        if not check or not check.Visible then return end
+        
+        local line = check:FindFirstChild("Line")
+        local goal = check:FindFirstChild("Goal")
+        if not line or not goal then return end
+        
+        local lineRot = line.Rotation % 360
+        local goalRot = goal.Rotation % 360
+        
+        local startAngle = (goalRot + 110) % 360
+        local endAngle   = (goalRot + 115) % 360
+        local targetCenter = (goalRot + 114) % 360
+        
+        local function isAngleInRange(angle, startAng, endAng)
+            if startAng <= endAng then
+                return angle >= startAng and angle <= endAng
+            else
+                return angle >= startAng or angle <= endAng
+            end
+        end
+        
+        if isAngleInRange(lineRot, startAngle, endAngle) then
+            if tick() - lastPressTime > pressCooldown then
+                task.wait(0.3)  -- ADDED DELAY before sending the touch
+                TriggerMobileButton()
+                lastPressTime = tick()
+                line._lastRot = nil
+                line._lastTime = nil
+            end
+        else
+            if not line._lastRot then
+                line._lastRot = lineRot
+                line._lastTime = tick()
+                return
+            end
+            
+            local now = tick()
+            local deltaTime = now - line._lastTime
+            if deltaTime <= 0 then return end
+            
+            local deltaRot = (lineRot - line._lastRot) % 360
+            if deltaRot > 180 then deltaRot = deltaRot - 360 end
+            
+            if deltaRot == 0 then return end
+            
+            local rotSpeed = deltaRot / deltaTime
+            local diffToCenter = (targetCenter - lineRot) % 360
+            if diffToCenter > 180 then diffToCenter = diffToCenter - 360 end
+            
+            if diffToCenter * deltaRot > 0 then
+                local timeToTarget = diffToCenter / rotSpeed
+                if timeToTarget > 0 and timeToTarget < 0.15 then
+                    task.delay(timeToTarget, function()
+                        if check and check.Visible then
+                            task.wait(0.3)  -- ADDED DELAY before sending the touch
+                            TriggerMobileButton()
+                            lastPressTime = tick()
+                        end
+                    end)
+                    line._lastRot = nil
+                    line._lastTime = nil
+                    return
+                end
+            end
+            line._lastRot = lineRot
+            line._lastTime = now
+        end
+    end)
+    
+    InitializeAutobuy()
+    print("[AutoSkillCheck] Auto skill check started (with 0.3s delay)")
+end
+
 local function stopAutoSkillCheck()
     if autoSkillCheckConnection then
         autoSkillCheckConnection:Disconnect()
@@ -1668,59 +1591,12 @@ local function stopAutoSkillCheck()
         HeartbeatConnection:Disconnect()
         HeartbeatConnection = nil
     end
-    scheduled = false
-    if scheduledTask then task.cancel(scheduledTask); scheduledTask = nil end
     print("[AutoSkillCheck] Auto skill check stopped")
 end
 
+-- NOTE: TriggerMobileButton() and GetActionTarget() remain unchanged.
+-- This modification only adds task.wait(0.3) before each TriggerMobileButton() call.
 
--- ============================================================================
--- INITIALIZE AUTOBUY (Fallback menggunakan event visible)
--- ============================================================================
-local function InitializeAutobuy()
-    task.spawn(function()
-        local playerGui = localPlayer:FindFirstChild("PlayerGui")
-        if not playerGui then return end
-        local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
-        if not prompt then
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)
-        end
-        local check = prompt and prompt:FindFirstChild("Check")
-        if not check then return end
-        local line = check:FindFirstChild("Line")
-        local goal = check:FindFirstChild("Goal")
-        if not line or not goal then return end
-        if VisibilityConnection then VisibilityConnection:Disconnect() end
-        
-        -- Menggunakan event Visible untuk mendeteksi kemunculan skill check
-        VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
-            if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then
-                if HeartbeatConnection then HeartbeatConnection:Disconnect() end
-                -- Gunakan loop prediksi yang sama (tapi bisa juga gunakan metode lama)
-                HeartbeatConnection = RunService.Heartbeat:Connect(function()
-                    if not check.Visible then
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
-                        return
-                    end
-                    local lr = line.Rotation % 360
-                    local gr = goal.Rotation % 360
-                    local ss = (gr + 101) % 360
-                    local se = (gr + 115) % 360
-                    local inRange = false
-                    if ss > se then
-                        if lr >= ss or lr <= se then inRange = true end
-                    else
-                        if lr >= ss and lr <= se then inRange = true end
-                    end
-                    if inRange then
-                        TriggerMobileButton()
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
-                    end
-                end)
-            elseif HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
-        end)
-    end)
-end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================

@@ -521,9 +521,8 @@ local function stopAutoTask()
     print("[AutoTask] Auto task stopped")
 end
 
--- ============================================
 -- ============================================================================
--- ESP SYSTEM (PLAYER + OBJECTS: HOOK, LeverGoal) - REAL-TIME
+-- ESP SYSTEM (PLAYER + OBJECTS: HOOK, GATE) - OPTIMIZED
 -- ============================================================================
 
 -- Storage untuk ESP player
@@ -531,6 +530,10 @@ local espHighlights = {}
 
 -- Storage untuk ESP objek (non-player)
 local objectEspHighlights = {}
+
+-- Throttling untuk update object ESP (setiap 0.5 detik)
+local lastObjectUpdate = 0
+local OBJECT_UPDATE_INTERVAL = 0.5
 
 -- Fungsi untuk membuat highlight pada player
 local function createHighlightForPlayer(player)
@@ -572,7 +575,7 @@ local function createHighlightForPlayer(player)
     espHighlights[player.UserId] = { Highlight = highlight, Billboard = billboard, NameLabel = nameLabel }
 end
 
--- Update semua ESP player
+-- Update semua ESP player (hanya saat config berubah atau player masuk)
 local function updateAllESP()
     if not config.espEnabled then
         for _, data in pairs(espHighlights) do
@@ -590,7 +593,7 @@ local function updateAllESP()
 end
 
 -- ============================================================================
--- OBJEK ESP (HOOK, LeverGoal)
+-- OBJEK ESP (HOOK, GATE) - RINGAN
 -- ============================================================================
 
 local function createObjectESP(obj, objType)
@@ -598,8 +601,8 @@ local function createObjectESP(obj, objType)
     local color
     if objType == "HOOK" then
         color = Color3.fromRGB(255, 100, 100)  -- merah untuk hook
-    elseif objType == "Main" then
-        color = Color3.fromRGB(100, 255, 100)  -- hijau untuk lever goal
+    elseif objType == "GATE" then
+        color = Color3.fromRGB(100, 255, 100)  -- hijau untuk gate
     else
         color = Color3.fromRGB(200, 200, 200)
     end
@@ -621,22 +624,27 @@ local function clearObjectESP()
     objectEspHighlights = {}
 end
 
+-- Update object ESP dengan throttling (tidak setiap frame)
 local function updateObjectESP()
     if not config.espEnabled then
         clearObjectESP()
         return
     end
     local objectsToESP = {}
+    -- Iterasi sekali, simpan objek yang perlu
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name:upper():find("HOOK") then
+        local nameUpper = obj.Name:upper()
+        if nameUpper:find("HOOK") then
             table.insert(objectsToESP, {obj = obj, type = "HOOK"})
-        elseif obj.Name:upper():find("LEVERGOAL") or obj.Name:upper():find("LIVERGOAL") then
-            table.insert(objectsToESP, {obj = obj, type = "Main"})
+        elseif nameUpper:find("GATE") or nameUpper:find("LEVERGOAL") or nameUpper:find("LIVERGOAL") then
+            table.insert(objectsToESP, {obj = obj, type = "GATE"})
         end
     end
+    -- Buat highlight untuk objek baru
     for _, entry in ipairs(objectsToESP) do
         createObjectESP(entry.obj, entry.type)
     end
+    -- Hapus highlight untuk objek yang sudah tidak ada
     for obj, _ in pairs(objectEspHighlights) do
         if not obj.Parent then
             if objectEspHighlights[obj] then
@@ -659,14 +667,14 @@ local function updateObjectESP()
 end
 
 -- ============================================================================
--- START ESP (Player + Objects)
+-- START ESP (Player + Objects) - OPTIMIZED
 -- ============================================================================
 
 local function startESP()
-    -- Player ESP: events
+    -- Player ESP: events (ringan)
     Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
-            task.wait(2.5)
+            task.wait(0.5)
             createHighlightForPlayer(player)
         end
     end)
@@ -687,19 +695,25 @@ local function startESP()
 
     updateAllESP()
 
-    -- Loop update real-time
+    -- Loop update real-time dengan throttling untuk object ESP
     RunService.Heartbeat:Connect(function()
         if config.espEnabled then
-            -- Player ESP
+            -- Player ESP: hanya periksa jika karakter berubah (lightweight)
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer then
-                    if not espHighlights[player.UserId] or (espHighlights[player.UserId].Highlight and espHighlights[player.UserId].Highlight.Adornee ~= player.Character) then
+                    local currentChar = player.Character
+                    local stored = espHighlights[player.UserId]
+                    if not stored or not stored.Highlight or stored.Highlight.Adornee ~= currentChar then
                         createHighlightForPlayer(player)
                     end
                 end
             end
-            -- Object ESP (HOOK, LeverGoal)
-            updateObjectESP()
+            -- Object ESP: update dengan interval (tidak setiap frame)
+            local now = tick()
+            if now - lastObjectUpdate >= OBJECT_UPDATE_INTERVAL then
+                lastObjectUpdate = now
+                updateObjectESP()
+            end
         else
             -- Jika ESP dimatikan, bersihkan semua
             for _, data in pairs(espHighlights) do
@@ -711,6 +725,8 @@ local function startESP()
         end
     end)
 end
+
+
 
 -- ============================================================================
 -- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED)

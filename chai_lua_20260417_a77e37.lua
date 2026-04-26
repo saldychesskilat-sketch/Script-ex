@@ -1489,8 +1489,8 @@ local function InitializeAutobuy()
                 HeartbeatConnection = RunService.Heartbeat:Connect(function()
                     local lr = line.Rotation % 360
                     local gr = goal.Rotation % 360
-                    local ss = (gr + 110) % 360
-                    local se = (gr + 120) % 360
+                    local ss = (gr + 106) % 360
+                    local se = (gr + 116) % 360
                     local inRange = false
                     if ss > se then
                         if lr >= ss or lr <= se then inRange = true end

@@ -522,394 +522,303 @@ local function stopAutoTask()
 end
 
 -- ============================================
--- CYBERHEROES ADVANCED ESP SYSTEM v2.0
--- Original player ESP (Highlight + NameTag) + Object ESP (Hook & Liver) + Tracer (3D line)
--- Optimized and integrated without breaking existing features
+-- CYBERHEROES ESP v2.0 (LINE ESP + OPTIMIZED)
+-- Developed for Delta Executor / Synapse / Krnl
+-- Targets: Killers (red), Survivors (green), Hook (orange), Liver (yellow)
+-- Features: Line tracer, endpoint marker, name label, real-time update, low overhead
 -- ============================================
 
--- ========== EXISTING CONFIG (pertahankan, tambah warna objek) ==========
-local config = config or {
-    espEnabled = true,
-    highlightColorKiller = Color3.fromRGB(255, 0, 0),      -- Merah
-    highlightColorSurvivor = Color3.fromRGB(0, 255, 0),    -- Hijau
-    highlightColorHook = Color3.fromRGB(255, 165, 0),      -- Oranye
-    highlightColorLiver = Color3.fromRGB(255, 255, 0),     -- Kuning
-    highlightTransparency = 0.5,
-    tracerEnabled = true,
-    tracerThickness = 0.2,
-    tracerColorKiller = Color3.fromRGB(255, 0, 0),
-    tracerColorSurvivor = Color3.fromRGB(0, 255, 0),
-    tracerColorHook = Color3.fromRGB(255, 165, 0),
-    tracerColorLiver = Color3.fromRGB(255, 255, 0),
-}
-
--- ========== EXISTING GLOBAL VARIABLES ==========
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local Camera = workspace.CurrentCamera
+
 local localPlayer = Players.LocalPlayer
-local espHighlights = espHighlights or {}
-local objectEsp = {}           -- { [object] = { Highlight, Billboard, TracerPart } }
-local tracerParts = {}         -- untuk menyimpan part tracer setiap target
 
--- ========== FUNGSI ASLI (TIDAK DIUBAH) ==========
-local function createHighlightForPlayer(player)
-    if espHighlights[player.UserId] then
-        if espHighlights[player.UserId].Highlight then espHighlights[player.UserId].Highlight:Destroy() end
-        if espHighlights[player.UserId].Billboard then espHighlights[player.UserId].Billboard:Destroy() end
-        espHighlights[player.UserId] = nil
-    end
-    local character = player.Character
-    if not character then return end
-    local isKiller = false
-    if player.Team then
-        local teamName = player.Team.Name:lower()
-        isKiller = teamName:find("killer") or teamName:find("monster") or teamName:find("enemy")
-    end
-    local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "CyberHeroes_ESP"
-    highlight.FillColor = highlightColor
-    highlight.FillTransparency = config.highlightTransparency
-    highlight.OutlineColor = highlightColor
-    highlight.OutlineTransparency = 0.2
-    highlight.Adornee = character
-    highlight.Parent = character
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "CyberHeroes_NameTag"
-    local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 120, 0, 30)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)
-    billboard.Parent = character
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 1, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = highlightColor
-    nameLabel.TextStrokeTransparency = 0.5
-    nameLabel.TextScaled = true
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.Parent = billboard
-    espHighlights[player.UserId] = { Highlight = highlight, Billboard = billboard, NameLabel = nameLabel }
-    
-    -- juga buat tracer untuk player ini (jika diaktifkan)
-    if config.tracerEnabled then
-        createTracerForTarget(player, "player", highlightColor)
-    end
-end
+-- ============================================
+-- CONFIGURATION (sesuaikan dengan kebutuhan)
+-- ============================================
+local config = {
+    espEnabled = true,
+    -- Warna (Color3)
+    killerColor = Color3.fromRGB(255, 0, 0),      -- Merah
+    survivorColor = Color3.fromRGB(0, 255, 0),    -- Hijau
+    hookColor = Color3.fromRGB(255, 165, 0),      -- Orange
+    liverColor = Color3.fromRGB(255, 255, 0),     -- Kuning
+    -- Pengaturan visual
+    lineThickness = 2,
+    markerRadius = 6,
+    textSize = 14,
+    updateInterval = 0.2,  -- detik, refresh daftar target (optimasi)
+    enableLabel = true,
+    -- Sesuaikan jika ingin menampilkan tracer dari player ke target
+    useTracer = true,
+}
 
-local function updateAllESP()
-    if not config.espEnabled then
-        for _, data in pairs(espHighlights) do
-            if data.Highlight then data.Highlight:Destroy() end
-            if data.Billboard then data.Billboard:Destroy() end
-        end
-        espHighlights = {}
-        -- hapus semua tracer
-        for _, part in pairs(tracerParts) do
-            if part then pcall(function() part:Destroy() end) end
-        end
-        tracerParts = {}
-        return
-    end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            createHighlightForPlayer(player)
-        end
-    end
-end
+-- ============================================
+-- DATA STORAGE
+-- ============================================
+local targets = {}   -- key = target (instance), value = {type, color, drawings, position, name}
+local lastUpdate = 0
 
-local function startESP()
-    Players.PlayerAdded:Connect(function(player)
-        if config.espEnabled then task.wait(0.5); createHighlightForPlayer(player) end
-    end)
-    Players.PlayerRemoving:Connect(function(player)
-        if espHighlights[player.UserId] then
-            if espHighlights[player.UserId].Highlight then espHighlights[player.UserId].Highlight:Destroy() end
-            if espHighlights[player.UserId].Billboard then espHighlights[player.UserId].Billboard:Destroy() end
-            espHighlights[player.UserId] = nil
-        end
-        -- hapus tracer player
-        local tracerKey = "player_" .. player.UserId
-        if tracerParts[tracerKey] then
-            pcall(function() tracerParts[tracerKey]:Destroy() end)
-            tracerParts[tracerKey] = nil
-        end
-    end)
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            player.CharacterAdded:Connect(function()
-                if config.espEnabled then createHighlightForPlayer(player) end
-            end)
-        end
-    end
-    updateAllESP()
-    RunService.Heartbeat:Connect(function()
-        if config.espEnabled then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer then
-                    if not espHighlights[player.UserId] or (espHighlights[player.UserId].Highlight and espHighlights[player.UserId].Highlight.Adornee ~= player.Character) then
-                        createHighlightForPlayer(player)
-                    end
-                end
-            end
-        end
-        -- Update semua tracer (posisi garis)
-        if config.tracerEnabled then
-            updateAllTracers()
-        end
-    end)
-end
-
--- ========== FUNGSI BARU: OBJECT ESP (HOOK & LIVER) ==========
-local function getObjectPrimaryPart(obj)
-    if obj:IsA("BasePart") then return obj end
-    return obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("PrimaryPart") or obj:FindFirstChildWhichIsA("BasePart")
-end
-
-local function createObjectHighlight(obj, objType, color)
-    local key = tostring(obj)
-    if objectEsp[key] then
-        if objectEsp[key].Highlight then objectEsp[key].Highlight:Destroy() end
-        if objectEsp[key].Billboard then objectEsp[key].Billboard:Destroy() end
-        if objectEsp[key].TracerPart then pcall(function() objectEsp[key].TracerPart:Destroy() end) end
-        objectEsp[key] = nil
-    end
-    
-    local primaryPart = getObjectPrimaryPart(obj)
-    if not primaryPart then return end
-    
-    -- Highlight
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "CyberHeroes_ObjectESP"
-    highlight.FillColor = color
-    highlight.FillTransparency = config.highlightTransparency
-    highlight.OutlineColor = color
-    highlight.OutlineTransparency = 0.2
-    highlight.Adornee = obj
-    highlight.Parent = obj
-    
-    -- Billboard dengan teks
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "CyberHeroes_ObjectTag"
-    billboard.Adornee = primaryPart
-    billboard.Size = UDim2.new(0, 100, 0, 25)
-    billboard.StudsOffset = Vector3.new(0, 1.5, 0)
-    billboard.Parent = obj
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, 0, 1, 0)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Text = objType -- "Hook" atau "Liver"
-    textLabel.TextColor3 = color
-    textLabel.TextStrokeTransparency = 0.5
-    textLabel.TextScaled = true
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.Parent = billboard
-    
-    objectEsp[key] = { Highlight = highlight, Billboard = billboard, TextLabel = textLabel, Object = obj, Type = objType, PrimaryPart = primaryPart }
-    
-    -- Tracer untuk objek
-    if config.tracerEnabled then
-        local tracerPart = Instance.new("Part")
-        tracerPart.Name = "CyberHeroes_Tracer"
-        tracerPart.Size = Vector3.new(config.tracerThickness, config.tracerThickness, 1)
-        tracerPart.Anchored = true
-        tracerPart.CanCollide = false
-        tracerPart.Material = Enum.Material.Neon
-        tracerPart.BrickColor = BrickColor.new(color)
-        tracerPart.Transparency = 0.3
-        tracerPart.Parent = Workspace
-        objectEsp[key].TracerPart = tracerPart
-        tracerParts["obj_" .. obj:GetFullName()] = tracerPart
-    end
-end
-
-local function removeObjectEsp(obj)
-    local key = tostring(obj)
-    if objectEsp[key] then
-        if objectEsp[key].Highlight then objectEsp[key].Highlight:Destroy() end
-        if objectEsp[key].Billboard then objectEsp[key].Billboard:Destroy() end
-        if objectEsp[key].TracerPart then pcall(function() objectEsp[key].TracerPart:Destroy() end) end
-        tracerParts["obj_" .. obj:GetFullName()] = nil
-        objectEsp[key] = nil
-    end
-end
-
--- Cari semua objek Hook dan Liver di Workspace
-local function refreshObjectEsp()
-    if not config.espEnabled then
-        for _, data in pairs(objectEsp) do
-            removeObjectEsp(data.Object)
-        end
-        return
-    end
-    
-    -- Kumpulkan semua objek Hook dan Liver saat ini
-    local currentObjects = {}
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj.Name == "Hook" or obj.Name == "Liver" then
-            local key = tostring(obj)
-            currentObjects[key] = obj
-            if not objectEsp[key] then
-                local color = (obj.Name == "Hook") and config.highlightColorHook or config.highlightColorLiver
-                local objType = obj.Name
-                createObjectHighlight(obj, objType, color)
-            end
-        end
-    end
-    -- Hapus ESP untuk objek yang sudah tidak ada
-    for key, data in pairs(objectEsp) do
-        if not currentObjects[key] then
-            removeObjectEsp(data.Object)
-        end
-    end
-end
-
--- ========== FUNGSI BARU: TRACER 3D (PART) ==========
--- Membuat tracer untuk target (player atau objek)
-local function createTracerForTarget(target, targetType, color)
-    local key = nil
-    if targetType == "player" then
-        key = "player_" .. target.UserId
-    else
-        key = "obj_" .. target:GetFullName()
-    end
-    if tracerParts[key] then
-        pcall(function() tracerParts[key]:Destroy() end)
-        tracerParts[key] = nil
-    end
-    local part = Instance.new("Part")
-    part.Name = "CyberHeroes_Tracer"
-    part.Size = Vector3.new(config.tracerThickness, config.tracerThickness, 1)
-    part.Anchored = true
-    part.CanCollide = false
-    part.Material = Enum.Material.Neon
-    part.BrickColor = BrickColor.new(color)
-    part.Transparency = 0.3
-    part.Parent = Workspace
-    tracerParts[key] = part
-    return part
-end
-
--- Update semua tracer (posisi, orientasi, panjang)
-local function updateAllTracers()
-    local localChar = localPlayer.Character
-    if not localChar then return end
-    local localRoot = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("UpperTorso") or localChar:FindFirstChild("Torso")
-    if not localRoot then return end
-    
-    local localPos = localRoot.Position
-    
-    -- Update tracer untuk player
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
-                if targetRoot then
-                    local key = "player_" .. player.UserId
-                    local part = tracerParts[key]
-                    if not part then
-                        -- buat tracer baru jika belum ada
-                        local isKiller = false
-                        if player.Team then
-                            local teamName = player.Team.Name:lower()
-                            isKiller = teamName:find("killer") or teamName:find("monster") or teamName:find("enemy")
-                        end
-                        local color = isKiller and config.tracerColorKiller or config.tracerColorSurvivor
-                        part = createTracerForTarget(player, "player", color)
-                    end
-                    if part then
-                        updateTracerPart(part, localPos, targetRoot.Position)
-                    end
-                else
-                    -- tidak ada root, sembunyikan atau hapus tracer
-                    local key = "player_" .. player.UserId
-                    if tracerParts[key] then
-                        tracerParts[key].Visible = false
-                    end
-                end
+-- ============================================
+-- HELPER FUNCTIONS
+-- ============================================
+local function getColorForTarget(target)
+    if target:IsA("Player") then
+        local team = target.Team
+        if team then
+            local teamName = team.Name:lower()
+            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                return config.killerColor, "Killer"
             else
-                local key = "player_" .. player.UserId
-                if tracerParts[key] then
-                    tracerParts[key].Visible = false
-                end
-            end
-        end
-    end
-    
-    -- Update tracer untuk objek Hook/Liver
-    for _, data in pairs(objectEsp) do
-        if data.PrimaryPart and data.PrimaryPart.Parent then
-            local targetPos = data.PrimaryPart.Position
-            local key = "obj_" .. data.Object:GetFullName()
-            local part = tracerParts[key]
-            if not part and data.TracerPart then
-                part = data.TracerPart
-                tracerParts[key] = part
-            end
-            if part then
-                updateTracerPart(part, localPos, targetPos)
-                part.Visible = true
+                return config.survivorColor, "Survivor"
             end
         else
-            local key = "obj_" .. data.Object:GetFullName()
-            if tracerParts[key] then
-                tracerParts[key].Visible = false
+            -- fallback: cek apakah player tersebut bisa dianggap survivor/killer? default survivor
+            return config.survivorColor, "Survivor"
+        end
+    elseif target:IsA("BasePart") or target:IsA("Model") then
+        local name = target.Name:lower()
+        if name == "hook" then
+            return config.hookColor, "Hook"
+        elseif name == "liver" then
+            return config.liverColor, "Liver"
+        end
+    end
+    return nil, nil
+end
+
+-- Dapatkan posisi target (root part atau pusat)
+local function getTargetPosition(target)
+    if target:IsA("Player") then
+        local char = target.Character
+        if char then
+            local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+            if root then return root.Position end
+        end
+        return nil
+    elseif target:IsA("BasePart") then
+        return target.Position
+    elseif target:IsA("Model") then
+        local primary = target.PrimaryPart
+        if primary then return primary.Position end
+        -- cari part dengan nama "HumanoidRootPart" atau "Torso" atau part pertama
+        for _, part in ipairs(target:GetChildren()) do
+            if part:IsA("BasePart") then
+                return part.Position
             end
         end
     end
+    return nil
 end
 
--- Fungsi untuk mengupdate part tracer (posisi, rotasi, panjang)
-local function updateTracerPart(part, fromPos, toPos)
-    local direction = toPos - fromPos
-    local distance = direction.Magnitude
-    if distance < 0.1 then
-        part.Visible = false
+-- Dapatkan nama target untuk label
+local function getTargetName(target)
+    if target:IsA("Player") then
+        return target.Name
+    else
+        return target.Name
+    end
+end
+
+-- Buat drawing objects untuk target
+local function createDrawings(target, color, targetType)
+    local line = Drawing.new("Line")
+    line.Thickness = config.lineThickness
+    line.Color = color
+    line.Visible = true
+    line.Transparency = 1
+
+    local marker = Drawing.new("Circle")
+    marker.Thickness = 1
+    marker.Color = color
+    marker.Filled = true
+    marker.NumSides = 24
+    marker.Radius = config.markerRadius
+    marker.Visible = true
+    marker.Transparency = 1
+
+    local text = nil
+    if config.enableLabel then
+        text = Drawing.new("Text")
+        text.Color = color
+        text.Size = config.textSize
+        text.Center = true
+        text.Outline = true
+        text.OutlineColor = Color3.new(0, 0, 0)
+        text.Visible = true
+        text.Text = getTargetName(target)
+    end
+
+    return {line = line, marker = marker, text = text}
+end
+
+-- Hapus drawing objects untuk target
+local function destroyDrawings(drawings)
+    if drawings.line then drawings.line:Remove() end
+    if drawings.marker then drawings.marker:Remove() end
+    if drawings.text then drawings.text:Remove() end
+end
+
+-- Update posisi drawing berdasarkan posisi target di layar
+local function updateDrawing(drawings, targetPos, worldPos, camera, localPos)
+    local vector, onScreen = camera:WorldToViewportPoint(worldPos)
+    if not onScreen or vector.Z < 0 then
+        drawings.line.Visible = false
+        drawings.marker.Visible = false
+        if drawings.text then drawings.text.Visible = false end
         return
     end
-    part.Visible = true
-    part.Size = Vector3.new(part.Size.X, part.Size.Y, distance)
-    local midPoint = (fromPos + toPos) / 2
-    part.CFrame = CFrame.lookAt(midPoint, toPos) * CFrame.new(0, 0, -distance/2)
+
+    local screenX, screenY = vector.X, vector.Y
+    -- Tracer line dari local player ke target
+    if config.useTracer and localPos then
+        local localVector, localOnScreen = camera:WorldToViewportPoint(localPos)
+        if localOnScreen and localVector.Z > 0 then
+            drawings.line.From = Vector2.new(localVector.X, localVector.Y)
+            drawings.line.To = Vector2.new(screenX, screenY)
+            drawings.line.Visible = true
+        else
+            drawings.line.Visible = false
+        end
+    else
+        drawings.line.Visible = false
+    end
+
+    -- Marker
+    drawings.marker.Position = Vector2.new(screenX, screenY)
+    drawings.marker.Visible = true
+
+    -- Text label (di atas marker)
+    if drawings.text then
+        drawings.text.Position = Vector2.new(screenX, screenY - config.markerRadius - 2)
+        drawings.text.Visible = true
+    end
 end
 
--- ========== INISIALISASI UPGRADE ==========
--- Hook untuk mendeteksi objek baru di Workspace (tanpa scanning berlebihan)
-local function setupObjectDetection()
-    Workspace.DescendantAdded:Connect(function(desc)
-        if (desc.Name == "Hook" or desc.Name == "Liver") and config.espEnabled then
-            task.wait(0.1) -- tunggu objek stabil
-            refreshObjectEsp()
+-- ============================================
+-- DAFTAR TARGET PERIODIK (OPTIMASI)
+-- ============================================
+local function refreshTargetList()
+    local newTargets = {}
+    local now = tick()
+
+    -- 1. Player targets (killer/survivor)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local color, targetType = getColorForTarget(player)
+            if color then
+                newTargets[player] = {type = targetType, color = color, instance = player}
+            end
         end
-    end)
-    Workspace.DescendantRemoving:Connect(function(desc)
-        if (desc.Name == "Hook" or desc.Name == "Liver") then
-            removeObjectEsp(desc)
+    end
+
+    -- 2. Object targets (Hook, Liver) – cari di seluruh workspace
+    local searchNames = {"Hook", "Liver"}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local name = obj.Name
+            for _, search in ipairs(searchNames) do
+                if name == search then
+                    local color, targetType = getColorForTarget(obj)
+                    if color then
+                        newTargets[obj] = {type = targetType, color = color, instance = obj}
+                    end
+                end
+            end
         end
-    end)
-    -- Scan awal
-    refreshObjectEsp()
+    end
+
+    -- Cleanup: hapus target yang sudah tidak ada, dan buat drawing untuk yang baru
+    for target, data in pairs(targets) do
+        if not newTargets[target] then
+            destroyDrawings(data.drawings)
+            targets[target] = nil
+        end
+    end
+
+    for target, data in pairs(newTargets) do
+        if not targets[target] then
+            local drawings = createDrawings(target, data.color, data.type)
+            targets[target] = {
+                type = data.type,
+                color = data.color,
+                instance = target,
+                drawings = drawings,
+                lastPos = nil
+            }
+        end
+    end
 end
 
--- Jalankan semua upgrade setelah startESP dipanggil (atau kita patch startESP asli)
-local originalStartESP = startESP
-startESP = function()
-    originalStartESP()
-    setupObjectDetection()
-    -- Refresh objek setiap 2 detik (fallback untuk keamanan)
-    game:GetService("RunService").Stepped:Connect(function()
-        if config.espEnabled then
-            refreshObjectEsp()
+-- ============================================
+-- UPDATE POSISI GARIS SETIAP FRAME
+-- ============================================
+local function updateAllDrawings()
+    if not config.espEnabled then
+        for _, data in pairs(targets) do
+            destroyDrawings(data.drawings)
         end
+        targets = {}
+        return
+    end
+
+    -- Dapatkan posisi local player (source tracer)
+    local localPos = nil
+    local localChar = localPlayer.Character
+    if localChar then
+        local root = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso") or localChar:FindFirstChild("UpperTorso")
+        if root then localPos = root.Position end
+    end
+
+    for target, data in pairs(targets) do
+        local worldPos = getTargetPosition(target)
+        if worldPos then
+            updateDrawing(data.drawings, nil, worldPos, Camera, localPos)
+        else
+            if data.drawings.line then data.drawings.line.Visible = false end
+            if data.drawings.marker then data.drawings.marker.Visible = false end
+            if data.drawings.text then data.drawings.text.Visible = false end
+        end
+    end
+end
+
+-- ============================================
+-- INISIALISASI & LOOP
+-- ============================================
+local function startESP()
+    refreshTargetList()
+    -- Periodik refresh daftar target (untuk mendeteksi objek baru)
+    task.spawn(function()
+        while config.espEnabled do
+            wait(config.updateInterval)
+            refreshTargetList()
+        end
+    end)
+    -- Update posisi drawing setiap frame
+    RunService.RenderStepped:Connect(function()
+        updateAllDrawings()
     end)
 end
 
--- Panggil startESP untuk memulai semuanya (jika belum dipanggil)
+-- ============================================
+-- EVENT HANDLERS (Cleanup saat player berganti karakter)
+-- ============================================
+localPlayer.CharacterAdded:Connect(function()
+    -- Tidak perlu refresh, karena refresh periodik akan update
+    -- Namun, kita bisa reset line source
+end)
 
-print("[CyberHeroes] Advanced ESP v2.0 loaded - Player ESP + Hook/Liver ESP + Tracers")
+Players.PlayerRemoving:Connect(function(player)
+    if targets[player] then
+        destroyDrawings(targets[player].drawings)
+        targets[player] = nil
+    end
+end)
+
+-- Hapus drawing saat ESP dimatikan dari luar (jika ada toggle)
+-- Bisa ditambahkan fungsi untuk mengubah config.espEnabled secara eksternal
 
 -- ============================================================================
 -- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED)

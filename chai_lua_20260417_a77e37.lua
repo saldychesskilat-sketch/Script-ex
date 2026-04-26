@@ -598,7 +598,7 @@ local function createObjectESP(obj, objType)
     local color
     if objType == "HOOK" then
         color = Color3.fromRGB(255, 100, 100)  -- merah untuk hook
-    elseif objType == "LeverGoal" then
+    elseif objType == "Main" then
         color = Color3.fromRGB(100, 255, 100)  -- hijau untuk lever goal
     else
         color = Color3.fromRGB(200, 200, 200)
@@ -631,7 +631,7 @@ local function updateObjectESP()
         if obj.Name:upper():find("HOOK") then
             table.insert(objectsToESP, {obj = obj, type = "HOOK"})
         elseif obj.Name:upper():find("LEVERGOAL") or obj.Name:upper():find("LIVERGOAL") then
-            table.insert(objectsToESP, {obj = obj, type = "LeverGoal"})
+            table.insert(objectsToESP, {obj = obj, type = "Main"})
         end
     end
     for _, entry in ipairs(objectsToESP) do
@@ -666,7 +666,7 @@ local function startESP()
     -- Player ESP: events
     Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
-            task.wait(0.5)
+            task.wait(2.5)
             createHighlightForPlayer(player)
         end
     end)

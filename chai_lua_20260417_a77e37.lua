@@ -1444,9 +1444,9 @@ local function stopAutoGeneratorLoop()
     print("[AutoGenerator] Auto generator stopped")
 end
 
-----------------_----------------------
+--========================
 -- Skull check
------------------------------------------
+--========================
 local function GetActionTarget()
     local current = localPlayer:FindFirstChild("PlayerGui")
     if not current then return nil end
@@ -1489,7 +1489,7 @@ local function InitializeAutobuy()
                 HeartbeatConnection = RunService.Heartbeat:Connect(function()
                     local lr = line.Rotation % 360
                     local gr = goal.Rotation % 360
-                    local ss = (gr + 115) % 360
+                    local ss = (gr + 110) % 360
                     local se = (gr + 120) % 360
                     local inRange = false
                     if ss > se then

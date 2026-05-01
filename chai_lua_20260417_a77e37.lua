@@ -601,8 +601,8 @@ local function createObjectESP(obj, objType)
     local color
     if objType == "HOOK" then
         color = Color3.fromRGB(255, 100, 100)  -- merah untuk hook
-    elseif objType == "GATE" then
-        color = Color3.fromRGB(100, 255, 100)  -- hijau untuk gate
+    elseif objType == "generator" then
+        color = Color3.fromRGB(100, 255, 100)  -- hijau untuk generator 
     else
         color = Color3.fromRGB(200, 200, 200)
     end
@@ -636,8 +636,8 @@ local function updateObjectESP()
         local nameUpper = obj.Name:upper()
         if nameUpper:find("HOOK") then
             table.insert(objectsToESP, {obj = obj, type = "HOOK"})
-        elseif nameUpper:find("GATE") or nameUpper:find("LEVERGOAL") or nameUpper:find("LIVERGOAL") then
-            table.insert(objectsToESP, {obj = obj, type = "GATE"})
+        elseif nameUpper:find("generator") or nameUpper:find("generator") or nameUpper:find("generator") then
+            table.insert(objectsToESP, {obj = obj, type = "generator"})
         end
     end
     -- Buat highlight untuk objek baru

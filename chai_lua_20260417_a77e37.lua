@@ -522,7 +522,7 @@ local function stopAutoTask()
 end
 
 -- ============================================================================
--- ESP SYSTEM (PLAYER + OBJECTS: HOOK, GATE) - OPTIMIZED
+-- ESP SYSTEM (PLAYER + OBJECTS: HOOK, Generator) - OPTIMIZED
 -- ============================================================================
 
 -- Storage untuk ESP player
@@ -593,7 +593,7 @@ local function updateAllESP()
 end
 
 -- ============================================================================
--- OBJEK ESP (HOOK, GATE) - RINGAN
+-- OBJEK ESP (HOOK, GAnerator - RINGAN
 -- ============================================================================
 
 local function createObjectESP(obj, objType)

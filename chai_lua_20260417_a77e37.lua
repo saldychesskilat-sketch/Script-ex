@@ -894,56 +894,62 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
+
 -- ============================================================================
 -- FEATURE 4: SPEED BOOST + TPWALK (CFRAME DASH - 2x SPEED)
 -- ============================================================================
--- Fungsi ini memberikan kecepatan gerak 2x lebih cepat menggunakan CFrame dash
--- Tidak memerlukan trigger jarak killer, selalu aktif jika toggle ON
--- ============================================================================
 
--- Variabel untuk koneksi loop
 local boostConnection = nil
 local isBoostActive = false
-local dashStep = nil  -- untuk menyimpan arah per frame
+local dashStep = nil
 
--- Fungsi untuk mendapatkan arah gerakan lokal (tanpa mempengaruhi server)
 local function getMovementDirection()
     if not localHumanoid then return Vector3.zero end
+
     local moveDir = localHumanoid.MoveDirection
-    if moveDir.Magnitude < 0.1 then return Vector3.zero end
+
+    -- fallback kalau input kosong (biar tetap gerak)
+    if moveDir.Magnitude < 0.1 then
+        local cam = workspace.CurrentCamera
+        if cam then
+            moveDir = cam.CFrame.LookVector
+        else
+            return Vector3.zero
+        end
+    end
+
     return moveDir.Unit
 end
 
--- Fungsi utama untuk menerapkan CFrame dash (2x kecepatan normal)
-local function applyCFrameDash()
+local function applyCFrameDash(delta)
     if not config.speedBoostEnabled then return end
     if not getLocalCharacter() or not localRootPart or not localHumanoid then return end
 
     local moveDir = getMovementDirection()
     if moveDir == Vector3.zero then return end
 
-    -- Kecepatan normal berjalan sekitar 16 studs/s, kita buat 32 studs/s (2x)
     local speed = 32
-    -- Delta time per frame (asumsi ~1/60 detik)
-    local delta = 1 / 60
     local step = moveDir * speed * delta
 
-    -- Pindahkan posisi karakter dengan CFrame
     local newPos = localRootPart.Position + step
+
     pcall(function()
-        localRootPart.CFrame = CFrame.new(newPos)
+        -- pakai PivotTo biar lebih stabil (nggak dilawan physics)
+        localRootPart:PivotTo(CFrame.new(newPos))
     end)
 end
 
--- Fungsi untuk memulai boost (aktif saat toggle ON)
 local function startBoost()
     if boostConnection then return end
-    boostConnection = RunService.Heartbeat:Connect(applyCFrameDash)
+
+    boostConnection = RunService.Heartbeat:Connect(function(dt)
+        applyCFrameDash(dt)
+    end)
+
     isBoostActive = true
     print("[SpeedBoost] TPWalk CFrame dash active (2x speed)")
 end
 
--- Fungsi untuk menghentikan boost
 local function stopBoost()
     if boostConnection then
         boostConnection:Disconnect()
@@ -953,7 +959,6 @@ local function stopBoost()
     print("[SpeedBoost] TPWalk CFrame dash deactivated")
 end
 
--- Wrapper untuk integrasi dengan sistem toggle (startSpeedBoostMonitor / stopSpeedBoostMonitor)
 local function startSpeedBoostMonitor()
     if config.speedBoostEnabled then
         startBoost()
@@ -963,14 +968,6 @@ end
 local function stopSpeedBoostMonitor()
     stopBoost()
 end
-
--- Override agar sinkron dengan perubahan config saat runtime
--- (fungsi ini akan dipanggil oleh tombol GUI setiap toggle)
--- Karena di script utama sudah ada yang memanggil startAllSystems dll,
--- kita cukup memastikan bahwa saat config.speedBoostEnabled berubah,
--- sistem akan restart. Namun di kode asli, tombol GUI langsung memanggil
--- startSpeedBoostMonitor / stopSpeedBoostMonitor. Maka kita perlu memastikan
--- fungsi tersebut bekerja dengan baik.
 
 -- ============================================================================
 -- END OF UPGRADED FEATURE 4

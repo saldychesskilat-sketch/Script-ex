@@ -896,10 +896,10 @@ end
 
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED & FIXED)
+-- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED - STABLE & DELTA TIME)
 -- ============================================================================
 
--- Fungsi deteksi player dalam jarak tertentu (untuk speed boost)
+-- Fungsi deteksi player dalam jarak tertentu (tetap)
 local function isPlayerNearby(maxDistance)
     if not localRootPart then return false end
     local localPos = localRootPart.Position
@@ -917,7 +917,7 @@ local function isPlayerNearby(maxDistance)
     return false
 end
 
--- Deteksi killer berdasarkan team atau weapon (lebih akurat)
+-- Deteksi killer berdasarkan team atau weapon (tetap)
 local function isKiller(player)
     if not player then return false end
     local char = player.Character
@@ -928,30 +928,17 @@ local function isKiller(player)
             return true
         end
     end
-    -- Cek weapon di tangan atau backpack
     local tool = char:FindFirstChildWhichIsA("Tool")
     if tool then
         local toolName = tool.Name:lower()
-        if toolName:find("knife") or toolName:find("weapon") or toolName:find("sword") then
+        if toolName:find("knife") or toolName:find("weapon") then
             return true
-        end
-    end
-    -- Cek di backpack
-    local backpack = localPlayer:FindFirstChild("Backpack")
-    if backpack then
-        for _, t in ipairs(backpack:GetChildren()) do
-            if t:IsA("Tool") then
-                local tn = t.Name:lower()
-                if tn:find("knife") or tn:find("weapon") or tn:find("sword") then
-                    return true
-                end
-            end
         end
     end
     return false
 end
 
--- Dapatkan jarak ke killer terdekat (untuk TPWalk)
+-- Dapatkan jarak killer terdekat
 local function getKillerDistance()
     if not localRootPart then return math.huge end
     local localPos = localRootPart.Position
@@ -973,75 +960,95 @@ local function getKillerDistance()
     return minDist
 end
 
--- Speed boost utama (WalkSpeed increase)
+-- ============================================================================
+-- Speed boost utama (WalkSpeed) - diperbaiki dengan cooldown & validasi
+-- ============================================================================
+local speedBoostActive = false
+local speedBoostTimer = nil
+
 local function applySpeedBoost()
     if not config.speedBoostEnabled then return end
     if not localHumanoid then return end
+    if speedBoostActive then return end  -- sudah aktif, jangan trigger ulang
     if boostDebounce then return end
 
     boostDebounce = true
 
-    -- Simpan speed asli jika belum disimpan
-    if not config.originalWalkSpeed then
+    -- Simpan speed asli jika belum
+    if not config.originalWalkSpeed or config.originalWalkSpeed == 16 then
         config.originalWalkSpeed = localHumanoid.WalkSpeed
     end
 
-    -- Meningkatkan kecepatan sebesar 1.5x
+    -- Terapkan boost 1.5x
     local boostedSpeed = config.originalWalkSpeed * 1.5
     localHumanoid.WalkSpeed = boostedSpeed
+    speedBoostActive = true
     isSpeedBoostActive = true
 
-    print("[SpeedBoost] Activated for 3 seconds (speed: " .. boostedSpeed .. ")")
+    -- Atur timer untuk mengembalikan speed setelah 3 detik
+    if speedBoostTimer then speedBoostTimer:Disconnect() end
+    speedBoostTimer = task.delay(3, function()
+        if localHumanoid and not boostDebounce then -- boostDebounce akan false setelah durasi, tapi kita cek juga
+            localHumanoid.WalkSpeed = config.originalWalkSpeed
+        end
+        speedBoostActive = false
+        isSpeedBoostActive = false
+        boostDebounce = false
+        speedBoostTimer = nil
+        print("[SpeedBoost] Speed boost ended")
+    end)
 
-    task.wait(3)
-
-    if localHumanoid then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
-    end
-    isSpeedBoostActive = false
-    boostDebounce = false
-    print("[SpeedBoost] Deactivated")
+    print("[SpeedBoost] Speed boosted to " .. boostedSpeed)
 end
 
--- Variabel untuk TPWalk fallback
-local isTPWalking = false
+-- ============================================================================
+-- TPWalk fallback (CFrame-based movement dengan delta time)
+-- ============================================================================
+local isTPWalkingActive = false
 local tpwalkFallbackConnection = nil
-local lastFrameTime = tick()
+local lastStepTime = 0
 
--- Fungsi TPWalk fallback (CFrame-based movement dengan delta time)
 local function applyTPWalk(deltaTime)
     if not config.speedBoostEnabled then return end
     if not localHumanoid or not localRootPart then return end
 
-    -- Hanya aktif saat ada input gerakan
+    -- Hanya aktif jika ada input gerakan
     local moveDir = localHumanoid.MoveDirection
     if moveDir.Magnitude < 0.1 then return end
 
-    -- Kecepatan TPWalk (80 studs per detik, cukup cepat tapi halus)
-    local speed = 80
-    local step = moveDir * speed * deltaTime
+    -- Kecepatan gerak normal + boost 1.5x (sama seperti WalkSpeed boost)
+    local baseSpeed = config.originalWalkSpeed or 16
+    local currentSpeed = baseSpeed * 1.5
+    -- Jarak per step = kecepatan * deltaTime (dalam studs)
+    local stepDistance = currentSpeed * deltaTime
+    if stepDistance < 0.01 then return end
 
-    local newPos = localRootPart.Position + step
-    -- Validasi posisi agar tidak keluar batas (opsional)
+    local newPos = localRootPart.Position + moveDir * stepDistance
+    -- Gunakan CFrame untuk menghindari masalah physics override
     pcall(function()
         localRootPart.CFrame = CFrame.new(newPos)
     end)
 end
 
--- Loop TPWalk fallback (menggunakan RenderStepped untuk delta time)
 local function startTPWalkFallback()
     if tpwalkFallbackConnection then return end
-    lastFrameTime = tick()
-    tpwalkFallbackConnection = RunService.RenderStepped:Connect(function(deltaTime)
+    local lastTime = tick()
+    tpwalkFallbackConnection = RunService.Heartbeat:Connect(function()
         if not config.speedBoostEnabled then return end
         if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
 
         local killerDist = getKillerDistance()
         if killerDist <= 10 then
+            local now = tick()
+            local deltaTime = math.min(0.033, now - lastTime)  -- batasi maks 0.033 detik (30 FPS)
+            lastTime = now
             applyTPWalk(deltaTime)
+        else
+            -- Reset lastTime jika tidak aktif untuk menghindari loncatan besar
+            lastTime = tick()
         end
     end)
-    print("[TPWalkFallback] TPWalk fallback system started with delta time")
+    print("[TPWalkFallback] TPWalk fallback system started (delta time based)")
 end
 
 local function stopTPWalkFallback()
@@ -1052,23 +1059,32 @@ local function stopTPWalkFallback()
     print("[TPWalkFallback] TPWalk fallback system stopped")
 end
 
--- Monitor utama (menggabungkan WalkSpeed boost + TPWalk fallback)
+-- ============================================================================
+-- Monitor utama (menggabungkan kedua sistem)
+-- ============================================================================
 local function startSpeedBoostMonitor()
     if currentBoostConnection then return end
 
-    -- Speed boost berdasarkan jarak player lain (bukan killer)
+    -- Jalankan Speed Boost (WalkSpeed) berdasarkan jarak player (trigger sekali saat jarak <= 10)
+    -- Gunakan loop dengan cooldown agar tidak spam
+    local lastBoostTime = 0
     currentBoostConnection = RunService.Heartbeat:Connect(function()
         if not config.speedBoostEnabled then return end
         if not getLocalCharacter() or not localHumanoid then return end
+
+        local now = tick()
         if isPlayerNearby(10) then
-            applySpeedBoost()
+            if not speedBoostActive and (now - lastBoostTime) > 3 then
+                applySpeedBoost()
+                lastBoostTime = now
+            end
         end
     end)
 
-    -- TPWalk fallback berdasarkan jarak killer
+    -- Jalankan TPWalk fallback
     startTPWalkFallback()
 
-    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback active")
+    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback active (upgraded with delta time)")
 end
 
 local function stopSpeedBoostMonitor()
@@ -1077,16 +1093,19 @@ local function stopSpeedBoostMonitor()
         currentBoostConnection = nil
     end
     stopTPWalkFallback()
+    if speedBoostTimer then speedBoostTimer:Disconnect(); speedBoostTimer = nil end
     if localHumanoid and config.originalWalkSpeed then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
     end
+    speedBoostActive = false
+    isSpeedBoostActive = false
+    boostDebounce = false
     print("[SpeedBoostMonitor] Speed boost + TPWalk fallback stopped")
 end
 
 -- ============================================================================
--- AKHIR FEATURE 4 (UPGRADED & FIXED)
+-- AKHIR FEATURE 4 (UPGRADED)
 -- ============================================================================
-
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================

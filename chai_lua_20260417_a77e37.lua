@@ -895,85 +895,85 @@ end
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
 -- ============================================================================
--- FEATURE 4: TPWALK 2x SPEED (CFrame-based, NO TRIGGER, ALWAYS ACTIVE WHEN ENABLED)
+-- FEATURE 4: SPEED BOOST + TPWALK (CFRAME DASH - 2x SPEED)
+-- ============================================================================
+-- Fungsi ini memberikan kecepatan gerak 2x lebih cepat menggunakan CFrame dash
+-- Tidak memerlukan trigger jarak killer, selalu aktif jika toggle ON
 -- ============================================================================
 
--- Variabel untuk kontrol
-local tpwalkActive = false
-local tpwalkConnection = nil
+-- Variabel untuk koneksi loop
+local boostConnection = nil
+local isBoostActive = false
+local dashStep = nil  -- untuk menyimpan arah per frame
 
--- Fungsi untuk mempercepat gerakan menggunakan CFrame (2x kecepatan)
-local function applyTPWalk()
-    if not config.speedBoostEnabled then return end
-    if not localHumanoid or not localRootPart then return end
-    
-    -- Ambil arah gerakan dari MoveDirection (jika tidak bergerak, skip)
+-- Fungsi untuk mendapatkan arah gerakan lokal (tanpa mempengaruhi server)
+local function getMovementDirection()
+    if not localHumanoid then return Vector3.zero end
     local moveDir = localHumanoid.MoveDirection
-    if moveDir.Magnitude < 0.1 then return end
-    
-    -- Kecepatan normal (asumsikan 16) dikalikan 2 = 32
-    local speedMult = 2.0
-    local step = moveDir * (16 * speedMult) * (0.05) -- 0.05 adalah delta time kira-kira untuk Heartbeat
-    
-    -- Posisi baru
+    if moveDir.Magnitude < 0.1 then return Vector3.zero end
+    return moveDir.Unit
+end
+
+-- Fungsi utama untuk menerapkan CFrame dash (2x kecepatan normal)
+local function applyCFrameDash()
+    if not config.speedBoostEnabled then return end
+    if not getLocalCharacter() or not localRootPart or not localHumanoid then return end
+
+    local moveDir = getMovementDirection()
+    if moveDir == Vector3.zero then return end
+
+    -- Kecepatan normal berjalan sekitar 16 studs/s, kita buat 32 studs/s (2x)
+    local speed = 32
+    -- Delta time per frame (asumsi ~1/60 detik)
+    local delta = 1 / 60
+    local step = moveDir * speed * delta
+
+    -- Pindahkan posisi karakter dengan CFrame
     local newPos = localRootPart.Position + step
-    
-    -- Pindahkan karakter dengan CFrame (tanpa mengubah WalkSpeed)
     pcall(function()
         localRootPart.CFrame = CFrame.new(newPos)
     end)
 end
 
--- Fungsi untuk memulai TPWalk (loop)
-local function startTPWalk()
-    if tpwalkConnection then return end
-    tpwalkConnection = RunService.Heartbeat:Connect(applyTPWalk)
-    print("[TPWalk] 2x speed active (CFrame-based, no trigger)")
+-- Fungsi untuk memulai boost (aktif saat toggle ON)
+local function startBoost()
+    if boostConnection then return end
+    boostConnection = RunService.Heartbeat:Connect(applyCFrameDash)
+    isBoostActive = true
+    print("[SpeedBoost] TPWalk CFrame dash active (2x speed)")
 end
 
-local function stopTPWalk()
-    if tpwalkConnection then
-        tpwalkConnection:Disconnect()
-        tpwalkConnection = nil
+-- Fungsi untuk menghentikan boost
+local function stopBoost()
+    if boostConnection then
+        boostConnection:Disconnect()
+        boostConnection = nil
     end
-    print("[TPWalk] Stopped")
+    isBoostActive = false
+    print("[SpeedBoost] TPWalk CFrame dash deactivated")
 end
 
--- Monitor untuk menghubungkan dengan config.speedBoostEnabled
+-- Wrapper untuk integrasi dengan sistem toggle (startSpeedBoostMonitor / stopSpeedBoostMonitor)
 local function startSpeedBoostMonitor()
-    if currentBoostConnection then return end
-    currentBoostConnection = RunService.Heartbeat:Connect(function()
-        if config.speedBoostEnabled then
-            if not tpwalkConnection then
-                startTPWalk()
-            end
-        else
-            if tpwalkConnection then
-                stopTPWalk()
-            end
-        end
-    end)
-    -- Inisialisasi awal
     if config.speedBoostEnabled then
-        startTPWalk()
+        startBoost()
     end
-    print("[SpeedBoostMonitor] TPWalk 2x speed monitor started")
 end
 
 local function stopSpeedBoostMonitor()
-    if currentBoostConnection then
-        currentBoostConnection:Disconnect()
-        currentBoostConnection = nil
-    end
-    stopTPWalk()
-    if localHumanoid and config.originalWalkSpeed then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
-    end
-    print("[SpeedBoostMonitor] TPWalk 2x speed monitor stopped")
+    stopBoost()
 end
 
+-- Override agar sinkron dengan perubahan config saat runtime
+-- (fungsi ini akan dipanggil oleh tombol GUI setiap toggle)
+-- Karena di script utama sudah ada yang memanggil startAllSystems dll,
+-- kita cukup memastikan bahwa saat config.speedBoostEnabled berubah,
+-- sistem akan restart. Namun di kode asli, tombol GUI langsung memanggil
+-- startSpeedBoostMonitor / stopSpeedBoostMonitor. Maka kita perlu memastikan
+-- fungsi tersebut bekerja dengan baik.
+
 -- ============================================================================
--- AKHIR FEATURE 4 (UPGRADED - TPWALK 2x CFrame)
+-- END OF UPGRADED FEATURE 4
 -- ============================================================================
 
 -- ============================================================================

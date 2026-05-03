@@ -896,81 +896,195 @@ end
 
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (CFRAME DASH - 2x SPEED)
+-- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED & FIXED)
 -- ============================================================================
 
-local boostConnection = nil
-local isBoostActive = false
-local dashStep = nil
-
-local function getMovementDirection()
-    if not localHumanoid then return Vector3.zero end
-
-    local moveDir = localHumanoid.MoveDirection
-
-    -- fallback kalau input kosong (biar tetap gerak)
-    if moveDir.Magnitude < 0.1 then
-        local cam = workspace.CurrentCamera
-        if cam then
-            moveDir = cam.CFrame.LookVector
-        else
-            return Vector3.zero
+-- Fungsi deteksi player dalam jarak tertentu (untuk speed boost)
+local function isPlayerNearby(maxDistance)
+    if not localRootPart then return false end
+    local localPos = localRootPart.Position
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character then
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+            if targetRoot then
+                local distance = (targetRoot.Position - localPos).Magnitude
+                if distance <= maxDistance then
+                    return true
+                end
+            end
         end
     end
-
-    return moveDir.Unit
+    return false
 end
 
-local function applyCFrameDash(delta)
+-- Deteksi killer berdasarkan team atau weapon (lebih akurat)
+local function isKiller(player)
+    if not player then return false end
+    local char = player.Character
+    if not char then return false end
+    if player.Team then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            return true
+        end
+    end
+    -- Cek weapon di tangan atau backpack
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then
+        local toolName = tool.Name:lower()
+        if toolName:find("knife") or toolName:find("weapon") or toolName:find("sword") then
+            return true
+        end
+    end
+    -- Cek di backpack
+    local backpack = localPlayer:FindFirstChild("Backpack")
+    if backpack then
+        for _, t in ipairs(backpack:GetChildren()) do
+            if t:IsA("Tool") then
+                local tn = t.Name:lower()
+                if tn:find("knife") or tn:find("weapon") or tn:find("sword") then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- Dapatkan jarak ke killer terdekat (untuk TPWalk)
+local function getKillerDistance()
+    if not localRootPart then return math.huge end
+    local localPos = localRootPart.Position
+    local minDist = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and isKiller(player) then
+            local char = player.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if root then
+                    local dist = (localPos - root.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return minDist
+end
+
+-- Speed boost utama (WalkSpeed increase)
+local function applySpeedBoost()
     if not config.speedBoostEnabled then return end
-    if not getLocalCharacter() or not localRootPart or not localHumanoid then return end
+    if not localHumanoid then return end
+    if boostDebounce then return end
 
-    local moveDir = getMovementDirection()
-    if moveDir == Vector3.zero then return end
+    boostDebounce = true
 
-    local speed = 32
-    local step = moveDir * speed * delta
+    -- Simpan speed asli jika belum disimpan
+    if not config.originalWalkSpeed then
+        config.originalWalkSpeed = localHumanoid.WalkSpeed
+    end
+
+    -- Meningkatkan kecepatan sebesar 1.5x
+    local boostedSpeed = config.originalWalkSpeed * 1.5
+    localHumanoid.WalkSpeed = boostedSpeed
+    isSpeedBoostActive = true
+
+    print("[SpeedBoost] Activated for 3 seconds (speed: " .. boostedSpeed .. ")")
+
+    task.wait(3)
+
+    if localHumanoid then
+        localHumanoid.WalkSpeed = config.originalWalkSpeed
+    end
+    isSpeedBoostActive = false
+    boostDebounce = false
+    print("[SpeedBoost] Deactivated")
+end
+
+-- Variabel untuk TPWalk fallback
+local isTPWalking = false
+local tpwalkFallbackConnection = nil
+local lastFrameTime = tick()
+
+-- Fungsi TPWalk fallback (CFrame-based movement dengan delta time)
+local function applyTPWalk(deltaTime)
+    if not config.speedBoostEnabled then return end
+    if not localHumanoid or not localRootPart then return end
+
+    -- Hanya aktif saat ada input gerakan
+    local moveDir = localHumanoid.MoveDirection
+    if moveDir.Magnitude < 0.1 then return end
+
+    -- Kecepatan TPWalk (80 studs per detik, cukup cepat tapi halus)
+    local speed = 80
+    local step = moveDir * speed * deltaTime
 
     local newPos = localRootPart.Position + step
-
+    -- Validasi posisi agar tidak keluar batas (opsional)
     pcall(function()
-        -- pakai PivotTo biar lebih stabil (nggak dilawan physics)
-        localRootPart:PivotTo(CFrame.new(newPos))
+        localRootPart.CFrame = CFrame.new(newPos)
     end)
 end
 
-local function startBoost()
-    if boostConnection then return end
+-- Loop TPWalk fallback (menggunakan RenderStepped untuk delta time)
+local function startTPWalkFallback()
+    if tpwalkFallbackConnection then return end
+    lastFrameTime = tick()
+    tpwalkFallbackConnection = RunService.RenderStepped:Connect(function(deltaTime)
+        if not config.speedBoostEnabled then return end
+        if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
 
-    boostConnection = RunService.Heartbeat:Connect(function(dt)
-        applyCFrameDash(dt)
+        local killerDist = getKillerDistance()
+        if killerDist <= 10 then
+            applyTPWalk(deltaTime)
+        end
     end)
-
-    isBoostActive = true
-    print("[SpeedBoost] TPWalk CFrame dash active (2x speed)")
+    print("[TPWalkFallback] TPWalk fallback system started with delta time")
 end
 
-local function stopBoost()
-    if boostConnection then
-        boostConnection:Disconnect()
-        boostConnection = nil
+local function stopTPWalkFallback()
+    if tpwalkFallbackConnection then
+        tpwalkFallbackConnection:Disconnect()
+        tpwalkFallbackConnection = nil
     end
-    isBoostActive = false
-    print("[SpeedBoost] TPWalk CFrame dash deactivated")
+    print("[TPWalkFallback] TPWalk fallback system stopped")
 end
 
+-- Monitor utama (menggabungkan WalkSpeed boost + TPWalk fallback)
 local function startSpeedBoostMonitor()
-    if config.speedBoostEnabled then
-        startBoost()
-    end
+    if currentBoostConnection then return end
+
+    -- Speed boost berdasarkan jarak player lain (bukan killer)
+    currentBoostConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled then return end
+        if not getLocalCharacter() or not localHumanoid then return end
+        if isPlayerNearby(10) then
+            applySpeedBoost()
+        end
+    end)
+
+    -- TPWalk fallback berdasarkan jarak killer
+    startTPWalkFallback()
+
+    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback active")
 end
 
 local function stopSpeedBoostMonitor()
-    stopBoost()
+    if currentBoostConnection then
+        currentBoostConnection:Disconnect()
+        currentBoostConnection = nil
+    end
+    stopTPWalkFallback()
+    if localHumanoid and config.originalWalkSpeed then
+        localHumanoid.WalkSpeed = config.originalWalkSpeed
+    end
+    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback stopped")
 end
 
 -- ============================================================================
--- END OF UPGRADED FEATURE 4
+-- AKHIR FEATURE 4 (UPGRADED & FIXED)
 -- ============================================================================
 
 -- ============================================================================

@@ -895,148 +895,69 @@ end
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED)
+-- FEATURE 4: TPWALK 2x SPEED (CFrame-based, NO TRIGGER, ALWAYS ACTIVE WHEN ENABLED)
 -- ============================================================================
 
--- Fungsi deteksi player dalam jarak tertentu
-local function isPlayerNearby(maxDistance)    
-    for _, player in ipairs(Players:GetPlayers()) do    
-        if player ~= localPlayer and player.Character then    
-            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")    
-            if targetRoot and localRootPart then    
-                local distance = (targetRoot.Position - localRootPart.Position).Magnitude    
-                if distance <= maxDistance then    
-                    return true    
-                end    
-            end    
-        end    
-    end    
-    return false    
-end    
+-- Variabel untuk kontrol
+local tpwalkActive = false
+local tpwalkConnection = nil
 
--- Deteksi killer berdasarkan team atau weapon
-local function isKiller(player)
-    if not player then return false end
-    local char = player.Character
-    if not char then return false end
-    if player.Team then
-        local teamName = player.Team.Name:lower()
-        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-            return true
-        end
-    end
-    local tool = char:FindFirstChildWhichIsA("Tool")
-    if tool then
-        local toolName = tool.Name:lower()
-        if toolName:find("knife") or toolName:find("weapon") then
-            return true
-        end
-    end
-    return false
-end
-
--- Dapatkan jarak killer terdekat
-local function getKillerDistance()
-    if not localRootPart then return math.huge end
-    local localPos = localRootPart.Position
-    local minDist = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and isKiller(player) then
-            local char = player.Character
-            if char then
-                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                if root then
-                    local dist = (localPos - root.Position).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                    end
-                end
-            end
-        end
-    end
-    return minDist
-end
-
--- Speed boost utama (WalkSpeed)
-local function applySpeedBoost()    
-    if not config.speedBoostEnabled then return end    
-    if not localHumanoid then return end    
-    if boostDebounce then return end    
-    
-    boostDebounce = true    
-    
-    -- Simpan speed asli    
-    if not config.originalWalkSpeed then    
-        config.originalWalkSpeed = localHumanoid.WalkSpeed    
-    end    
-    
-    -- 1.5x speed    
-    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5    
-    isSpeedBoostActive = true    
-    
-    task.wait(3)    
-    
-    if localHumanoid then    
-        localHumanoid.WalkSpeed = config.originalWalkSpeed    
-    end    
-    
-    isSpeedBoostActive = false    
-    boostDebounce = false    
-end    
-
--- TPWalk fallback (CFrame-based movement)
-local isTPWalking = false
-local tpwalkFallbackConnection = nil
-
+-- Fungsi untuk mempercepat gerakan menggunakan CFrame (2x kecepatan)
 local function applyTPWalk()
     if not config.speedBoostEnabled then return end
     if not localHumanoid or not localRootPart then return end
+    
+    -- Ambil arah gerakan dari MoveDirection (jika tidak bergerak, skip)
     local moveDir = localHumanoid.MoveDirection
     if moveDir.Magnitude < 0.1 then return end
-    local speedMult = 1.5
-    local step = moveDir * (16 * speedMult) * 0.05
+    
+    -- Kecepatan normal (asumsikan 16) dikalikan 2 = 32
+    local speedMult = 2.0
+    local step = moveDir * (16 * speedMult) * (0.05) -- 0.05 adalah delta time kira-kira untuk Heartbeat
+    
+    -- Posisi baru
     local newPos = localRootPart.Position + step
+    
+    -- Pindahkan karakter dengan CFrame (tanpa mengubah WalkSpeed)
     pcall(function()
         localRootPart.CFrame = CFrame.new(newPos)
     end)
 end
 
-local function startTPWalkFallback()
-    if tpwalkFallbackConnection then return end
-    tpwalkFallbackConnection = RunService.Heartbeat:Connect(function()
-        if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
-        local killerDist = getKillerDistance()
-        if killerDist <= 10 then
-            applyTPWalk()
-        end
-    end)
-    print("[TPWalkFallback] TPWalk fallback system started")
+-- Fungsi untuk memulai TPWalk (loop)
+local function startTPWalk()
+    if tpwalkConnection then return end
+    tpwalkConnection = RunService.Heartbeat:Connect(applyTPWalk)
+    print("[TPWalk] 2x speed active (CFrame-based, no trigger)")
 end
 
-local function stopTPWalkFallback()
-    if tpwalkFallbackConnection then
-        tpwalkFallbackConnection:Disconnect()
-        tpwalkFallbackConnection = nil
+local function stopTPWalk()
+    if tpwalkConnection then
+        tpwalkConnection:Disconnect()
+        tpwalkConnection = nil
     end
-    print("[TPWalkFallback] TPWalk fallback system stopped")
+    print("[TPWalk] Stopped")
 end
 
--- Monitor utama (menggabungkan kedua sistem)
+-- Monitor untuk menghubungkan dengan config.speedBoostEnabled
 local function startSpeedBoostMonitor()
     if currentBoostConnection then return end
-    -- Speed boost utama (WalkSpeed) berdasarkan jarak player
-    local lastHealth = 100
     currentBoostConnection = RunService.Heartbeat:Connect(function()
-        if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid then return end
-        if isPlayerNearby(10) then
-            applySpeedBoost()
+        if config.speedBoostEnabled then
+            if not tpwalkConnection then
+                startTPWalk()
+            end
+        else
+            if tpwalkConnection then
+                stopTPWalk()
+            end
         end
     end)
-    -- TPWalk fallback berdasarkan jarak killer
-    startTPWalkFallback()
-    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback active")
+    -- Inisialisasi awal
+    if config.speedBoostEnabled then
+        startTPWalk()
+    end
+    print("[SpeedBoostMonitor] TPWalk 2x speed monitor started")
 end
 
 local function stopSpeedBoostMonitor()
@@ -1044,14 +965,15 @@ local function stopSpeedBoostMonitor()
         currentBoostConnection:Disconnect()
         currentBoostConnection = nil
     end
-    stopTPWalkFallback()
+    stopTPWalk()
     if localHumanoid and config.originalWalkSpeed then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
     end
-    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback stopped")
+    print("[SpeedBoostMonitor] TPWalk 2x speed monitor stopped")
 end
+
 -- ============================================================================
--- AKHIR FEATURE 4 (UPGRADED)
+-- AKHIR FEATURE 4 (UPGRADED - TPWALK 2x CFrame)
 -- ============================================================================
 
 -- ============================================================================

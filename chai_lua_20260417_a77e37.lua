@@ -892,41 +892,112 @@ end
 -- ============================================================================
 -- Catatan: Pastikan fungsi startESP() ini dipanggil di init() atau tempat yang sesuai
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
--- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
+-- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.siap
+-- ============================================================================
+-- FEATURE 4: SPEED BOOST + TPWALK (ALWAYS ACTIVE, STABLE CFrame DASH)
+-- UPGRADED: No triggers, works continuously when enabled.
+-- Combines increased WalkSpeed + CFrame dash that activates only when moving.
+-- ============================================================================
 
--- ============================================================================
--- FEATURE 4: SPEED BOOST ON DAMAGE (UNCHANGED)
--- ============================================================================
-local function applySpeedBoost()
+-- Global variable untuk dash timer
+local dashConnection = nil
+local isSpeedBoostFeatureActive = false
+local originalWalkSpeedSaved = false
+
+-- Fungsi untuk mengaktifkan speed boost (WalkSpeed permanen)
+local function enableSpeedBoost()
     if not config.speedBoostEnabled then return end
     if not localHumanoid then return end
-    if boostDebounce then return end
-    boostDebounce = true
-    if config.originalWalkSpeed == 16 then config.originalWalkSpeed = localHumanoid.WalkSpeed end
-    localHumanoid.WalkSpeed = config.originalWalkSpeed + config.boostAmount
+    if not originalWalkSpeedSaved then
+        config.originalWalkSpeed = localHumanoid.WalkSpeed
+        originalWalkSpeedSaved = true
+    end
+    -- Boost speed 1.5x
+    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5
     isSpeedBoostActive = true
-    task.wait(config.boostDuration)
-    if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end
-    isSpeedBoostActive = false
-    boostDebounce = false
+    print("[SpeedBoost] Permanently active - WalkSpeed increased")
 end
 
-local function startSpeedBoostMonitor()
-    if currentBoostConnection then return end
-    local lastHealth = 100
-    currentBoostConnection = RunService.Heartbeat:Connect(function()
-        if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid then return end
-        if lastHealth == 100 then lastHealth = localHumanoid.Health end
-        if localHumanoid.Health < lastHealth then applySpeedBoost() end
-        lastHealth = localHumanoid.Health
+-- Fungsi untuk menonaktifkan speed boost (kembalikan kecepatan asli)
+local function disableSpeedBoost()
+    if not localHumanoid then return end
+    if originalWalkSpeedSaved then
+        localHumanoid.WalkSpeed = config.originalWalkSpeed
+    end
+    isSpeedBoostActive = false
+    print("[SpeedBoost] Disabled - WalkSpeed restored")
+end
+
+-- Fungsi CFrame dash yang aman dan stabil (hanya saat bergerak)
+local function applyCFrameDash(deltaTime)
+    if not config.speedBoostEnabled then return end
+    if not localHumanoid or not localRootPart then return end
+    local moveDir = localHumanoid.MoveDirection
+    if moveDir.Magnitude < 0.1 then return end  -- hanya bergerak
+
+    -- Kecepatan dash: 2x kecepatan normal per detik (konstanta 60 studs/detik)
+    local dashSpeed = 60  -- studs per second
+    local step = moveDir * dashSpeed * deltaTime
+    local newPos = localRootPart.Position + step
+    pcall(function()
+        localRootPart.CFrame = CFrame.new(newPos)
     end)
 end
-local function stopSpeedBoostMonitor()
-    if currentBoostConnection then currentBoostConnection:Disconnect(); currentBoostConnection = nil end
-    if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end
+
+-- Loop utama: jalankan dash setiap frame dengan delta time yang akurat
+local lastFrameTime = tick()
+local function onHeartbeat()
+    if not config.speedBoostEnabled then return end
+    if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
+
+    -- Hitung delta time yang akurat
+    local now = tick()
+    local delta = math.min(0.033, now - lastFrameTime)  -- batasi maks 0.033 detik
+    lastFrameTime = now
+
+    -- Pastikan WalkSpeed selalu dalam kondisi boost (jika karakter ganti)
+    if localHumanoid.WalkSpeed ~= config.originalWalkSpeed * 1.5 then
+        enableSpeedBoost()
+    end
+
+    -- Terapkan dash setiap frame saat bergerak
+    applyCFrameDash(delta)
 end
--- ============================================================================
+
+-- Fungsi untuk memulai seluruh sistem (dipanggil saat toggle ON)
+local function startSpeedBoostMonitor()
+    if currentBoostConnection then return end
+    if dashConnection then dashConnection:Disconnect() end
+
+    -- Pastikan original speed tersimpan
+    if localHumanoid and not originalWalkSpeedSaved then
+        config.originalWalkSpeed = localHumanoid.WalkSpeed
+        originalWalkSpeedSaved = true
+    end
+
+    -- Aktifkan speed boost permanen
+    enableSpeedBoost()
+
+    -- Mulai loop dash dengan delta time
+    lastFrameTime = tick()
+    dashConnection = RunService.Heartbeat:Connect(onHeartbeat)
+    currentBoostConnection = dashConnection  -- untuk konsistensi dengan stop function
+
+    print("[SpeedBoostMonitor] Fully active: WalkSpeed boosted + CFrame dash enabled")
+end
+
+-- Fungsi untuk menghentikan sistem (dipanggil saat toggle OFF)
+local function stopSpeedBoostMonitor()
+    if dashConnection then
+        dashConnection:Disconnect()
+        dashConnection = nil
+    end
+    currentBoostConnection = nil
+    disableSpeedBoost()
+    print("[SpeedBoostMonitor] Fully deactivated")
+end
+
+
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================
 local function makeInvisible()

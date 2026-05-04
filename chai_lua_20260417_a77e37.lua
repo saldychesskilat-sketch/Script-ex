@@ -895,81 +895,317 @@ end
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST - BLINK BASED (CFrame Teleport, NO WalkSpeed Change)
--- UPGRADED: Pure CFrame blink, 2x normal movement speed, stable, no lag.
--- Does not modify WalkSpeed; moves character via CFrame when moving.
+-- FEATURE 4: SPEED BOOST (5 METHODS COMBINED) - ULTRA FAST
+-- UPGRADED: Menggabungkan 5 metode speed boost sekaligus untuk kecepatan maksimal
+-- Methods: BodyVelocity, LinearVelocity, VectorForce, AssemblyLinearVelocity, CFrame Stacking
+-- Semua metode berjalan PARALEL (bukan looping biasa) untuk efek stacking speed
 -- ============================================================================
 
-local blinkConnection = nil
-local lastBlinkTime = 0
-local blinkSpeed = 32  -- 2x default walkspeed (default 16)
+-- Global variables
+local speedBoostActive = false
+local speedBoostConnections = {}
+local originalWalkSpeed = 16
+local isSpeedBoostEnabled = false
+local boostObjects = {}  -- Store created instances for cleanup
 
--- Fungsi untuk mengaktifkan blink (dipanggil saat toggle ON)
-local function enableBlink()
-    if blinkConnection then return end
-    -- Simpan kecepatan asli jika belum (untuk kompatibilitas, tapi tidak digunakan)
-    if not originalWalkSpeedSaved and localHumanoid then
-        config.originalWalkSpeed = localHumanoid.WalkSpeed
-        originalWalkSpeedSaved = true
+-- Constants
+local BOOST_SPEED = 150  -- Kecepatan target (studs per second)
+local FORCE_MULTIPLIER = 5000  -- Kekuatan force
+
+-- ============================================================================
+-- METHOD 1: WalkSpeed (Basic)
+-- ============================================================================
+local function applyWalkSpeedBoost()
+    if not localHumanoid then return end
+    originalWalkSpeed = localHumanoid.WalkSpeed
+    localHumanoid.WalkSpeed = BOOST_SPEED
+    print("[SpeedBoost] WalkSpeed boosted to " .. BOOST_SPEED)
+end
+
+local function revertWalkSpeed()
+    if localHumanoid and originalWalkSpeed then
+        localHumanoid.WalkSpeed = originalWalkSpeed
     end
-    lastBlinkTime = tick()
-    blinkConnection = RunService.Heartbeat:Connect(function()
-        if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
+end
+
+-- ============================================================================
+-- METHOD 2: BodyVelocity (Constant Force)
+-- ============================================================================
+local function createBodyVelocity()
+    if not localRootPart then return nil end
+    
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "CyberHeroes_BodyVelocity"
+    bv.MaxForce = Vector3.new(FORCE_MULTIPLIER, FORCE_MULTIPLIER, FORCE_MULTIPLIER)
+    bv.Velocity = Vector3.zero
+    bv.Parent = localRootPart
+    return bv
+end
+
+local function updateBodyVelocity(direction)
+    if not boostObjects.bodyVelocity then return end
+    if direction and direction.Magnitude > 0.1 then
+        boostObjects.bodyVelocity.Velocity = direction.Unit * BOOST_SPEED
+    else
+        boostObjects.bodyVelocity.Velocity = Vector3.zero
+    end
+end
+
+-- ============================================================================
+-- METHOD 3: LinearVelocity (More Stable)
+-- ============================================================================
+local function createLinearVelocity()
+    if not localRootPart then return nil end
+    
+    -- Need attachment for LinearVelocity
+    local attachment = Instance.new("Attachment")
+    attachment.Name = "CyberHeroes_Attachment"
+    attachment.Parent = localRootPart
+    
+    local lv = Instance.new("LinearVelocity")
+    lv.Name = "CyberHeroes_LinearVelocity"
+    lv.Attachment0 = attachment
+    lv.MaxForce = FORCE_MULTIPLIER
+    lv.VectorVelocity = Vector3.zero
+    lv.Parent = localRootPart
+    
+    return {lv = lv, attachment = attachment}
+end
+
+local function updateLinearVelocity(direction)
+    if not boostObjects.linearVelocity or not boostObjects.linearVelocity.lv then return end
+    if direction and direction.Magnitude > 0.1 then
+        boostObjects.linearVelocity.lv.VectorVelocity = direction.Unit * BOOST_SPEED
+    else
+        boostObjects.linearVelocity.lv.VectorVelocity = Vector3.zero
+    end
+end
+
+-- ============================================================================
+-- METHOD 4: VectorForce (Accumulating Force - Gets faster over time)
+-- ============================================================================
+local function createVectorForce()
+    if not localRootPart then return nil end
+    
+    local attachment = Instance.new("Attachment")
+    attachment.Name = "CyberHeroes_VectorAttachment"
+    attachment.Parent = localRootPart
+    
+    local vf = Instance.new("VectorForce")
+    vf.Name = "CyberHeroes_VectorForce"
+    vf.Attachment0 = attachment
+    vf.Force = Vector3.zero
+    vf.Parent = localRootPart
+    
+    return {vf = vf, attachment = attachment}
+end
+
+local function updateVectorForce(direction)
+    if not boostObjects.vectorForce or not boostObjects.vectorForce.vf then return end
+    if direction and direction.Magnitude > 0.1 then
+        -- VectorForce accumulates, so smaller force = constant speed, larger force = accelerating
+        boostObjects.vectorForce.vf.Force = direction.Unit * FORCE_MULTIPLIER * 1.5
+    else
+        boostObjects.vectorForce.vf.Force = Vector3.zero
+    end
+end
+
+-- ============================================================================
+-- METHOD 5: AssemblyLinearVelocity (Direct Velocity Manipulation)
+-- ============================================================================
+local function applyAssemblyLinearVelocity(direction)
+    if not localRootPart then return end
+    if direction and direction.Magnitude > 0.1 then
+        localRootPart.AssemblyLinearVelocity = direction.Unit * BOOST_SPEED
+    end
+end
+
+-- ============================================================================
+-- METHOD 6: CFrame Stacking (Teleport-based, for extreme speed)
+-- ============================================================================
+local lastFrameTime = tick()
+local cframeStackingActive = false
+
+local function startCFrameStacking()
+    if cframeStackingActive then return end
+    cframeStackingActive = true
+    lastFrameTime = tick()
+    
+    local connection
+    connection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled or not speedBoostActive then
+            if connection then connection:Disconnect() end
+            cframeStackingActive = false
+            return
+        end
+        if not localHumanoid or not localRootPart then return end
+        
         local moveDir = localHumanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end  -- hanya blink jika bergerak
-
+        if moveDir.Magnitude < 0.1 then return end
+        
         local now = tick()
-        local delta = math.min(0.033, now - lastBlinkTime)
-        lastBlinkTime = now
-
-        -- Kecepatan blink = 2x kecepatan normal (dinamis dari WalkSpeed asli)
-        local currentBlinkSpeed = (config.originalWalkSpeed or 16) * 2
-        local step = moveDir * currentBlinkSpeed * delta
+        local delta = math.min(0.033, now - lastFrameTime)
+        lastFrameTime = now
+        
+        -- CFrame stacking: move forward every frame
+        local step = moveDir.Unit * (BOOST_SPEED * delta * 1.2)
         local newPos = localRootPart.Position + step
         pcall(function()
             localRootPart.CFrame = CFrame.new(newPos)
         end)
     end)
-    print("[Blink] Activated - 2x speed via CFrame teleport (WalkSpeed unchanged)")
+    
+    table.insert(speedBoostConnections, connection)
 end
 
--- Fungsi untuk menonaktifkan blink
-local function disableBlink()
-    if blinkConnection then
-        blinkConnection:Disconnect()
-        blinkConnection = nil
+-- ============================================================================
+-- MAIN FUNCTION: Apply All Methods Simultaneously
+-- ============================================================================
+local function enableAllSpeedMethods()
+    if speedBoostActive then return end
+    speedBoostActive = true
+    
+    print("[SpeedBoost] ENABLING ALL 6 SPEED METHODS SIMULTANEOUSLY")
+    
+    -- Create all physics objects
+    boostObjects.bodyVelocity = createBodyVelocity()
+    boostObjects.linearVelocity = createLinearVelocity()
+    boostObjects.vectorForce = createVectorForce()
+    
+    -- Apply WalkSpeed boost
+    applyWalkSpeedBoost()
+    
+    -- Start CFrame stacking
+    startCFrameStacking()
+    
+    -- Create movement update connection
+    local movementConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled or not speedBoostActive then return end
+        if not localHumanoid or not localRootPart then return end
+        
+        local moveDir = localHumanoid.MoveDirection
+        
+        -- Update all physics-based velocity methods
+        updateBodyVelocity(moveDir)
+        updateLinearVelocity(moveDir)
+        updateVectorForce(moveDir)
+        applyAssemblyLinearVelocity(moveDir)
+    end)
+    
+    table.insert(speedBoostConnections, movementConnection)
+    
+    print("[SpeedBoost] All methods active: WalkSpeed + BodyVelocity + LinearVelocity + VectorForce + AssemblyLinearVelocity + CFrame Stacking")
+end
+
+-- ============================================================================
+-- DISABLE ALL METHODS (Cleanup)
+-- ============================================================================
+local function disableAllSpeedMethods()
+    if not speedBoostActive then return end
+    
+    print("[SpeedBoost] DISABLING ALL SPEED METHODS")
+    
+    -- Disconnect all connections
+    for _, conn in ipairs(speedBoostConnections) do
+        pcall(function() conn:Disconnect() end)
     end
-    print("[Blink] Deactivated")
+    speedBoostConnections = {}
+    
+    -- Destroy all created objects
+    if boostObjects.bodyVelocity then
+        pcall(function() boostObjects.bodyVelocity:Destroy() end)
+        boostObjects.bodyVelocity = nil
+    end
+    
+    if boostObjects.linearVelocity then
+        if boostObjects.linearVelocity.lv then
+            pcall(function() boostObjects.linearVelocity.lv:Destroy() end)
+        end
+        if boostObjects.linearVelocity.attachment then
+            pcall(function() boostObjects.linearVelocity.attachment:Destroy() end)
+        end
+        boostObjects.linearVelocity = nil
+    end
+    
+    if boostObjects.vectorForce then
+        if boostObjects.vectorForce.vf then
+            pcall(function() boostObjects.vectorForce.vf:Destroy() end)
+        end
+        if boostObjects.vectorForce.attachment then
+            pcall(function() boostObjects.vectorForce.attachment:Destroy() end)
+        end
+        boostObjects.vectorForce = nil
+    end
+    
+    -- Revert WalkSpeed
+    revertWalkSpeed()
+    
+    -- Stop CFrame stacking
+    cframeStackingActive = false
+    
+    -- Reset velocity
+    if localRootPart then
+        pcall(function() localRootPart.AssemblyLinearVelocity = Vector3.zero end)
+    end
+    
+    speedBoostActive = false
+    print("[SpeedBoost] All speed methods disabled")
 end
 
--- Override startSpeedBoostMonitor (asli dari script)
+-- ============================================================================
+-- EXTERNAL CONTROL FUNCTIONS (for integration with existing code)
+-- ============================================================================
 local function startSpeedBoostMonitor()
     if currentBoostConnection then return end
-    enableBlink()
-    -- Agar konsisten dengan sistem lama, simpan referensi
-    currentBoostConnection = blinkConnection
+    -- Keep a dummy connection for compatibility
+    currentBoostConnection = RunService.Heartbeat:Connect(function() end)
+    enableAllSpeedMethods()
+    print("[SpeedBoostMonitor] Started")
 end
 
--- Override stopSpeedBoostMonitor
 local function stopSpeedBoostMonitor()
-    disableBlink()
-    currentBoostConnection = nil
+    if currentBoostConnection then
+        pcall(function() currentBoostConnection:Disconnect() end)
+        currentBoostConnection = nil
+    end
+    disableAllSpeedMethods()
+    print("[SpeedBoostMonitor] Stopped")
 end
 
 -- ============================================================================
--- PASTIKAN FUNGSI INI DIPANGGIL SAAT INIT/CHARACTER RESPAWN
+-- CHARACTER CHANGE HANDLER (Re-apply after respawn)
 -- ============================================================================
--- Di dalam onCharacterAdded, kita perlu reset lastBlinkTime dan pastikan blink
--- tetap berjalan jika speedBoostEnabled true.
--- Tambahkan kode berikut di dalam onCharacterAdded (jika ada):
--- if config.speedBoostEnabled and blinkConnection then
---     lastBlinkTime = tick()
--- end
--- ============================================================================
+local function onCharacterAddedForSpeed(character)
+    -- Wait for character to fully load
+    task.wait(0.5)
+    
+    if config.speedBoostEnabled and speedBoostActive then
+        -- Re-create all speed objects on new character
+        disableAllSpeedMethods()
+        task.wait(0.2)
+        enableAllSpeedMethods()
+    end
+end
+
+-- Hook into existing character added event
+local originalCharacterAdded = onCharacterAdded
+if originalCharacterAdded then
+    localPlayer.CharacterAdded:Connect(function(character)
+        if originalCharacterAdded then
+            originalCharacterAdded(character)
+        end
+        onCharacterAddedForSpeed(character)
+    end)
+end
 
 -- ============================================================================
--- SISAKAN KODE LAIN (FEATURE 5,6, DLL) TIDAK DIUBAH
+-- NOTES FOR INTEGRATION:
+-- 1. This code REPLACES the existing FEATURE 4 block
+-- 2. Make sure config.speedBoostEnabled exists (already in global config)
+-- 3. The functions startSpeedBoostMonitor() and stopSpeedBoostMonitor()
+--    are compatible with existing toggle system
+-- 4. All methods run in PARALLEL for maximum speed stacking effect
+-- 5. Proper cleanup on disable and character death/respawn
 -- ============================================================================
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
@@ -2592,11 +2828,6 @@ local function onCharacterAdded(character)
     isInvisible = false; isShieldActive = false; isTpwalkActive = false; isNoCollideActive = false
     if currentForceField then currentForceField:Destroy(); currentForceField = nil end
 
-    -- Reset blink timer jika fitur speed boost aktif dan blink connection berjalan
-    if config.speedBoostEnabled and blinkConnection then
-        lastBlinkTime = tick()
-    end
-end
 
 local function startAllSystems()
     if config.autoWinEnabled then startAutoWin() end

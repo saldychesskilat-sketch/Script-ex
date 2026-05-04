@@ -2592,8 +2592,6 @@ local function createGUI()
     gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
     gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
     gridLayout.Parent = contentPanel
-    createSpeedSlider()
-    if not speedSliderFrame then createSpeedSlider() end
 
     local features = {
         {name="autoWinEnabled", text="AUTO WIN"},
@@ -2727,10 +2725,11 @@ local function restoreFeatureStates()
     
     if config.speedBoostEnabled and not currentBoostConnection then
         startSpeedBoostMonitor()
-    elseif not config.speedBoostEnabled and currentBoostConnection then
+        createSpeedSlider()
+        if not speedSliderFrame then createSpeedSlider() end
+       elseif not config.speedBoostEnabled and currentBoostConnection then
         stopSpeedBoostMonitor()
     end
-    
     if config.stealthEnabled and not stealthConnection then
         startStealthMonitor()
     elseif not config.stealthEnabled and stealthConnection then

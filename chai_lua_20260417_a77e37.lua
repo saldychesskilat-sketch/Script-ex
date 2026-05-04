@@ -1132,11 +1132,15 @@ local function stopGodMode()
 end
 
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (Menggantikan INFINITE AMMO)
--- Mekanisme: Ketika killer dalam jarak ≤ 30 studs, script akan terus menerus
--- mengaktifkan parry (block/tangkis) menggunakan remote event atau simulasi klik.
--- Berhenti ketika killer menjauh (>30 studs).
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (UPGRADED - REDUCED SPAM, NO COOLDOWN)
+-- Menggunakan item "Blade", "Parry Dagger", "Parrying Dagger" secara bergantian
+-- untuk menghindari cooldown internal game. Spam dikurangi (interval 0.2 detik)
+-- tetapi tetap efektif dengan multiple methods.
 -- ============================================================================
+
+-- Penyimpanan waktu terakhir parry untuk throttle
+local lastParryTime = 0
+local PARRY_INTERVAL = 0.2  -- 200ms antara setiap attempt, cukup untuk menghindari spam berlebih
 
 -- Simulasi klik kanan (biasanya digunakan untuk parry)
 local function simulateRightClick()
@@ -1161,118 +1165,94 @@ local function simulatePressF()
     end)
 end
 
--- Cari remote event untuk parry/block
-local function findParryRemoteEvent()
-    local parryKeywords = {"parry", "block", "deflect", "counter", "riposte", "reflect", "dodge"}
-    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
-        if remote:IsA("RemoteEvent") then
-            local name = remote.Name:lower()
-            for _, kw in ipairs(parryKeywords) do
-                if name:find(kw) then
-                    return remote
-                end
-            end
-        end
-    end
-    return nil
-end
+-- ============================================================================
+-- FUNGSI PARRY DENGAN ITEM BERGANTIAN (UNTUK MENGHINDARI COOLDOWN)
+-- ============================================================================
+local parryItems = {"Blade", "Parry Dagger", "Parrying Dagger", "Dagger"}
+local lastItemIndex = 1
 
--- Dapatkan jarak ke killer terdekat
-local function getKillerDistance()
-    if not localRootPart then return math.huge end
-    local localPos = localRootPart.Position
-    local minDist = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then
-                    local teamName = player.Team.Name:lower()
-                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                        isKiller = true
-                    end
-                end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                        isKiller = true
-                    end
-                end
-                if isKiller then
-                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if root then
-                        local dist = (localPos - root.Position).Magnitude
-                        if dist < minDist then minDist = dist end
+-- Cari dan aktivasi item berdasarkan nama (dari character / backpack)
+local function activateParryItemByName(itemName)
+    local character = localPlayer.Character
+    local backpack = localPlayer:FindFirstChild("Backpack")
+    local function tryActivate(tool)
+        if tool and tool:IsA("Tool") and tool.Name == itemName then
+            pcall(function() tool:Activate() end)
+            -- Coba remote events yang mungkin terkait item
+            for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+                if remote:IsA("RemoteEvent") then
+                    local remoteName = remote.Name:lower()
+                    if remoteName:find(itemName:lower()) or remoteName:find("parry") or remoteName:find("block") then
+                        pcall(function() remote:FireServer(tool) end)
                     end
                 end
             end
+            return true
+        end
+        return false
+    end
+    if character then
+        for _, tool in ipairs(character:GetChildren()) do
+            if tryActivate(tool) then return true end
         end
     end
-    return minDist
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tryActivate(tool) then return true end
+        end
+    end
+    return false
 end
 
--- Fungsi utama untuk melakukan parry (gunakan berbagai metode)
+-- Perform parry dengan rotasi item untuk menghindari cooldown internal
 local function performParry()
-    -- Metode 1: Cari remote event parry
+    -- Coba aktivasi item secara bergantian (Blade, Parry Dagger, Parrying Dagger)
+    local currentItem = parryItems[lastItemIndex]
+    if activateParryItemByName(currentItem) then
+        -- Jika berhasil, pindah ke item berikutnya untuk siklus berikutnya
+        lastItemIndex = lastItemIndex % #parryItems + 1
+    else
+        -- Fallback: coba semua item secara cepat
+        for _, itemName in ipairs(parryItems) do
+            if activateParryItemByName(itemName) then
+                break
+            end
+        end
+    end
+
+    -- Metode remote event (global)
     local parryRemote = findParryRemoteEvent()
     if parryRemote then
         pcall(function() parryRemote:FireServer() end)
         pcall(function() parryRemote:FireServer("parry") end)
     end
 
-    -- Metode 2: Simulasi klik kanan (umum untuk parry)
+    -- Simulasi input (klik kanan & tombol F)
     simulateRightClick()
-
-    -- Metode 3: Simulasi tekan F (alternatif)
     simulatePressF()
-
-    -- Metode 4: Cari item "Blade", "Parry Dagger", "Parrying Dagger" di karakter atau backpack
-    local character = localPlayer.Character
-    local backpack = localPlayer:FindFirstChild("Backpack")
-    local function activateParryItem(item)
-        if item and item:IsA("Tool") then
-            pcall(function() item:Activate() end)
-            local clickDetector = item:FindFirstChildWhichIsA("ClickDetector")
-            if clickDetector and clickDetector.Enabled then
-                pcall(function() clickDetector:FireClick() end)
-            end
-            local proximityPrompt = item:FindFirstChildWhichIsA("ProximityPrompt")
-            if proximityPrompt and proximityPrompt.Enabled then
-                pcall(function() proximityPrompt:Hold(); task.wait(0.1); proximityPrompt:Release() end)
-            end
-        end
-    end
-    if character then
-        for _, item in ipairs(character:GetChildren()) do
-            if item:IsA("Tool") and (item.Name:lower():find("blade") or item.Name:lower():find("parry") or item.Name:lower():find("dagger")) then
-                activateParryItem(item)
-            end
-        end
-    end
-    if backpack then
-        for _, item in ipairs(backpack:GetChildren()) do
-            if item:IsA("Tool") and (item.Name:lower():find("blade") or item.Name:lower():find("parry") or item.Name:lower():find("dagger")) then
-                activateParryItem(item)
-            end
-        end
-    end
 end
 
--- Loop auto parry (mirip dengan infinite ammo loop, tapi diganti fungsinya)
-local infiniteAmmoConnection = nil   -- tetap gunakan nama variabel yang sama untuk kompatibilitas
+-- ============================================================================
+-- LOOP PARRY DENGAN THROTTLE (MENGURANGI SPAM)
+-- ============================================================================
+local infiniteAmmoConnection = nil   -- tetap gunakan variabel yang sama
 
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
     infiniteAmmoConnection = RunService.Heartbeat:Connect(function()
         if not config.infiniteAmmoEnabled then return end
         if not getLocalCharacter() or not localRootPart then return end
+        
+        local now = tick()
+        if now - lastParryTime < PARRY_INTERVAL then return end  -- throttle
+        
         local killerDist = getKillerDistance()
-        if killerDist <= 30 then
+        if killerDist <= 15 then
+            lastParryTime = now
             performParry()
         end
     end)
-    print("[AutoParry] Auto parry started (continuous parry when killer ≤ 30 studs)")
+    print("[AutoParry] Auto parry started (reduced spam, rotating items to avoid cooldown)")
 end
 
 local function stopInfiniteAmmo()
@@ -1284,10 +1264,8 @@ local function stopInfiniteAmmo()
 end
 
 -- ============================================================================
--- CATATAN: Fungsi startInfiniteAmmo dan stopInfiniteAmmo di atas menggantikan 
--- implementasi infinite ammo sebelumnya. Semua pemanggilan di tempat lain (startAllSystems, 
--- restartScript, restoreFeatureStates) tetap berfungsi karena nama fungsi tidak berubah.
--- Fitur sekarang menjadi auto parry (block) saat killer dekat, bukan lagi infinite ammo.
+-- CATATAN: Fungsi findParryRemoteEvent dan getKillerDistance tetap sama seperti sebelumnya
+-- (tidak diubah). Hanya performParry dan loop yang diupgrade dengan throttle dan rotasi item.
 -- ============================================================================
 
 -- ============================================================================

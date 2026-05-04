@@ -894,7 +894,77 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 -- ============================================================================
--- FEATURE 4: speedboots tapi tpwalk 
+-- FEATURE 4: SPEED BOOST + TPWALK (CFrame Dash Only, No WalkSpeed)
+-- UPGRADED v2: Stable delta-time based CFrame movement, 2x speed, only when moving.
+-- No WalkSpeed manipulation, purely CFrame displacement.
+-- ============================================================================
+
+-- Global variables untuk dash
+local dashConnection = nil
+local lastFrameTime = 0
+local isDashActive = false
+local originalRootPos = nil  -- tidak digunakan, untuk referensi
+local dashEnabled = false     -- local mirror of config.speedBoostEnabled
+
+-- Konstanta kecepatan dash (2x kecepatan normal)
+-- Kecepatan normal Roblox sekitar 16 studs/s, jadi 2x = 32 studs/s
+local DASH_SPEED = 32
+
+-- Fungsi untuk memulai dash (dipanggil saat toggle ON)
+local function startSpeedBoostMonitor()
+    if dashConnection then return end
+    if not getLocalCharacter() or not localRootPart then
+        -- Tunggu sebentar jika karakter belum siap
+        task.wait(0.5)
+        if not getLocalCharacter() or not localRootPart then
+            print("[SpeedBoost] Failed to start: character not ready")
+            return
+        end
+    end
+    lastFrameTime = tick()
+    dashConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled then return end
+        if not getLocalCharacter() or not localHumanoid or not localRootPart then
+            -- Karakter mungkin hilang (respawn), coba perbaharui referensi
+            getLocalCharacter()
+            if not localRootPart then return end
+        end
+
+        -- Delta time yang akurat (batasi maks 0.033 untuk menghindari lompatan besar)
+        local now = tick()
+        local delta = math.min(0.033, now - lastFrameTime)
+        lastFrameTime = now
+
+        -- Hanya bergerak jika player sedang menggerakkan karakter
+        local moveDir = localHumanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end
+
+        -- Hitung perpindahan berdasarkan arah gerakan dan delta time
+        local displacement = moveDir.Unit * DASH_SPEED * delta
+        local newPos = localRootPart.Position + displacement
+
+        -- Terapkan CFrame dengan aman (tanpa mengubah rotasi)
+        pcall(function()
+            localRootPart.CFrame = CFrame.new(newPos, localRootPart.CFrame.Position + localRootPart.CFrame.LookVector)
+        end)
+    end)
+    print("[SpeedBoost] TPWalk active: 2x speed CFrame dash (delta-time based)")
+end
+
+-- Fungsi untuk menghentikan dash
+local function stopSpeedBoostMonitor()
+    if dashConnection then
+        dashConnection:Disconnect()
+        dashConnection = nil
+    end
+    print("[SpeedBoost] TPWalk deactivated")
+end
+
+-- ============================================================================
+-- Catatan: Fungsi applySpeedBoost, applyTpwalkBoost, checkTpwalkProximity,
+-- dan semua variabel terkait WalkSpeed (originalWalkSpeed, isTpwalkActive) 
+-- TIDAK DIGUNAKAN LAGI. Hapus atau komentar jika diperlukan.
+-- Namun untuk kompatibilitas, kita biarkan saja tetapi tidak akan terpanggil.
 -- ============================================================================
 
 -- ============================================================================

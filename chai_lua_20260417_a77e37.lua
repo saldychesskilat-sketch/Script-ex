@@ -894,66 +894,37 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
-
 -- ============================================================================
--- FEATURE 4: OTOMATIF BLINK TPWALK (REPLACES SPEED BOOST DAMAGE)
+-- FEATURE 4: SPEED BOOST ON DAMAGE (UNCHANGED)
 -- ============================================================================
-
--- Konfigurasi default untuk fitur ini
-local defaultSpeedMultiplier = 5 -- Kecepatan awal 5x lebih cepat dari normal
-local isTpwalkActive = false
-local tpwalkConnection = nil
-
--- Fungsi untuk mengaplikasikan efek TPWalk (TranslateBy)
-local function applyTpwalkEffect(character)
-    local hum = character and character:FindFirstChildWhichIsA("Humanoid")
-    if not character or not hum then return end
-
-    -- Loop utama untuk TPWalk
-    while config.tpwalkEnabled and character and hum and hum.Parent do
-        local delta = RunService.Heartbeat:Wait()
-        -- Hanya aktif jika pemain sedang bergerak (MoveDirection)
-        if hum.MoveDirection.Magnitude > 0 then
-            -- 'TranslateBy' adalah kunci utama TPWalk: menggerakkan karakter tanpa mengganggu animasi dan kecepatan asli
-            character:TranslateBy(hum.MoveDirection * delta * (originalTpwalkSpeed * config.tpwalkSpeedMultiplier))
-        end
-        character = localPlayer.Character
-        hum = character and character:FindFirstChildWhichIsA("Humanoid")
-    end
+local function applySpeedBoost()
+    if not config.speedBoostEnabled then return end
+    if not localHumanoid then return end
+    if boostDebounce then return end
+    boostDebounce = true
+    if config.originalWalkSpeed == 16 then config.originalWalkSpeed = localHumanoid.WalkSpeed end
+    localHumanoid.WalkSpeed = config.originalWalkSpeed + config.boostAmount
+    isSpeedBoostActive = true
+    task.wait(config.boostDuration)
+    if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end
+    isSpeedBoostActive = false
+    boostDebounce = false
 end
 
--- Fungsi untuk memulai monitoring TPWalk
-local function startTpwalkMonitor()
-    if tpwalkConnection then return end
-    tpwalkConnection = RunService.Heartbeat:Connect(function()
-        if not config.tpwalkEnabled then return end
+local function startSpeedBoostMonitor()
+    if currentBoostConnection then return end
+    local lastHealth = 100
+    currentBoostConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled then return end
         if not getLocalCharacter() or not localHumanoid then return end
-
-        -- Memastikan kecepatan asli tersimpan
-        if originalTpwalkSpeed == 16 then
-            originalTpwalkSpeed = localHumanoid.WalkSpeed
-        end
-
-        -- Menjalankan TPWalk dalam task terpisah
-        task.spawn(function()
-            if not isTpwalkActive then
-                isTpwalkActive = true
-                applyTpwalkEffect(localCharacter)
-                isTpwalkActive = false
-            end
-        end)
+        if lastHealth == 100 then lastHealth = localHumanoid.Health end
+        if localHumanoid.Health < lastHealth then applySpeedBoost() end
+        lastHealth = localHumanoid.Health
     end)
-    print("[TPWalk] System activated: Automatic Blink TPWalk is ON")
 end
-
--- Fungsi untuk menghentikan TPWalk
-local function stopTpwalkMonitor()
-    if tpwalkConnection then
-        tpwalkConnection:Disconnect()
-        tpwalkConnection = nil
-    end
-    isTpwalkActive = false
-    print("[TPWalk] System deactivated: Automatic Blink TPWalk is OFF")
+local function stopSpeedBoostMonitor()
+    if currentBoostConnection then currentBoostConnection:Disconnect(); currentBoostConnection = nil end
+    if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end
 end
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)

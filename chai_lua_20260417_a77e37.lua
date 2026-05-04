@@ -894,224 +894,326 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 -- ============================================================================
--- FEATURE 4: SPEED BOOST (TPWALK + MODERN DRAGGABLE GUI)
+-- FEATURE 4: SPEED BOOST + TPWALK (OPTIMIZED, STABLE, SMOOTH)
+-- NEW: Adjustable speed multiplier via GUI slider (1x - 25x)
 -- ============================================================================
 
-local dashConnection = nil  
-local isSpeedBoostActive = false  
-local speedMultiplier = 5  
-
--- GUI
-local speedGui = nil  
-local UIS = game:GetService("UserInputService")
+-- ============================================================================
+-- Global variables for Feature 4
+-- ============================================================================
+local speedBoostActive = false               -- Status fitur (toggle)
+local speedBoostConnection = nil             -- Koneksi heartbeat
+local savedOriginalWalkSpeed = 16            -- Kecepatan asli karakter
+local speedMultiplier = 2.0                  -- Default 2x speed (bisa diubah via GUI)
+local lastDeltaTime = tick()                 -- Untuk akurasi delta time
+local isSpeedBootstrapped = false            -- Mencegah init ulang berlebihan
 
 -- ============================================================================
--- TPWALK CORE
+-- Helper untuk mendapatkan karakter dan komponen dengan validasi lengkap
 -- ============================================================================
-
-local function applyTPWalk(deltaTime)  
-    if not config.speedBoostEnabled then return end  
-    if not localHumanoid or not localRootPart then return end  
-
-    local moveDir = localHumanoid.MoveDirection  
-    if moveDir.Magnitude < 0.1 then return end  
-
-    local baseSpeed = 16  
-    local dashSpeed = baseSpeed * speedMultiplier  
-
-    local step = moveDir * dashSpeed * deltaTime  
-    local newPos = localRootPart.Position + step  
-
-    pcall(function()  
-        localRootPart.CFrame = CFrame.new(newPos)  
-    end)  
-end  
+local function getValidCharacterComponents()
+    local char = localPlayer.Character
+    if not char or char.Parent == nil then return nil, nil, nil end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    if not humanoid or not rootPart then return nil, nil, nil end
+    return char, humanoid, rootPart
+end
 
 -- ============================================================================
--- LOOP
+-- Fungsi untuk mengubah kecepatan walk speed (dengan batasan aman)
 -- ============================================================================
-
-local lastFrameTime = tick()  
-
-local function onHeartbeat()  
-    if not config.speedBoostEnabled then return end  
-    if not getLocalCharacter() then return end  
-
-    local now = tick()  
-    local delta = math.min(0.033, now - lastFrameTime)  
-    lastFrameTime = now  
-
-    applyTPWalk(delta)  
-end  
+local function applyWalkSpeedBoost()
+    local _, humanoid, _ = getValidCharacterComponents()
+    if not humanoid then return end
+    -- Simpan kecepatan asli hanya sekali
+    if savedOriginalWalkSpeed == 16 then
+        savedOriginalWalkSpeed = humanoid.WalkSpeed
+    end
+    if speedBoostActive then
+        local newSpeed = savedOriginalWalkSpeed * speedMultiplier
+        -- Batasi antara 16 dan 400 (reasonable max)
+        newSpeed = math.clamp(newSpeed, 16, 400)
+        if humanoid.WalkSpeed ~= newSpeed then
+            humanoid.WalkSpeed = newSpeed
+        end
+    else
+        if humanoid.WalkSpeed ~= savedOriginalWalkSpeed then
+            humanoid.WalkSpeed = savedOriginalWalkSpeed
+        end
+    end
+end
 
 -- ============================================================================
--- DRAG SYSTEM
+-- CFrame Dash: halus, menggunakan Humanoid.MoveDirection dan delta time
 -- ============================================================================
+local function applySmoothDash(deltaTime)
+    if not speedBoostActive then return end
+    local char, humanoid, rootPart = getValidCharacterComponents()
+    if not char or not humanoid or not rootPart then return end
 
-local function makeDraggable(frame)
+    -- Hanya dash jika player sedang bergerak (MoveDirection > 0.1)
+    local moveDir = humanoid.MoveDirection
+    if moveDir.Magnitude < 0.1 then return end
+
+    -- Kecepatan dash dalam studs per detik = (speedMultiplier * 30) base dash speed
+    local baseDashSpeed = 30  -- kecepatan dasar agar tidak terlalu liar
+    local dashSpeed = baseDashSpeed * speedMultiplier
+    dashSpeed = math.clamp(dashSpeed, 30, 400)
+
+    -- Pergerakan dengan delta time
+    local step = moveDir * dashSpeed * deltaTime
+    local newPos = rootPart.Position + step
+
+    -- Teleport halus (CFrame) - tidak menyebabkan deteksi cheat berlebihan
+    pcall(function()
+        rootPart.CFrame = CFrame.new(newPos)
+    end)
+end
+
+-- ============================================================================
+-- Main heartbeat loop: perbarui walk speed dan dash setiap frame
+-- ============================================================================
+local function onHeartbeat()
+    -- Hitung delta time yang akurat, batasi max 0.033 detik (30 fps)
+    local now = tick()
+    local delta = math.min(0.033, now - lastDeltaTime)
+    lastDeltaTime = now
+
+    -- Pastikan karakter valid setiap siklus
+    local char, humanoid, rootPart = getValidCharacterComponents()
+    if not char or not humanoid or not rootPart then return end
+
+    -- Terapkan WalkSpeed boost (jika active)
+    applyWalkSpeedBoost()
+
+    -- Terapkan dash (jika active)
+    if speedBoostActive then
+        applySmoothDash(delta)
+    end
+end
+
+-- ============================================================================
+-- Public API untuk start / stop fitur (dipanggil dari toggle button)
+-- ============================================================================
+function startSpeedBoostMonitor()
+    if speedBoostConnection then
+        -- Jika sudah ada koneksi, jangan buat duplikat
+        return
+    end
+    speedBoostActive = true
+    -- Reset delta time
+    lastDeltaTime = tick()
+    -- Mulai heartbeat
+    speedBoostConnection = RunService.Heartbeat:Connect(onHeartbeat)
+    print("[SpeedBoost] Activated (multiplier = " .. speedMultiplier .. "x)")
+end
+
+function stopSpeedBoostMonitor()
+    speedBoostActive = false
+    if speedBoostConnection then
+        speedBoostConnection:Disconnect()
+        speedBoostConnection = nil
+    end
+    -- Kembalikan walk speed asli
+    local _, humanoid, _ = getValidCharacterComponents()
+    if humanoid and savedOriginalWalkSpeed then
+        humanoid.WalkSpeed = savedOriginalWalkSpeed
+    end
+    print("[SpeedBoost] Deactivated")
+end
+
+-- ============================================================================
+-- Fungsi untuk update multiplier dari GUI slider
+-- ============================================================================
+function setSpeedMultiplier(newMultiplier)
+    newMultiplier = math.clamp(newMultiplier, 1, 25)
+    speedMultiplier = newMultiplier
+    -- Langsung terapkan jika fitur sedang aktif
+    if speedBoostActive then
+        applyWalkSpeedBoost()
+    end
+    print("[SpeedBoost] Multiplier changed to " .. speedMultiplier .. "x")
+end
+
+-- ============================================================================
+-- Inisialisasi awal: pastikan tidak ada koneksi menggantung
+-- ============================================================================
+local function initializeSpeedBoost()
+    if isSpeedBootstrapped then return end
+    isSpeedBootstrapped = true
+    -- Pastikan tidak ada sisa koneksi dari sebelumnya
+    if speedBoostConnection then
+        speedBoostConnection:Disconnect()
+        speedBoostConnection = nil
+    end
+    speedBoostActive = false
+    savedOriginalWalkSpeed = 16
+    lastDeltaTime = tick()
+    print("[SpeedBoost] Module ready")
+end
+
+-- Panggil inisialisasi awal
+initializeSpeedBoost()
+
+-- ============================================================================
+-- GUI: Slider untuk mengatur speed multiplier (hanya untuk Speed Boost)
+-- ============================================================================
+-- Kita asumsikan Anda sudah memiliki panel GUI (contentPanel). 
+-- Fungsi berikut menambahkan slider dan label ke GUI Anda.
+-- Panggil createSpeedSlider() setelah GUI siap (misal di createGUI()).
+-- ============================================================================
+local speedSliderFrame = nil
+local speedSliderValueLabel = nil
+
+function createSpeedSlider()
+    if not contentPanel then return end -- pastikan contentPanel sudah ada
+
+    -- Buat frame untuk slider-speed (ditempatkan di bawah tombol-tombol fitur)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Name = "SpeedSliderFrame"
+    sliderFrame.Size = UDim2.new(0.9, 0, 0, 40)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.Parent = contentPanel
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.4, 0, 1, 0)
+    label.Text = "SPEED MULTI:"
+    label.TextColor3 = Color3.fromRGB(0, 230, 255)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = sliderFrame
+
+    speedSliderValueLabel = Instance.new("TextLabel")
+    speedSliderValueLabel.Size = UDim2.new(0.2, 0, 1, 0)
+    speedSliderValueLabel.Position = UDim2.new(0.75, 0, 0, 0)
+    speedSliderValueLabel.Text = string.format("%.1fx", speedMultiplier)
+    speedSliderValueLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+    speedSliderValueLabel.BackgroundTransparency = 1
+    speedSliderValueLabel.Font = Enum.Font.GothamBold
+    speedSliderValueLabel.TextSize = 12
+    speedSliderValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    speedSliderValueLabel.Parent = sliderFrame
+
+    -- Slider sebagai TextButton sederhana (dapat digeser)
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(0.5, 0, 0, 6)
+    sliderBg.Position = UDim2.new(0.45, 0, 0.5, -3)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = sliderFrame
+    local bgCorner = Instance.new("UICorner")
+    bgCorner.CornerRadius = UDim.new(1, 0)
+    bgCorner.Parent = sliderBg
+
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((speedMultiplier - 1) / 24, 0, 1, 0)  -- 1..25 -> 0..1
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 230, 255)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBg
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = sliderFill
+
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Size = UDim2.new(0, 12, 0, 12)
+    sliderButton.Position = UDim2.new((speedMultiplier - 1) / 24, -6, 0.5, -6)
+    sliderButton.Text = ""
+    sliderButton.BackgroundColor3 = Color3.fromRGB(0, 230, 255)
+    sliderButton.BorderSizePixel = 0
+    sliderButton.Parent = sliderBg
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(1, 0)
+    btnCorner.Parent = sliderButton
+
+    -- Fungsi update slider dari posisi mouse
     local dragging = false
-    local dragInput, startPos, startFramePos
-
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            startPos = input.Position
-            startFramePos = frame.Position
+    local function updateSliderFromMouse(x)
+        local relativeX = math.clamp((x - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local newMulti = 1 + relativeX * 24
+        newMulti = math.floor(newMulti * 10) / 10
+        setSpeedMultiplier(newMulti)
+        if speedSliderValueLabel then
+            speedSliderValueLabel.Text = string.format("%.1fx", speedMultiplier)
         end
-    end)
+        sliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
+        sliderButton.Position = UDim2.new(relativeX, -6, 0.5, -6)
+    end
 
-    frame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    sliderButton.MouseButton1Down:Connect(function()
+        dragging = true
+        local mouse = localPlayer:GetMouse()
+        updateSliderFromMouse(mouse.X)
+        local moveConn
+        moveConn = mouse.Move:Connect(function()
+            if dragging then
+                updateSliderFromMouse(mouse.X)
+            end
+        end)
+        mouse.Button1Up:Connect(function()
             dragging = false
-        end
+            moveConn:Disconnect()
+        end)
     end)
 
-    UIS.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - startPos
-            frame.Position = UDim2.new(
-                startFramePos.X.Scale,
-                startFramePos.X.Offset + delta.X,
-                startFramePos.Y.Scale,
-                startFramePos.Y.Offset + delta.Y
-            )
-        end
-    end)
+    -- Tambahkan ke dalam list layout (jika ada)
+    if contentPanel and contentPanel:FindFirstChildOfClass("UIListLayout") then
+        sliderFrame.LayoutOrder = 99 -- taruh di bawah
+    end
 end
 
 -- ============================================================================
--- MODERN GUI
+-- Override restartScript agar membersihkan speed boost dengan benar
+-- ============================================================================
+-- (Fungsi restartScript sudah ada di script utama, kita akan memperbaikinya)
+-- Kita akan mendefinisikan ulang restartScript nanti di bagian akhir.
+-- ============================================================================
+-- Catatan: Jangan timpa fungsi restartScript jika sudah ada, cukup modifikasi.
+-- Saya akan memberikan kode modifikasi restartScript yang kompatibel.
+-- ============================================================================
+-- Salin kode restartScript asli dan tambahkan pembersihan speed boost di dalamnya.
+-- Karena di file Anda restartScript sudah didefinisikan, kita bisa patch dengan:
 -- ============================================================================
 
-local function createSpeedGui()  
-    if speedGui then return end  
+-- Backup original jika diperlukan (tapi kita akan ganti di sini)
+-- Asumsikan fungsi restartScript belum didefinisikan ulang di blok ini.
+-- Jika sudah ada, kita timpa dengan versi yang lebih baik.
+-- Tapi untuk aman, kita akan tambahkan logic ke dalam restartScript yang sudah ada.
+-- Karena kita tidak bisa mengubah file utama secara langsung, kita akan tambahkan hook.
+-- Lebih mudah: override restartScript.
 
-    speedGui = Instance.new("ScreenGui")  
-    speedGui.Name = "TPWalkSpeedGui"  
-    speedGui.ResetOnSpawn = false  
-    speedGui.Parent = game.CoreGui  
+-- override restartScript (pastikan tidak konflik dengan yang lain)
 
-    -- Main Frame
-    local frame = Instance.new("Frame")  
-    frame.Size = UDim2.new(0, 220, 0, 130)  
-    frame.Position = UDim2.new(0.75, 0, 0.4, 0)  
-    frame.BackgroundColor3 = Color3.fromRGB(15,15,15)  
-    frame.BorderSizePixel = 0  
-    frame.Parent = speedGui  
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = frame
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(80,80,80)
-    stroke.Thickness = 1
-    stroke.Parent = frame
-
-    -- Title
-    local title = Instance.new("TextLabel")  
-    title.Size = UDim2.new(1,0,0,30)  
-    title.Text = "⚡ Speed Boost"  
-    title.TextColor3 = Color3.fromRGB(255,255,255)  
-    title.Font = Enum.Font.GothamBold  
-    title.TextSize = 14  
-    title.BackgroundTransparency = 1  
-    title.Parent = frame  
-
-    -- Value Text
-    local valueLabel = Instance.new("TextLabel")  
-    valueLabel.Size = UDim2.new(1,0,0,25)  
-    valueLabel.Position = UDim2.new(0,0,0,35)  
-    valueLabel.Text = "Speed: "..speedMultiplier.."x"  
-    valueLabel.TextColor3 = Color3.fromRGB(180,180,180)  
-    valueLabel.Font = Enum.Font.Gotham  
-    valueLabel.TextSize = 13  
-    valueLabel.BackgroundTransparency = 1  
-    valueLabel.Parent = frame  
-
-    -- Button +
-    local plusBtn = Instance.new("TextButton")  
-    plusBtn.Size = UDim2.new(0.45,0,0,35)  
-    plusBtn.Position = UDim2.new(0.05,0,0,75)  
-    plusBtn.Text = "+"  
-    plusBtn.Font = Enum.Font.GothamBold  
-    plusBtn.TextSize = 18  
-    plusBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)  
-    plusBtn.TextColor3 = Color3.new(1,1,1)  
-    plusBtn.Parent = frame  
-
-    local plusCorner = Instance.new("UICorner")
-    plusCorner.CornerRadius = UDim.new(0,8)
-    plusCorner.Parent = plusBtn
-
-    -- Button -
-    local minusBtn = Instance.new("TextButton")  
-    minusBtn.Size = UDim2.new(0.45,0,0,35)  
-    minusBtn.Position = UDim2.new(0.5,0,0,75)  
-    minusBtn.Text = "-"  
-    minusBtn.Font = Enum.Font.GothamBold  
-    minusBtn.TextSize = 18  
-    minusBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)  
-    minusBtn.TextColor3 = Color3.new(1,1,1)  
-    minusBtn.Parent = frame  
-
-    local minusCorner = Instance.new("UICorner")
-    minusCorner.CornerRadius = UDim.new(0,8)
-    minusCorner.Parent = minusBtn
-
-    -- Logic tombol
-    plusBtn.MouseButton1Click:Connect(function()  
-        speedMultiplier = math.clamp(speedMultiplier + 1, 1, 25)  
-        valueLabel.Text = "Speed: "..speedMultiplier.."x"  
-    end)  
-
-    minusBtn.MouseButton1Click:Connect(function()  
-        speedMultiplier = math.clamp(speedMultiplier - 1, 1, 25)  
-        valueLabel.Text = "Speed: "..speedMultiplier.."x"  
-    end)  
-
-    -- Aktifkan drag
-    makeDraggable(frame)
-end  
-
-local function removeSpeedGui()  
-    if speedGui then  
-        speedGui:Destroy()  
-        speedGui = nil  
-    end  
-end  
 
 -- ============================================================================
--- START / STOP
+-- Integrasi dengan toggle GUI (perbarui fungsi callback tombol)
 -- ============================================================================
+-- Misalnya Anda memiliki tombol "SPEED BOOST" di createGridButton.
+-- Jika fungsi createGridButton sudah ada, Anda dapat memodifikasi callback untuk memanggil start/stop yang baru.
+-- Karena kode asli memiliki:
+--      elseif name == "speedBoostEnabled" then
+--          config.speedBoostEnabled = newState
+--          if newState then startSpeedBoostMonitor() else stopSpeedBoostMonitor() end
+-- Maka sudah sesuai, karena kita telah mendefinisikan ulang startSpeedBoostMonitor dan stopSpeedBoostMonitor.
+-- Jadi tidak perlu mengubah createGridButton.
 
-local function startSpeedBoostMonitor()  
-    if dashConnection then return end  
+-- ============================================================================
+-- Panggil createSpeedSlider() di dalam createGUI() setelah contentPanel diisi
+-- ============================================================================
+-- Tambahkan baris berikut di akhir fungsi createGUI() (setelah membuat gridLayout):
+-- if not speedSliderFrame then createSpeedSlider() end
+-- Pastikan hanya dipanggil sekali.
 
-    isSpeedBoostActive = true  
-    config.speedBoostEnabled = true  
+-- ============================================================================
+-- Perbaikan pada karakter respawn: reset state speed boost
+-- ============================================================================
+-- Pada fungsi onCharacterAdded, kita reset kecepatan dan pastikan speed boost tetap berjalan jika aktif.
 
-    createSpeedGui()  
-
-    lastFrameTime = tick()  
-    dashConnection = RunService.Heartbeat:Connect(onHeartbeat)  
-
-    print("[SpeedBoost] TPWalk active")  
-end  
-
-local function stopSpeedBoostMonitor()  
-    if dashConnection then  
-        dashConnection:Disconnect()  
-        dashConnection = nil  
-    end  
-
-    isSpeedBoostActive = false  
-    config.speedBoostEnabled = false  
-
-    removeSpeedGui()  
-
-    print("[SpeedBoost] Disabled")  
-end
+-- Ganti onCharacterAdded dengan versi baru (pastikan tidak double bind)
+localPlayer.CharacterAdded:Connect(onCharacterAdded)
+if localPlayer.Character then onCharacterAdded(localPlayer.Character) end
 
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
@@ -1230,30 +1332,37 @@ end
 -- ============================================================================
 -- FEATURE 8: SCRIPT RESTART (FIXED)
 -- ============================================================================
-local function restartScript()
-    print("[Restart] Restarting all systems...")
-    if autoWinConnection then autoWinConnection:Disconnect(); autoWinConnection = nil end
-    if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
-    if currentBoostConnection then currentBoostConnection:Disconnect(); currentBoostConnection = nil end
-    if stealthConnection then stealthConnection:Disconnect(); stealthConnection = nil end
-    if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
-    if infiniteAmmoConnection then infiniteAmmoConnection:Disconnect(); infiniteAmmoConnection = nil end
-    if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
-    if tpwalkConnection then tpwalkConnection:Disconnect(); tpwalkConnection = nil end
-    if noCollideConnection then noCollideConnection:Disconnect(); noCollideConnection = nil end
-    if massKillLoopConnection then massKillLoopConnection:Disconnect(); massKillLoopConnection = nil end
-    if autoGeneratorLoopConnection then autoGeneratorLoopConnection:Disconnect(); autoGeneratorLoopConnection = nil end
-    if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end
-    if autoAimConnection then autoAimConnection:Disconnect(); autoAimConnection = nil end
-    isSpeedBoostActive = false; boostDebounce = false; isInvisible = false; isShieldActive = false; isTpwalkActive = false; isNoCollideActive = false
-    processedGenerators = {}; espHighlights = {}
-    if currentForceField then currentForceField:Destroy(); currentForceField = nil end
-    if localHumanoid and originalWalkSpeed then localHumanoid.WalkSpeed = originalWalkSpeed end
-    task.wait(0.5)
-    startAllSystems()
-    print("[Restart] All systems restarted successfully!")
+local originalRestartScript = restartScript  -- backup jika ada
+function restartScript()
+    print("[Restart] Restarting all systems including Speed Boost...")
+    -- Hentikan speed boost terlebih dahulu
+    stopSpeedBoostMonitor()
+    -- Panggil fungsi restart asli jika ada (misal dari script utama)
+    if originalRestartScript then
+        originalRestartScript()
+    else
+        -- Fallback: matikan semua koneksi lain (sesuai kebutuhan script utama)
+        if autoWinConnection then autoWinConnection:Disconnect(); autoWinConnection = nil end
+        if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
+        if stealthConnection then stealthConnection:Disconnect(); stealthConnection = nil end
+        if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
+        if infiniteAmmoConnection then infiniteAmmoConnection:Disconnect(); infiniteAmmoConnection = nil end
+        if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
+        if noCollideConnection then noCollideConnection:Disconnect(); noCollideConnection = nil end
+        if massKillLoopConnection then massKillLoopConnection:Disconnect(); massKillLoopConnection = nil end
+        if autoGeneratorLoopConnection then autoGeneratorLoopConnection:Disconnect(); autoGeneratorLoopConnection = nil end
+        if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end
+        if autoAimConnection then autoAimConnection:Disconnect(); autoAimConnection = nil end
+        processedGenerators = {}; espHighlights = {}
+        if currentForceField then currentForceField:Destroy(); currentForceField = nil end
+        if localHumanoid and savedOriginalWalkSpeed then
+            localHumanoid.WalkSpeed = savedOriginalWalkSpeed
+        end
+        task.wait(0.5)
+        startAllSystems()
+    end
+    print("[Restart] Restart completed")
 end
-
 -- ============================================================================
 -- FEATURE 9: AUTO SHIELD (ForceField Protection)
 -- ============================================================================
@@ -2483,6 +2592,8 @@ local function createGUI()
     gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
     gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
     gridLayout.Parent = contentPanel
+    createSpeedSlider()
+    if not speedSliderFrame then createSpeedSlider() end
 
     local features = {
         {name="autoWinEnabled", text="AUTO WIN"},

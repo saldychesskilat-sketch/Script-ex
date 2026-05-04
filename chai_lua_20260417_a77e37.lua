@@ -14,7 +14,7 @@ if not _G.CyberHeroesState then
                 AgentHeight = 5,
                 AgentCanJump = true,
                 AgentMaxSlope = 45
-            },
+            }
             espEnabled = false,
             highlightColorKiller = Color3.fromRGB(255, 50, 50),
             highlightColorSurvivor = Color3.fromRGB(50, 255, 50),
@@ -894,6 +894,14 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.siap
 -- ============================================================================
+
+
+
+
+-- ============================================================================
+-- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED - STABLE & DELTA TIME)
+-- ============================================================================
+-- ============================================================================
 -- FEATURE 4: SPEED BOOST + TPWALK (ALWAYS ACTIVE, STABLE CFrame DASH)
 -- UPGRADED: No triggers, works continuously when enabled.
 -- Combines increased WalkSpeed + CFrame dash that activates only when moving.
@@ -997,6 +1005,13 @@ local function stopSpeedBoostMonitor()
     print("[SpeedBoostMonitor] Fully deactivated")
 end
 
+-- ============================================================================
+-- MODIFIKASI PADA FUNGSI RESTART DAN STARTALL (pastikan kompatibel)
+-- ============================================================================
+-- Catatan: Fungsi restartScript dan startAllSystems sudah ada di script utama.
+-- Pastikan bahwa ketika restart, state speed boost dimatikan dengan benar.
+-- Tidak perlu mengubah fungsi lain di luar blok ini.
+-- ============================================================================
 
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================

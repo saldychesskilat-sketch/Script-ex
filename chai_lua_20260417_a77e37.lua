@@ -893,111 +893,83 @@ end
 -- Catatan: Pastikan fungsi startESP() ini dipanggil di init() atau tempat yang sesuai
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
+
 -- ============================================================================
--- FEATURE 4: SPEED BOOST (PURE CFŘAME TPWALK) - NO WALKSPEED MODIFICATION
--- Description: Moves character using CFrame manipulations at 2x normal speed.
--- Works continuously when enabled, respects movement direction.
--- Fully independent of WalkSpeed; preserves originalWalkSpeed variable for compatibility.
+-- FEATURE 4: SPEED BOOST - BLINK BASED (CFrame Teleport, NO WalkSpeed Change)
+-- UPGRADED: Pure CFrame blink, 2x normal movement speed, stable, no lag.
+-- Does not modify WalkSpeed; moves character via CFrame when moving.
 -- ============================================================================
 
--- State variables (keep existing names for compatibility)
-local isSpeedBoostActive = false          -- Indicates boost is active
-local boostDebounce = false               -- Unused but kept for compatibility
-local currentBoostConnection = nil        -- Stores Heartbeat connection
+local blinkConnection = nil
+local lastBlinkTime = 0
+local blinkSpeed = 32  -- 2x default walkspeed (default 16)
 
--- Internal variables
-local lastHeartbeatTime = 0
-local speedMultiplier = 2.0               -- 2x normal speed
-local baseWalkSpeed = 16                  -- Fallback default speed (studs/sec)
+-- Fungsi untuk mengaktifkan blink (dipanggil saat toggle ON)
+local function enableBlink()
+    if blinkConnection then return end
+    -- Simpan kecepatan asli jika belum (untuk kompatibilitas, tapi tidak digunakan)
+    if not originalWalkSpeedSaved and localHumanoid then
+        config.originalWalkSpeed = localHumanoid.WalkSpeed
+        originalWalkSpeedSaved = true
+    end
+    lastBlinkTime = tick()
+    blinkConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled then return end
+        if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
+        local moveDir = localHumanoid.MoveDirection
+        if moveDir.Magnitude < 0.1 then return end  -- hanya blink jika bergerak
 
--- Helper to get current character's root part and humanoid
-local function getCharacterParts()
-    local char = localPlayer.Character
-    if not char then return nil, nil end
-    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    return root, hum
-end
+        local now = tick()
+        local delta = math.min(0.033, now - lastBlinkTime)
+        lastBlinkTime = now
 
--- CFrame dash function (pure movement, no WalkSpeed changes)
-local function applyCFrameMovement(deltaTime)
-    if not config.speedBoostEnabled then return end
-    local rootPart, humanoid = getCharacterParts()
-    if not rootPart or not humanoid then return end
-
-    -- Get movement direction from humanoid (normalized)
-    local moveDir = humanoid.MoveDirection
-    if moveDir.Magnitude < 0.1 then return end  -- Not moving
-
-    -- Determine target speed: use originalWalkSpeed if available, else default 16
-    local normalSpeed = (config.originalWalkSpeed and config.originalWalkSpeed > 0) and config.originalWalkSpeed or baseWalkSpeed
-    local boostedSpeed = normalSpeed * speedMultiplier
-
-    -- Calculate displacement for this frame
-    local step = moveDir * boostedSpeed * deltaTime
-    local newPosition = rootPart.Position + step
-
-    -- Apply movement using CFrame (preserves rotation)
-    pcall(function()
-        rootPart.CFrame = CFrame.new(newPosition, rootPart.Position + rootPart.CFrame.LookVector)
+        -- Kecepatan blink = 2x kecepatan normal (dinamis dari WalkSpeed asli)
+        local currentBlinkSpeed = (config.originalWalkSpeed or 16) * 2
+        local step = moveDir * currentBlinkSpeed * delta
+        local newPos = localRootPart.Position + step
+        pcall(function()
+            localRootPart.CFrame = CFrame.new(newPos)
+        end)
     end)
+    print("[Blink] Activated - 2x speed via CFrame teleport (WalkSpeed unchanged)")
 end
 
--- Heartbeat loop with accurate delta time
-local function onHeartbeat()
-    if not config.speedBoostEnabled then
-        -- If feature is disabled but connection exists, stop it (extra safety)
-        if currentBoostConnection then
-            stopSpeedBoostMonitor()
-        end
-        return
+-- Fungsi untuk menonaktifkan blink
+local function disableBlink()
+    if blinkConnection then
+        blinkConnection:Disconnect()
+        blinkConnection = nil
     end
-
-    local now = tick()
-    if lastHeartbeatTime == 0 then
-        lastHeartbeatTime = now
-        return
-    end
-    local delta = math.min(0.033, now - lastHeartbeatTime)  -- Cap at 0.033 sec (30 fps)
-    lastHeartbeatTime = now
-
-    applyCFrameMovement(delta)
+    print("[Blink] Deactivated")
 end
 
--- Public functions to start/stop the boost (compatible with existing toggle logic)
+-- Override startSpeedBoostMonitor (asli dari script)
 local function startSpeedBoostMonitor()
-    if currentBoostConnection then return end  -- Already running
-
-    -- Reset delta time tracker
-    lastHeartbeatTime = 0
-
-    -- Start Heartbeat loop
-    currentBoostConnection = RunService.Heartbeat:Connect(onHeartbeat)
-    isSpeedBoostActive = true
-
-    print("[SpeedBoost] Enabled (pure CFrame movement, 2x speed, WalkSpeed untouched)")
+    if currentBoostConnection then return end
+    enableBlink()
+    -- Agar konsisten dengan sistem lama, simpan referensi
+    currentBoostConnection = blinkConnection
 end
 
+-- Override stopSpeedBoostMonitor
 local function stopSpeedBoostMonitor()
-    if currentBoostConnection then
-        currentBoostConnection:Disconnect()
-        currentBoostConnection = nil
-    end
-    isSpeedBoostActive = false
-    lastHeartbeatTime = 0
-
-    -- Ensure no leftover CFrame influence (character returns to normal physics)
-    print("[SpeedBoost] Disabled (normal movement restored)")
-end
-
--- Override the old applySpeedBoost function (if still referenced elsewhere) to do nothing
-local function applySpeedBoost()
-    -- Legacy function; speed boost now works continuously.
-    -- Kept to avoid errors in other parts of the script.
+    disableBlink()
+    currentBoostConnection = nil
 end
 
 -- ============================================================================
--- END OF FEATURE 4 UPGRADE
+-- PASTIKAN FUNGSI INI DIPANGGIL SAAT INIT/CHARACTER RESPAWN
+-- ============================================================================
+-- Di dalam onCharacterAdded, kita perlu reset lastBlinkTime dan pastikan blink
+-- tetap berjalan jika speedBoostEnabled true.
+-- Tambahkan kode berikut di dalam onCharacterAdded (jika ada):
+-- if config.speedBoostEnabled and blinkConnection then
+--     lastBlinkTime = tick()
+-- end
+-- ============================================================================
+
+-- ============================================================================
+-- SISAKAN KODE LAIN (FEATURE 5,6, DLL) TIDAK DIUBAH
 -- ============================================================================
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
@@ -2619,6 +2591,11 @@ local function onCharacterAdded(character)
     end
     isInvisible = false; isShieldActive = false; isTpwalkActive = false; isNoCollideActive = false
     if currentForceField then currentForceField:Destroy(); currentForceField = nil end
+
+    -- Reset blink timer jika fitur speed boost aktif dan blink connection berjalan
+    if config.speedBoostEnabled and blinkConnection then
+        lastBlinkTime = tick()
+    end
 end
 
 local function startAllSystems()

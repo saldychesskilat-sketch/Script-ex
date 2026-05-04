@@ -2641,8 +2641,7 @@ local function ensureGUIPersistent()
         while isScriptRunning do
             if not screenGui or not screenGui.Parent then
                 print("[Recovery] Recreating main GUI...")
-                createGUI() 
-                restoreFeatureStates()
+                createGUI()
             end
             if not config.guiVisible and (not floatingLogo or not floatingLogo.Parent) then
                     print("[Recovery] Recreating floating logo...")

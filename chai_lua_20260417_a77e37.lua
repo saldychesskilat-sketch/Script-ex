@@ -894,148 +894,67 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
+
 -- ============================================================================
--- FEATURE 4: SPEED & BLINK (HIT-ACTIVATED) - UPGRADED
+-- FEATURE 4: OTOMATIF BLINK TPWALK (REPLACES SPEED BOOST DAMAGE)
 -- ============================================================================
 
--- Variabel state untuk effect blink
-local isBlinking = false
-local blinkConnection = nil
+-- Konfigurasi default untuk fitur ini
+local defaultSpeedMultiplier = 5 -- Kecepatan awal 5x lebih cepat dari normal
+local isTpwalkActive = false
+local tpwalkConnection = nil
 
--- Fungsi untuk efek "blink" (teleportasi kecil ke depan berulang kali)
-local function startBlinkEffect(duration)
-    if isBlinking or not localRootPart then return end
-    isBlinking = true
-    local startTime = tick()
-    blinkConnection = RunService.Heartbeat:Connect(function()
-        if not isBlinking or (tick() - startTime) >= (duration or config.boostDuration) then
-            if blinkConnection then blinkConnection:Disconnect(); blinkConnection = nil end
-            isBlinking = false
-            return
+-- Fungsi untuk mengaplikasikan efek TPWalk (TranslateBy)
+local function applyTpwalkEffect(character)
+    local hum = character and character:FindFirstChildWhichIsA("Humanoid")
+    if not character or not hum then return end
+
+    -- Loop utama untuk TPWalk
+    while config.tpwalkEnabled and character and hum and hum.Parent do
+        local delta = RunService.Heartbeat:Wait()
+        -- Hanya aktif jika pemain sedang bergerak (MoveDirection)
+        if hum.MoveDirection.Magnitude > 0 then
+            -- 'TranslateBy' adalah kunci utama TPWalk: menggerakkan karakter tanpa mengganggu animasi dan kecepatan asli
+            character:TranslateBy(hum.MoveDirection * delta * (originalTpwalkSpeed * config.tpwalkSpeedMultiplier))
         end
-        if localRootPart then
-            -- Teleportasi kecil sejauh 3 stud ke depan
-            local forward = localRootPart.CFrame.LookVector * 3
-            localRootPart.CFrame = localRootPart.CFrame + forward
+        character = localPlayer.Character
+        hum = character and character:FindFirstChildWhichIsA("Humanoid")
+    end
+end
+
+-- Fungsi untuk memulai monitoring TPWalk
+local function startTpwalkMonitor()
+    if tpwalkConnection then return end
+    tpwalkConnection = RunService.Heartbeat:Connect(function()
+        if not config.tpwalkEnabled then return end
+        if not getLocalCharacter() or not localHumanoid then return end
+
+        -- Memastikan kecepatan asli tersimpan
+        if originalTpwalkSpeed == 16 then
+            originalTpwalkSpeed = localHumanoid.WalkSpeed
         end
+
+        -- Menjalankan TPWalk dalam task terpisah
+        task.spawn(function()
+            if not isTpwalkActive then
+                isTpwalkActive = true
+                applyTpwalkEffect(localCharacter)
+                isTpwalkActive = false
+            end
+        end)
     end)
+    print("[TPWalk] System activated: Automatic Blink TPWalk is ON")
 end
 
--- Apply speed boost + blink effect
-local function applySpeedBoost()
-    if not config.speedBoostEnabled then return end
-    if not localHumanoid then return end
-    if boostDebounce then return end
-    
-    boostDebounce = true
-    
-    -- Simpan WalkSpeed asli jika belum
-    if config.originalWalkSpeed == 16 then
-        config.originalWalkSpeed = localHumanoid.WalkSpeed
+-- Fungsi untuk menghentikan TPWalk
+local function stopTpwalkMonitor()
+    if tpwalkConnection then
+        tpwalkConnection:Disconnect()
+        tpwalkConnection = nil
     end
-    
-    -- Terapkan speed boost
-    localHumanoid.WalkSpeed = config.originalWalkSpeed + config.boostAmount
-    isSpeedBoostActive = true
-    
-    -- Aktifkan efek blink (tpwalk)
-    startBlinkEffect(config.boostDuration)
-    
-    print("[SpeedBoost] Activated! Speed increased + blink effect for " .. config.boostDuration .. " seconds")
-    
-    -- Kembalikan ke normal setelah durasi boost
-    task.wait(config.boostDuration)
-    
-    if localHumanoid then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
-    end
-    isSpeedBoostActive = false
-    boostDebounce = false
-    print("[SpeedBoost] Deactivated. Speed restored to normal.")
+    isTpwalkActive = false
+    print("[TPWalk] System deactivated: Automatic Blink TPWalk is OFF")
 end
-
--- Monitor damage menggunakan event HealthChanged (metode paling akurat)
-local healthChangedConnection = nil
-local function startSpeedBoostMonitor()
-    if currentBoostConnection then return end
-    
-    local function onHealthChanged()
-        -- Jika fitur non-aktif, skip
-        if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid then return end
-        
-        -- Ambil nilai health dari humanoid (jika ada)
-        local currentHealth = localHumanoid.Health
-        
-        -- Bandingkan dengan health terakhir yang tersimpan
-        if lastHealth and currentHealth < lastHealth then
-            print("[SpeedBoost] Damage detected via HealthChanged! Health: " .. lastHealth .. " -> " .. currentHealth)
-            applySpeedBoost()
-        end
-        
-        -- Update lastHealth untuk iterasi berikutnya
-        lastHealth = currentHealth
-    end
-    
-    -- Inisialisasi lastHealth saat pertama kali monitor dijalankan
-    lastHealth = nil
-    
-    -- Gunakan .Changed event untuk mendeteksi perubahan health secara real-time
-    -- Buat fungsi yang akan dipanggil setiap kali properti Health berubah
-    local function healthPropertyChanged()
-        if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid then return end
-        
-        local currentHealth = localHumanoid.Health
-        
-        -- Jika lastHealth belum di-set, set sekarang
-        if lastHealth == nil then
-            lastHealth = currentHealth
-            return
-        end
-        
-        -- Deteksi damage jika health menurun
-        if currentHealth < lastHealth then
-            print("[SpeedBoost] Damage detected via PropertyChanged! Health: " .. lastHealth .. " -> " .. currentHealth)
-            applySpeedBoost()
-        end
-        
-        lastHealth = currentHealth
-    end
-    
-    -- Registrasi event: HealthChanged (jika tersedia, lebih akurat)
-    local healthChangedEvent = localHumanoid:FindFirstChild("HealthChanged")
-    if healthChangedEvent and healthChangedEvent:IsA("RBXScriptSignal") then
-        healthChangedConnection = localHumanoid.HealthChanged:Connect(onHealthChanged)
-        print("[SpeedBoost] Monitor started using HealthChanged event.")
-    else
-        -- Fallback: gunakan sinyal GetPropertyChangedSignal
-        healthChangedConnection = localHumanoid:GetPropertyChangedSignal("Health"):Connect(healthPropertyChanged)
-        print("[SpeedBoost] Monitor started using GetPropertyChangedSignal (fallback).")
-    end
-    
-    currentBoostConnection = healthChangedConnection
-end
-
-local function stopSpeedBoostMonitor()
-    if currentBoostConnection then
-        currentBoostConnection:Disconnect()
-        currentBoostConnection = nil
-        healthChangedConnection = nil
-    end
-    if localHumanoid then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
-    end
-    if blinkConnection then
-        blinkConnection:Disconnect()
-        blinkConnection = nil
-    end
-    isBlinking = false
-    boostDebounce = false
-    isSpeedBoostActive = false
-    print("[SpeedBoost] Monitor stopped.")
-end
-
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================

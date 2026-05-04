@@ -893,118 +893,235 @@ end
 -- Catatan: Pastikan fungsi startESP() ini dipanggil di init() atau tempat yang sesuai
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
-
-
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED - STABLE & DELTA TIME)
+-- FEATURE 4: SPEED BOOST (TPWALK STYLE) - DENGAN GUI TERPISAH DAN SLIDER KECEPATAN
 -- ============================================================================
--- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (ALWAYS ACTIVE, STABLE CFrame DASH)
--- UPGRADED: No triggers, works continuously when enabled.
--- Combines increased WalkSpeed + CFrame dash that activates only when moving.
+-- Upgrade: Menggunakan CFrame dash (tpwalk) tanpa mengubah WalkSpeed.
+-- Kecepatan dapat diatur 1x - 25x melalui GUI terpisah yang muncul saat fitur aktif.
 -- ============================================================================
 
--- Global variable untuk dash timer
-local dashConnection = nil
-local isSpeedBoostFeatureActive = false
+-- Variabel global untuk GUI terpisah speed boost
+local speedBoostGui = nil
+local speedBoostMainFrame = nil
+local speedSlider = nil
+local speedValueLabel = nil
+local speedBoostDashConnection = nil
 local originalWalkSpeedSaved = false
+local lastFrameTimeSpeed = tick()
 
--- Fungsi untuk mengaktifkan speed boost (WalkSpeed permanen)
-local function enableSpeedBoost()
-    if not config.speedBoostEnabled then return end
-    if not localHumanoid then return end
-    if not originalWalkSpeedSaved then
-        config.originalWalkSpeed = localHumanoid.WalkSpeed
-        originalWalkSpeedSaved = true
-    end
-    -- Boost speed 1.5x
-    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5
-    isSpeedBoostActive = true
-    print("[SpeedBoost] Permanently active - WalkSpeed increased")
+-- Inisialisasi multiplier di config (jika belum ada)
+if not config.speedBoostMultiplier then
+    config.speedBoostMultiplier = 5  -- default 5x
 end
 
--- Fungsi untuk menonaktifkan speed boost (kembalikan kecepatan asli)
-local function disableSpeedBoost()
-    if not localHumanoid then return end
-    if originalWalkSpeedSaved then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
+-- Fungsi untuk membuat GUI terpisah (hanya muncul saat fitur aktif)
+local function createSpeedBoostGUI()
+    if speedBoostGui then speedBoostGui:Destroy() end
+    speedBoostGui = Instance.new("ScreenGui")
+    speedBoostGui.Name = "CyberHeroes_SpeedBoostPanel"
+    speedBoostGui.Parent = CoreGui
+    speedBoostGui.ResetOnSpawn = false
+
+    -- Frame utama (kecil, bisa dipindah)
+    speedBoostMainFrame = Instance.new("Frame")
+    speedBoostMainFrame.Size = UDim2.new(0, 200, 0, 90)
+    speedBoostMainFrame.Position = UDim2.new(0.02, 0, 0.75, 0)  -- pojok kiri bawah
+    speedBoostMainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+    speedBoostMainFrame.BackgroundTransparency = 0.1
+    speedBoostMainFrame.BorderSizePixel = 0
+    speedBoostMainFrame.Parent = speedBoostGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = speedBoostMainFrame
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 230, 255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.4
+    stroke.Parent = speedBoostMainFrame
+
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 25)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.Text = "⚡ SPEED BOOST ACTIVE"
+    title.TextColor3 = Color3.fromRGB(0, 230, 255)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 10
+    title.Parent = speedBoostMainFrame
+
+    -- Label speed multiplier
+    local speedLabel = Instance.new("TextLabel")
+    speedLabel.Size = UDim2.new(0.5, 0, 0, 25)
+    speedLabel.Position = UDim2.new(0.05, 0, 0.3, 0)
+    speedLabel.Text = "Speed x"
+    speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    speedLabel.BackgroundTransparency = 1
+    speedLabel.Font = Enum.Font.Gotham
+    speedLabel.TextSize = 10
+    speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    speedLabel.Parent = speedBoostMainFrame
+
+    -- Nilai multiplier saat ini
+    speedValueLabel = Instance.new("TextLabel")
+    speedValueLabel.Size = UDim2.new(0.3, 0, 0, 25)
+    speedValueLabel.Position = UDim2.new(0.55, 0, 0.3, 0)
+    speedValueLabel.Text = string.format("%.1f", config.speedBoostMultiplier)
+    speedValueLabel.TextColor3 = Color3.fromRGB(0, 230, 255)
+    speedValueLabel.BackgroundTransparency = 1
+    speedValueLabel.Font = Enum.Font.GothamBold
+    speedValueLabel.TextSize = 10
+    speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    speedValueLabel.Parent = speedBoostMainFrame
+
+    -- Slider
+    speedSlider = Instance.new("TextButton")
+    speedSlider.Size = UDim2.new(0.9, 0, 0, 6)
+    speedSlider.Position = UDim2.new(0.05, 0, 0.6, 0)
+    speedSlider.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+    speedSlider.BackgroundTransparency = 0.3
+    speedSlider.BorderSizePixel = 0
+    speedSlider.Parent = speedBoostMainFrame
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(1, 0)
+    sliderCorner.Parent = speedSlider
+
+    local sliderFill = Instance.new("Frame")
+    local fillWidth = (config.speedBoostMultiplier - 1) / 24  -- range 1-25
+    sliderFill.Size = UDim2.new(fillWidth, 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 230, 255)
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = speedSlider
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(1, 0)
+    fillCorner.Parent = sliderFill
+
+    -- Drag slider
+    local dragging = false
+    local function updateSpeedFromMouse(x)
+        local relativeX = math.clamp((x - speedSlider.AbsolutePosition.X) / speedSlider.AbsoluteSize.X, 0, 1)
+        local newMult = 1 + relativeX * 24
+        newMult = math.clamp(newMult, 1, 25)
+        config.speedBoostMultiplier = newMult
+        speedValueLabel.Text = string.format("%.1f", newMult)
+        sliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
     end
-    isSpeedBoostActive = false
-    print("[SpeedBoost] Disabled - WalkSpeed restored")
+    speedSlider.MouseButton1Down:Connect(function()
+        dragging = true
+        local mouse = localPlayer:GetMouse()
+        updateSpeedFromMouse(mouse.X)
+        local conn
+        conn = mouse.Move:Connect(function()
+            if dragging then updateSpeedFromMouse(mouse.X) end
+        end)
+        mouse.Button1Up:Connect(function()
+            dragging = false
+            conn:Disconnect()
+        end)
+    end)
+
+    -- Draggable untuk seluruh panel
+    local draggingPanel = false
+    local dragPanelStart, startPanelPos
+    speedBoostMainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            draggingPanel = true
+            dragPanelStart = input.Position
+            startPanelPos = speedBoostMainFrame.Position
+        end
+    end)
+    speedBoostMainFrame.InputChanged:Connect(function(input)
+        if draggingPanel and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragPanelStart
+            speedBoostMainFrame.Position = UDim2.new(startPanelPos.X.Scale, startPanelPos.X.Offset + delta.X,
+                                                    startPanelPos.Y.Scale, startPanelPos.Y.Offset + delta.Y)
+        end
+    end)
+    speedBoostMainFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            draggingPanel = false
+        end
+    end)
+
+    print("[SpeedBoostGUI] Speed boost control panel created")
 end
 
--- Fungsi CFrame dash yang aman dan stabil (hanya saat bergerak)
-local function applyCFrameDash(deltaTime)
+local function destroySpeedBoostGUI()
+    if speedBoostGui then
+        speedBoostGui:Destroy()
+        speedBoostGui = nil
+        speedBoostMainFrame = nil
+        speedSlider = nil
+        speedValueLabel = nil
+        print("[SpeedBoostGUI] Speed boost control panel destroyed")
+    end
+end
+
+-- Fungsi CFrame dash menggunakan multiplier yang dapat diatur
+local function applyCFrameDashMultiplier(deltaTime)
     if not config.speedBoostEnabled then return end
     if not localHumanoid or not localRootPart then return end
     local moveDir = localHumanoid.MoveDirection
-    if moveDir.Magnitude < 0.1 then return end  -- hanya bergerak
+    if moveDir.Magnitude < 0.1 then return end
 
-    -- Kecepatan dash: 2x kecepatan normal per detik (konstanta 60 studs/detik)
-    local dashSpeed = 60  -- studs per second
+    -- Kecepatan dasar: 60 studs/detik, dikalikan multiplier
+    local baseSpeed = 60
+    local dashSpeed = baseSpeed * config.speedBoostMultiplier
     local step = moveDir * dashSpeed * deltaTime
     local newPos = localRootPart.Position + step
     pcall(function()
         localRootPart.CFrame = CFrame.new(newPos)
+        -- Juga sedikit efek visual? opsional
     end)
 end
 
--- Loop utama: jalankan dash setiap frame dengan delta time yang akurat
-local lastFrameTime = tick()
-local function onHeartbeat()
+-- Loop utama untuk dash
+local function onSpeedBoostHeartbeat()
     if not config.speedBoostEnabled then return end
     if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
 
-    -- Hitung delta time yang akurat
     local now = tick()
-    local delta = math.min(0.033, now - lastFrameTime)  -- batasi maks 0.033 detik
-    lastFrameTime = now
+    local delta = math.min(0.033, now - lastFrameTimeSpeed)
+    lastFrameTimeSpeed = now
 
-    -- Pastikan WalkSpeed selalu dalam kondisi boost (jika karakter ganti)
-    if localHumanoid.WalkSpeed ~= config.originalWalkSpeed * 1.5 then
-        enableSpeedBoost()
-    end
-
-    -- Terapkan dash setiap frame saat bergerak
-    applyCFrameDash(delta)
+    applyCFrameDashMultiplier(delta)
 end
 
--- Fungsi untuk memulai seluruh sistem (dipanggil saat toggle ON)
+-- Fungsi untuk memulai speed boost (dipanggil saat toggle ON)
 local function startSpeedBoostMonitor()
-    if currentBoostConnection then return end
-    if dashConnection then dashConnection:Disconnect() end
+    if speedBoostDashConnection then return end
+    if not localHumanoid then return end
 
-    -- Pastikan original speed tersimpan
-    if localHumanoid and not originalWalkSpeedSaved then
+    -- Simpan walk speed asli jika perlu (tidak digunakan, tapi biar konsisten)
+    if not originalWalkSpeedSaved then
         config.originalWalkSpeed = localHumanoid.WalkSpeed
         originalWalkSpeedSaved = true
     end
+    -- Jangan ubah walkspeed, hanya dash
 
-    -- Aktifkan speed boost permanen
-    enableSpeedBoost()
+    lastFrameTimeSpeed = tick()
+    speedBoostDashConnection = RunService.Heartbeat:Connect(onSpeedBoostHeartbeat)
+    currentBoostConnection = speedBoostDashConnection  -- agar sesuai dengan stop di fungsi lain
 
-    -- Mulai loop dash dengan delta time
-    lastFrameTime = tick()
-    dashConnection = RunService.Heartbeat:Connect(onHeartbeat)
-    currentBoostConnection = dashConnection  -- untuk konsistensi dengan stop function
+    -- Buat GUI terpisah
+    createSpeedBoostGUI()
 
-    print("[SpeedBoostMonitor] Fully active: WalkSpeed boosted + CFrame dash enabled")
+    print("[SpeedBoost] Active (TPWalk style) - Multiplier: " .. config.speedBoostMultiplier)
 end
 
--- Fungsi untuk menghentikan sistem (dipanggil saat toggle OFF)
+-- Fungsi untuk menghentikan speed boost (dipanggil saat toggle OFF)
 local function stopSpeedBoostMonitor()
-    if dashConnection then
-        dashConnection:Disconnect()
-        dashConnection = nil
+    if speedBoostDashConnection then
+        speedBoostDashConnection:Disconnect()
+        speedBoostDashConnection = nil
     end
     currentBoostConnection = nil
-    disableSpeedBoost()
-    print("[SpeedBoostMonitor] Fully deactivated")
+    destroySpeedBoostGUI()
+    print("[SpeedBoost] Deactivated")
 end
 
 -- ============================================================================
 -- MODIFIKASI PADA FUNGSI RESTART DAN STARTALL (pastikan kompatibel)
--- ============================================================================
 -- Catatan: Fungsi restartScript dan startAllSystems sudah ada di script utama.
 -- Pastikan bahwa ketika restart, state speed boost dimatikan dengan benar.
 -- Tidak perlu mengubah fungsi lain di luar blok ini.

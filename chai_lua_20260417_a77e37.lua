@@ -894,79 +894,111 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (CFrame Dash Only, No WalkSpeed)
--- UPGRADED v2: Stable delta-time based CFrame movement, 2x speed, only when moving.
--- No WalkSpeed manipulation, purely CFrame displacement.
+-- FEATURE 4: SPEED BOOST (PURE CFŘAME TPWALK) - NO WALKSPEED MODIFICATION
+-- Description: Moves character using CFrame manipulations at 2x normal speed.
+-- Works continuously when enabled, respects movement direction.
+-- Fully independent of WalkSpeed; preserves originalWalkSpeed variable for compatibility.
 -- ============================================================================
 
--- Global variables untuk dash
-local dashConnection = nil
-local lastFrameTime = 0
-local isDashActive = false
-local originalRootPos = nil  -- tidak digunakan, untuk referensi
-local dashEnabled = false     -- local mirror of config.speedBoostEnabled
+-- State variables (keep existing names for compatibility)
+local isSpeedBoostActive = false          -- Indicates boost is active
+local boostDebounce = false               -- Unused but kept for compatibility
+local currentBoostConnection = nil        -- Stores Heartbeat connection
 
--- Konstanta kecepatan dash (2x kecepatan normal)
--- Kecepatan normal Roblox sekitar 16 studs/s, jadi 2x = 32 studs/s
-local DASH_SPEED = 64
+-- Internal variables
+local lastHeartbeatTime = 0
+local speedMultiplier = 2.0               -- 2x normal speed
+local baseWalkSpeed = 16                  -- Fallback default speed (studs/sec)
 
--- Fungsi untuk memulai dash (dipanggil saat toggle ON)
-local function startSpeedBoostMonitor()
-    if dashConnection then return end
-    if not getLocalCharacter() or not localRootPart then
-        -- Tunggu sebentar jika karakter belum siap
-        task.wait(0.5)
-        if not getLocalCharacter() or not localRootPart then
-            print("[SpeedBoost] Failed to start: character not ready")
-            return
-        end
-    end
-    lastFrameTime = tick()
-    dashConnection = RunService.Heartbeat:Connect(function()
-        if not config.speedBoostEnabled then return end
-        if not getLocalCharacter() or not localHumanoid or not localRootPart then
-            -- Karakter mungkin hilang (respawn), coba perbaharui referensi
-            getLocalCharacter()
-            if not localRootPart then return end
-        end
+-- Helper to get current character's root part and humanoid
+local function getCharacterParts()
+    local char = localPlayer.Character
+    if not char then return nil, nil end
+    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    return root, hum
+end
 
-        -- Delta time yang akurat (batasi maks 0.033 untuk menghindari lompatan besar)
-        local now = tick()
-        local delta = math.min(0.033, now - lastFrameTime)
-        lastFrameTime = now
+-- CFrame dash function (pure movement, no WalkSpeed changes)
+local function applyCFrameMovement(deltaTime)
+    if not config.speedBoostEnabled then return end
+    local rootPart, humanoid = getCharacterParts()
+    if not rootPart or not humanoid then return end
 
-        -- Hanya bergerak jika player sedang menggerakkan karakter
-        local moveDir = localHumanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
+    -- Get movement direction from humanoid (normalized)
+    local moveDir = humanoid.MoveDirection
+    if moveDir.Magnitude < 0.1 then return end  -- Not moving
 
-        -- Hitung perpindahan berdasarkan arah gerakan dan delta time
-        local displacement = moveDir.Unit * DASH_SPEED * delta
-        local newPos = localRootPart.Position + displacement
+    -- Determine target speed: use originalWalkSpeed if available, else default 16
+    local normalSpeed = (config.originalWalkSpeed and config.originalWalkSpeed > 0) and config.originalWalkSpeed or baseWalkSpeed
+    local boostedSpeed = normalSpeed * speedMultiplier
 
-        -- Terapkan CFrame dengan aman (tanpa mengubah rotasi)
-        pcall(function()
-            localRootPart.CFrame = CFrame.new(newPos, localRootPart.CFrame.Position + localRootPart.CFrame.LookVector)
-        end)
+    -- Calculate displacement for this frame
+    local step = moveDir * boostedSpeed * deltaTime
+    local newPosition = rootPart.Position + step
+
+    -- Apply movement using CFrame (preserves rotation)
+    pcall(function()
+        rootPart.CFrame = CFrame.new(newPosition, rootPart.Position + rootPart.CFrame.LookVector)
     end)
-    print("[SpeedBoost] TPWalk active: 2x speed CFrame dash (delta-time based)")
 end
 
--- Fungsi untuk menghentikan dash
-local function stopSpeedBoostMonitor()
-    if dashConnection then
-        dashConnection:Disconnect()
-        dashConnection = nil
+-- Heartbeat loop with accurate delta time
+local function onHeartbeat()
+    if not config.speedBoostEnabled then
+        -- If feature is disabled but connection exists, stop it (extra safety)
+        if currentBoostConnection then
+            stopSpeedBoostMonitor()
+        end
+        return
     end
-    print("[SpeedBoost] TPWalk deactivated")
+
+    local now = tick()
+    if lastHeartbeatTime == 0 then
+        lastHeartbeatTime = now
+        return
+    end
+    local delta = math.min(0.033, now - lastHeartbeatTime)  -- Cap at 0.033 sec (30 fps)
+    lastHeartbeatTime = now
+
+    applyCFrameMovement(delta)
+end
+
+-- Public functions to start/stop the boost (compatible with existing toggle logic)
+local function startSpeedBoostMonitor()
+    if currentBoostConnection then return end  -- Already running
+
+    -- Reset delta time tracker
+    lastHeartbeatTime = 0
+
+    -- Start Heartbeat loop
+    currentBoostConnection = RunService.Heartbeat:Connect(onHeartbeat)
+    isSpeedBoostActive = true
+
+    print("[SpeedBoost] Enabled (pure CFrame movement, 2x speed, WalkSpeed untouched)")
+end
+
+local function stopSpeedBoostMonitor()
+    if currentBoostConnection then
+        currentBoostConnection:Disconnect()
+        currentBoostConnection = nil
+    end
+    isSpeedBoostActive = false
+    lastHeartbeatTime = 0
+
+    -- Ensure no leftover CFrame influence (character returns to normal physics)
+    print("[SpeedBoost] Disabled (normal movement restored)")
+end
+
+-- Override the old applySpeedBoost function (if still referenced elsewhere) to do nothing
+local function applySpeedBoost()
+    -- Legacy function; speed boost now works continuously.
+    -- Kept to avoid errors in other parts of the script.
 end
 
 -- ============================================================================
--- Catatan: Fungsi applySpeedBoost, applyTpwalkBoost, checkTpwalkProximity,
--- dan semua variabel terkait WalkSpeed (originalWalkSpeed, isTpwalkActive) 
--- TIDAK DIGUNAKAN LAGI. Hapus atau komentar jika diperlukan.
--- Namun untuk kompatibilitas, kita biarkan saja tetapi tidak akan terpanggil.
+-- END OF FEATURE 4 UPGRADE
 -- ============================================================================
-
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================

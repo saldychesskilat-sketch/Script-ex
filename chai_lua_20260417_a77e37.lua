@@ -1131,27 +1131,26 @@ local function stopGodMode()
     if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
 end
 
--- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (UPGRADED - REDUCED SPAM, NO COOLDOWN)
--- Menggunakan item "Blade", "Parry Dagger", "Parrying Dagger" secara bergantian
--- untuk menghindari cooldown internal game. Spam dikurangi (interval 0.2 detik)
--- tetapi tetap efektif dengan multiple methods.
--- ============================================================================
 
--- Penyimpanan waktu terakhir parry untuk throttle
-local lastParryTime = 0
-local PARRY_INTERVAL = 0.2  -- 200ms antara setiap attempt, cukup untuk menghindari spam berlebih
+-- ============================================================================
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (OPTIMIZED - REDUCED SPAM, CONTINUOUS)
+-- Mekanisme: Ketika killer dalam jarak ≤ 30 studs, script akan melakukan parry
+-- dengan frekuensi lebih rendah (0.3 detik) dan menggunakan berbagai metode:
+-- - Remote event parry
+-- - Simulasi klik kanan
+-- - Aktivasi item Blade/Parry Dagger/Parrying Dagger (tanpa cooldown)
+-- ============================================================================
 
 -- Simulasi klik kanan (biasanya digunakan untuk parry)
 local function simulateRightClick()
     pcall(function()
         VirtualInputManager:SendMouseButtonEvent(1, 1, true, game, 1) -- Right button down
-        task.wait(0.02)
+        task.wait(0.01)
         VirtualInputManager:SendMouseButtonEvent(1, 1, false, game, 1) -- Right button up
     end)
     pcall(function()
         VirtualUser:Button2Down(Vector2.new(500, 500))
-        task.wait(0.02)
+        task.wait(0.01)
         VirtualUser:Button2Up(Vector2.new(500, 500))
     end)
 end
@@ -1160,82 +1159,140 @@ end
 local function simulatePressF()
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-        task.wait(0.05)
+        task.wait(0.03)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
     end)
 end
 
--- ============================================================================
--- FUNGSI PARRY DENGAN ITEM BERGANTIAN (UNTUK MENGHINDARI COOLDOWN)
--- ============================================================================
-local parryItems = {"Blade", "Parry Dagger", "Parrying Dagger", "Dagger"}
-local lastItemIndex = 1
+-- Cari remote event untuk parry/block dengan keyword lebih lengkap
+local function findParryRemoteEvent()
+    local parryKeywords = {"parry", "block", "deflect", "counter", "riposte", "reflect", "dodge", "parrying"}
+    local candidates = {}
+    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+        if remote:IsA("RemoteEvent") then
+            local name = remote.Name:lower()
+            for _, kw in ipairs(parryKeywords) do
+                if name:find(kw) then
+                    table.insert(candidates, remote)
+                end
+            end
+        end
+    end
+    -- Prioritaskan yang berhubungan dengan dagger atau blade
+    for _, remote in ipairs(candidates) do
+        if remote.Name:lower():find("dagger") or remote.Name:lower():find("blade") then
+            return remote
+        end
+    end
+    return candidates[1]
+end
 
--- Cari dan aktivasi item berdasarkan nama (dari character / backpack)
-local function activateParryItemByName(itemName)
-    local character = localPlayer.Character
-    local backpack = localPlayer:FindFirstChild("Backpack")
-    local function tryActivate(tool)
-        if tool and tool:IsA("Tool") and tool.Name == itemName then
-            pcall(function() tool:Activate() end)
-            -- Coba remote events yang mungkin terkait item
-            for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
-                if remote:IsA("RemoteEvent") then
-                    local remoteName = remote.Name:lower()
-                    if remoteName:find(itemName:lower()) or remoteName:find("parry") or remoteName:find("block") then
-                        pcall(function() remote:FireServer(tool) end)
+-- Dapatkan jarak ke killer terdekat (sama seperti sebelumnya)
+local function getKillerDistance()
+    if not localRootPart then return math.huge end
+    local localPos = localRootPart.Position
+    local minDist = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local isKiller = false
+                if player.Team then
+                    local teamName = player.Team.Name:lower()
+                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                        isKiller = true
+                    end
+                end
+                if not isKiller then
+                    local tool = char:FindFirstChildWhichIsA("Tool")
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                        isKiller = true
+                    end
+                end
+                if isKiller then
+                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    if root then
+                        local dist = (localPos - root.Position).Magnitude
+                        if dist < minDist then minDist = dist end
                     end
                 end
             end
-            return true
-        end
-        return false
-    end
-    if character then
-        for _, tool in ipairs(character:GetChildren()) do
-            if tryActivate(tool) then return true end
         end
     end
-    if backpack then
-        for _, tool in ipairs(backpack:GetChildren()) do
-            if tryActivate(tool) then return true end
-        end
-    end
-    return false
+    return minDist
 end
 
--- Perform parry dengan rotasi item untuk menghindari cooldown internal
-local function performParry()
-    -- Coba aktivasi item secara bergantian (Blade, Parry Dagger, Parrying Dagger)
-    local currentItem = parryItems[lastItemIndex]
-    if activateParryItemByName(currentItem) then
-        -- Jika berhasil, pindah ke item berikutnya untuk siklus berikutnya
-        lastItemIndex = lastItemIndex % #parryItems + 1
-    else
-        -- Fallback: coba semua item secara cepat
-        for _, itemName in ipairs(parryItems) do
-            if activateParryItemByName(itemName) then
-                break
+-- ** Fungsi baru: Mendapatkan item Parry yang tersedia (Blade, Parry Dagger, Parrying Dagger) **
+local function getParryItem()
+    local character = localPlayer.Character
+    local backpack = localPlayer:FindFirstChild("Backpack")
+    local itemNames = {"Blade", "Parry Dagger", "Parrying Dagger"}
+    -- Cari di karakter dulu
+    if character then
+        for _, item in ipairs(character:GetChildren()) do
+            if item:IsA("Tool") then
+                for _, name in ipairs(itemNames) do
+                    if item.Name == name then
+                        return item
+                    end
+                end
             end
         end
     end
+    -- Cari di backpack
+    if backpack then
+        for _, item in ipairs(backpack:GetChildren()) do
+            if item:IsA("Tool") then
+                for _, name in ipairs(itemNames) do
+                    if item.Name == name then
+                        return item
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
 
-    -- Metode remote event (global)
+-- ** Fungsi utama parry (lebih efisien, dengan prioritas weapon) **
+local function performParry()
+    -- Metode 1: Gunakan item parry jika ada (Blade, Parry Dagger, Parrying Dagger)
+    local parryItem = getParryItem()
+    if parryItem then
+        -- Aktifkan tool (simulasi penggunaan)
+        pcall(function() parryItem:Activate() end)
+        -- Kirim remote event terkait item (jika ada)
+        local remote = findParryRemoteEvent()
+        if remote then
+            pcall(function() remote:FireServer(parryItem) end)
+            pcall(function() remote:FireServer("parry", parryItem) end)
+        end
+        -- Simulasi klik kanan untuk memastikan
+        simulateRightClick()
+        return
+    end
+
+    -- Metode 2: Remote event parry (fallback)
     local parryRemote = findParryRemoteEvent()
     if parryRemote then
         pcall(function() parryRemote:FireServer() end)
         pcall(function() parryRemote:FireServer("parry") end)
+        pcall(function() parryRemote:FireServer("block") end)
     end
 
-    -- Simulasi input (klik kanan & tombol F)
+    -- Metode 3: Simulasi klik kanan
     simulateRightClick()
+
+    -- Metode 4: Simulasi tekan F (alternatif)
     simulatePressF()
 end
 
--- ============================================================================
--- LOOP PARRY DENGAN THROTTLE (MENGURANGI SPAM)
--- ============================================================================
-local infiniteAmmoConnection = nil   -- tetap gunakan variabel yang sama
+-- ** Timer untuk mengurangi spam: parry dieksekusi maksimal setiap 0.3 detik **
+local lastParryTime = 0
+local PARRY_INTERVAL = 0.3  -- interval minimal antara parry (kurang spam)
+
+-- Loop auto parry (menggantikan infinite ammo)
+local infiniteAmmoConnection = nil
 
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
@@ -1243,16 +1300,16 @@ local function startInfiniteAmmo()
         if not config.infiniteAmmoEnabled then return end
         if not getLocalCharacter() or not localRootPart then return end
         
-        local now = tick()
-        if now - lastParryTime < PARRY_INTERVAL then return end  -- throttle
-        
         local killerDist = getKillerDistance()
-        if killerDist <= 15 then
-            lastParryTime = now
-            performParry()
+        if killerDist <= 30 then
+            local now = tick()
+            if now - lastParryTime >= PARRY_INTERVAL then
+                lastParryTime = now
+                performParry()
+            end
         end
     end)
-    print("[AutoParry] Auto parry started (reduced spam, rotating items to avoid cooldown)")
+    print("[AutoParry] Auto parry started (interval " .. PARRY_INTERVAL .. "s) - uses Blade/Parry Dagger when available")
 end
 
 local function stopInfiniteAmmo()
@@ -1264,13 +1321,20 @@ local function stopInfiniteAmmo()
 end
 
 -- ============================================================================
--- CATATAN: Fungsi findParryRemoteEvent dan getKillerDistance tetap sama seperti sebelumnya
--- (tidak diubah). Hanya performParry dan loop yang diupgrade dengan throttle dan rotasi item.
+-- CATATAN:
+-- - Fungsi startInfiniteAmmo dan stopInfiniteAmmo menggantikan infinite ammo.
+-- - Interval parry diatur 0.3 detik untuk mengurangi spam, namun tetap efektif.
+-- - Script akan otomatis menggunakan item "Blade", "Parry Dagger", "Parrying Dagger"
+--   jika tersedia, dengan mengaktifkan tool dan mengirim remote event.
+-- - Jika tidak ada item, tetap menggunakan remote event dan klik kanan.
+-- - Tidak ada cooldown dari sisi client karena kita menggunakan interval tetap,
+--   dan server mungkin memiliki cooldown sendiri, tapi dengan item yang tepat
+--   kita berharap bisa memanfaatkan mekanisme game.
 -- ============================================================================
 
 -- ============================================================================
 -- FEATURE 8: SCRIPT RESTART (FIXED & ENHANCED with Speed Boost Cleanup)
--- ============================================================================
+-- ===========================================================================
 
 local function restartScript()
     print("[Restart] Restarting all systems...")

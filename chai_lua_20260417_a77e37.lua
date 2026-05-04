@@ -895,126 +895,106 @@ end
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (ALWAYS ACTIVE, STABLE CFrame DASH)
--- UPGRADED: No triggers, works continuously when enabled.
--- Combines increased WalkSpeed + CFrame dash that activates only when moving.
--- Compatible with Delta Executor (client-side manipulation).
+-- FEATURE 4: SPEED BOOST + TPWALK (AUTO DASH & SPEED INCREASE)
+-- UPGRADED: Works continuously without distance triggers. 
+-- Boosts WalkSpeed and adds smooth blink/dash effect when moving.
+-- Compatible with Delta Executor – client-side manipulation.
 -- ============================================================================
 
 -- Global variables for this feature
-local dashHeartbeatConn = nil
-local speedBoostEnabledFlag = false
-local originalSpeedValue = 16
-local lastDeltaTime = tick()
+local speedBoostConnection = nil
+local originalWalkSpeedValue = 16
+local isSpeedBoostEnabled = false
 
--- Helper: ensure original speed is saved
-local function saveOriginalWalkSpeed()
-    if localHumanoid and not originalSpeedValue then
-        originalSpeedValue = localHumanoid.WalkSpeed
-        config.originalWalkSpeed = originalSpeedValue
+-- Initializes original walk speed from current humanoid
+local function initOriginalSpeed()
+    if localHumanoid and not originalWalkSpeedSaved then
+        originalWalkSpeedValue = localHumanoid.WalkSpeed
+        config.originalWalkSpeed = originalWalkSpeedValue
+        originalWalkSpeedSaved = true
     end
 end
 
--- Apply speed boost (multiplier 1.5x)
-local function applySpeedBoost()
+-- Applies the speed boost to WalkSpeed (1.8x multiplier for extra speed)
+local function applyWalkSpeedBoost()
+    if not localHumanoid then return end
     if not config.speedBoostEnabled then return end
-    if not localHumanoid then return end
-    saveOriginalWalkSpeed()
-    local boostedSpeed = originalSpeedValue * 1.5
-    localHumanoid.WalkSpeed = boostedSpeed
-    speedBoostEnabledFlag = true
-    print("[SpeedBoost] WalkSpeed increased to " .. boostedSpeed)
-end
-
--- Revert speed boost
-local function revertSpeedBoost()
-    if not localHumanoid then return end
-    if originalSpeedValue then
-        localHumanoid.WalkSpeed = originalSpeedValue
+    initOriginalSpeed()
+    local boostedSpeed = originalWalkSpeedValue * 1.8
+    if localHumanoid.WalkSpeed ~= boostedSpeed then
+        localHumanoid.WalkSpeed = boostedSpeed
+        isSpeedBoostActive = true
     end
-    speedBoostEnabledFlag = false
-    print("[SpeedBoost] WalkSpeed restored to " .. (originalSpeedValue or 16))
 end
 
--- CFrame dash (teleport step) based on delta time, only when moving
-local function performDash(deltaTime)
+-- Restores original walk speed
+local function restoreWalkSpeed()
+    if localHumanoid then
+        localHumanoid.WalkSpeed = originalWalkSpeedValue
+        isSpeedBoostActive = false
+    end
+end
+
+-- Performs a smooth CFrame dash (small teleport) while moving
+-- Uses delta time to move consistently across different frame rates
+local lastDashTime = 0
+local function handleDash()
     if not config.speedBoostEnabled then return end
-    if not localHumanoid or not localRootPart then return end
-
-    local moveDir = localHumanoid.MoveDirection
-    if moveDir.Magnitude < 0.1 then return end  -- only dash when moving
-
-    local dashSpeed = 60  -- studs per second (smooth dash)
-    local step = moveDir * dashSpeed * deltaTime
+    if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
+    
+    -- Only dash when player is actually moving
+    local moveDirection = localHumanoid.MoveDirection
+    if moveDirection.Magnitude < 0.1 then return end
+    
+    local now = tick()
+    -- Limit dash frequency to avoid excessive teleportation (max ~30 dashes/sec)
+    if now - lastDashTime < 0.033 then return end
+    lastDashTime = now
+    
+    -- Dash distance: 3 studs forward per dash (feels like quick blink)
+    local step = moveDirection * 3
     local newPos = localRootPart.Position + step
     pcall(function()
         localRootPart.CFrame = CFrame.new(newPos)
     end)
 end
 
--- Main heartbeat loop with delta time
+-- Main loop: keep speed boosted and add dash effect
 local function onHeartbeat()
     if not config.speedBoostEnabled then return end
-    if not getLocalCharacter() or not localHumanoid or not localRootPart then
-        -- Character not ready, skip but keep connection alive
-        return
-    end
-
-    -- Update delta time (limit to 0.033 to avoid huge leaps)
-    local now = tick()
-    local delta = math.min(0.033, now - lastDeltaTime)
-    lastDeltaTime = now
-
-    -- Ensure walk speed is boosted (in case character respawned)
-    if localHumanoid.WalkSpeed ~= (originalSpeedValue * 1.5) then
-        applySpeedBoost()
-    end
-
-    -- Apply dash movement
-    performDash(delta)
+    if not getLocalCharacter() then return end
+    applyWalkSpeedBoost()
+    handleDash()
 end
 
--- Public start function (to be called when toggled ON)
+-- Public function to start the feature (called when toggle ON)
 local function startSpeedBoostMonitor()
-    if dashHeartbeatConn then return end
-
-    -- Initialize original speed
-    if localHumanoid then
-        originalSpeedValue = localHumanoid.WalkSpeed
-        config.originalWalkSpeed = originalSpeedValue
-    end
-
-    applySpeedBoost()
-    lastDeltaTime = tick()
-    dashHeartbeatConn = RunService.Heartbeat:Connect(onHeartbeat)
-    currentBoostConnection = dashHeartbeatConn  -- for compatibility with restart logic
-    print("[SpeedBoostMonitor] ACTIVATED: WalkSpeed + CFrame dash (always on)")
+    if speedBoostConnection then return end
+    initOriginalSpeed()
+    applyWalkSpeedBoost()
+    speedBoostConnection = RunService.Heartbeat:Connect(onHeartbeat)
+    print("[SpeedBoost+TPWalk] Activated: WalkSpeed boosted + auto dash when moving")
 end
 
--- Public stop function (to be called when toggled OFF)
+-- Public function to stop the feature (called when toggle OFF)
 local function stopSpeedBoostMonitor()
-    if dashHeartbeatConn then
-        dashHeartbeatConn:Disconnect()
-        dashHeartbeatConn = nil
+    if speedBoostConnection then
+        speedBoostConnection:Disconnect()
+        speedBoostConnection = nil
     end
-    currentBoostConnection = nil
-    revertSpeedBoost()
-    print("[SpeedBoostMonitor] DEACTIVATED")
+    restoreWalkSpeed()
+    print("[SpeedBoost+TPWalk] Deactivated")
 end
 
--- Ensure speed boost reapplies when character respawns
-local function onCharacterRespawn(character)
-    if config.speedBoostEnabled then
-        -- Small delay to let humanoid fully load
-        task.wait(0.2)
-        applySpeedBoost()
-    end
+-- Ensure compatibility with existing code: reassign global references
+-- (The script already uses 'currentBoostConnection' for stopping, so we keep it synced)
+if currentBoostConnection then
+    currentBoostConnection = speedBoostConnection
 end
 
 -- ============================================================================
--- END OF UPGRADED FEATURE 4
--- Replace the old startSpeedBoostMonitor / stopSpeedBoostMonitor functions
--- with these new ones. Delete any old connections related to tpwalk or dash.
+-- REPLACE THE OLD SPEED BOOST + TPWALK SECTION WITH THE CODE ABOVE.
+-- PASTE THIS ENTIRE BLOCK OVER THE OLD "FEATURE 4" SECTION.
 -- ============================================================================
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)

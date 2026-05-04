@@ -899,118 +899,165 @@ end
 
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED - STABLE & DELTA TIME)
--- ============================================================================
--- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (ALWAYS ACTIVE, STABLE CFrame DASH)
--- UPGRADED: No triggers, works continuously when enabled.
--- Combines increased WalkSpeed + CFrame dash that activates only when moving.
+-- FEATURE 4: SPEED BOOST + TPWALK FALLBACK (UPGRADED)
 -- ============================================================================
 
--- Global variable untuk dash timer
-local dashConnection = nil
-local isSpeedBoostFeatureActive = false
-local originalWalkSpeedSaved = false
+-- Fungsi deteksi player dalam jarak tertentu
+local function isPlayerNearby(maxDistance)    
+    for _, player in ipairs(Players:GetPlayers()) do    
+        if player ~= localPlayer and player.Character then    
+            local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")    
+            if targetRoot and localRootPart then    
+                local distance = (targetRoot.Position - localRootPart.Position).Magnitude    
+                if distance <= maxDistance then    
+                    return true    
+                end    
+            end    
+        end    
+    end    
+    return false    
+end    
 
--- Fungsi untuk mengaktifkan speed boost (WalkSpeed permanen)
-local function enableSpeedBoost()
-    if not config.speedBoostEnabled then return end
-    if not localHumanoid then return end
-    if not originalWalkSpeedSaved then
-        config.originalWalkSpeed = localHumanoid.WalkSpeed
-        originalWalkSpeedSaved = true
+-- Deteksi killer berdasarkan team atau weapon
+local function isKiller(player)
+    if not player then return false end
+    local char = player.Character
+    if not char then return false end
+    if player.Team then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            return true
+        end
     end
-    -- Boost speed 1.5x
-    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5
-    isSpeedBoostActive = true
-    print("[SpeedBoost] Permanently active - WalkSpeed increased")
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then
+        local toolName = tool.Name:lower()
+        if toolName:find("knife") or toolName:find("weapon") then
+            return true
+        end
+    end
+    return false
 end
 
--- Fungsi untuk menonaktifkan speed boost (kembalikan kecepatan asli)
-local function disableSpeedBoost()
-    if not localHumanoid then return end
-    if originalWalkSpeedSaved then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
+-- Dapatkan jarak killer terdekat
+local function getKillerDistance()
+    if not localRootPart then return math.huge end
+    local localPos = localRootPart.Position
+    local minDist = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and isKiller(player) then
+            local char = player.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if root then
+                    local dist = (localPos - root.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                    end
+                end
+            end
+        end
     end
-    isSpeedBoostActive = false
-    print("[SpeedBoost] Disabled - WalkSpeed restored")
+    return minDist
 end
 
--- Fungsi CFrame dash yang aman dan stabil (hanya saat bergerak)
-local function applyCFrameDash(deltaTime)
+-- Speed boost utama (WalkSpeed)
+local function applySpeedBoost()    
+    if not config.speedBoostEnabled then return end    
+    if not localHumanoid then return end    
+    if boostDebounce then return end    
+    
+    boostDebounce = true    
+    
+    -- Simpan speed asli    
+    if not config.originalWalkSpeed then    
+        config.originalWalkSpeed = localHumanoid.WalkSpeed    
+    end    
+    
+    -- 1.5x speed    
+    localHumanoid.WalkSpeed = config.originalWalkSpeed * 1.5    
+    isSpeedBoostActive = true    
+    
+    task.wait(3)    
+    
+    if localHumanoid then    
+        localHumanoid.WalkSpeed = config.originalWalkSpeed    
+    end    
+    
+    isSpeedBoostActive = false    
+    boostDebounce = false    
+end    
+
+-- TPWalk fallback (CFrame-based movement)
+local isTPWalking = false
+local tpwalkFallbackConnection = nil
+
+local function applyTPWalk()
     if not config.speedBoostEnabled then return end
     if not localHumanoid or not localRootPart then return end
     local moveDir = localHumanoid.MoveDirection
-    if moveDir.Magnitude < 0.1 then return end  -- hanya bergerak
-
-    -- Kecepatan dash: 2x kecepatan normal per detik (konstanta 60 studs/detik)
-    local dashSpeed = 60  -- studs per second
-    local step = moveDir * dashSpeed * deltaTime
+    if moveDir.Magnitude < 0.1 then return end
+    local speedMult = 1.5
+    local step = moveDir * (16 * speedMult) * 0.05
     local newPos = localRootPart.Position + step
     pcall(function()
         localRootPart.CFrame = CFrame.new(newPos)
     end)
 end
 
--- Loop utama: jalankan dash setiap frame dengan delta time yang akurat
-local lastFrameTime = tick()
-local function onHeartbeat()
-    if not config.speedBoostEnabled then return end
-    if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
-
-    -- Hitung delta time yang akurat
-    local now = tick()
-    local delta = math.min(0.033, now - lastFrameTime)  -- batasi maks 0.033 detik
-    lastFrameTime = now
-
-    -- Pastikan WalkSpeed selalu dalam kondisi boost (jika karakter ganti)
-    if localHumanoid.WalkSpeed ~= config.originalWalkSpeed * 1.5 then
-        enableSpeedBoost()
-    end
-
-    -- Terapkan dash setiap frame saat bergerak
-    applyCFrameDash(delta)
+local function startTPWalkFallback()
+    if tpwalkFallbackConnection then return end
+    tpwalkFallbackConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled then return end
+        if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
+        local killerDist = getKillerDistance()
+        if killerDist <= 10 then
+            applyTPWalk()
+        end
+    end)
+    print("[TPWalkFallback] TPWalk fallback system started")
 end
 
--- Fungsi untuk memulai seluruh sistem (dipanggil saat toggle ON)
+local function stopTPWalkFallback()
+    if tpwalkFallbackConnection then
+        tpwalkFallbackConnection:Disconnect()
+        tpwalkFallbackConnection = nil
+    end
+    print("[TPWalkFallback] TPWalk fallback system stopped")
+end
+
+-- Monitor utama (menggabungkan kedua sistem)
 local function startSpeedBoostMonitor()
     if currentBoostConnection then return end
-    if dashConnection then dashConnection:Disconnect() end
-
-    -- Pastikan original speed tersimpan
-    if localHumanoid and not originalWalkSpeedSaved then
-        config.originalWalkSpeed = localHumanoid.WalkSpeed
-        originalWalkSpeedSaved = true
-    end
-
-    -- Aktifkan speed boost permanen
-    enableSpeedBoost()
-
-    -- Mulai loop dash dengan delta time
-    lastFrameTime = tick()
-    dashConnection = RunService.Heartbeat:Connect(onHeartbeat)
-    currentBoostConnection = dashConnection  -- untuk konsistensi dengan stop function
-
-    print("[SpeedBoostMonitor] Fully active: WalkSpeed boosted + CFrame dash enabled")
+    -- Speed boost utama (WalkSpeed) berdasarkan jarak player
+    local lastHealth = 100
+    currentBoostConnection = RunService.Heartbeat:Connect(function()
+        if not config.speedBoostEnabled then return end
+        if not getLocalCharacter() or not localHumanoid then return end
+        if isPlayerNearby(10) then
+            applySpeedBoost()
+        end
+    end)
+    -- TPWalk fallback berdasarkan jarak killer
+    startTPWalkFallback()
+    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback active")
 end
 
--- Fungsi untuk menghentikan sistem (dipanggil saat toggle OFF)
 local function stopSpeedBoostMonitor()
-    if dashConnection then
-        dashConnection:Disconnect()
-        dashConnection = nil
+    if currentBoostConnection then
+        currentBoostConnection:Disconnect()
+        currentBoostConnection = nil
     end
-    currentBoostConnection = nil
-    disableSpeedBoost()
-    print("[SpeedBoostMonitor] Fully deactivated")
+    stopTPWalkFallback()
+    if localHumanoid and config.originalWalkSpeed then
+        localHumanoid.WalkSpeed = config.originalWalkSpeed
+    end
+    print("[SpeedBoostMonitor] Speed boost + TPWalk fallback stopped")
 end
+-- ============================================================================
+-- AKHIR FEATURE 4 (UPGRADED)
+-- ============================================================================
 
--- ============================================================================
--- MODIFIKASI PADA FUNGSI RESTART DAN STARTALL (pastikan kompatibel)
--- ============================================================================
--- Catatan: Fungsi restartScript dan startAllSystems sudah ada di script utama.
--- Pastikan bahwa ketika restart, state speed boost dimatikan dengan benar.
--- Tidak perlu mengubah fungsi lain di luar blok ini.
 -- ============================================================================
 
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)

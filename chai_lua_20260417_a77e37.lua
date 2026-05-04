@@ -2679,6 +2679,7 @@ local function onCharacterAdded(character)
     end
     isInvisible = false; isShieldActive = false; isTpwalkActive = false; isNoCollideActive = false
     if currentForceField then currentForceField:Destroy(); currentForceField = nil end
+end
 
 
 local function startAllSystems()

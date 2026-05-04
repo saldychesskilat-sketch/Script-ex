@@ -894,238 +894,225 @@ end
 -- dan fungsi-fungsi lain (createHighlightForPlayer, updateAllESP, dll) sudah didefinisikan di atas.
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 -- ============================================================================
--- FEATURE 4: SPEED BOOST (TPWALK STYLE) - DENGAN GUI TERPISAH DAN SLIDER KECEPATAN
--- ============================================================================
--- Upgrade: Menggunakan CFrame dash (tpwalk) tanpa mengubah WalkSpeed.
--- Kecepatan dapat diatur 1x - 25x melalui GUI terpisah yang muncul saat fitur aktif.
+-- FEATURE 4: SPEED BOOST (TPWALK + MODERN DRAGGABLE GUI)
 -- ============================================================================
 
--- Variabel global untuk GUI terpisah speed boost
-local speedBoostGui = nil
-local speedBoostMainFrame = nil
-local speedSlider = nil
-local speedValueLabel = nil
-local speedBoostDashConnection = nil
-local originalWalkSpeedSaved = false
-local lastFrameTimeSpeed = tick()
+local dashConnection = nil  
+local isSpeedBoostActive = false  
+local speedMultiplier = 5  
 
--- Inisialisasi multiplier di config (jika belum ada)
-if not config.speedBoostMultiplier then
-    config.speedBoostMultiplier = 5  -- default 5x
+-- GUI
+local speedGui = nil  
+local UIS = game:GetService("UserInputService")
+
+-- ============================================================================
+-- TPWALK CORE
+-- ============================================================================
+
+local function applyTPWalk(deltaTime)  
+    if not config.speedBoostEnabled then return end  
+    if not localHumanoid or not localRootPart then return end  
+
+    local moveDir = localHumanoid.MoveDirection  
+    if moveDir.Magnitude < 0.1 then return end  
+
+    local baseSpeed = 16  
+    local dashSpeed = baseSpeed * speedMultiplier  
+
+    local step = moveDir * dashSpeed * deltaTime  
+    local newPos = localRootPart.Position + step  
+
+    pcall(function()  
+        localRootPart.CFrame = CFrame.new(newPos)  
+    end)  
+end  
+
+-- ============================================================================
+-- LOOP
+-- ============================================================================
+
+local lastFrameTime = tick()  
+
+local function onHeartbeat()  
+    if not config.speedBoostEnabled then return end  
+    if not getLocalCharacter() then return end  
+
+    local now = tick()  
+    local delta = math.min(0.033, now - lastFrameTime)  
+    lastFrameTime = now  
+
+    applyTPWalk(delta)  
+end  
+
+-- ============================================================================
+-- DRAG SYSTEM
+-- ============================================================================
+
+local function makeDraggable(frame)
+    local dragging = false
+    local dragInput, startPos, startFramePos
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            startPos = input.Position
+            startFramePos = frame.Position
+        end
+    end)
+
+    frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - startPos
+            frame.Position = UDim2.new(
+                startFramePos.X.Scale,
+                startFramePos.X.Offset + delta.X,
+                startFramePos.Y.Scale,
+                startFramePos.Y.Offset + delta.Y
+            )
+        end
+    end)
 end
 
--- Fungsi untuk membuat GUI terpisah (hanya muncul saat fitur aktif)
-local function createSpeedBoostGUI()
-    if speedBoostGui then speedBoostGui:Destroy() end
-    speedBoostGui = Instance.new("ScreenGui")
-    speedBoostGui.Name = "CyberHeroes_SpeedBoostPanel"
-    speedBoostGui.Parent = CoreGui
-    speedBoostGui.ResetOnSpawn = false
+-- ============================================================================
+-- MODERN GUI
+-- ============================================================================
 
-    -- Frame utama (kecil, bisa dipindah)
-    speedBoostMainFrame = Instance.new("Frame")
-    speedBoostMainFrame.Size = UDim2.new(0, 200, 0, 90)
-    speedBoostMainFrame.Position = UDim2.new(0.02, 0, 0.75, 0)  -- pojok kiri bawah
-    speedBoostMainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
-    speedBoostMainFrame.BackgroundTransparency = 0.1
-    speedBoostMainFrame.BorderSizePixel = 0
-    speedBoostMainFrame.Parent = speedBoostGui
+local function createSpeedGui()  
+    if speedGui then return end  
+
+    speedGui = Instance.new("ScreenGui")  
+    speedGui.Name = "TPWalkSpeedGui"  
+    speedGui.ResetOnSpawn = false  
+    speedGui.Parent = game.CoreGui  
+
+    -- Main Frame
+    local frame = Instance.new("Frame")  
+    frame.Size = UDim2.new(0, 220, 0, 130)  
+    frame.Position = UDim2.new(0.75, 0, 0.4, 0)  
+    frame.BackgroundColor3 = Color3.fromRGB(15,15,15)  
+    frame.BorderSizePixel = 0  
+    frame.Parent = speedGui  
+
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = speedBoostMainFrame
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
+
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 230, 255)
+    stroke.Color = Color3.fromRGB(80,80,80)
     stroke.Thickness = 1
-    stroke.Transparency = 0.4
-    stroke.Parent = speedBoostMainFrame
+    stroke.Parent = frame
 
     -- Title
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 25)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.Text = "⚡ SPEED BOOST ACTIVE"
-    title.TextColor3 = Color3.fromRGB(0, 230, 255)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 10
-    title.Parent = speedBoostMainFrame
+    local title = Instance.new("TextLabel")  
+    title.Size = UDim2.new(1,0,0,30)  
+    title.Text = "⚡ Speed Boost"  
+    title.TextColor3 = Color3.fromRGB(255,255,255)  
+    title.Font = Enum.Font.GothamBold  
+    title.TextSize = 14  
+    title.BackgroundTransparency = 1  
+    title.Parent = frame  
 
-    -- Label speed multiplier
-    local speedLabel = Instance.new("TextLabel")
-    speedLabel.Size = UDim2.new(0.5, 0, 0, 25)
-    speedLabel.Position = UDim2.new(0.05, 0, 0.3, 0)
-    speedLabel.Text = "Speed x"
-    speedLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    speedLabel.BackgroundTransparency = 1
-    speedLabel.Font = Enum.Font.Gotham
-    speedLabel.TextSize = 10
-    speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-    speedLabel.Parent = speedBoostMainFrame
+    -- Value Text
+    local valueLabel = Instance.new("TextLabel")  
+    valueLabel.Size = UDim2.new(1,0,0,25)  
+    valueLabel.Position = UDim2.new(0,0,0,35)  
+    valueLabel.Text = "Speed: "..speedMultiplier.."x"  
+    valueLabel.TextColor3 = Color3.fromRGB(180,180,180)  
+    valueLabel.Font = Enum.Font.Gotham  
+    valueLabel.TextSize = 13  
+    valueLabel.BackgroundTransparency = 1  
+    valueLabel.Parent = frame  
 
-    -- Nilai multiplier saat ini
-    speedValueLabel = Instance.new("TextLabel")
-    speedValueLabel.Size = UDim2.new(0.3, 0, 0, 25)
-    speedValueLabel.Position = UDim2.new(0.55, 0, 0.3, 0)
-    speedValueLabel.Text = string.format("%.1f", config.speedBoostMultiplier)
-    speedValueLabel.TextColor3 = Color3.fromRGB(0, 230, 255)
-    speedValueLabel.BackgroundTransparency = 1
-    speedValueLabel.Font = Enum.Font.GothamBold
-    speedValueLabel.TextSize = 10
-    speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    speedValueLabel.Parent = speedBoostMainFrame
+    -- Button +
+    local plusBtn = Instance.new("TextButton")  
+    plusBtn.Size = UDim2.new(0.45,0,0,35)  
+    plusBtn.Position = UDim2.new(0.05,0,0,75)  
+    plusBtn.Text = "+"  
+    plusBtn.Font = Enum.Font.GothamBold  
+    plusBtn.TextSize = 18  
+    plusBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)  
+    plusBtn.TextColor3 = Color3.new(1,1,1)  
+    plusBtn.Parent = frame  
 
-    -- Slider
-    speedSlider = Instance.new("TextButton")
-    speedSlider.Size = UDim2.new(0.9, 0, 0, 6)
-    speedSlider.Position = UDim2.new(0.05, 0, 0.6, 0)
-    speedSlider.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
-    speedSlider.BackgroundTransparency = 0.3
-    speedSlider.BorderSizePixel = 0
-    speedSlider.Parent = speedBoostMainFrame
-    local sliderCorner = Instance.new("UICorner")
-    sliderCorner.CornerRadius = UDim.new(1, 0)
-    sliderCorner.Parent = speedSlider
+    local plusCorner = Instance.new("UICorner")
+    plusCorner.CornerRadius = UDim.new(0,8)
+    plusCorner.Parent = plusBtn
 
-    local sliderFill = Instance.new("Frame")
-    local fillWidth = (config.speedBoostMultiplier - 1) / 24  -- range 1-25
-    sliderFill.Size = UDim2.new(fillWidth, 0, 1, 0)
-    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 230, 255)
-    sliderFill.BorderSizePixel = 0
-    sliderFill.Parent = speedSlider
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(1, 0)
-    fillCorner.Parent = sliderFill
+    -- Button -
+    local minusBtn = Instance.new("TextButton")  
+    minusBtn.Size = UDim2.new(0.45,0,0,35)  
+    minusBtn.Position = UDim2.new(0.5,0,0,75)  
+    minusBtn.Text = "-"  
+    minusBtn.Font = Enum.Font.GothamBold  
+    minusBtn.TextSize = 18  
+    minusBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)  
+    minusBtn.TextColor3 = Color3.new(1,1,1)  
+    minusBtn.Parent = frame  
 
-    -- Drag slider
-    local dragging = false
-    local function updateSpeedFromMouse(x)
-        local relativeX = math.clamp((x - speedSlider.AbsolutePosition.X) / speedSlider.AbsoluteSize.X, 0, 1)
-        local newMult = 1 + relativeX * 24
-        newMult = math.clamp(newMult, 1, 25)
-        config.speedBoostMultiplier = newMult
-        speedValueLabel.Text = string.format("%.1f", newMult)
-        sliderFill.Size = UDim2.new(relativeX, 0, 1, 0)
-    end
-    speedSlider.MouseButton1Down:Connect(function()
-        dragging = true
-        local mouse = localPlayer:GetMouse()
-        updateSpeedFromMouse(mouse.X)
-        local conn
-        conn = mouse.Move:Connect(function()
-            if dragging then updateSpeedFromMouse(mouse.X) end
-        end)
-        mouse.Button1Up:Connect(function()
-            dragging = false
-            conn:Disconnect()
-        end)
-    end)
+    local minusCorner = Instance.new("UICorner")
+    minusCorner.CornerRadius = UDim.new(0,8)
+    minusCorner.Parent = minusBtn
 
-    -- Draggable untuk seluruh panel
-    local draggingPanel = false
-    local dragPanelStart, startPanelPos
-    speedBoostMainFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingPanel = true
-            dragPanelStart = input.Position
-            startPanelPos = speedBoostMainFrame.Position
-        end
-    end)
-    speedBoostMainFrame.InputChanged:Connect(function(input)
-        if draggingPanel and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragPanelStart
-            speedBoostMainFrame.Position = UDim2.new(startPanelPos.X.Scale, startPanelPos.X.Offset + delta.X,
-                                                    startPanelPos.Y.Scale, startPanelPos.Y.Offset + delta.Y)
-        end
-    end)
-    speedBoostMainFrame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingPanel = false
-        end
-    end)
+    -- Logic tombol
+    plusBtn.MouseButton1Click:Connect(function()  
+        speedMultiplier = math.clamp(speedMultiplier + 1, 1, 25)  
+        valueLabel.Text = "Speed: "..speedMultiplier.."x"  
+    end)  
 
-    print("[SpeedBoostGUI] Speed boost control panel created")
-end
+    minusBtn.MouseButton1Click:Connect(function()  
+        speedMultiplier = math.clamp(speedMultiplier - 1, 1, 25)  
+        valueLabel.Text = "Speed: "..speedMultiplier.."x"  
+    end)  
 
-local function destroySpeedBoostGUI()
-    if speedBoostGui then
-        speedBoostGui:Destroy()
-        speedBoostGui = nil
-        speedBoostMainFrame = nil
-        speedSlider = nil
-        speedValueLabel = nil
-        print("[SpeedBoostGUI] Speed boost control panel destroyed")
-    end
-end
+    -- Aktifkan drag
+    makeDraggable(frame)
+end  
 
--- Fungsi CFrame dash menggunakan multiplier yang dapat diatur
-local function applyCFrameDashMultiplier(deltaTime)
-    if not config.speedBoostEnabled then return end
-    if not localHumanoid or not localRootPart then return end
-    local moveDir = localHumanoid.MoveDirection
-    if moveDir.Magnitude < 0.1 then return end
-
-    -- Kecepatan dasar: 60 studs/detik, dikalikan multiplier
-    local baseSpeed = 60
-    local dashSpeed = baseSpeed * config.speedBoostMultiplier
-    local step = moveDir * dashSpeed * deltaTime
-    local newPos = localRootPart.Position + step
-    pcall(function()
-        localRootPart.CFrame = CFrame.new(newPos)
-        -- Juga sedikit efek visual? opsional
-    end)
-end
-
--- Loop utama untuk dash
-local function onSpeedBoostHeartbeat()
-    if not config.speedBoostEnabled then return end
-    if not getLocalCharacter() or not localHumanoid or not localRootPart then return end
-
-    local now = tick()
-    local delta = math.min(0.033, now - lastFrameTimeSpeed)
-    lastFrameTimeSpeed = now
-
-    applyCFrameDashMultiplier(delta)
-end
-
--- Fungsi untuk memulai speed boost (dipanggil saat toggle ON)
-local function startSpeedBoostMonitor()
-    if speedBoostDashConnection then return end
-    if not localHumanoid then return end
-
-    -- Simpan walk speed asli jika perlu (tidak digunakan, tapi biar konsisten)
-    if not originalWalkSpeedSaved then
-        config.originalWalkSpeed = localHumanoid.WalkSpeed
-        originalWalkSpeedSaved = true
-    end
-    -- Jangan ubah walkspeed, hanya dash
-
-    lastFrameTimeSpeed = tick()
-    speedBoostDashConnection = RunService.Heartbeat:Connect(onSpeedBoostHeartbeat)
-    currentBoostConnection = speedBoostDashConnection  -- agar sesuai dengan stop di fungsi lain
-
-    -- Buat GUI terpisah
-    createSpeedBoostGUI()
-
-    print("[SpeedBoost] Active (TPWalk style) - Multiplier: " .. config.speedBoostMultiplier)
-end
-
--- Fungsi untuk menghentikan speed boost (dipanggil saat toggle OFF)
-local function stopSpeedBoostMonitor()
-    if speedBoostDashConnection then
-        speedBoostDashConnection:Disconnect()
-        speedBoostDashConnection = nil
-    end
-    currentBoostConnection = nil
-    destroySpeedBoostGUI()
-    print("[SpeedBoost] Deactivated")
-end
+local function removeSpeedGui()  
+    if speedGui then  
+        speedGui:Destroy()  
+        speedGui = nil  
+    end  
+end  
 
 -- ============================================================================
--- MODIFIKASI PADA FUNGSI RESTART DAN STARTALL (pastikan kompatibel)
--- Catatan: Fungsi restartScript dan startAllSystems sudah ada di script utama.
--- Pastikan bahwa ketika restart, state speed boost dimatikan dengan benar.
--- Tidak perlu mengubah fungsi lain di luar blok ini.
+-- START / STOP
 -- ============================================================================
+
+local function startSpeedBoostMonitor()  
+    if dashConnection then return end  
+
+    isSpeedBoostActive = true  
+    config.speedBoostEnabled = true  
+
+    createSpeedGui()  
+
+    lastFrameTime = tick()  
+    dashConnection = RunService.Heartbeat:Connect(onHeartbeat)  
+
+    print("[SpeedBoost] TPWalk active")  
+end  
+
+local function stopSpeedBoostMonitor()  
+    if dashConnection then  
+        dashConnection:Disconnect()  
+        dashConnection = nil  
+    end  
+
+    isSpeedBoostActive = false  
+    config.speedBoostEnabled = false  
+
+    removeSpeedGui()  
+
+    print("[SpeedBoost] Disabled")  
+end
+
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
 -- ============================================================================

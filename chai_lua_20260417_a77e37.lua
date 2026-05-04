@@ -2726,7 +2726,6 @@ local function restoreFeatureStates()
     if config.speedBoostEnabled and not currentBoostConnection then
         startSpeedBoostMonitor()
         createSpeedSlider()
-        if not speedSliderFrame then createSpeedSlider() end
        elseif not config.speedBoostEnabled and currentBoostConnection then
         stopSpeedBoostMonitor()
     end

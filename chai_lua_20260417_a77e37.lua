@@ -14,7 +14,7 @@ if not _G.CyberHeroesState then
                 AgentHeight = 5,
                 AgentCanJump = true,
                 AgentMaxSlope = 45
-            }
+            },
             espEnabled = false,
             highlightColorKiller = Color3.fromRGB(255, 50, 50),
             highlightColorSurvivor = Color3.fromRGB(50, 255, 50),

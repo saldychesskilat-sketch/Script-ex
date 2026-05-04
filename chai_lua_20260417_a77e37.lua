@@ -2721,6 +2721,10 @@ local function createGUI()
             task.wait(1)
         end
     end)
+-- Tambahkan speed slider ke GUI (hanya sekali)
+if not speedSliderFrame then
+    createSpeedSlider()
+end
 
     mainFrame.BackgroundTransparency = 0.3
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()

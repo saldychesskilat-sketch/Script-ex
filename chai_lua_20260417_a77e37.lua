@@ -717,9 +717,9 @@ local function createObjectESP(obj, objType)
     if objectEspHighlights[obj] then return end
     local color
     if objType == "HOOK" then
-        color = Color3.fromRGB(255, 80, 80)  -- merah terang untuk hook
+        color = Color3.fromRGB(255, 165, 0)  -- orange untuk hook
     elseif objType == "generator" then
-        color = Color3.fromRGB(100, 255, 100)  -- hijau untuk generator
+        color = Color3.fromRGB(0, 150, 255)  -- biru untuk generator
     else
         color = Color3.fromRGB(200, 200, 200)
     end

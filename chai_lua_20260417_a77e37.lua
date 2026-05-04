@@ -895,317 +895,126 @@ end
 -- Kode di atas sudah mencakup semuanya, sehingga Anda bisa mengganti blok ESP lama dengan ini.s
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST (5 METHODS COMBINED) - ULTRA FAST
--- UPGRADED: Menggabungkan 5 metode speed boost sekaligus untuk kecepatan maksimal
--- Methods: BodyVelocity, LinearVelocity, VectorForce, AssemblyLinearVelocity, CFrame Stacking
--- Semua metode berjalan PARALEL (bukan looping biasa) untuk efek stacking speed
+-- FEATURE 4: SPEED BOOST + TPWALK (ALWAYS ACTIVE, STABLE CFrame DASH)
+-- UPGRADED: No triggers, works continuously when enabled.
+-- Combines increased WalkSpeed + CFrame dash that activates only when moving.
+-- Compatible with Delta Executor (client-side manipulation).
 -- ============================================================================
 
--- Global variables
-local speedBoostActive = false
-local speedBoostConnections = {}
-local originalWalkSpeed = 16
-local isSpeedBoostEnabled = false
-local boostObjects = {}  -- Store created instances for cleanup
+-- Global variables for this feature
+local dashHeartbeatConn = nil
+local speedBoostEnabledFlag = false
+local originalSpeedValue = 16
+local lastDeltaTime = tick()
 
--- Constants
-local BOOST_SPEED = 150  -- Kecepatan target (studs per second)
-local FORCE_MULTIPLIER = 5000  -- Kekuatan force
+-- Helper: ensure original speed is saved
+local function saveOriginalWalkSpeed()
+    if localHumanoid and not originalSpeedValue then
+        originalSpeedValue = localHumanoid.WalkSpeed
+        config.originalWalkSpeed = originalSpeedValue
+    end
+end
 
--- ============================================================================
--- METHOD 1: WalkSpeed (Basic)
--- ============================================================================
-local function applyWalkSpeedBoost()
+-- Apply speed boost (multiplier 1.5x)
+local function applySpeedBoost()
+    if not config.speedBoostEnabled then return end
     if not localHumanoid then return end
-    originalWalkSpeed = localHumanoid.WalkSpeed
-    localHumanoid.WalkSpeed = BOOST_SPEED
-    print("[SpeedBoost] WalkSpeed boosted to " .. BOOST_SPEED)
+    saveOriginalWalkSpeed()
+    local boostedSpeed = originalSpeedValue * 1.5
+    localHumanoid.WalkSpeed = boostedSpeed
+    speedBoostEnabledFlag = true
+    print("[SpeedBoost] WalkSpeed increased to " .. boostedSpeed)
 end
 
-local function revertWalkSpeed()
-    if localHumanoid and originalWalkSpeed then
-        localHumanoid.WalkSpeed = originalWalkSpeed
+-- Revert speed boost
+local function revertSpeedBoost()
+    if not localHumanoid then return end
+    if originalSpeedValue then
+        localHumanoid.WalkSpeed = originalSpeedValue
     end
+    speedBoostEnabledFlag = false
+    print("[SpeedBoost] WalkSpeed restored to " .. (originalSpeedValue or 16))
 end
 
--- ============================================================================
--- METHOD 2: BodyVelocity (Constant Force)
--- ============================================================================
-local function createBodyVelocity()
-    if not localRootPart then return nil end
-    
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "CyberHeroes_BodyVelocity"
-    bv.MaxForce = Vector3.new(FORCE_MULTIPLIER, FORCE_MULTIPLIER, FORCE_MULTIPLIER)
-    bv.Velocity = Vector3.zero
-    bv.Parent = localRootPart
-    return bv
-end
+-- CFrame dash (teleport step) based on delta time, only when moving
+local function performDash(deltaTime)
+    if not config.speedBoostEnabled then return end
+    if not localHumanoid or not localRootPart then return end
 
-local function updateBodyVelocity(direction)
-    if not boostObjects.bodyVelocity then return end
-    if direction and direction.Magnitude > 0.1 then
-        boostObjects.bodyVelocity.Velocity = direction.Unit * BOOST_SPEED
-    else
-        boostObjects.bodyVelocity.Velocity = Vector3.zero
-    end
-end
+    local moveDir = localHumanoid.MoveDirection
+    if moveDir.Magnitude < 0.1 then return end  -- only dash when moving
 
--- ============================================================================
--- METHOD 3: LinearVelocity (More Stable)
--- ============================================================================
-local function createLinearVelocity()
-    if not localRootPart then return nil end
-    
-    -- Need attachment for LinearVelocity
-    local attachment = Instance.new("Attachment")
-    attachment.Name = "CyberHeroes_Attachment"
-    attachment.Parent = localRootPart
-    
-    local lv = Instance.new("LinearVelocity")
-    lv.Name = "CyberHeroes_LinearVelocity"
-    lv.Attachment0 = attachment
-    lv.MaxForce = FORCE_MULTIPLIER
-    lv.VectorVelocity = Vector3.zero
-    lv.Parent = localRootPart
-    
-    return {lv = lv, attachment = attachment}
-end
-
-local function updateLinearVelocity(direction)
-    if not boostObjects.linearVelocity or not boostObjects.linearVelocity.lv then return end
-    if direction and direction.Magnitude > 0.1 then
-        boostObjects.linearVelocity.lv.VectorVelocity = direction.Unit * BOOST_SPEED
-    else
-        boostObjects.linearVelocity.lv.VectorVelocity = Vector3.zero
-    end
-end
-
--- ============================================================================
--- METHOD 4: VectorForce (Accumulating Force - Gets faster over time)
--- ============================================================================
-local function createVectorForce()
-    if not localRootPart then return nil end
-    
-    local attachment = Instance.new("Attachment")
-    attachment.Name = "CyberHeroes_VectorAttachment"
-    attachment.Parent = localRootPart
-    
-    local vf = Instance.new("VectorForce")
-    vf.Name = "CyberHeroes_VectorForce"
-    vf.Attachment0 = attachment
-    vf.Force = Vector3.zero
-    vf.Parent = localRootPart
-    
-    return {vf = vf, attachment = attachment}
-end
-
-local function updateVectorForce(direction)
-    if not boostObjects.vectorForce or not boostObjects.vectorForce.vf then return end
-    if direction and direction.Magnitude > 0.1 then
-        -- VectorForce accumulates, so smaller force = constant speed, larger force = accelerating
-        boostObjects.vectorForce.vf.Force = direction.Unit * FORCE_MULTIPLIER * 1.5
-    else
-        boostObjects.vectorForce.vf.Force = Vector3.zero
-    end
-end
-
--- ============================================================================
--- METHOD 5: AssemblyLinearVelocity (Direct Velocity Manipulation)
--- ============================================================================
-local function applyAssemblyLinearVelocity(direction)
-    if not localRootPart then return end
-    if direction and direction.Magnitude > 0.1 then
-        localRootPart.AssemblyLinearVelocity = direction.Unit * BOOST_SPEED
-    end
-end
-
--- ============================================================================
--- METHOD 6: CFrame Stacking (Teleport-based, for extreme speed)
--- ============================================================================
-local lastFrameTime = tick()
-local cframeStackingActive = false
-
-local function startCFrameStacking()
-    if cframeStackingActive then return end
-    cframeStackingActive = true
-    lastFrameTime = tick()
-    
-    local connection
-    connection = RunService.Heartbeat:Connect(function()
-        if not config.speedBoostEnabled or not speedBoostActive then
-            if connection then connection:Disconnect() end
-            cframeStackingActive = false
-            return
-        end
-        if not localHumanoid or not localRootPart then return end
-        
-        local moveDir = localHumanoid.MoveDirection
-        if moveDir.Magnitude < 0.1 then return end
-        
-        local now = tick()
-        local delta = math.min(0.033, now - lastFrameTime)
-        lastFrameTime = now
-        
-        -- CFrame stacking: move forward every frame
-        local step = moveDir.Unit * (BOOST_SPEED * delta * 1.2)
-        local newPos = localRootPart.Position + step
-        pcall(function()
-            localRootPart.CFrame = CFrame.new(newPos)
-        end)
+    local dashSpeed = 60  -- studs per second (smooth dash)
+    local step = moveDir * dashSpeed * deltaTime
+    local newPos = localRootPart.Position + step
+    pcall(function()
+        localRootPart.CFrame = CFrame.new(newPos)
     end)
-    
-    table.insert(speedBoostConnections, connection)
 end
 
--- ============================================================================
--- MAIN FUNCTION: Apply All Methods Simultaneously
--- ============================================================================
-local function enableAllSpeedMethods()
-    if speedBoostActive then return end
-    speedBoostActive = true
-    
-    print("[SpeedBoost] ENABLING ALL 6 SPEED METHODS SIMULTANEOUSLY")
-    
-    -- Create all physics objects
-    boostObjects.bodyVelocity = createBodyVelocity()
-    boostObjects.linearVelocity = createLinearVelocity()
-    boostObjects.vectorForce = createVectorForce()
-    
-    -- Apply WalkSpeed boost
-    applyWalkSpeedBoost()
-    
-    -- Start CFrame stacking
-    startCFrameStacking()
-    
-    -- Create movement update connection
-    local movementConnection = RunService.Heartbeat:Connect(function()
-        if not config.speedBoostEnabled or not speedBoostActive then return end
-        if not localHumanoid or not localRootPart then return end
-        
-        local moveDir = localHumanoid.MoveDirection
-        
-        -- Update all physics-based velocity methods
-        updateBodyVelocity(moveDir)
-        updateLinearVelocity(moveDir)
-        updateVectorForce(moveDir)
-        applyAssemblyLinearVelocity(moveDir)
-    end)
-    
-    table.insert(speedBoostConnections, movementConnection)
-    
-    print("[SpeedBoost] All methods active: WalkSpeed + BodyVelocity + LinearVelocity + VectorForce + AssemblyLinearVelocity + CFrame Stacking")
+-- Main heartbeat loop with delta time
+local function onHeartbeat()
+    if not config.speedBoostEnabled then return end
+    if not getLocalCharacter() or not localHumanoid or not localRootPart then
+        -- Character not ready, skip but keep connection alive
+        return
+    end
+
+    -- Update delta time (limit to 0.033 to avoid huge leaps)
+    local now = tick()
+    local delta = math.min(0.033, now - lastDeltaTime)
+    lastDeltaTime = now
+
+    -- Ensure walk speed is boosted (in case character respawned)
+    if localHumanoid.WalkSpeed ~= (originalSpeedValue * 1.5) then
+        applySpeedBoost()
+    end
+
+    -- Apply dash movement
+    performDash(delta)
 end
 
--- ============================================================================
--- DISABLE ALL METHODS (Cleanup)
--- ============================================================================
-local function disableAllSpeedMethods()
-    if not speedBoostActive then return end
-    
-    print("[SpeedBoost] DISABLING ALL SPEED METHODS")
-    
-    -- Disconnect all connections
-    for _, conn in ipairs(speedBoostConnections) do
-        pcall(function() conn:Disconnect() end)
-    end
-    speedBoostConnections = {}
-    
-    -- Destroy all created objects
-    if boostObjects.bodyVelocity then
-        pcall(function() boostObjects.bodyVelocity:Destroy() end)
-        boostObjects.bodyVelocity = nil
-    end
-    
-    if boostObjects.linearVelocity then
-        if boostObjects.linearVelocity.lv then
-            pcall(function() boostObjects.linearVelocity.lv:Destroy() end)
-        end
-        if boostObjects.linearVelocity.attachment then
-            pcall(function() boostObjects.linearVelocity.attachment:Destroy() end)
-        end
-        boostObjects.linearVelocity = nil
-    end
-    
-    if boostObjects.vectorForce then
-        if boostObjects.vectorForce.vf then
-            pcall(function() boostObjects.vectorForce.vf:Destroy() end)
-        end
-        if boostObjects.vectorForce.attachment then
-            pcall(function() boostObjects.vectorForce.attachment:Destroy() end)
-        end
-        boostObjects.vectorForce = nil
-    end
-    
-    -- Revert WalkSpeed
-    revertWalkSpeed()
-    
-    -- Stop CFrame stacking
-    cframeStackingActive = false
-    
-    -- Reset velocity
-    if localRootPart then
-        pcall(function() localRootPart.AssemblyLinearVelocity = Vector3.zero end)
-    end
-    
-    speedBoostActive = false
-    print("[SpeedBoost] All speed methods disabled")
-end
-
--- ============================================================================
--- EXTERNAL CONTROL FUNCTIONS (for integration with existing code)
--- ============================================================================
+-- Public start function (to be called when toggled ON)
 local function startSpeedBoostMonitor()
-    if currentBoostConnection then return end
-    -- Keep a dummy connection for compatibility
-    currentBoostConnection = RunService.Heartbeat:Connect(function() end)
-    enableAllSpeedMethods()
-    print("[SpeedBoostMonitor] Started")
+    if dashHeartbeatConn then return end
+
+    -- Initialize original speed
+    if localHumanoid then
+        originalSpeedValue = localHumanoid.WalkSpeed
+        config.originalWalkSpeed = originalSpeedValue
+    end
+
+    applySpeedBoost()
+    lastDeltaTime = tick()
+    dashHeartbeatConn = RunService.Heartbeat:Connect(onHeartbeat)
+    currentBoostConnection = dashHeartbeatConn  -- for compatibility with restart logic
+    print("[SpeedBoostMonitor] ACTIVATED: WalkSpeed + CFrame dash (always on)")
 end
 
+-- Public stop function (to be called when toggled OFF)
 local function stopSpeedBoostMonitor()
-    if currentBoostConnection then
-        pcall(function() currentBoostConnection:Disconnect() end)
-        currentBoostConnection = nil
+    if dashHeartbeatConn then
+        dashHeartbeatConn:Disconnect()
+        dashHeartbeatConn = nil
     end
-    disableAllSpeedMethods()
-    print("[SpeedBoostMonitor] Stopped")
+    currentBoostConnection = nil
+    revertSpeedBoost()
+    print("[SpeedBoostMonitor] DEACTIVATED")
 end
 
--- ============================================================================
--- CHARACTER CHANGE HANDLER (Re-apply after respawn)
--- ============================================================================
-local function onCharacterAddedForSpeed(character)
-    -- Wait for character to fully load
-    task.wait(0.5)
-    
-    if config.speedBoostEnabled and speedBoostActive then
-        -- Re-create all speed objects on new character
-        disableAllSpeedMethods()
+-- Ensure speed boost reapplies when character respawns
+local function onCharacterRespawn(character)
+    if config.speedBoostEnabled then
+        -- Small delay to let humanoid fully load
         task.wait(0.2)
-        enableAllSpeedMethods()
+        applySpeedBoost()
     end
 end
 
--- Hook into existing character added event
-local originalCharacterAdded = onCharacterAdded
-if originalCharacterAdded then
-    localPlayer.CharacterAdded:Connect(function(character)
-        if originalCharacterAdded then
-            originalCharacterAdded(character)
-        end
-        onCharacterAddedForSpeed(character)
-    end)
-end
-
 -- ============================================================================
--- NOTES FOR INTEGRATION:
--- 1. This code REPLACES the existing FEATURE 4 block
--- 2. Make sure config.speedBoostEnabled exists (already in global config)
--- 3. The functions startSpeedBoostMonitor() and stopSpeedBoostMonitor()
---    are compatible with existing toggle system
--- 4. All methods run in PARALLEL for maximum speed stacking effect
--- 5. Proper cleanup on disable and character death/respawn
+-- END OF UPGRADED FEATURE 4
+-- Replace the old startSpeedBoostMonitor / stopSpeedBoostMonitor functions
+-- with these new ones. Delete any old connections related to tpwalk or dash.
 -- ============================================================================
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)

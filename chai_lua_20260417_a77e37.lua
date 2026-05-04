@@ -908,7 +908,7 @@ local dashEnabled = false     -- local mirror of config.speedBoostEnabled
 
 -- Konstanta kecepatan dash (2x kecepatan normal)
 -- Kecepatan normal Roblox sekitar 16 studs/s, jadi 2x = 32 studs/s
-local DASH_SPEED = 32
+local DASH_SPEED = 64
 
 -- Fungsi untuk memulai dash (dipanggil saat toggle ON)
 local function startSpeedBoostMonitor()

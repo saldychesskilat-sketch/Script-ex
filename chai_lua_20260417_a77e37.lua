@@ -1212,8 +1212,6 @@ end
 -- Pada fungsi onCharacterAdded, kita reset kecepatan dan pastikan speed boost tetap berjalan jika aktif.
 
 -- Ganti onCharacterAdded dengan versi baru (pastikan tidak double bind)
-localPlayer.CharacterAdded:Connect(onCharacterAdded)
-if localPlayer.Character then onCharacterAdded(localPlayer.Character) end
 
 -- ============================================================================
 -- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
@@ -1330,38 +1328,61 @@ local function stopInfiniteAmmo()
 end
 
 -- ============================================================================
--- FEATURE 8: SCRIPT RESTART (FIXED)
+-- FEATURE 8: SCRIPT RESTART (FIXED & ENHANCED with Speed Boost Cleanup)
 -- ============================================================================
-local originalRestartScript = restartScript  -- backup jika ada
-function restartScript()
-    print("[Restart] Restarting all systems including Speed Boost...")
-    -- Hentikan speed boost terlebih dahulu
-    stopSpeedBoostMonitor()
-    -- Panggil fungsi restart asli jika ada (misal dari script utama)
-    if originalRestartScript then
-        originalRestartScript()
-    else
-        -- Fallback: matikan semua koneksi lain (sesuai kebutuhan script utama)
-        if autoWinConnection then autoWinConnection:Disconnect(); autoWinConnection = nil end
-        if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
-        if stealthConnection then stealthConnection:Disconnect(); stealthConnection = nil end
-        if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
-        if infiniteAmmoConnection then infiniteAmmoConnection:Disconnect(); infiniteAmmoConnection = nil end
-        if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
-        if noCollideConnection then noCollideConnection:Disconnect(); noCollideConnection = nil end
-        if massKillLoopConnection then massKillLoopConnection:Disconnect(); massKillLoopConnection = nil end
-        if autoGeneratorLoopConnection then autoGeneratorLoopConnection:Disconnect(); autoGeneratorLoopConnection = nil end
-        if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end
-        if autoAimConnection then autoAimConnection:Disconnect(); autoAimConnection = nil end
-        processedGenerators = {}; espHighlights = {}
-        if currentForceField then currentForceField:Destroy(); currentForceField = nil end
-        if localHumanoid and savedOriginalWalkSpeed then
-            localHumanoid.WalkSpeed = savedOriginalWalkSpeed
-        end
-        task.wait(0.5)
-        startAllSystems()
+local function restartScript()
+    print("[Restart] Restarting all systems...")
+    
+    -- 1. Matikan semua koneksi lama (sesuai script asli)
+    if autoWinConnection then autoWinConnection:Disconnect(); autoWinConnection = nil end
+    if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
+    if currentBoostConnection then currentBoostConnection:Disconnect(); currentBoostConnection = nil end
+    if stealthConnection then stealthConnection:Disconnect(); stealthConnection = nil end
+    if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
+    if infiniteAmmoConnection then infiniteAmmoConnection:Disconnect(); infiniteAmmoConnection = nil end
+    if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
+    if tpwalkConnection then tpwalkConnection:Disconnect(); tpwalkConnection = nil end
+    if noCollideConnection then noCollideConnection:Disconnect(); noCollideConnection = nil end
+    if massKillLoopConnection then massKillLoopConnection:Disconnect(); massKillLoopConnection = nil end
+    if autoGeneratorLoopConnection then autoGeneratorLoopConnection:Disconnect(); autoGeneratorLoopConnection = nil end
+    if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end
+    if autoAimConnection then autoAimConnection:Disconnect(); autoAimConnection = nil end
+    
+    -- 2. Matikan speed boost yang sudah di-upgrade (jika ada)
+    if speedBoostConnection then
+        speedBoostConnection:Disconnect()
+        speedBoostConnection = nil
     end
-    print("[Restart] Restart completed")
+    speedBoostActive = false
+    
+    -- 3. Reset state flags
+    isSpeedBoostActive = false
+    boostDebounce = false
+    isInvisible = false
+    isShieldActive = false
+    isTpwalkActive = false
+    isNoCollideActive = false
+    processedGenerators = {}
+    espHighlights = {}
+    
+    -- 4. Bersihkan objek fisik
+    if currentForceField then currentForceField:Destroy(); currentForceField = nil end
+    
+    -- 5. Kembalikan kecepatan karakter ke asli
+    if localHumanoid and originalWalkSpeed then
+        localHumanoid.WalkSpeed = originalWalkSpeed
+    end
+    
+    -- 6. Tunggu sebentar sebelum restart
+    task.wait(0.5)
+    
+    -- 7. Restart semua sistem (panggil fungsi startAllSystems dari script utama)
+    startAllSystems()
+    
+    -- 8. Jika speed boost sebelumnya aktif, mulai ulang (opsional, karena startAllSystems akan memanggil sesuai config)
+    -- Tidak perlu manual karena config.speedBoostEnabled sudah di-restore oleh startAllSystems
+    
+    print("[Restart] All systems restarted successfully!")
 end
 -- ============================================================================
 -- FEATURE 9: AUTO SHIELD (ForceField Protection)
@@ -2805,6 +2826,7 @@ local function ensureGUIPersistent()
             if not screenGui or not screenGui.Parent then
                 print("[Recovery] Recreating main GUI...")
                 createGUI()
+                    createSpeedSlider() 
                 restoreFeatureStates()
             end
             if not config.guiVisible and (not floatingLogo or not floatingLogo.Parent) then
@@ -2839,9 +2861,21 @@ local function onCharacterAdded(character)
         originalWalkSpeed = localHumanoid.WalkSpeed
         originalTpwalkSpeed = localHumanoid.WalkSpeed
         config.lastHealth = localHumanoid.MaxHealth
+        
+        -- Simpan kecepatan asli untuk speed boost (hanya sekali)
+        if not savedOriginalWalkSpeed or savedOriginalWalkSpeed == 16 then
+            savedOriginalWalkSpeed = localHumanoid.WalkSpeed
+        end
     end
     isInvisible = false; isShieldActive = false; isTpwalkActive = false; isNoCollideActive = false
     if currentForceField then currentForceField:Destroy(); currentForceField = nil end
+    
+    -- Jika fitur speed boost sedang aktif, terapkan kembali kecepatan setelah respawn
+    if speedBoostActive and localHumanoid and savedOriginalWalkSpeed then
+        local newSpeed = savedOriginalWalkSpeed * (speedMultiplier or 2)
+        newSpeed = math.clamp(newSpeed, 16, 400)
+        localHumanoid.WalkSpeed = newSpeed
+    end
 end
 
 local function startAllSystems()

@@ -1132,41 +1132,46 @@ local function stopGodMode()
 end
 
 
+
+-- ** Fungsi baru: Mendapatkan item Parry yang tersedia (Blade, Parry Dagger, Parrying Dagger) **
+
+  --  local itemNames = {"Blade", "Parry Dagger", "Parrying Dagger"}
+    -- Cari di karakter dulu
+    
+
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (OPTIMIZED - REDUCED SPAM, CONTINUOUS)
--- Mekanisme: Ketika killer dalam jarak ≤ 30 studs, script akan melakukan parry
--- dengan frekuensi lebih rendah (0.3 detik) dan menggunakan berbagai metode:
--- - Remote event parry
--- - Simulasi klik kanan
--- - Aktivasi item Blade/Parry Dagger/Parrying Dagger (tanpa cooldown)
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (OPTIMIZED - RELIABLE, 2x PER SECOND)
+-- Berdasarkan scanning workspace: item "Swort" (juga "Parrying Dagger", "Parry Dagger")
+-- Mekanisme: Ketika killer dalam jarak ≤ 10 studs, script melakukan parry maksimal 2x per detik
+-- menggunakan aktivasi tool + remote event + simulasi klik kanan.
 -- ============================================================================
 
--- Simulasi klik kanan (biasanya digunakan untuk parry)
+-- Simulasi klik kanan (biasanya digunakan untuk parry / block)
 local function simulateRightClick()
     pcall(function()
         VirtualInputManager:SendMouseButtonEvent(1, 1, true, game, 1) -- Right button down
-        task.wait(0.01)
+        task.wait(0.02)
         VirtualInputManager:SendMouseButtonEvent(1, 1, false, game, 1) -- Right button up
     end)
     pcall(function()
         VirtualUser:Button2Down(Vector2.new(500, 500))
-        task.wait(0.01)
+        task.wait(0.02)
         VirtualUser:Button2Up(Vector2.new(500, 500))
     end)
 end
 
--- Simulasi tekan tombol F (alternatif untuk parry)
+-- Simulasi tekan tombol F (alternatif untuk parry / ability)
 local function simulatePressF()
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-        task.wait(0.03)
+        task.wait(0.05)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
     end)
 end
 
 -- Cari remote event untuk parry/block dengan keyword lebih lengkap
 local function findParryRemoteEvent()
-    local parryKeywords = {"parry", "block", "deflect", "counter", "riposte", "reflect", "dodge", "parrying"}
+    local parryKeywords = {"parry", "block", "deflect", "counter", "riposte", "reflect", "dodge", "parrying", "use", "activate", "ability", "skill","Parry Dagger", "Parryng Dagger","Dagger"}
     local candidates = {}
     for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
         if remote:IsA("RemoteEvent") then
@@ -1178,16 +1183,17 @@ local function findParryRemoteEvent()
             end
         end
     end
-    -- Prioritaskan yang berhubungan dengan dagger atau blade
+    -- Prioritaskan yang berhubungan dengan weapon/sword/dagger
     for _, remote in ipairs(candidates) do
-        if remote.Name:lower():find("dagger") or remote.Name:lower():find("blade") then
+        local rname = remote.Name:lower()
+        if rname:find("sword") or rname:find("weapon") or rname:find("dagger") or rname:find("blade") or rname:find("swort") then
             return remote
         end
     end
     return candidates[1]
 end
 
--- Dapatkan jarak ke killer terdekat (sama seperti sebelumnya)
+-- Dapatkan jarak ke killer terdekat (dengan threshold 10 studs)
 local function getKillerDistance()
     if not localRootPart then return math.huge end
     local localPos = localRootPart.Position
@@ -1222,11 +1228,12 @@ local function getKillerDistance()
     return minDist
 end
 
--- ** Fungsi baru: Mendapatkan item Parry yang tersedia (Blade, Parry Dagger, Parrying Dagger) **
+-- ** Mendapatkan item Parry yang tersedia (prioritas: Swort, Parrying Dagger, Parry Dagger, Blade) **
 local function getParryItem()
     local character = localPlayer.Character
     local backpack = localPlayer:FindFirstChild("Backpack")
-    local itemNames = {"Blade", "Parry Dagger", "Parrying Dagger"}
+    -- Urutan prioritas berdasarkan hasil scanning workspace
+    local itemNames = {"Swort", "Parrying Dagger", "Parry Dagger", "Blade"}
     -- Cari di karakter dulu
     if character then
         for _, item in ipairs(character:GetChildren()) do
@@ -1254,21 +1261,27 @@ local function getParryItem()
     return nil
 end
 
--- ** Fungsi utama parry (lebih efisien, dengan prioritas weapon) **
+-- ** Fungsi utama parry (menggunakan item + remote event + klik kanan) **
 local function performParry()
-    -- Metode 1: Gunakan item parry jika ada (Blade, Parry Dagger, Parrying Dagger)
+    -- Metode 1: Gunakan item parry jika ada (Swort, Parrying Dagger, dll)
     local parryItem = getParryItem()
     if parryItem then
-        -- Aktifkan tool (simulasi penggunaan)
+        -- Aktifkan tool (simulasi equipping dan penggunaan)
         pcall(function() parryItem:Activate() end)
-        -- Kirim remote event terkait item (jika ada)
+        -- Kirim remote event terkait item (berbagai format argumen untuk memastikan)
         local remote = findParryRemoteEvent()
         if remote then
+            -- Coba dengan berbagai argumen
             pcall(function() remote:FireServer(parryItem) end)
             pcall(function() remote:FireServer("parry", parryItem) end)
+            pcall(function() remote:FireServer("use", parryItem) end)
+            pcall(function() remote:FireServer(parryItem.Name) end)
+            pcall(function() remote:FireServer("ability", parryItem.Name) end)
         end
-        -- Simulasi klik kanan untuk memastikan
+        -- Simulasi klik kanan
         simulateRightClick()
+        -- Simulasi tekan F (untuk skill/ability)
+        simulatePressF()
         return
     end
 
@@ -1278,18 +1291,19 @@ local function performParry()
         pcall(function() parryRemote:FireServer() end)
         pcall(function() parryRemote:FireServer("parry") end)
         pcall(function() parryRemote:FireServer("block") end)
+        pcall(function() parryRemote:FireServer("ability") end)
     end
 
     -- Metode 3: Simulasi klik kanan
     simulateRightClick()
 
-    -- Metode 4: Simulasi tekan F (alternatif)
+    -- Metode 4: Simulasi tekan F
     simulatePressF()
 end
 
--- ** Timer untuk mengurangi spam: parry dieksekusi maksimal setiap 0.3 detik **
+-- ** Timer untuk mengurangi spam: parry dieksekusi maksimal 2x per detik (interval 0.5 detik) **
 local lastParryTime = 0
-local PARRY_INTERVAL = 0.3  -- interval minimal antara parry (kurang spam)
+local PARRY_INTERVAL = 0.5  -- interval minimal antara parry (2x per detik, tidak spam)
 
 -- Loop auto parry (menggantikan infinite ammo)
 local infiniteAmmoConnection = nil
@@ -1301,15 +1315,18 @@ local function startInfiniteAmmo()
         if not getLocalCharacter() or not localRootPart then return end
         
         local killerDist = getKillerDistance()
-        if killerDist <= 30 then
+        if killerDist <= 10 then  -- jarak trigger diubah menjadi 10 studs
             local now = tick()
             if now - lastParryTime >= PARRY_INTERVAL then
                 lastParryTime = now
                 performParry()
             end
+        else
+            -- Reset timer saat killer menjauh agar bisa langsung parry lagi saat kembali mendekat
+            lastParryTime = 0
         end
     end)
-    print("[AutoParry] Auto parry started (interval " .. PARRY_INTERVAL .. "s) - uses Blade/Parry Dagger when available")
+    print("[AutoParry] Auto parry started (interval 0.5s, trigger 10 studs) - uses Swort/Parrying Dagger when available")
 end
 
 local function stopInfiniteAmmo()
@@ -1321,15 +1338,13 @@ local function stopInfiniteAmmo()
 end
 
 -- ============================================================================
--- CATATAN:
--- - Fungsi startInfiniteAmmo dan stopInfiniteAmmo menggantikan infinite ammo.
--- - Interval parry diatur 0.3 detik untuk mengurangi spam, namun tetap efektif.
--- - Script akan otomatis menggunakan item "Blade", "Parry Dagger", "Parrying Dagger"
---   jika tersedia, dengan mengaktifkan tool dan mengirim remote event.
--- - Jika tidak ada item, tetap menggunakan remote event dan klik kanan.
--- - Tidak ada cooldown dari sisi client karena kita menggunakan interval tetap,
---   dan server mungkin memiliki cooldown sendiri, tapi dengan item yang tepat
---   kita berharap bisa memanfaatkan mekanisme game.
+-- CATATAN PERBAIKAN:
+-- - Jarak trigger diubah menjadi 10 studs.
+-- - Interval parry 0.5 detik (2x per detik, tidak spam).
+-- - Prioritas item: "Swort" (berdasarkan hasil scan), lalu "Parrying Dagger", "Parry Dagger", "Blade".
+-- - Pengiriman remote event diperluas dengan berbagai kemungkinan argumen untuk memastikan server menerima.
+-- - Reset timer saat killer menjauh agar responsif saat kembali.
+-- - Tetap menggunakan nama fungsi startInfiniteAmmo/stopInfiniteAmmo untuk kompatibilitas dengan script utama.
 -- ============================================================================
 
 -- ============================================================================

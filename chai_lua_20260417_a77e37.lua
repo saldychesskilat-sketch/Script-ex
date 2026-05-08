@@ -1478,7 +1478,8 @@ local function restartScript()
     print("[Restart] All systems restarted successfully!")
 end
 -- ============================================================================
--- FEATURE 9: AUTO SHIELD (ForceField Protection)
+-- FEATURE 9: AUTO SHIELD (ForceField Protection - ALWAYS ACTIVE WHEN ENABLED)
+-- Tidak menggunakan trigger jarak killer. Shield aktif terus saat fitur dinyalakan.
 -- ============================================================================
 local function addForceField()
     if currentForceField then return end
@@ -1488,50 +1489,30 @@ local function addForceField()
     currentForceField.Parent = localCharacter
     isShieldActive = true
 end
+
 local function removeForceField()
     if currentForceField then currentForceField:Destroy(); currentForceField = nil end
     isShieldActive = false
 end
+
+-- Fungsi ini sekarang hanya mengaktifkan/menonaktifkan shield berdasarkan config (tanpa cek jarak).
 local function checkShieldProximity()
-    if not config.shieldEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-    local localPos = localRootPart.Position
-    local nearestKillerDistance = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy")) end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                end
-                if isKiller then
-                    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if rootPart then
-                        local distance = (localPos - rootPart.Position).Magnitude
-                        if distance < nearestKillerDistance then nearestKillerDistance = distance end
-                    end
-                end
-            end
-        end
-    end
-    if nearestKillerDistance <= config.shieldRadius then
-        if not isShieldActive then addForceField() end
-    else
+    if not config.shieldEnabled then
         if isShieldActive then removeForceField() end
+        return
     end
+    if not isShieldActive then addForceField() end
 end
+
 local function startShieldMonitor()
     if shieldConnection then return end
     shieldConnection = RunService.Heartbeat:Connect(checkShieldProximity)
 end
+
 local function stopShieldMonitor()
     if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
     removeForceField()
 end
-
 -- ============================================================================
 -- FEATURE 10: TPWALK (2x speed boost + CFrame dash)
 -- ============================================================================
@@ -1612,7 +1593,8 @@ local function stopTpwalkMonitor()
 end
 
 -- ============================================================================
--- FEATURE 11: NO COLLISION (Phase through killer when nearby)
+-- FEATURE 11: NO COLLISION (ALWAYS ACTIVE WHEN ENABLED)
+-- Tidak menggunakan trigger jarak killer. Noclip aktif terus saat fitur dinyalakan.
 -- ============================================================================
 local function enableNoCollision()
     if not config.noCollideEnabled then return end
@@ -1623,6 +1605,7 @@ local function enableNoCollision()
     end
     isNoCollideActive = true
 end
+
 local function disableNoCollision()
     if not isNoCollideActive then return end
     if not localCharacter then return end
@@ -1631,41 +1614,21 @@ local function disableNoCollision()
     end
     isNoCollideActive = false
 end
+
+-- Fungsi ini sekarang hanya mengaktifkan/menonaktifkan berdasarkan config (tanpa cek jarak).
 local function checkNoCollideProximity()
-    if not config.noCollideEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-    local localPos = localRootPart.Position
-    local nearestKillerDistance = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy")) end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                end
-                if isKiller then
-                    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if rootPart then
-                        local distance = (localPos - rootPart.Position).Magnitude
-                        if distance < nearestKillerDistance then nearestKillerDistance = distance end
-                    end
-                end
-            end
-        end
-    end
-    if nearestKillerDistance <= config.noCollideRadius then
-        if not isNoCollideActive then enableNoCollision() end
-    else
+    if not config.noCollideEnabled then
         if isNoCollideActive then disableNoCollision() end
+        return
     end
+    if not isNoCollideActive then enableNoCollision() end
 end
+
 local function startNoCollideMonitor()
     if noCollideConnection then return end
     noCollideConnection = RunService.Heartbeat:Connect(checkNoCollideProximity)
 end
+
 local function stopNoCollideMonitor()
     if noCollideConnection then noCollideConnection:Disconnect(); noCollideConnection = nil end
     disableNoCollision()

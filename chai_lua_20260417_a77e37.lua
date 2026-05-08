@@ -1059,61 +1059,67 @@ end
 -- ============================================================================
 
 -- ============================================================================
-
--- FEATURE 5: STEALTH INVISIBILITY (UNCHANGED)
+-- STEALTH INVISIBILITY (UPGRADED - ALWAYS ACTIVE WHEN ENABLED)
+-- Fitur: Membuat karakter lokal tidak terlihat secara permanen saat fitur diaktifkan.
+-- Tidak lagi bergantung pada jarak killer.
 -- ============================================================================
+
+-- Fungsi untuk membuat karakter tidak terlihat
 local function makeInvisible()
     if not config.stealthEnabled then return end
     if isInvisible then return end
     if not localCharacter then return end
+    -- Loop semua BasePart di karakter (termasuk aksesoris dan tool yang dipegang)
     for _, part in ipairs(localCharacter:GetDescendants()) do
-        if part:IsA("BasePart") then part.Transparency = 1 end
+        if part:IsA("BasePart") then
+            part.Transparency = 1
+        end
     end
     isInvisible = true
 end
+
+-- Fungsi untuk mengembalikan karakter ke keadaan terlihat
 local function makeVisible()
     if not isInvisible then return end
     if not localCharacter then return end
     for _, part in ipairs(localCharacter:GetDescendants()) do
-        if part:IsA("BasePart") then part.Transparency = 0 end
+        if part:IsA("BasePart") then
+            part.Transparency = 0
+        end
     end
     isInvisible = false
 end
-local function checkKillerProximity()
-    if not config.stealthEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-    local localPos = localRootPart.Position
-    local nearestKillerDistance = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy")) end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                end
-                if isKiller then
-                    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if rootPart then
-                        local distance = (localPos - rootPart.Position).Magnitude
-                        if distance < nearestKillerDistance then nearestKillerDistance = distance end
-                    end
-                end
-            end
-        end
-    end
-    if nearestKillerDistance <= config.stealthRadiusInvisible then makeInvisible() elseif nearestKillerDistance >= config.stealthRadiusVisible then makeVisible() end
-end
+
+-- ** Fungsi monitoring (SEDERHANA: hanya aktifkan/ nonaktifkan tanpa pengecekan jarak) **
 local function startStealthMonitor()
     if stealthConnection then return end
-    stealthConnection = RunService.Heartbeat:Connect(checkKillerProximity)
+    -- Langsung aktifkan invisible jika fitur dinyalakan
+    if config.stealthEnabled then
+        makeInvisible()
+    end
+    -- Tidak perlu loop Heartbeat untuk pengecekan jarak, karena kita akan menggunakan 
+    -- event CharacterAdded untuk mempertahankan invisibility setelah respawn.
+    -- Kita tetap buat koneksi kosong untuk kompatibilitas, tapi tidak melakukan apa-apa.
+    stealthConnection = RunService.Heartbeat:Connect(function()
+        -- Tidak ada pengecekan jarak, hanya pastikan status invisible sesuai config.
+        if config.stealthEnabled and not isInvisible then
+            makeInvisible()
+        elseif not config.stealthEnabled and isInvisible then
+            makeVisible()
+        end
+    end)
+    print("[Stealth] Stealth mode activated (always invisible, no proximity check)")
 end
+
 local function stopStealthMonitor()
-    if stealthConnection then stealthConnection:Disconnect(); stealthConnection = nil end
+    if stealthConnection then
+        stealthConnection:Disconnect()
+        stealthConnection = nil
+    end
     makeVisible()
+    print("[Stealth] Stealth mode deactivated")
 end
+
 
 -- ============================================================================
 -- FEATURE 6: GOD MODE (UNCHANGED)

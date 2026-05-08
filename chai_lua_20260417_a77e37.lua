@@ -1059,56 +1059,154 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- STEALTH INVISIBILITY (UPGRADED - ALWAYS ACTIVE WHEN ENABLED)
--- Fitur: Membuat karakter lokal tidak terlihat secara permanen saat fitur diaktifkan.
+-- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD FROM FE INVISIBLE V2.3)
+-- Menggunakan metode seat + teleport ke posisi tertentu + transparency
+-- Fitur: Membuat karakter lokal tidak terlihat secara permanen saat diaktifkan.
 -- Tidak lagi bergantung pada jarak killer.
 -- ============================================================================
 
--- Fungsi untuk membuat karakter tidak terlihat
+-- Variabel state untuk sistem seat
+local currentSeat = nil
+local seatWeld = nil
+local isSeatActive = false
+local seatTeleportPosition = Vector3.new(-25.95, 400, 3537.55)  -- dari script referensi
+local voidLevelYThreshold = -50  -- batas void untuk deteksi gagal
+local originalCharacterTransparency = nil
+local seatReturnHeartbeatConnection = nil
+
+-- Fungsi untuk mulai memantau karakter agar tetap di seat (jika perlu)
+local function startSeatReturnHeartbeat()
+    if seatReturnHeartbeatConnection then
+        seatReturnHeartbeatConnection:Disconnect()
+        seatReturnHeartbeatConnection = nil
+    end
+    seatReturnHeartbeatConnection = RunService.Heartbeat:Connect(function()
+        -- Kosongkan atau isi sesuai kebutuhan (bisa untuk mempertahankan posisi)
+    end)
+end
+
+local function stopSeatReturnHeartbeat()
+    if seatReturnHeartbeatConnection then
+        seatReturnHeartbeatConnection:Disconnect()
+        seatReturnHeartbeatConnection = nil
+    end
+end
+
+-- Set transparency untuk seluruh karakter
+local function setCharacterTransparency(transparency)
+    if not localCharacter then return end
+    for _, part in ipairs(localCharacter:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.Transparency = transparency
+        end
+    end
+end
+
+-- ** Fungsi utama makeInvisible (menggunakan metode seat) **
 local function makeInvisible()
     if not config.stealthEnabled then return end
     if isInvisible then return end
     if not localCharacter then return end
-    -- Loop semua BasePart di karakter (termasuk aksesoris dan tool yang dipegang)
-    for _, part in ipairs(localCharacter:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Transparency = 1
-        end
+
+    -- Bersihkan seat lama jika ada
+    if currentSeat then
+        pcall(function() currentSeat:Destroy() end)
+        currentSeat = nil
+        seatWeld = nil
     end
+    stopSeatReturnHeartbeat()
+    isSeatActive = false
+
+    -- Simpan posisi asli untuk fallback
+    local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then
+        print("[Stealth] Cannot make invisible: No HumanoidRootPart")
+        return
+    end
+    local savedpos = humanoidRootPart.CFrame
+
+    -- Teleport ke posisi seat
+    pcall(function() localCharacter:MoveTo(seatTeleportPosition) end)
+    task.wait(0.05)
+
+    -- Cek apakah teleport gagal (masuk void)
+    if not localCharacter:FindFirstChild("HumanoidRootPart") or 
+       localCharacter.HumanoidRootPart.Position.Y < voidLevelYThreshold then
+        pcall(function() localCharacter:MoveTo(savedpos) end)
+        print("[Stealth] Teleport to seat failed (void). Aborting.")
+        return
+    end
+
+    -- Buat seat baru
+    local Seat = Instance.new('Seat')
+    Seat.Name = 'CyberHeroes_Seat'
+    Seat.Anchored = false
+    Seat.CanCollide = false
+    Seat.Transparency = 1
+    Seat.Position = seatTeleportPosition
+    Seat.Parent = workspace
+
+    -- Weld ke torso
+    local torso = localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso")
+    if torso then
+        seatWeld = Instance.new("Weld")
+        seatWeld.Part0 = Seat
+        seatWeld.Part1 = torso
+        seatWeld.Parent = Seat
+        task.wait()
+        pcall(function() Seat.CFrame = savedpos end)
+        currentSeat = Seat
+        startSeatReturnHeartbeat()
+        isSeatActive = true
+    else
+        Seat:Destroy()
+        print("[Stealth] Cannot make invisible: No torso found")
+        return
+    end
+
+    -- Set transparency (default 0.75 dari script referensi)
+    setCharacterTransparency(0.75)
     isInvisible = true
+    print("[Stealth] Invisibility enabled (seat method)")
 end
 
--- Fungsi untuk mengembalikan karakter ke keadaan terlihat
+-- ** Fungsi makeVisible (mengembalikan karakter ke normal) **
 local function makeVisible()
     if not isInvisible then return end
     if not localCharacter then return end
-    for _, part in ipairs(localCharacter:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Transparency = 0
-        end
+
+    -- Hancurkan seat dan weld
+    if currentSeat then
+        pcall(function() currentSeat:Destroy() end)
+        currentSeat = nil
+        seatWeld = nil
     end
+    stopSeatReturnHeartbeat()
+    isSeatActive = false
+
+    -- Kembalikan transparency ke 0
+    setCharacterTransparency(0)
+
     isInvisible = false
+    print("[Stealth] Invisibility disabled")
 end
 
--- ** Fungsi monitoring (SEDERHANA: hanya aktifkan/ nonaktifkan tanpa pengecekan jarak) **
+-- ** Start/Stop Stealth Monitor (versi sederhana: langsung aktifkan/nonaktifkan) **
 local function startStealthMonitor()
     if stealthConnection then return end
-    -- Langsung aktifkan invisible jika fitur dinyalakan
+    -- Jika fitur aktif, langsung invisible
     if config.stealthEnabled then
         makeInvisible()
     end
-    -- Tidak perlu loop Heartbeat untuk pengecekan jarak, karena kita akan menggunakan 
-    -- event CharacterAdded untuk mempertahankan invisibility setelah respawn.
-    -- Kita tetap buat koneksi kosong untuk kompatibilitas, tapi tidak melakukan apa-apa.
+    -- Loop sederhana untuk menjaga status saat karakter respawn atau perubahan config
     stealthConnection = RunService.Heartbeat:Connect(function()
-        -- Tidak ada pengecekan jarak, hanya pastikan status invisible sesuai config.
         if config.stealthEnabled and not isInvisible then
             makeInvisible()
         elseif not config.stealthEnabled and isInvisible then
             makeVisible()
         end
     end)
-    print("[Stealth] Stealth mode activated (always invisible, no proximity check)")
+    print("[Stealth] Stealth monitor started (seat method)")
 end
 
 local function stopStealthMonitor()
@@ -1117,9 +1215,8 @@ local function stopStealthMonitor()
         stealthConnection = nil
     end
     makeVisible()
-    print("[Stealth] Stealth mode deactivated")
+    print("[Stealth] Stealth monitor stopped")
 end
-
 
 -- ============================================================================
 -- FEATURE 6: GOD MODE (UNCHANGED)

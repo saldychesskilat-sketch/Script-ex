@@ -989,18 +989,11 @@ end
 
 -- ============================================================================
 -- CATATAN:
--- - Kecepatan default 30, bisa diubah dengan mengubah variabel tpwalkSpeed.
--- - Multiplier 50 memberikan efek lari super cepat (seperti blink).
--- - Gunakan delta time untuk kecepatan konsisten di berbagai frame rate.
--- - Fungsi applySpeedBoost tetap ada untuk kompatibilitas.
--- ============================================================================
-
 
 -- ============================================================================
--- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD FROM FE INVISIBLE V2.3)
--- Menggunakan metode seat + teleport ke posisi tertentu + transparency
--- Fitur: Membuat karakter lokal tidak terlihat secara permanen saat diaktifkan.
--- Tidak lagi bergantung pada jarak killer.
+-- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD WITH JUMP TO 90 STUDS)
+-- Menggunakan metode seat + teleport ke atas 90 studs sebelum aktif, lalu kembali ke posisi semula.
+-- Fitur: Membuat karakter lokal tidak terlihat secara permanen, dengan efek lompat ke atas.
 -- ============================================================================
 
 -- Variabel state untuk sistem seat
@@ -1040,11 +1033,25 @@ local function setCharacterTransparency(transparency)
     end
 end
 
--- ** Fungsi utama makeInvisible (menggunakan metode seat) **
+-- ** Fungsi utama makeInvisible (optimized: teleport ke atas 90 studs, seat method, kembali ke posisi awal) **
 local function makeInvisible()
     if not config.stealthEnabled then return end
     if isInvisible then return end
     if not localCharacter then return end
+
+    -- Simpan posisi awal karakter (tanah)
+    local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then
+        print("[Stealth] Cannot make invisible: No HumanoidRootPart")
+        return
+    end
+    local startPos = humanoidRootPart.CFrame
+    local targetFinalPos = startPos  -- posisi akhir yang diinginkan (tanah)
+
+    -- 1. Teleport ke atas 90 studs dari posisi awal
+    local upPos = startPos + Vector3.new(0, 90, 0)
+    pcall(function() humanoidRootPart.CFrame = upPos end)
+    task.wait(0.05)  -- tunggu teleport selesai
 
     -- Bersihkan seat lama jika ada
     if currentSeat then
@@ -1055,15 +1062,10 @@ local function makeInvisible()
     stopSeatReturnHeartbeat()
     isSeatActive = false
 
-    -- Simpan posisi asli untuk fallback
-    local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then
-        print("[Stealth] Cannot make invisible: No HumanoidRootPart")
-        return
-    end
+    -- Simpan posisi saat ini (posisi atas) untuk fallback void
     local savedpos = humanoidRootPart.CFrame
 
-    -- Teleport ke posisi seat
+    -- Teleport ke posisi seat (metode standar)
     pcall(function() localCharacter:MoveTo(seatTeleportPosition) end)
     task.wait(0.05)
 
@@ -1092,7 +1094,8 @@ local function makeInvisible()
         seatWeld.Part1 = torso
         seatWeld.Parent = Seat
         task.wait()
-        pcall(function() Seat.CFrame = savedpos end)
+        -- Set posisi seat ke target akhir (tanah), bukan ke posisi atas
+        pcall(function() Seat.CFrame = targetFinalPos end)
         currentSeat = Seat
         startSeatReturnHeartbeat()
         isSeatActive = true
@@ -1102,10 +1105,10 @@ local function makeInvisible()
         return
     end
 
-    -- Set transparency (default 0.75 dari script referensi)
+    -- Set transparency
     setCharacterTransparency(0.75)
     isInvisible = true
-    print("[Stealth] Invisibility enabled (seat method)")
+    print("[Stealth] Invisibility enabled (seat method with jump 90 studs)")
 end
 
 -- ** Fungsi makeVisible (mengembalikan karakter ke normal) **
@@ -1144,7 +1147,7 @@ local function startStealthMonitor()
             makeVisible()
         end
     end)
-    print("[Stealth] Stealth monitor started (seat method)")
+    print("[Stealth] Stealth monitor started (seat method with 90 studs jump)")
 end
 
 local function stopStealthMonitor()
@@ -1155,7 +1158,6 @@ local function stopStealthMonitor()
     makeVisible()
     print("[Stealth] Stealth monitor stopped")
 end
-
 -- ============================================================================
 -- FEATURE 6: GOD MODE (UNCHANGED)
 -- ============================================================================

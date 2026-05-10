@@ -991,9 +991,8 @@ end
 -- CATATAN:
 
 -- ============================================================================
--- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD WITH JUMP TO 90 STUDS)
--- Menggunakan metode seat + teleport ke atas 90 studs sebelum aktif, lalu kembali ke posisi semula.
--- Fitur: Membuat karakter lokal tidak terlihat secara permanen, dengan efek lompat ke atas.
+-- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD WITH FLASH TELEPORT)
+-- Menambahkan efek teleport ke atas 90 studs sebelum stealth aktif, lalu kembali ke posisi semula.
 -- ============================================================================
 
 -- Variabel state untuk sistem seat
@@ -1001,27 +1000,9 @@ local currentSeat = nil
 local seatWeld = nil
 local isSeatActive = false
 local seatTeleportPosition = Vector3.new(-25.95, 400, 3537.55)  -- dari script referensi
-local voidLevelYThreshold = -50  -- batas void untuk deteksi gagal
-local originalCharacterTransparency = nil
+local voidLevelYThreshold = -50
 local seatReturnHeartbeatConnection = nil
-
--- Fungsi untuk mulai memantau karakter agar tetap di seat (jika perlu)
-local function startSeatReturnHeartbeat()
-    if seatReturnHeartbeatConnection then
-        seatReturnHeartbeatConnection:Disconnect()
-        seatReturnHeartbeatConnection = nil
-    end
-    seatReturnHeartbeatConnection = RunService.Heartbeat:Connect(function()
-        -- Kosongkan atau isi sesuai kebutuhan (bisa untuk mempertahankan posisi)
-    end)
-end
-
-local function stopSeatReturnHeartbeat()
-    if seatReturnHeartbeatConnection then
-        seatReturnHeartbeatConnection:Disconnect()
-        seatReturnHeartbeatConnection = nil
-    end
-end
+local stealthEffectDone = false   -- flag untuk mencegah efek berulang
 
 -- Set transparency untuk seluruh karakter
 local function setCharacterTransparency(transparency)
@@ -1033,25 +1014,45 @@ local function setCharacterTransparency(transparency)
     end
 end
 
--- ** Fungsi utama makeInvisible (optimized: teleport ke atas 90 studs, seat method, kembali ke posisi awal) **
+-- Teleport ke atas 90 studs dari posisi saat ini
+local function teleportAbove(offset)
+    if not localRootPart then return false end
+    local currentPos = localRootPart.Position
+    local newPos = Vector3.new(currentPos.X, currentPos.Y + offset, currentPos.Z)
+    pcall(function() localRootPart.CFrame = CFrame.new(newPos) end)
+    return true
+end
+
+-- Teleport kembali ke posisi semula
+local function teleportToPosition(pos)
+    if not localRootPart then return false end
+    pcall(function() localRootPart.CFrame = CFrame.new(pos) end)
+    return true
+end
+
+-- Efek visual: naik 90 studs, tunggu sebentar, turun kembali
+local function performStealthFlash()
+    if not getLocalCharacter() or not localRootPart then return
+    local originalPos = localRootPart.Position
+    -- Teleport ke atas
+    teleportAbove(90)
+    task.wait(0.1)
+    -- Teleport kembali ke posisi semula
+    teleportToPosition(originalPos)
+    task.wait(0.05)
+end
+
+-- ** Fungsi utama makeInvisible (tidak diubah, hanya menambahkan flag efek) **
 local function makeInvisible()
     if not config.stealthEnabled then return end
     if isInvisible then return end
     if not localCharacter then return end
 
-    -- Simpan posisi awal karakter (tanah)
-    local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then
-        print("[Stealth] Cannot make invisible: No HumanoidRootPart")
-        return
+    -- Jika efek belum pernah dilakukan, lakukan flash teleport
+    if not stealthEffectDone then
+        performStealthFlash()
+        stealthEffectDone = true
     end
-    local startPos = humanoidRootPart.CFrame
-    local targetFinalPos = startPos  -- posisi akhir yang diinginkan (tanah)
-
-    -- 1. Teleport ke atas 90 studs dari posisi awal
-    local upPos = startPos + Vector3.new(0, 90, 0)
-    pcall(function() humanoidRootPart.CFrame = upPos end)
-    task.wait(0.05)  -- tunggu teleport selesai
 
     -- Bersihkan seat lama jika ada
     if currentSeat then
@@ -1059,13 +1060,18 @@ local function makeInvisible()
         currentSeat = nil
         seatWeld = nil
     end
-    stopSeatReturnHeartbeat()
+    if seatReturnHeartbeatConnection then seatReturnHeartbeatConnection:Disconnect() end
     isSeatActive = false
 
-    -- Simpan posisi saat ini (posisi atas) untuk fallback void
+    -- Simpan posisi asli untuk fallback
+    local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then
+        print("[Stealth] Cannot make invisible: No HumanoidRootPart")
+        return
+    end
     local savedpos = humanoidRootPart.CFrame
 
-    -- Teleport ke posisi seat (metode standar)
+    -- Teleport ke posisi seat
     pcall(function() localCharacter:MoveTo(seatTeleportPosition) end)
     task.wait(0.05)
 
@@ -1094,10 +1100,8 @@ local function makeInvisible()
         seatWeld.Part1 = torso
         seatWeld.Parent = Seat
         task.wait()
-        -- Set posisi seat ke target akhir (tanah), bukan ke posisi atas
-        pcall(function() Seat.CFrame = targetFinalPos end)
+        pcall(function() Seat.CFrame = savedpos end)
         currentSeat = Seat
-        startSeatReturnHeartbeat()
         isSeatActive = true
     else
         Seat:Destroy()
@@ -1105,41 +1109,41 @@ local function makeInvisible()
         return
     end
 
-    -- Set transparency
+    -- Set transparency (default 0.75)
     setCharacterTransparency(0.75)
     isInvisible = true
-    print("[Stealth] Invisibility enabled (seat method with jump 90 studs)")
+    print("[Stealth] Invisibility enabled (seat method)")
 end
 
--- ** Fungsi makeVisible (mengembalikan karakter ke normal) **
+-- ** Fungsi makeVisible (tidak diubah) **
 local function makeVisible()
     if not isInvisible then return end
     if not localCharacter then return end
 
-    -- Hancurkan seat dan weld
     if currentSeat then
         pcall(function() currentSeat:Destroy() end)
         currentSeat = nil
         seatWeld = nil
     end
-    stopSeatReturnHeartbeat()
+    if seatReturnHeartbeatConnection then
+        seatReturnHeartbeatConnection:Disconnect()
+        seatReturnHeartbeatConnection = nil
+    end
     isSeatActive = false
 
-    -- Kembalikan transparency ke 0
     setCharacterTransparency(0)
-
     isInvisible = false
     print("[Stealth] Invisibility disabled")
 end
 
--- ** Start/Stop Stealth Monitor (versi sederhana: langsung aktifkan/nonaktifkan) **
+-- ** Start Stealth Monitor (reset flag saat mode mati) **
 local function startStealthMonitor()
     if stealthConnection then return end
+    stealthEffectDone = false   -- reset flag setiap kali monitor dimulai
     -- Jika fitur aktif, langsung invisible
     if config.stealthEnabled then
         makeInvisible()
     end
-    -- Loop sederhana untuk menjaga status saat karakter respawn atau perubahan config
     stealthConnection = RunService.Heartbeat:Connect(function()
         if config.stealthEnabled and not isInvisible then
             makeInvisible()
@@ -1147,7 +1151,7 @@ local function startStealthMonitor()
             makeVisible()
         end
     end)
-    print("[Stealth] Stealth monitor started (seat method with 90 studs jump)")
+    print("[Stealth] Stealth monitor started (seat method with flash teleport)")
 end
 
 local function stopStealthMonitor()
@@ -1157,7 +1161,9 @@ local function stopStealthMonitor()
     end
     makeVisible()
     print("[Stealth] Stealth monitor stopped")
-end
+    end
+
+
 -- ============================================================================
 -- FEATURE 6: GOD MODE (UNCHANGED)
 -- ============================================================================

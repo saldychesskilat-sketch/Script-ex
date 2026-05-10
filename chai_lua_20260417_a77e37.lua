@@ -892,39 +892,46 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - ALWAYS ACTIVE)
--- Menggunakan metode TranslateBy dari TpWalk (bypass anti-cheat)
--- Tidak ada trigger jarak, aktif terus saat fitur dinyalakan.
+-- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - BLINK / HIGH SPEED)
+-- Menggunakan metode TranslateBy dengan kecepatan tinggi (efek seperti blink)
+-- Kecepatan dapat diatur via config.tpwalkSpeed (default 30)
 -- ============================================================================
 
 -- Variabel untuk TPWalk (mirip dengan file referensi)
 local tpwalking = false
-local tpwalkSpeed = 4          -- kecepatan default, bisa diubah via config jika perlu
+local tpwalkSpeed = 20         -- kecepatan tinggi (default 30, bisa diubah via config)
 local tpwalkConnection = nil
-local tpwalkThread = nil
 
--- Fungsi TPWalk utama (menggunakan TranslateBy seperti di file)
+-- Fungsi TPWalk utama (menggunakan TranslateBy dengan multiplier besar)
 local function startTPWalk(speed)
     if tpwalking then return end
     tpwalking = true
     local char = localCharacter
     local hum = char and char:FindFirstChildWhichIsA("Humanoid")
     if not hum then return end
-    
+
     tpwalkConnection = RunService.Heartbeat:Connect(function()
         if not tpwalking then return end
         if not config.speedBoostEnabled then return end
         if not localCharacter or not localHumanoid or not localRootPart then return end
+
         local moveDir = localHumanoid.MoveDirection
         if moveDir.Magnitude > 0 then
+            -- Gunakan delta time untuk kecepatan konstan
+            local delta = RunService.Heartbeat:Wait()
+            -- Kecepatan efektif: speed * delta * multiplier (multiplier 50 untuk efek blink / super cepat)
+            local step = moveDir * speed * delta * 50
             pcall(function()
-                localCharacter:TranslateBy(moveDir * tpwalkSpeed * task.wait() * 10)
+                localCharacter:TranslateBy(step)
             end)
         end
+
+        -- Cek jika karakter berubah atau mati
         if not localCharacter or localCharacter ~= char then
             stopTPWalk()
         end
     end)
+    print("[SpeedBoost] TPWalk aktif dengan kecepatan " .. speed)
 end
 
 local function stopTPWalk()
@@ -935,12 +942,11 @@ local function stopTPWalk()
     tpwalking = false
 end
 
--- Fungsi untuk mereset TPWalk saat karakter berganti (mirip event CharacterAdded di file)
+-- Fungsi untuk mereset TPWalk saat karakter berganti
 local function onCharacterAddedForTPWalk()
     if config.speedBoostEnabled then
         stopTPWalk()
-        -- Tunggu sebentar agar karakter stabil
-        task.wait(0.5)
+        task.wait(0.2)
         startTPWalk(tpwalkSpeed)
     end
 end
@@ -980,6 +986,14 @@ local function stopSpeedBoostMonitor()
     stopTPWalk()
     print("[SpeedBoost] TPWalk stopped")
 end
+
+-- ============================================================================
+-- CATATAN:
+-- - Kecepatan default 30, bisa diubah dengan mengubah variabel tpwalkSpeed.
+-- - Multiplier 50 memberikan efek lari super cepat (seperti blink).
+-- - Gunakan delta time untuk kecepatan konsisten di berbagai frame rate.
+-- - Fungsi applySpeedBoost tetap ada untuk kompatibilitas.
+-- ============================================================================
 
 
 -- ============================================================================

@@ -1163,24 +1163,21 @@ end
 
 -- ============================================================================
 -- FEATURE 6: GOD MODE (HEALTH REGEN + STEALTH WITH DISTANCE TRIGGER)
--- Menggabungkan health regeneration dengan stealth yang hanya aktif saat killer
--- dalam jarak ≤ config.stealthTriggerDistance (default 20 studs)
--- Stealth nonaktif saat jarak > config.stealthTriggerDistance
--- Mekanisme stealth menggunakan seat method + pre-teleport (tidak diubah)
+-- Mengaktifkan stealth monitor (startStealthMonitor) saat killer dalam jarak ≤ threshold,
+-- dan menonaktifkannya (stopStealthMonitor) saat killer menjauh.
 -- ============================================================================
 
--- Variabel untuk koneksi god mode (health regen + stealth trigger)
 local godModeConnection = nil
-local stealthTriggerConnection = nil
+local stealthDistanceConnection = nil
+local isStealthMonitorActive = false
 
 -- Konfigurasi jarak trigger stealth (dapat diubah via config)
 if config.stealthTriggerDistance == nil then
     config.stealthTriggerDistance = 20   -- jarak dalam studs
 end
 
--- Fungsi untuk mengecek jarak killer dan mengaktifkan/menonaktifkan stealth
-local function checkKillerDistanceAndToggleStealth()
-    -- Pastikan fitur god mode aktif dan karakter tersedia
+-- Fungsi untuk mengecek jarak killer dan mengaktifkan/menonaktifkan stealth monitor
+local function checkKillerDistanceForStealth()
     if not config.godModeEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
     
@@ -1191,7 +1188,6 @@ local function checkKillerDistanceAndToggleStealth()
         if player ~= localPlayer then
             local char = player.Character
             if char then
-                -- Deteksi killer berdasarkan team atau weapon
                 local isKiller = false
                 if player.Team then
                     local teamName = player.Team.Name:lower()
@@ -1218,30 +1214,25 @@ local function checkKillerDistanceAndToggleStealth()
         end
     end
     
-    -- Trigger stealth hanya jika dalam jarak yang ditentukan
     if nearestKillerDistance <= config.stealthTriggerDistance then
-        if not isInvisible then
-            -- Pastikan karakter masih ada sebelum memanggil makeInvisible
-            if localCharacter then
-                makeInvisible()
-                print("[GodMode] Stealth activated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
-            end
+        if not isStealthMonitorActive then
+            startStealthMonitor()   -- mengaktifkan stealth (makeInvisible)
+            isStealthMonitorActive = true
+            print("[GodMode] Stealth activated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
         end
     else
-        if isInvisible then
-            if localCharacter then
-                makeVisible()
-                print("[GodMode] Stealth deactivated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
-            end
+        if isStealthMonitorActive then
+            stopStealthMonitor()    -- menonaktifkan stealth (makeVisible)
+            isStealthMonitorActive = false
+            print("[GodMode] Stealth deactivated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
         end
     end
 end
 
--- Fungsi startGodMode (mengaktifkan health regen + stealth trigger)
 local function startGodMode()
     if godModeConnection then return end
     
-    -- 1. Aktifkan health regen (god mode)
+    -- Health regen (god mode)
     godModeConnection = RunService.Heartbeat:Connect(function()
         if not config.godModeEnabled then return end
         if not getLocalCharacter() or not localHumanoid then return end
@@ -1251,41 +1242,28 @@ local function startGodMode()
         end
     end)
     
-    -- 2. Aktifkan stealth trigger (berbasis jarak killer)
-    if stealthTriggerConnection then stealthTriggerConnection:Disconnect() end
-    stealthTriggerConnection = RunService.Heartbeat:Connect(checkKillerDistanceAndToggleStealth)
+    -- Stealth trigger based on killer distance
+    if stealthDistanceConnection then stealthDistanceConnection:Disconnect() end
+    stealthDistanceConnection = RunService.Heartbeat:Connect(checkKillerDistanceForStealth)
     
     print("[GodMode] Activated: Health regen + Stealth (auto on/off when killer ≤ " .. config.stealthTriggerDistance .. " studs)")
 end
 
--- Fungsi stopGodMode (menonaktifkan health regen + stealth trigger)
 local function stopGodMode()
-    -- 1. Hentikan health regen
     if godModeConnection then
         godModeConnection:Disconnect()
         godModeConnection = nil
     end
-    
-    -- 2. Hentikan stealth trigger dan pastikan karakter visible
-    if stealthTriggerConnection then
-        stealthTriggerConnection:Disconnect()
-        stealthTriggerConnection = nil
+    if stealthDistanceConnection then
+        stealthDistanceConnection:Disconnect()
+        stealthDistanceConnection = nil
     end
-    if isInvisible then
-        makeVisible()
+    if isStealthMonitorActive then
+        stopStealthMonitor()
+        isStealthMonitorActive = false
     end
-    
     print("[GodMode] Deactivated: Health regen and stealth stopped")
 end
-
--- ============================================================================
--- CATATAN PERBAIKAN:
--- - Menambahkan pengecekan `localCharacter` sebelum memanggil `makeInvisible()` / `makeVisible()`.
--- - Memastikan `getLocalCharacter()` dan `localRootPart` sudah valid sebelum mengakses posisi.
--- - Menambahkan jeda implisit melalui `task.spawn` jika diperlukan? Tidak, karena tidak ada delay.
--- - Mencetak log saat stealth aktif/nonaktif untuk debugging (opsional).
--- - Semua fungsi asli `makeInvisible()` dan `makeVisible()` dipertahankan dari FEATURE 5.
--- ============================================================================
 
 
 -- ============================================================================

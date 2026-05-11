@@ -1180,6 +1180,7 @@ end
 
 -- Fungsi untuk mengecek jarak killer dan mengaktifkan/menonaktifkan stealth
 local function checkKillerDistanceAndToggleStealth()
+    -- Pastikan fitur god mode aktif dan karakter tersedia
     if not config.godModeEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
     
@@ -1220,13 +1221,18 @@ local function checkKillerDistanceAndToggleStealth()
     -- Trigger stealth hanya jika dalam jarak yang ditentukan
     if nearestKillerDistance <= config.stealthTriggerDistance then
         if not isInvisible then
-            makeInvisible()   -- fungsi asli dari bagian STEALTH INVISIBILITY
-            print("[GodMode] Stealth activated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
+            -- Pastikan karakter masih ada sebelum memanggil makeInvisible
+            if localCharacter then
+                makeInvisible()
+                print("[GodMode] Stealth activated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
+            end
         end
     else
         if isInvisible then
-            makeVisible()     -- fungsi asli dari bagian STEALTH INVISIBILITY
-            print("[GodMode] Stealth deactivated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
+            if localCharacter then
+                makeVisible()
+                print("[GodMode] Stealth deactivated (killer distance: " .. string.format("%.1f", nearestKillerDistance) .. " studs)")
+            end
         end
     end
 end
@@ -1273,21 +1279,14 @@ local function stopGodMode()
 end
 
 -- ============================================================================
--- CATATAN:
--- - Fungsi makeInvisible() dan makeVisible() diambil dari bagian STEALTH INVISIBILITY yang sudah ada.
--- - Tidak ada perubahan pada mekanisme seat method + pre-teleport.
--- - Stealth hanya aktif saat jarak killer ≤ config.stealthTriggerDistance (default 20 studs).
--- - Nilai trigger dapat diubah dengan mengedit config.stealthTriggerDistance.
--- - Koneksi stealth trigger berjalan independen, tidak mengganggu fitur lain.
+-- CATATAN PERBAIKAN:
+-- - Menambahkan pengecekan `localCharacter` sebelum memanggil `makeInvisible()` / `makeVisible()`.
+-- - Memastikan `getLocalCharacter()` dan `localRootPart` sudah valid sebelum mengakses posisi.
+-- - Menambahkan jeda implisit melalui `task.spawn` jika diperlukan? Tidak, karena tidak ada delay.
+-- - Mencetak log saat stealth aktif/nonaktif untuk debugging (opsional).
+-- - Semua fungsi asli `makeInvisible()` dan `makeVisible()` dipertahankan dari FEATURE 5.
 -- ============================================================================
 
-
-
--- ** Fungsi baru: Mendapatkan item Parry yang tersedia (Blade, Parry Dagger, Parrying Dagger) **
-
-  --  local itemNames = {"Blade", "Parry Dagger", "Parrying Dagger"}
-    -- Cari di karakter dulu
-    
 
 -- ============================================================================
 -- FEATURE 7: AUTO PARRY / AUTO BLOCK (OPTIMIZED - RELIABLE, 2x PER SECOND)

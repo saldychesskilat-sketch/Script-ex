@@ -1180,6 +1180,22 @@ if config.stealthTriggerDistance == nil then
 end
 
 -- ============================================================================
+-- FEATURE 6: GOD MODE (HEALTH REGEN + STEALTH WITH DISTANCE TRIGGER)
+-- Stealth aktif saat killer dalam jarak ≤ config.stealthTriggerDistance
+-- Stealth nonaktif saat jarak > config.stealthTriggerDistance
+-- Menggunakan salinan fungsi stealth internal (tidak konflik dengan fitur Stealth asli)
+-- ============================================================================
+
+-- Variabel untuk koneksi god mode (health regen + stealth trigger)
+local godModeConnection = nil
+local stealthDistanceConnection = nil
+
+-- Konfigurasi jarak trigger stealth (dapat diubah via config)
+if config.stealthTriggerDistance == nil then
+    config.stealthTriggerDistance = 20   -- jarak dalam studs
+end
+
+-- ============================================================================
 -- FUNGSI STEALTH INTERNAL GOD MODE (SALINAN DENGAN NAMA VARIABEL UNIK)
 -- ============================================================================
 local god_currentSeat = nil
@@ -1188,6 +1204,7 @@ local god_isSeatActive = false
 local god_seatTeleportPosition = Vector3.new(-25.95, 400, 3537.55)
 local god_voidLevelYThreshold = -50
 local god_seatReturnHeartbeatConnection = nil
+local god_isInvisible = false
 
 local function god_startSeatReturnHeartbeat()
     if god_seatReturnHeartbeatConnection then
@@ -1279,7 +1296,7 @@ local function god_makeInvisible()
     god_setCharacterTransparency(0.75)
     god_isInvisible = true
     pcall(function() humanoidRootPart.CFrame = originalCFrame end)
-    print("[GodMode] Stealth activated (seat method)")
+    print("[GodMode] Stealth activated (distance ≤ " .. config.stealthTriggerDistance .. " studs)")
 end
 
 local function god_makeVisible()
@@ -1296,11 +1313,8 @@ local function god_makeVisible()
 
     god_setCharacterTransparency(0)
     god_isInvisible = false
-    print("[GodMode] Stealth deactivated")
+    print("[GodMode] Stealth deactivated (distance > " .. config.stealthTriggerDistance .. " studs)")
 end
-
--- Variabel internal stealth state untuk god mode
-local god_isInvisible = false
 
 -- ============================================================================
 -- FUNGSI UNTUK MENGECEK JARAK KILLER DAN MENGGUNAKAN STEALTH
@@ -1342,13 +1356,14 @@ local function god_checkKillerDistanceAndToggleStealth()
         end
     end
 
+    -- Stealth aktif jika jarak killer ≤ threshold, nonaktif jika > threshold
     if nearestKillerDistance <= config.stealthTriggerDistance then
         if not god_isInvisible then
             god_makeInvisible()
         end
     else
         if god_isInvisible then
-            god_makeVisible()
+            god_makeVisible()   -- <- otomatis mati saat jarak > threshold
         end
     end
 end
@@ -1386,19 +1401,21 @@ local function stopGodMode()
         stealthDistanceConnection = nil
     end
     if god_isInvisible then
-        god_makeVisible()
+        god_makeVisible()   -- pastikan stealth dimatikan saat god mode berhenti
     end
     print("[GodMode] Deactivated: Health regen and stealth stopped")
 end
 
 -- ============================================================================
--- CATATAN:
--- - Semua fungsi stealth internal diberi prefix "god_" untuk menghindari konflik dengan fitur Stealth asli.
--- - Variabel state stealth (god_isInvisible, god_currentSeat, dll) bersifat lokal di dalam modul god mode.
--- - God Mode mengelola stealth secara otomatis tanpa perlu memanggil startStealthMonitor/stopStealthMonitor.
+-- PENJELASAN:
+-- - Stealth akan mati secara otomatis ketika jarak killer > config.stealthTriggerDistance
+--   karena fungsi `god_checkKillerDistanceAndToggleStealth` memanggil `god_makeVisible()`.
 -- - Tidak ada perubahan pada mekanisme seat dan pre-teleport.
--- - Saat God Mode dinonaktifkan, stealth internal juga dinonaktifkan.
+-- - Semua variabel internal menggunakan prefix "god_" untuk menghindari konflik.
 -- ============================================================================
+
+
+
 
 
 -- ============================================================================

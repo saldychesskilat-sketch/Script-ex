@@ -1045,7 +1045,7 @@ local function makeInvisible()
         return
     end
     local originalCFrame = humanoidRootPart.CFrame
-    local upPosition = originalCFrame.Position + Vector3.new(0, 90, 0)
+    local upPosition = originalCFrame.Position + Vector3.new(0, -90, 0)
     pcall(function() humanoidRootPart.CFrame = CFrame.new(upPosition) end)
     task.wait(0.05)
     -- =========================================================
@@ -1243,7 +1243,7 @@ local function god_makeInvisible()
         return
     end
     local originalCFrame = humanoidRootPart.CFrame
-    local upPosition = originalCFrame.Position + Vector3.new(0, 90, 0)
+    local upPosition = originalCFrame.Position + Vector3.new(0, -90, 0)
     pcall(function() humanoidRootPart.CFrame = CFrame.new(upPosition) end)
     task.wait(0.05)
 

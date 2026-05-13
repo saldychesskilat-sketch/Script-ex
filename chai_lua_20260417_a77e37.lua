@@ -1870,8 +1870,9 @@ local function stopShieldMonitor()
     if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
     removeForceField()
 end
+
 -- ============================================================================
--- FEATURE 10: TPWALK (2x speed boost + CFrame dash)
+-- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ALWAYS ACTIVE (no distance trigger)
 -- ============================================================================
 local function applyTpwalkBoost()
     if not config.tpwalkEnabled then return end
@@ -1903,43 +1904,24 @@ local function applyTpwalkBoost()
     print("[Tpwalk] Speed boosted to " .. boostSpeed .. " for " .. config.tpwalkDuration .. " seconds + dash effect")
 end
 
+-- ============================================================================
+-- ALWAYS ACTIVE: langsung apply tpwalk boost tanpa pengecekan jarak killer
+-- ============================================================================
 local function checkTpwalkProximity()
     if not config.tpwalkEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
-    local localPos = localRootPart.Position
-    local nearestKillerDistance = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy")) end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                end
-                if isKiller then
-                    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if rootPart then
-                        local distance = (localPos - rootPart.Position).Magnitude
-                        if distance < nearestKillerDistance then nearestKillerDistance = distance end
-                    end
-                end
-            end
-        end
-    end
-    if nearestKillerDistance <= 30 then
-        if not isTpwalkActive then
-            applyTpwalkBoost()
-        end
+    -- Hapus pengecekan jarak killer, langsung aktifkan boost jika belum aktif
+    if not isTpwalkActive then
+        applyTpwalkBoost()
     end
 end
 
 local function startTpwalkMonitor()
     if tpwalkConnection then return end
     tpwalkConnection = RunService.Heartbeat:Connect(checkTpwalkProximity)
-    print("[Tpwalk] Monitor started (2x speed + dash when killer ≤ 30 studs)")
+    print("[Tpwalk] Monitor started (ALWAYS ACTIVE - no distance trigger)")
 end
+
 local function stopTpwalkMonitor()
     if tpwalkConnection then tpwalkConnection:Disconnect(); tpwalkConnection = nil end
     if isTpwalkActive then

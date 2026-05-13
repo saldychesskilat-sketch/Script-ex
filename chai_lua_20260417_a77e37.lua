@@ -892,17 +892,19 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - BLINK / HIGH SPEED)
--- Menggunakan metode TranslateBy dengan kecepatan tinggi (efek seperti blink)
--- Kecepatan dapat diatur via config.tpwalkSpeed (default 30)
+-- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - CFrame BASED, REAL-TIME, LIGHTWEIGHT)
+-- Menggunakan metode CFrame addition pada HumanoidRootPart setiap frame (RenderStepped)
+-- Kecepatan dapat diatur via config.tpwalkSpeed (default 45, super cepat)
+-- Tetap aktif meskipun ada animasi lari karena langsung memanipulasi CFrame
 -- ============================================================================
 
--- Variabel untuk TPWalk (mirip dengan file referensi)
+-- Variabel untuk TPWalk
 local tpwalking = false
-local tpwalkSpeed = 20         -- kecepatan tinggi (default 30, bisa diubah via config)
+local tpwalkSpeed = 45           -- kecepatan tinggi (bisa diatur)
 local tpwalkConnection = nil
+local lastMoveDir = Vector3.zero
 
--- Fungsi TPWalk utama (menggunakan TranslateBy dengan multiplier besar)
+-- Fungsi TPWalk utama (menggunakan CFrame addition pada setiap frame)
 local function startTPWalk(speed)
     if tpwalking then return end
     tpwalking = true
@@ -910,20 +912,26 @@ local function startTPWalk(speed)
     local hum = char and char:FindFirstChildWhichIsA("Humanoid")
     if not hum then return end
 
-    tpwalkConnection = RunService.Heartbeat:Connect(function()
+    -- Gunakan RenderStepped untuk responsif terhadap frame rate
+    tpwalkConnection = RunService.RenderStepped:Connect(function(deltaTime)
         if not tpwalking then return end
         if not config.speedBoostEnabled then return end
         if not localCharacter or not localHumanoid or not localRootPart then return end
 
         local moveDir = localHumanoid.MoveDirection
-        if moveDir.Magnitude > 0 then
-            -- Gunakan delta time untuk kecepatan konstan
-            local delta = RunService.Heartbeat:Wait()
-            -- Kecepatan efektif: speed * delta * multiplier (multiplier 50 untuk efek blink / super cepat)
-            local step = moveDir * speed * delta * 50
+        if moveDir.Magnitude > 0.1 then
+            lastMoveDir = moveDir
+            -- Hitung perpindahan: kecepatan (studs per detik) dikali deltaTime
+            local step = moveDir * speed * deltaTime
+            -- Terapkan perpindahan ke CFrame (menambah posisi)
+            local newCFrame = localRootPart.CFrame + step
             pcall(function()
-                localCharacter:TranslateBy(step)
+                localRootPart.CFrame = newCFrame
             end)
+        elseif lastMoveDir.Magnitude > 0 then
+            -- Jika baru berhenti bergerak, tetap gunakan arah terakhir untuk sedikit slide (opsional)
+            -- Biarkan saja, tidak perlu tambahan
+            lastMoveDir = Vector3.zero
         end
 
         -- Cek jika karakter berubah atau mati
@@ -931,7 +939,7 @@ local function startTPWalk(speed)
             stopTPWalk()
         end
     end)
-    print("[SpeedBoost] TPWalk aktif dengan kecepatan " .. speed)
+    print("[SpeedBoost] TPWalk (CFrame) aktif dengan kecepatan " .. speed .. " studs/s")
 end
 
 local function stopTPWalk()
@@ -954,7 +962,6 @@ end
 -- Speed boost utama (tidak dipakai lagi, tapi dipertahankan untuk kompatibilitas)
 local function applySpeedBoost()
     -- Tidak digunakan karena kita menggunakan TPWalk yang aktif terus.
-    -- Biarkan kosong agar tidak error jika ada panggilan.
 end
 
 -- Monitor utama (sekarang hanya mengaktifkan/menonaktifkan TPWalk)
@@ -975,7 +982,7 @@ local function startSpeedBoostMonitor()
     end)
     -- Pasang event untuk karakter baru
     localPlayer.CharacterAdded:Connect(onCharacterAddedForTPWalk)
-    print("[SpeedBoost] TPWalk always active (speed = " .. tpwalkSpeed .. ")")
+    print("[SpeedBoost] TPWalk (CFrame) always active (speed = " .. tpwalkSpeed .. ")")
 end
 
 local function stopSpeedBoostMonitor()
@@ -988,7 +995,11 @@ local function stopSpeedBoostMonitor()
 end
 
 -- ============================================================================
--- CATATAN:
+-- CATATAN: Penggunaan CFrame addition pada HumanoidRootPart setiap frame
+-- memberikan kecepatan konstan dan tidak terganggu oleh animasi lari.
+-- RenderStepped memastikan pergerakan halus dan responsif.
+-- Kecepatan default 45 studs/detik (sangat cepat), bisa diubah via config.tpwalkSpeed.
+-- ============================================================================
 
 -- ============================================================================
 -- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD + PRE-TELEPORT)

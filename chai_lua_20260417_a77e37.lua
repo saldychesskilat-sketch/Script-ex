@@ -890,156 +890,214 @@ end
 -- ============================================================================
 -- FUNGSI UNTUK MENGGANTI YANG LAMA (PANGGIL startESP() SAAT INISIALISASI)
 -- ============================================================================
-
-
-        
-
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - CFrame BASED, REAL-TIME, LIGHTWEIGHT)
--- Menggunakan metode CFrame addition pada HumanoidRootPart setiap frame (RenderStepped)
--- Kecepatan dapat diatur via config.tpwalkSpeed (default 45, super cepat)
--- Tetap aktif meskipun ada animasi lari karena langsung memanipulasi CFrame
--- OPTIMIZED VERSION
+-- FEATURE 4: SPEED BOOST + TPWALK
+-- ADVANCED OPTIMIZED VERSION (ANTI CONFLICT)
+-- Menggunakan namespace khusus agar tidak bentrok dengan feature lain
+-- Menggunakan PivotTo untuk movement lebih stabil
 -- ============================================================================
 
--- Variabel untuk TPWalk
-local tpwalking = false
-local tpwalkSpeed = 45           -- kecepatan tinggi (bisa diatur)
-local tpwalkConnection = nil
-local lastMoveDir = Vector3.zero
+-- ============================================================================
+-- TPWALK NAMESPACE
+-- ============================================================================
 
--- Fungsi TPWalk utama (menggunakan CFrame addition pada setiap frame)
+local TPWALK_SYSTEM = {}
+
+TPWALK_SYSTEM.Active = false
+TPWALK_SYSTEM.Speed = 45
+TPWALK_SYSTEM.Connection = nil
+TPWALK_SYSTEM.LastMoveDirection = Vector3.zero
+TPWALK_SYSTEM.CharacterConnection = nil
+
+-- ============================================================================
+-- FUNGSI UTAMA TPWALK
+-- ============================================================================
+
 local function startTPWalk(speed)
-    if tpwalking then return end
-    tpwalking = true
+
+    if TPWALK_SYSTEM.Active then
+        return
+    end
+
+    TPWALK_SYSTEM.Active = true
 
     local char = localCharacter
     local hum = char and char:FindFirstChildWhichIsA("Humanoid")
 
     if not hum then
-        tpwalking = false
+        TPWALK_SYSTEM.Active = false
         return
     end
 
-    -- Gunakan RenderStepped untuk responsif terhadap frame rate
-    tpwalkConnection = RunService.RenderStepped:Connect(function(deltaTime)
+    -- Gunakan Heartbeat agar sinkron dengan physics Roblox
+    TPWALK_SYSTEM.Connection =
+        RunService.Heartbeat:Connect(function(deltaTime)
 
-        if not tpwalking then return end
-        if not config.speedBoostEnabled then return end
-
-        if not localCharacter or not localHumanoid or not localRootPart then
+        if not TPWALK_SYSTEM.Active then
             return
         end
 
-        -- Pastikan karakter masih valid
+        if not config.speedBoostEnabled then
+            return
+        end
+
+        if not localCharacter
+            or not localHumanoid
+            or not localRootPart then
+            return
+        end
+
+        -- Pastikan humanoid masih hidup
         if localHumanoid.Health <= 0 then
             stopTPWalk()
             return
         end
 
+        -- Ambil arah gerakan
         local moveDir = localHumanoid.MoveDirection
 
         -- Simpan arah terakhir
         if moveDir.Magnitude > 0.05 then
-            lastMoveDir = moveDir.Unit
+            TPWALK_SYSTEM.LastMoveDirection =
+                moveDir.Unit
         end
 
-        -- Jika sedang bergerak
+        -- Jika player bergerak
         if moveDir.Magnitude > 0.05 then
 
-            -- Reset velocity agar tidak dilawan physics Roblox
-            localRootPart.AssemblyLinearVelocity = Vector3.zero
-            localRootPart.Velocity = Vector3.zero
+            -- Velocity correction ringan
+            local currentVelocity =
+                localRootPart.AssemblyLinearVelocity
 
-            -- Multiplier internal supaya efek lebih terasa
-            local boostMultiplier = 1.35
+            localRootPart.AssemblyLinearVelocity =
+                Vector3.new(
+                    currentVelocity.X,
+                    0,
+                    currentVelocity.Z
+                )
+
+            -- Multiplier internal
+            local internalBoostMultiplier = 1.45
 
             -- Hitung perpindahan
-            local step =
-                lastMoveDir *
-                (speed * boostMultiplier) *
+            local movementOffset =
+                TPWALK_SYSTEM.LastMoveDirection *
+                (speed * internalBoostMultiplier) *
                 deltaTime
 
-            -- Tambahkan offset movement
-            local newCFrame =
-                localRootPart.CFrame + step
+            -- Gunakan PivotTo agar lebih stabil
+            local targetCFrame =
+                localRootPart.CFrame + movementOffset
 
-            -- Apply movement
             pcall(function()
-                localRootPart.CFrame = newCFrame
+
+                localCharacter:PivotTo(targetCFrame)
+
             end)
 
-        elseif lastMoveDir.Magnitude > 0 then
+        else
 
-            -- Smooth stop kecil agar tidak terasa kaku
-            lastMoveDir = lastMoveDir:Lerp(Vector3.zero, 0.15)
+            -- Smooth stop
+            TPWALK_SYSTEM.LastMoveDirection =
+                TPWALK_SYSTEM.LastMoveDirection:Lerp(
+                    Vector3.zero,
+                    0.18
+                )
 
         end
 
-        -- Anti stuck kecil
+        -- Anti-air correction
         if localHumanoid.FloorMaterial == Enum.Material.Air then
-            pcall(function()
-                localRootPart.AssemblyLinearVelocity =
-                    Vector3.new(
-                        localRootPart.AssemblyLinearVelocity.X,
-                        0,
-                        localRootPart.AssemblyLinearVelocity.Z
-                    )
-            end)
+
+            local airVelocity =
+                localRootPart.AssemblyLinearVelocity
+
+            localRootPart.AssemblyLinearVelocity =
+                Vector3.new(
+                    airVelocity.X,
+                    0,
+                    airVelocity.Z
+                )
+
         end
 
-        -- Cek jika karakter berubah atau mati
-        if not localCharacter or localCharacter ~= char then
+        -- Character validation
+        if not localCharacter
+            or localCharacter ~= char then
+
             stopTPWalk()
+
         end
 
     end)
 
-    print("[SpeedBoost] TPWalk (CFrame) aktif dengan kecepatan " .. speed .. " studs/s")
+    print(
+        "[SpeedBoost] TPWalk aktif | Speed = "
+        .. tostring(speed)
+    )
+
 end
+
+-- ============================================================================
+-- STOP TPWALK
+-- ============================================================================
 
 local function stopTPWalk()
 
-    if tpwalkConnection then
-        tpwalkConnection:Disconnect()
-        tpwalkConnection = nil
+    if TPWALK_SYSTEM.Connection then
+
+        TPWALK_SYSTEM.Connection:Disconnect()
+        TPWALK_SYSTEM.Connection = nil
+
     end
 
-    tpwalking = false
-    lastMoveDir = Vector3.zero
+    TPWALK_SYSTEM.Active = false
+    TPWALK_SYSTEM.LastMoveDirection = Vector3.zero
 
 end
 
--- Fungsi untuk mereset TPWalk saat karakter berganti
+-- ============================================================================
+-- CHARACTER ADDED
+-- ============================================================================
+
 local function onCharacterAddedForTPWalk()
 
     if config.speedBoostEnabled then
 
         stopTPWalk()
 
-        task.wait(0.2)
+        task.wait(0.25)
 
-        startTPWalk(tpwalkSpeed)
+        startTPWalk(TPWALK_SYSTEM.Speed)
 
     end
 
 end
 
--- Speed boost utama (tidak dipakai lagi, tapi dipertahankan untuk kompatibilitas)
+-- ============================================================================
+-- SPEED BOOST UTAMA
+-- ============================================================================
+
 local function applySpeedBoost()
-    -- Tidak digunakan karena kita menggunakan TPWalk yang aktif terus.
+    -- Kompatibilitas
 end
 
--- Monitor utama (sekarang hanya mengaktifkan/menonaktifkan TPWalk)
+-- ============================================================================
+-- MONITOR UTAMA
+-- ============================================================================
+
 local function startSpeedBoostMonitor()
 
-    if currentBoostConnection then return end
+    if currentBoostConnection then
+        return
+    end
 
-    currentBoostConnection = RunService.Heartbeat:Connect(function()
+    currentBoostConnection =
+        RunService.Heartbeat:Connect(function()
 
         if not config.speedBoostEnabled then
 
-            if tpwalking then
+            if TPWALK_SYSTEM.Active then
                 stopTPWalk()
             end
 
@@ -1050,32 +1108,57 @@ local function startSpeedBoostMonitor()
             or not localHumanoid
             or not localRootPart then
 
-            if tpwalking then
+            if TPWALK_SYSTEM.Active then
                 stopTPWalk()
             end
 
             return
         end
 
-        -- Pastikan TPWalk selalu aktif
-        if not tpwalking then
-            startTPWalk(tpwalkSpeed)
+        -- Pastikan TPWalk aktif
+        if not TPWALK_SYSTEM.Active then
+
+            startTPWalk(TPWALK_SYSTEM.Speed)
+
         end
 
     end)
 
-    -- Pasang event untuk karakter baru
-    localPlayer.CharacterAdded:Connect(onCharacterAddedForTPWalk)
+    -- Hindari connection duplicate
+    if TPWALK_SYSTEM.CharacterConnection then
+        TPWALK_SYSTEM.CharacterConnection:Disconnect()
+    end
 
-    print("[SpeedBoost] TPWalk (CFrame) always active (speed = " .. tpwalkSpeed .. ")")
+    TPWALK_SYSTEM.CharacterConnection =
+        localPlayer.CharacterAdded:Connect(
+            onCharacterAddedForTPWalk
+        )
+
+    print(
+        "[SpeedBoost] TPWalk Monitor Active | Speed = "
+        .. tostring(TPWALK_SYSTEM.Speed)
+    )
 
 end
+
+-- ============================================================================
+-- STOP MONITOR
+-- ============================================================================
 
 local function stopSpeedBoostMonitor()
 
     if currentBoostConnection then
+
         currentBoostConnection:Disconnect()
         currentBoostConnection = nil
+
+    end
+
+    if TPWALK_SYSTEM.CharacterConnection then
+
+        TPWALK_SYSTEM.CharacterConnection:Disconnect()
+        TPWALK_SYSTEM.CharacterConnection = nil
+
     end
 
     stopTPWalk()
@@ -1085,20 +1168,21 @@ local function stopSpeedBoostMonitor()
 end
 
 -- ============================================================================
--- CATATAN OPTIMASI:
+-- CATATAN:
 --
--- 1. Velocity reset ditambahkan agar physics Roblox tidak melawan movement.
--- 2. Menggunakan moveDir.Unit agar arah lebih stabil.
--- 3. Menambahkan boostMultiplier internal supaya speed lebih terasa.
--- 4. Menambahkan smooth stop agar movement tidak patah.
--- 5. Menambahkan anti-air velocity correction.
--- 6. Tetap menggunakan RenderStepped untuk movement realtime.
--- 7. Struktur variabel asli tetap dipertahankan.
+-- 1. Menggunakan namespace TPWALK_SYSTEM agar tidak bentrok.
+-- 2. Menggunakan PivotTo agar movement lebih stabil.
+-- 3. Menggunakan Heartbeat agar sinkron physics.
+-- 4. Menghindari duplicate CharacterAdded connection.
+-- 5. Tidak lagi memakai variable global raw.
+-- 6. Lebih aman terhadap overwrite feature lain.
+-- 7. Struktur utama tetap dipertahankan.
 --
 -- Rekomendasi:
--- tpwalkSpeed = 60  -> smooth
--- tpwalkSpeed = 90  -> cepat
--- tpwalkSpeed = 140 -> blink speed
+--
+-- TPWALK_SYSTEM.Speed = 70   -> Smooth
+-- TPWALK_SYSTEM.Speed = 110  -> Cepat
+-- TPWALK_SYSTEM.Speed = 160  -> Blink
 --
 -- ============================================================================
 -- ============================================================================

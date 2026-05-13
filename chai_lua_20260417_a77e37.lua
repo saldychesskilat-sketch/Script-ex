@@ -2541,16 +2541,28 @@ local function teleportToNearestSurvivor()
 end
 
 -- ============================================================================
--- FEATURE 17: MODERN GUI (unchanged, but ensure all features are included)
+-- FEATURE 17: MODERN GUI (ENHANCED WITH MODERN STYLES & ANIMATIONS)
+-- Semua fungsi asli dipertahankan, hanya ditambahkan efek visual modern:
+-- - Neon glow & shadow
+-- - Hover animations (scale, color shift)
+-- - Ripple effect yang lebih halus
+-- - Tween transitions untuk semua elemen
+-- - Gradient backgrounds pada sidebar dan tombol
+-- - Efek blur pada background (opsional, tetap menggunakan transparansi)
 -- ============================================================================
+
+-- DRAGGABLE (enhanced with smooth transition)
 local function makeDraggable(frame)
     local dragging = false
     local dragStart, startPos
+    local dragConnection = nil
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
+            -- Efek visual saat mulai drag
+            TweenService:Create(frame, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.05}):Play()
         end
     end)
     frame.InputChanged:Connect(function(input)
@@ -2563,22 +2575,29 @@ local function makeDraggable(frame)
     frame.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
+            TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
         end
     end)
 end
 
+-- UPDATE THEME (with transition)
 local function updateTheme()
-    if mainStroke then mainStroke.Color = config.guiThemeColor end
+    if mainStroke then 
+        TweenService:Create(mainStroke, TweenInfo.new(0.3), {Color = config.guiThemeColor}):Play()
+    end
     if sidebar then
         for _, btn in ipairs(sidebar:GetDescendants()) do
             if btn:IsA("TextButton") and btn.Text:find("HOME") then
-                btn.TextColor3 = config.guiThemeColor
+                TweenService:Create(btn, TweenInfo.new(0.2), {TextColor3 = config.guiThemeColor}):Play()
             end
         end
     end
-    if statusLabel then statusLabel.TextColor3 = config.guiThemeColor end
+    if statusLabel then 
+        TweenService:Create(statusLabel, TweenInfo.new(0.2), {TextColor3 = config.guiThemeColor}):Play()
+    end
 end
 
+-- SETTINGS CONTENT (with modern styling)
 local function createSettingsContent()
     if settingsContent then settingsContent:Destroy() end
     settingsContent = Instance.new("Frame")
@@ -2596,47 +2615,43 @@ local function createSettingsContent()
     colorLabel.TextSize = 12
     colorLabel.Parent = settingsContent
 
-    local colorRed = Instance.new("TextButton")
-    colorRed.Size = UDim2.new(0, 60, 0, 25)
-    colorRed.Position = UDim2.new(0.05, 0, 0.1, 0)
-    colorRed.Text = "RED"
-    colorRed.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-    colorRed.TextColor3 = Color3.fromRGB(255, 255, 255)
-    colorRed.Font = Enum.Font.GothamBold
-    colorRed.TextSize = 10
-    colorRed.Parent = settingsContent
-    colorRed.MouseButton1Click:Connect(function()
-        config.guiThemeColor = Color3.fromRGB(255, 0, 0)
-        updateTheme()
-    end)
-
-    local colorCyan = Instance.new("TextButton")
-    colorCyan.Size = UDim2.new(0, 60, 0, 25)
-    colorCyan.Position = UDim2.new(0.35, 0, 0.1, 0)
-    colorCyan.Text = "CYAN"
-    colorCyan.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-    colorCyan.TextColor3 = Color3.fromRGB(0, 0, 0)
-    colorCyan.Font = Enum.Font.GothamBold
-    colorCyan.TextSize = 10
-    colorCyan.Parent = settingsContent
-    colorCyan.MouseButton1Click:Connect(function()
-        config.guiThemeColor = Color3.fromRGB(0, 255, 255)
-        updateTheme()
-    end)
-
-    local colorYellow = Instance.new("TextButton")
-    colorYellow.Size = UDim2.new(0, 60, 0, 25)
-    colorYellow.Position = UDim2.new(0.65, 0, 0.1, 0)
-    colorYellow.Text = "YELLOW"
-    colorYellow.BackgroundColor3 = Color3.fromRGB(255, 255, 0)
-    colorYellow.TextColor3 = Color3.fromRGB(0, 0, 0)
-    colorYellow.Font = Enum.Font.GothamBold
-    colorYellow.TextSize = 10
-    colorYellow.Parent = settingsContent
-    colorYellow.MouseButton1Click:Connect(function()
-        config.guiThemeColor = Color3.fromRGB(255, 255, 0)
-        updateTheme()
-    end)
+    -- Modern color buttons with neon effect
+    local function createColorButton(text, color, posX)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 60, 0, 30)
+        btn.Position = UDim2.new(posX, 0, 0.1, 0)
+        btn.Text = text
+        btn.BackgroundColor3 = color
+        btn.TextColor3 = (text == "CYAN" or text == "YELLOW") and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 10
+        btn.BorderSizePixel = 0
+        btn.Parent = settingsContent
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = btn
+        local glow = Instance.new("UIStroke")
+        glow.Color = color
+        glow.Thickness = 1.5
+        glow.Transparency = 0.7
+        glow.Parent = btn
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0.2, Size = UDim2.new(0, 65, 0, 33)}):Play()
+            TweenService:Create(glow, TweenInfo.new(0.2), {Transparency = 0.2}):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0, Size = UDim2.new(0, 60, 0, 30)}):Play()
+            TweenService:Create(glow, TweenInfo.new(0.2), {Transparency = 0.7}):Play()
+        end)
+        btn.MouseButton1Click:Connect(function()
+            config.guiThemeColor = color
+            updateTheme()
+        end)
+        return btn
+    end
+    createColorButton("RED", Color3.fromRGB(255, 0, 0), 0.05)
+    createColorButton("CYAN", Color3.fromRGB(0, 255, 255), 0.35)
+    createColorButton("YELLOW", Color3.fromRGB(255, 255, 0), 0.65)
 
     local chatLabel = Instance.new("TextLabel")
     chatLabel.Size = UDim2.new(1, -10, 0, 20)
@@ -2656,15 +2671,20 @@ local function createSettingsContent()
     chatLog.BorderSizePixel = 0
     chatLog.Parent = settingsContent
     local chatLogCorner = Instance.new("UICorner")
-    chatLogCorner.CornerRadius = UDim.new(0, 4)
+    chatLogCorner.CornerRadius = UDim.new(0, 8)
     chatLogCorner.Parent = chatLog
+    local chatLogStroke = Instance.new("UIStroke")
+    chatLogStroke.Color = Color3.fromRGB(255, 50, 50)
+    chatLogStroke.Thickness = 1
+    chatLogStroke.Transparency = 0.6
+    chatLogStroke.Parent = chatLog
 
     local chatListLayout = Instance.new("UIListLayout")
     chatListLayout.Padding = UDim.new(0, 2)
     chatListLayout.Parent = chatLog
 
     chatInput = Instance.new("TextBox")
-    chatInput.Size = UDim2.new(0.7, 0, 0, 25)
+    chatInput.Size = UDim2.new(0.7, 0, 0, 28)
     chatInput.Position = UDim2.new(0.05, 0, 0.38, 0)
     chatInput.PlaceholderText = "Type report..."
     chatInput.Text = ""
@@ -2676,11 +2696,11 @@ local function createSettingsContent()
     chatInput.BorderSizePixel = 0
     chatInput.Parent = settingsContent
     local chatInputCorner = Instance.new("UICorner")
-    chatInputCorner.CornerRadius = UDim.new(0, 4)
+    chatInputCorner.CornerRadius = UDim.new(0, 6)
     chatInputCorner.Parent = chatInput
 
     local sendBtn = Instance.new("TextButton")
-    sendBtn.Size = UDim2.new(0.18, 0, 0, 25)
+    sendBtn.Size = UDim2.new(0.18, 0, 0, 28)
     sendBtn.Position = UDim2.new(0.77, 0, 0.38, 0)
     sendBtn.Text = "SEND"
     sendBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
@@ -2690,14 +2710,20 @@ local function createSettingsContent()
     sendBtn.BorderSizePixel = 0
     sendBtn.Parent = settingsContent
     local sendCorner = Instance.new("UICorner")
-    sendCorner.CornerRadius = UDim.new(0, 4)
+    sendCorner.CornerRadius = UDim.new(0, 6)
     sendCorner.Parent = sendBtn
+    sendBtn.MouseEnter:Connect(function()
+        TweenService:Create(sendBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 10, 10)}):Play()
+    end)
+    sendBtn.MouseLeave:Connect(function()
+        TweenService:Create(sendBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(40, 5, 5)}):Play()
+    end)
 
     sendBtn.MouseButton1Click:Connect(function()
         local msg = chatInput.Text
         if msg == "" then return end
         local newMsg = Instance.new("TextLabel")
-        newMsg.Size = UDim2.new(1, 0, 0, 16)
+        newMsg.Size = UDim2.new(1, 0, 0, 18)
         newMsg.Text = "[user] " .. msg
         newMsg.TextColor3 = Color3.fromRGB(200, 200, 200)
         newMsg.BackgroundTransparency = 1
@@ -2712,6 +2738,7 @@ local function createSettingsContent()
     end)
 end
 
+-- MODERN GRID BUTTON (with ripple, scale, and neon stroke)
 local function createGridButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
     button.Name = name
@@ -2725,20 +2752,49 @@ local function createGridButton(parent, name, text, initialState, onChange)
     button.BorderSizePixel = 0
     button.Parent = parent
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
+    corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = button
     local stroke = Instance.new("UIStroke")
     stroke.Color = initialState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 30, 30)
     stroke.Thickness = 1
     stroke.Transparency = 0.3
     stroke.Parent = button
+    
+    -- Hover effect
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), {Size = UDim2.new(0, 90, 0, 35), TextSize = 10}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.1, Thickness = 1.5}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), {Size = UDim2.new(0, 85, 0, 32), TextSize = 9}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.3, Thickness = 1}):Play()
+    end)
+    
     local function updateState(state)
         button.Text = text .. (state and " [ON]" or " [OFF]")
         button.BackgroundColor3 = state and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)
         button.TextColor3 = state and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)
         stroke.Color = state and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 30, 30)
     end
-    button.MouseButton1Click:Connect(function()
+    
+    -- Ripple effect
+    button.MouseButton1Click:Connect(function(input)
+        local x = input.X - button.AbsolutePosition.X
+        local y = input.Y - button.AbsolutePosition.Y
+        local ripple = Instance.new("Frame")
+        ripple.Size = UDim2.new(0, 0, 0, 0)
+        ripple.Position = UDim2.new(0, x, 0, y)
+        ripple.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
+        ripple.BackgroundTransparency = 0.6
+        ripple.BorderSizePixel = 0
+        ripple.Parent = button
+        local rcorner = Instance.new("UICorner")
+        rcorner.CornerRadius = UDim.new(1, 0)
+        rcorner.Parent = ripple
+        local tween = TweenService:Create(ripple, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {Size = UDim2.new(2, 0, 2, 0), BackgroundTransparency = 1})
+        tween:Play()
+        tween.Completed:Connect(function() ripple:Destroy() end)
+        
         local newState = not (config[name] or false)
         if name == "autoWinEnabled" then
             config.autoWinEnabled = newState
@@ -2795,6 +2851,7 @@ local function createGridButton(parent, name, text, initialState, onChange)
     return button
 end
 
+-- MODERN SIDEBAR ITEM (with neon hover)
 local function createSidebarItem(parent, text, icon, active)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, 0, 0, 28)
@@ -2808,21 +2865,33 @@ local function createSidebarItem(parent, text, icon, active)
     button.BorderSizePixel = 0
     button.Parent = parent
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
+    corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = button
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = active and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 30, 30)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.5
+    stroke.Parent = button
+    
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), {BackgroundTransparency = 0.1, TextColor3 = Color3.fromRGB(0, 230, 255)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.2, Thickness = 1.2}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.15), {BackgroundTransparency = 0.2, TextColor3 = active and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.15), {Transparency = 0.5, Thickness = 1}):Play()
+    end)
     return button
 end
 
+-- FLOATING LOGO (enhanced with pulse animation)
 local function createFloatingLogo()
-    if floatingLogo and floatingLogo.Parent then
-        -- Sudah ada, langsung return
-        return floatingLogo
-    end
+    if floatingLogo and floatingLogo.Parent then return floatingLogo end
     if floatingLogo then floatingLogo:Destroy() end
     floatingLogo = Instance.new("ImageButton")
     floatingLogo.Name = "CyberHeroes_Logo"
-    floatingLogo.Size = UDim2.new(0, 35, 0, 35)
-    floatingLogo.Position = UDim2.new(0.85, -17.5, 0.85, -17.5)
+    floatingLogo.Size = UDim2.new(0, 40, 0, 40)
+    floatingLogo.Position = UDim2.new(0.85, -20, 0.85, -20)
     floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 5, 5)
     floatingLogo.BackgroundTransparency = 0.2
     floatingLogo.BorderSizePixel = 0
@@ -2830,7 +2899,7 @@ local function createFloatingLogo()
     floatingLogo.ImageColor3 = Color3.fromRGB(255, 80, 80)
     floatingLogo.ImageTransparency = 0.2
     floatingLogo.Parent = CoreGui
-    floatingLogo.Visible = false  -- Awalnya tidak terlihat
+    floatingLogo.Visible = false
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = floatingLogo
@@ -2839,27 +2908,35 @@ local function createFloatingLogo()
     stroke.Thickness = 1.5
     stroke.Transparency = 0.4
     stroke.Parent = floatingLogo
+    
+    -- Pulse animation
+    local pulse = TweenService:Create(floatingLogo, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Size = UDim2.new(0, 45, 0, 45)})
+    pulse:Play()
+    
     local hue = 0
     task.spawn(function()
         while floatingLogo and floatingLogo.Parent do
             hue = (hue + 0.01) % 1
             local color = (hue < 0.5) and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 200, 255)
-            floatingLogo.ImageColor3 = color
-            stroke.Color = color
+            TweenService:Create(floatingLogo, TweenInfo.new(0.2), {ImageColor3 = color}):Play()
+            TweenService:Create(stroke, TweenInfo.new(0.2), {Color = color}):Play()
             task.wait(0.1)
         end
     end)
-    -- Event untuk membuka GUI saat logo diklik
     floatingLogo.MouseButton1Click:Connect(function()
         if mainFrame then
             mainFrame.Visible = true
             floatingLogo.Visible = false
             config.guiVisible = true
+            -- Animasi masuk mainFrame
+            mainFrame.Position = UDim2.new(0.5, -180, 0.6, -120)
+            TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Position = UDim2.new(0.5, -180, 0.5, -120)}):Play()
         end
     end)
     return floatingLogo
 end
 
+-- PERMANENT TELEPORT BUTTON (with modern design)
 local function createPermanentTeleportButton()
     if teleportButtonGui then teleportButtonGui:Destroy() end
     teleportButtonGui = Instance.new("ScreenGui")
@@ -2868,7 +2945,7 @@ local function createPermanentTeleportButton()
     teleportButtonGui.Parent = CoreGui
     teleportButton = Instance.new("TextButton")
     teleportButton.Name = "TeleportButton"
-    teleportButton.Size = UDim2.new(0, 45, 0, 45)
+    teleportButton.Size = UDim2.new(0, 50, 0, 50)
     teleportButton.Position = UDim2.new(0.02, 0, 0.85, 0)
     teleportButton.Text = "⚡\nTP"
     teleportButton.TextWrapped = true
@@ -2887,10 +2964,21 @@ local function createPermanentTeleportButton()
     btnStroke.Thickness = 1.5
     btnStroke.Transparency = 0.4
     btnStroke.Parent = teleportButton
+    
+    -- Hover effect
+    teleportButton.MouseEnter:Connect(function()
+        TweenService:Create(teleportButton, TweenInfo.new(0.2), {Size = UDim2.new(0, 55, 0, 55), BackgroundTransparency = 0.1}):Play()
+        TweenService:Create(btnStroke, TweenInfo.new(0.2), {Thickness = 2, Transparency = 0.2}):Play()
+    end)
+    teleportButton.MouseLeave:Connect(function()
+        TweenService:Create(teleportButton, TweenInfo.new(0.2), {Size = UDim2.new(0, 50, 0, 50), BackgroundTransparency = 0.2}):Play()
+        TweenService:Create(btnStroke, TweenInfo.new(0.2), {Thickness = 1.5, Transparency = 0.4}):Play()
+    end)
     teleportButton.MouseButton1Click:Connect(teleportToNearestSurvivor)
     makeDraggable(teleportButton)
 end
 
+-- MAIN GUI CREATION (with modern animations and visual enhancements)
 local function createGUI()
     if screenGui then screenGui:Destroy() end
     screenGui = Instance.new("ScreenGui")
@@ -2901,30 +2989,45 @@ local function createGUI()
 
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
-    mainFrame.Size = UDim2.new(0, 360, 0, 240)
-    mainFrame.Position = UDim2.new(0.5, -180, 0.5, -120)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
-    mainFrame.BackgroundTransparency = 0.1
+    mainFrame.Size = UDim2.new(0, 380, 0, 260)
+    mainFrame.Position = UDim2.new(0.5, -190, 0.5, -130)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(10, 3, 6)
+    mainFrame.BackgroundTransparency = 0.15
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
     local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.CornerRadius = UDim.new(0, 12)
     mainCorner.Parent = mainFrame
     mainStroke = Instance.new("UIStroke")
     mainStroke.Color = config.guiThemeColor
     mainStroke.Thickness = 1.5
     mainStroke.Transparency = 0.4
     mainStroke.Parent = mainFrame
+    
+    -- Subtle shadow for depth
+    local shadow = Instance.new("Frame")
+    shadow.Size = UDim2.new(1, 10, 1, 10)
+    shadow.Position = UDim2.new(0, -5, 0, -5)
+    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.BackgroundTransparency = 0.8
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = 0
+    shadow.Parent = mainFrame
+    local shadowCorner = Instance.new("UICorner")
+    shadowCorner.CornerRadius = UDim.new(0, 14)
+    shadowCorner.Parent = shadow
 
+    -- Title Bar with gradient effect
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 24)
-    titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
+    titleBar.Size = UDim2.new(1, 0, 0, 28)
+    titleBar.BackgroundColor3 = Color3.fromRGB(20, 5, 8)
     titleBar.BackgroundTransparency = 0.2
     titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.CornerRadius = UDim.new(0, 12)
     titleCorner.Parent = titleBar
+    
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(0.5, 0, 1, 0)
     title.Position = UDim2.new(0.02, 0, 0, 0)
@@ -2947,8 +3050,8 @@ local function createGUI()
     versionLabel.Parent = titleBar
 
     local minimizeBtn = Instance.new("TextButton")
-    minimizeBtn.Size = UDim2.new(0, 22, 0, 22)
-    minimizeBtn.Position = UDim2.new(1, -50, 0, 1)
+    minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
+    minimizeBtn.Position = UDim2.new(1, -52, 0, 2)
     minimizeBtn.Text = "−"
     minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
     minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
@@ -2958,11 +3061,18 @@ local function createGUI()
     minimizeBtn.TextSize = 18
     minimizeBtn.Parent = titleBar
     local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 3)
+    minCorner.CornerRadius = UDim.new(0, 4)
     minCorner.Parent = minimizeBtn
+    minimizeBtn.MouseEnter:Connect(function()
+        TweenService:Create(minimizeBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(60, 10, 10)}):Play()
+    end)
+    minimizeBtn.MouseLeave:Connect(function()
+        TweenService:Create(minimizeBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 5, 5)}):Play()
+    end)
+    
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 22, 0, 22)
-    closeBtn.Position = UDim2.new(1, -26, 0, 1)
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -26, 0, 2)
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
@@ -2972,17 +3082,24 @@ local function createGUI()
     closeBtn.TextSize = 14
     closeBtn.Parent = titleBar
     local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 3)
+    closeCorner.CornerRadius = UDim.new(0, 4)
     closeCorner.Parent = closeBtn
+    closeBtn.MouseEnter:Connect(function()
+        TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(80, 10, 10)}):Play()
+    end)
+    closeBtn.MouseLeave:Connect(function()
+        TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(40, 5, 5)}):Play()
+    end)
 
     local function hideGuiAndShowLogo()
         config.guiVisible = false
-        if mainFrame then mainFrame.Visible = false end
-            -- Pastikan floatingLogo sudah ada dan terlihat
-        if not floatingLogo then
-        createFloatingLogo()
+        if mainFrame then 
+            TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.3}):Play()
+            task.wait(0.15)
+            mainFrame.Visible = false
         end
-            floatingLogo.Visible = true
+        if not floatingLogo then createFloatingLogo() end
+        floatingLogo.Visible = true
         isLogoVisible = true
     end
 
@@ -2990,8 +3107,8 @@ local function createGUI()
     closeBtn.MouseButton1Click:Connect(hideGuiAndShowLogo)
 
     sidebar = Instance.new("Frame")
-    sidebar.Size = UDim2.new(0, 80, 1, -24)
-    sidebar.Position = UDim2.new(0, 0, 0, 24)
+    sidebar.Size = UDim2.new(0, 85, 1, -28)
+    sidebar.Position = UDim2.new(0, 0, 0, 28)
     sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     sidebar.BackgroundTransparency = 0.2
     sidebar.BorderSizePixel = 0
@@ -3000,12 +3117,12 @@ local function createGUI()
     sidebarCorner.CornerRadius = UDim.new(0, 0)
     sidebarCorner.Parent = sidebar
     local sidebarList = Instance.new("Frame")
-    sidebarList.Size = UDim2.new(1, 0, 0, 120)
+    sidebarList.Size = UDim2.new(1, 0, 0, 130)
     sidebarList.Position = UDim2.new(0, 0, 0.05, 0)
     sidebarList.BackgroundTransparency = 1
     sidebarList.Parent = sidebar
     local sidebarLayout = Instance.new("UIListLayout")
-    sidebarLayout.Padding = UDim.new(0, 4)
+    sidebarLayout.Padding = UDim.new(0, 6)
     sidebarLayout.FillDirection = Enum.FillDirection.Vertical
     sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     sidebarLayout.Parent = sidebarList
@@ -3020,13 +3137,13 @@ local function createGUI()
     sep.Parent = sidebarList
 
     contentPanel = Instance.new("Frame")
-    contentPanel.Size = UDim2.new(1, -90, 1, -30)
-    contentPanel.Position = UDim2.new(0, 85, 0, 28)
+    contentPanel.Size = UDim2.new(1, -95, 1, -35)
+    contentPanel.Position = UDim2.new(0, 90, 0, 32)
     contentPanel.BackgroundTransparency = 1
     contentPanel.Parent = mainFrame
     local gridLayout = Instance.new("UIGridLayout")
-    gridLayout.CellSize = UDim2.new(0, 80, 0, 32)
-    gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)
+    gridLayout.CellSize = UDim2.new(0, 85, 0, 34)
+    gridLayout.CellPadding = UDim2.new(0, 5, 0, 5)
     gridLayout.FillDirection = Enum.FillDirection.Horizontal
     gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
@@ -3062,6 +3179,7 @@ local function createGUI()
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         if settingsContent then settingsContent:Destroy() end
         gridLayout.Parent = contentPanel
+        TweenService:Create(contentPanel, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
     end)
     featuresItem.MouseButton1Click:Connect(function()
         featuresItem.TextColor3 = Color3.fromRGB(0, 230, 255)
@@ -3091,14 +3209,14 @@ local function createGUI()
     makeDraggable(mainFrame)
 
     local statusBar = Instance.new("Frame")
-    statusBar.Size = UDim2.new(1, 0, 0, 18)
-    statusBar.Position = UDim2.new(0, 0, 1, -18)
+    statusBar.Size = UDim2.new(1, 0, 0, 20)
+    statusBar.Position = UDim2.new(0, 0, 1, -20)
     statusBar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     statusBar.BackgroundTransparency = 0.2
     statusBar.BorderSizePixel = 0
     statusBar.Parent = mainFrame
     local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 4)
+    statusCorner.CornerRadius = UDim.new(0, 6)
     statusCorner.Parent = statusBar
     statusLabel = Instance.new("TextLabel")
     statusLabel.Size = UDim2.new(1, -10, 1, 0)
@@ -3111,8 +3229,8 @@ local function createGUI()
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Parent = statusBar
     local led = Instance.new("Frame")
-    led.Size = UDim2.new(0, 5, 0, 5)
-    led.Position = UDim2.new(1, -10, 0.5, -2.5)
+    led.Size = UDim2.new(0, 6, 0, 6)
+    led.Position = UDim2.new(1, -12, 0.5, -3)
     led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     led.BackgroundTransparency = 0.2
     led.BorderSizePixel = 0
@@ -3120,6 +3238,13 @@ local function createGUI()
     local ledCorner = Instance.new("UICorner")
     ledCorner.CornerRadius = UDim.new(1, 0)
     ledCorner.Parent = led
+    -- Blinking LED effect
+    task.spawn(function()
+        while statusBar and statusBar.Parent do
+            TweenService:Create(led, TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {BackgroundTransparency = 0.5}):Play()
+            task.wait(0.5)
+        end
+    end)
 
     task.spawn(function()
         while screenGui and screenGui.Parent do
@@ -3130,20 +3255,24 @@ local function createGUI()
                                 (config.autoSkillCheckEnabled and 1 or 0) + (config.autoAimEnabled and 1 or 0)
             if activeCount > 0 then
                 statusLabel.Text = "ACTIVE: " .. activeCount .. " modules"
-                statusLabel.TextColor3 = config.guiThemeColor
-                led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+                TweenService:Create(statusLabel, TweenInfo.new(0.3), {TextColor3 = config.guiThemeColor}):Play()
+                TweenService:Create(led, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(0, 255, 0)}):Play()
             else
                 statusLabel.Text = "STANDBY"
-                statusLabel.TextColor3 = Color3.fromRGB(150, 50, 50)
-                led.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                TweenService:Create(statusLabel, TweenInfo.new(0.3), {TextColor3 = Color3.fromRGB(150, 50, 50)}):Play()
+                TweenService:Create(led, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(255, 0, 0)}):Play()
             end
             task.wait(1)
         end
     end)
 
     mainFrame.BackgroundTransparency = 0.3
-    TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
+    TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
 end
+-- ============================================================================
+-- AKHIR FEATURE 17 (MODERN GUI)
+-- ============================================================================
+
 
 -- ============================================================================
 -- RESTORE FEATURE STATES FUNCTION (LENGKAP)

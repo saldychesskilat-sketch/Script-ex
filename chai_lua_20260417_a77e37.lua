@@ -904,7 +904,7 @@ end
 local TPWALK_SYSTEM = {}
 
 TPWALK_SYSTEM.Active = false
-TPWALK_SYSTEM.Speed = 45
+TPWALK_SYSTEM.Speed = 100
 TPWALK_SYSTEM.Connection = nil
 TPWALK_SYSTEM.LastMoveDirection = Vector3.zero
 TPWALK_SYSTEM.CharacterConnection = nil

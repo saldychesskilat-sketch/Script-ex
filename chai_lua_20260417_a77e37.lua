@@ -891,132 +891,216 @@ end
 -- FUNGSI UNTUK MENGGANTI YANG LAMA (PANGGIL startESP() SAAT INISIALISASI)
 -- ============================================================================
 
+
+        
+
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - TELEPORT 1 STUD PER DETIK)
--- Karakter akan teleport 1 stud ke arah depan (look vector) setiap detik
--- jika karakter sedang bergerak (MoveDirection tidak nol atau kecepatan > 0)
--- Monitor real-time untuk mendeteksi gerakan dan menampilkan status.
+-- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - CFrame BASED, REAL-TIME, LIGHTWEIGHT)
+-- Menggunakan metode CFrame addition pada HumanoidRootPart setiap frame (RenderStepped)
+-- Kecepatan dapat diatur via config.tpwalkSpeed (default 45, super cepat)
+-- Tetap aktif meskipun ada animasi lari karena langsung memanipulasi CFrame
+-- OPTIMIZED VERSION
 -- ============================================================================
 
 -- Variabel untuk TPWalk
-local tpwalkEnabled = false
+local tpwalking = false
+local tpwalkSpeed = 45           -- kecepatan tinggi (bisa diatur)
 local tpwalkConnection = nil
-local lastTeleportTime = 0
-local TELEPORT_INTERVAL = 1.0  -- 1 detik
-local previousPosition = nil
-local isMoving = false
+local lastMoveDir = Vector3.zero
 
--- Fungsi untuk mengecek apakah karakter bergerak (berdasarkan MoveDirection)
-local function isCharacterMoving()
-    if not localHumanoid then return false end
-    local moveDir = localHumanoid.MoveDirection
-    if moveDir.Magnitude > 0.1 then
-        return true
+-- Fungsi TPWalk utama (menggunakan CFrame addition pada setiap frame)
+local function startTPWalk(speed)
+    if tpwalking then return end
+    tpwalking = true
+
+    local char = localCharacter
+    local hum = char and char:FindFirstChildWhichIsA("Humanoid")
+
+    if not hum then
+        tpwalking = false
+        return
     end
-    -- Alternatif: cek kecepatan linear root part
-    if localRootPart and localRootPart.AssemblyLinearVelocity.Magnitude > 0.5 then
-        return true
-    end
-    return false
-end
 
--- Fungsi untuk melakukan teleport 1 stud ke arah depan karakter (look vector)
-local function teleportForwardOneStud()
-    if not localRootPart then return false end
-    local lookVector = localRootPart.CFrame.LookVector
-    local step = lookVector * 2  -- 1 stud
-    local newPos = localRootPart.Position + step
-    pcall(function()
-        localRootPart.CFrame = CFrame.new(newPos, newPos + lookVector)
-    end)
-    return true
-end
+    -- Gunakan RenderStepped untuk responsif terhadap frame rate
+    tpwalkConnection = RunService.RenderStepped:Connect(function(deltaTime)
 
--- Fungsi monitor gerakan (real-time)
-local function startMovementMonitor()
-    if tpwalkConnection then return end
-    tpwalkConnection = RunService.Heartbeat:Connect(function()
-        if not tpwalkEnabled or not config.speedBoostEnabled then
-            if tpwalkConnection then tpwalkConnection:Disconnect(); tpwalkConnection = nil end
+        if not tpwalking then return end
+        if not config.speedBoostEnabled then return end
+
+        if not localCharacter or not localHumanoid or not localRootPart then
             return
         end
-        if not getLocalCharacter() or not localRootPart then return end
 
-        -- Update status gerakan
-        local moving = isCharacterMoving()
-        if moving ~= isMoving then
-            isMoving = moving
-            if isMoving then
-                print("[SpeedBoost] Karakter mulai bergerak, TPWalk siap.")
-            else
-                print("[SpeedBoost] Karakter berhenti bergerak.")
-            end
+        -- Pastikan karakter masih valid
+        if localHumanoid.Health <= 0 then
+            stopTPWalk()
+            return
         end
 
-        -- Teleport setiap interval jika bergerak
-        local now = tick()
-        if isMoving and (now - lastTeleportTime) >= TELEPORT_INTERVAL then
-            lastTeleportTime = now
-            teleportForwardOneStud()
-            -- Opsional: tampilkan notifikasi di konsol (bisa dikurangi spam)
-            -- print("[SpeedBoost] Teleport 1 stud ke depan")
+        local moveDir = localHumanoid.MoveDirection
+
+        -- Simpan arah terakhir
+        if moveDir.Magnitude > 0.05 then
+            lastMoveDir = moveDir.Unit
         end
+
+        -- Jika sedang bergerak
+        if moveDir.Magnitude > 0.05 then
+
+            -- Reset velocity agar tidak dilawan physics Roblox
+            localRootPart.AssemblyLinearVelocity = Vector3.zero
+            localRootPart.Velocity = Vector3.zero
+
+            -- Multiplier internal supaya efek lebih terasa
+            local boostMultiplier = 1.35
+
+            -- Hitung perpindahan
+            local step =
+                lastMoveDir *
+                (speed * boostMultiplier) *
+                deltaTime
+
+            -- Tambahkan offset movement
+            local newCFrame =
+                localRootPart.CFrame + step
+
+            -- Apply movement
+            pcall(function()
+                localRootPart.CFrame = newCFrame
+            end)
+
+        elseif lastMoveDir.Magnitude > 0 then
+
+            -- Smooth stop kecil agar tidak terasa kaku
+            lastMoveDir = lastMoveDir:Lerp(Vector3.zero, 0.15)
+
+        end
+
+        -- Anti stuck kecil
+        if localHumanoid.FloorMaterial == Enum.Material.Air then
+            pcall(function()
+                localRootPart.AssemblyLinearVelocity =
+                    Vector3.new(
+                        localRootPart.AssemblyLinearVelocity.X,
+                        0,
+                        localRootPart.AssemblyLinearVelocity.Z
+                    )
+            end)
+        end
+
+        -- Cek jika karakter berubah atau mati
+        if not localCharacter or localCharacter ~= char then
+            stopTPWalk()
+        end
+
     end)
-    print("[SpeedBoost] Movement monitor started (teleport 1 stud per second when moving)")
+
+    print("[SpeedBoost] TPWalk (CFrame) aktif dengan kecepatan " .. speed .. " studs/s")
 end
 
--- Fungsi untuk mengatur ulang monitor saat karakter berganti
-local function onCharacterAddedForTPWalk()
-    if tpwalkEnabled then
-        -- Reset posisi dan timer
-        lastTeleportTime = 0
-        isMoving = false
-        previousPosition = nil
-        if tpwalkConnection then
-            tpwalkConnection:Disconnect()
-            tpwalkConnection = nil
-        end
-        startMovementMonitor()
-    end
-end
+local function stopTPWalk()
 
--- Start/Stop fungsi untuk kompatibilitas dengan script utama
-local function startSpeedBoostMonitor()
-    if currentBoostConnection then return end
-    tpwalkEnabled = true
-    startMovementMonitor()
-    -- Pasang event untuk karakter baru
-    localPlayer.CharacterAdded:Connect(onCharacterAddedForTPWalk)
-    print("[SpeedBoost] TPWalk (teleport 1 stud/s when moving) started")
-end
-
-local function stopSpeedBoostMonitor()
-    tpwalkEnabled = false
     if tpwalkConnection then
         tpwalkConnection:Disconnect()
         tpwalkConnection = nil
     end
-    isMoving = false
-    print("[SpeedBoost] TPWalk stopped")
+
+    tpwalking = false
+    lastMoveDir = Vector3.zero
+
 end
 
--- Untuk kompatibilitas dengan panggilan lama (applySpeedBoost dan lainnya)
+-- Fungsi untuk mereset TPWalk saat karakter berganti
+local function onCharacterAddedForTPWalk()
+
+    if config.speedBoostEnabled then
+
+        stopTPWalk()
+
+        task.wait(0.2)
+
+        startTPWalk(tpwalkSpeed)
+
+    end
+
+end
+
+-- Speed boost utama (tidak dipakai lagi, tapi dipertahankan untuk kompatibilitas)
 local function applySpeedBoost()
-    -- Tidak diperlukan, biarkan kosong
+    -- Tidak digunakan karena kita menggunakan TPWalk yang aktif terus.
 end
 
--- Override variabel global jika diperlukan
-currentBoostConnection = nil  -- akan diisi oleh startSpeedBoostMonitor
+-- Monitor utama (sekarang hanya mengaktifkan/menonaktifkan TPWalk)
+local function startSpeedBoostMonitor()
+
+    if currentBoostConnection then return end
+
+    currentBoostConnection = RunService.Heartbeat:Connect(function()
+
+        if not config.speedBoostEnabled then
+
+            if tpwalking then
+                stopTPWalk()
+            end
+
+            return
+        end
+
+        if not getLocalCharacter()
+            or not localHumanoid
+            or not localRootPart then
+
+            if tpwalking then
+                stopTPWalk()
+            end
+
+            return
+        end
+
+        -- Pastikan TPWalk selalu aktif
+        if not tpwalking then
+            startTPWalk(tpwalkSpeed)
+        end
+
+    end)
+
+    -- Pasang event untuk karakter baru
+    localPlayer.CharacterAdded:Connect(onCharacterAddedForTPWalk)
+
+    print("[SpeedBoost] TPWalk (CFrame) always active (speed = " .. tpwalkSpeed .. ")")
+
+end
+
+local function stopSpeedBoostMonitor()
+
+    if currentBoostConnection then
+        currentBoostConnection:Disconnect()
+        currentBoostConnection = nil
+    end
+
+    stopTPWalk()
+
+    print("[SpeedBoost] TPWalk stopped")
+
+end
 
 -- ============================================================================
--- CATATAN:
--- - Karakter akan teleport 1 stud ke depan (look vector) setiap detik jika bergerak.
--- - Pergerakan dideteksi dari Humanoid.MoveDirection dan AssemblyLinearVelocity.
--- - Monitor real-time mencetak status gerakan ke konsol.
--- - Tidak mengganggu animasi lari atau mekanik lain karena hanya memindahkan CFrame.
--- - Interval teleport 1 detik dapat diubah dengan mengubah TELEPORT_INTERVAL.
+-- CATATAN OPTIMASI:
+--
+-- 1. Velocity reset ditambahkan agar physics Roblox tidak melawan movement.
+-- 2. Menggunakan moveDir.Unit agar arah lebih stabil.
+-- 3. Menambahkan boostMultiplier internal supaya speed lebih terasa.
+-- 4. Menambahkan smooth stop agar movement tidak patah.
+-- 5. Menambahkan anti-air velocity correction.
+-- 6. Tetap menggunakan RenderStepped untuk movement realtime.
+-- 7. Struktur variabel asli tetap dipertahankan.
+--
+-- Rekomendasi:
+-- tpwalkSpeed = 60  -> smooth
+-- tpwalkSpeed = 90  -> cepat
+-- tpwalkSpeed = 140 -> blink speed
+--
 -- ============================================================================
-
 -- ============================================================================
 -- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD + PRE-TELEPORT)
 -- Fitur: Sebelum invisible, pemain dinaikkan 90 studs ke atas, lalu di-invisible,

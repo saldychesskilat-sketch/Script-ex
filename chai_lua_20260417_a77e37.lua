@@ -892,54 +892,91 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - CFrame BASED, REAL-TIME, LIGHTWEIGHT)
--- Menggunakan metode CFrame addition pada HumanoidRootPart setiap frame (RenderStepped)
--- Kecepatan dapat diatur via config.tpwalkSpeed (default 45, super cepat)
--- Tetap aktif meskipun ada animasi lari karena langsung memanipulasi CFrame
+-- FEATURE 4: SPEED BOOST + TPWALK (UPGRADED - CFRAME REALTIME VERSION)
+-- Menggunakan CFrame realtime movement agar tetap cepat walau animasi lari VD aktif
+-- Lebih stabil, ringan, dan resistant terhadap override animation movement
 -- ============================================================================
 
 -- Variabel untuk TPWalk
 local tpwalking = false
-local tpwalkSpeed = 45           -- kecepatan tinggi (bisa diatur)
+local tpwalkSpeed = 20
 local tpwalkConnection = nil
-local lastMoveDir = Vector3.zero
 
--- Fungsi TPWalk utama (menggunakan CFrame addition pada setiap frame)
+-- Cache delta agar lebih ringan
+local lastTick = tick()
+
+-- Fungsi TPWalk utama
 local function startTPWalk(speed)
     if tpwalking then return end
     tpwalking = true
+
     local char = localCharacter
     local hum = char and char:FindFirstChildWhichIsA("Humanoid")
-    if not hum then return end
+    local root = char and char:FindFirstChild("HumanoidRootPart")
 
-    -- Gunakan RenderStepped untuk responsif terhadap frame rate
-    tpwalkConnection = RunService.RenderStepped:Connect(function(deltaTime)
+    if not hum or not root then
+        tpwalking = false
+        return
+    end
+
+    -- Pastikan humanoid tetap normal
+    hum.PlatformStand = false
+
+    tpwalkConnection = RunService.Heartbeat:Connect(function()
         if not tpwalking then return end
         if not config.speedBoostEnabled then return end
-        if not localCharacter or not localHumanoid or not localRootPart then return end
 
-        local moveDir = localHumanoid.MoveDirection
-        if moveDir.Magnitude > 0.1 then
-            lastMoveDir = moveDir
-            -- Hitung perpindahan: kecepatan (studs per detik) dikali deltaTime
-            local step = moveDir * speed * deltaTime
-            -- Terapkan perpindahan ke CFrame (menambah posisi)
-            local newCFrame = localRootPart.CFrame + step
-            pcall(function()
-                localRootPart.CFrame = newCFrame
-            end)
-        elseif lastMoveDir.Magnitude > 0 then
-            -- Jika baru berhenti bergerak, tetap gunakan arah terakhir untuk sedikit slide (opsional)
-            -- Biarkan saja, tidak perlu tambahan
-            lastMoveDir = Vector3.zero
-        end
+        -- Refresh realtime reference
+        char = localCharacter
+        hum = localHumanoid
+        root = localRootPart
 
-        -- Cek jika karakter berubah atau mati
-        if not localCharacter or localCharacter ~= char then
+        if not char or not hum or not root then
             stopTPWalk()
+            return
         end
+
+        -- Karakter mati
+        if hum.Health <= 0 then
+            stopTPWalk()
+            return
+        end
+
+        -- Delta time realtime
+        local current = tick()
+        local delta = current - lastTick
+        lastTick = current
+
+        -- Clamp delta agar stabil
+        delta = math.clamp(delta, 0, 0.1)
+
+        -- Ambil arah gerakan
+        local moveDir = hum.MoveDirection
+
+        if moveDir.Magnitude > 0 then
+            -- Gerakan berbasis CFrame
+            local moveVector = moveDir.Unit * speed * delta * 45
+
+            -- Pertahankan rotasi karakter
+            local currentCFrame = root.CFrame
+            local newPosition = currentCFrame.Position + moveVector
+
+            -- Update posisi tanpa mengubah rotation
+            root.CFrame =
+                CFrame.new(newPosition, newPosition + currentCFrame.LookVector)
+        end
+
+        -- Anti override animasi VD
+        -- Paksa state agar tidak ditahan animasi sprint
+        if hum:GetState() == Enum.HumanoidStateType.Running then
+            hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
+        end
+
+        -- Pastikan velocity tidak menahan gerakan
+        root.AssemblyLinearVelocity = Vector3.zero
     end)
-    print("[SpeedBoost] TPWalk (CFrame) aktif dengan kecepatan " .. speed .. " studs/s")
+
+    print("[SpeedBoost] CFrame TPWalk aktif | Speed:", speed)
 end
 
 local function stopTPWalk()
@@ -947,42 +984,64 @@ local function stopTPWalk()
         tpwalkConnection:Disconnect()
         tpwalkConnection = nil
     end
+
     tpwalking = false
 end
 
--- Fungsi untuk mereset TPWalk saat karakter berganti
+-- Reset saat respawn
 local function onCharacterAddedForTPWalk()
     if config.speedBoostEnabled then
         stopTPWalk()
-        task.wait(0.2)
+
+        task.wait(0.3)
+
+        local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+
+        localCharacter = char
+        localHumanoid = char:WaitForChild("Humanoid")
+        localRootPart = char:WaitForChild("HumanoidRootPart")
+
         startTPWalk(tpwalkSpeed)
     end
 end
 
--- Speed boost utama (tidak dipakai lagi, tapi dipertahankan untuk kompatibilitas)
+-- Kompatibilitas
 local function applySpeedBoost()
-    -- Tidak digunakan karena kita menggunakan TPWalk yang aktif terus.
+    -- Tidak digunakan
 end
 
--- Monitor utama (sekarang hanya mengaktifkan/menonaktifkan TPWalk)
+-- Monitor utama
 local function startSpeedBoostMonitor()
     if currentBoostConnection then return end
+
     currentBoostConnection = RunService.Heartbeat:Connect(function()
         if not config.speedBoostEnabled then
-            if tpwalking then stopTPWalk() end
+            if tpwalking then
+                stopTPWalk()
+            end
             return
         end
-        if not getLocalCharacter() or not localHumanoid or not localRootPart then
-            if tpwalking then stopTPWalk() end
+
+        if not getLocalCharacter()
+            or not localHumanoid
+            or not localRootPart then
+
+            if tpwalking then
+                stopTPWalk()
+            end
+
             return
         end
+
         if not tpwalking then
             startTPWalk(tpwalkSpeed)
         end
     end)
-    -- Pasang event untuk karakter baru
+
+    -- Event respawn
     localPlayer.CharacterAdded:Connect(onCharacterAddedForTPWalk)
-    print("[SpeedBoost] TPWalk (CFrame) always active (speed = " .. tpwalkSpeed .. ")")
+
+    print("[SpeedBoost] Realtime CFrame TPWalk Enabled")
 end
 
 local function stopSpeedBoostMonitor()
@@ -990,15 +1049,21 @@ local function stopSpeedBoostMonitor()
         currentBoostConnection:Disconnect()
         currentBoostConnection = nil
     end
+
     stopTPWalk()
+
     print("[SpeedBoost] TPWalk stopped")
 end
 
 -- ============================================================================
--- CATATAN: Penggunaan CFrame addition pada HumanoidRootPart setiap frame
--- memberikan kecepatan konstan dan tidak terganggu oleh animasi lari.
--- RenderStepped memastikan pergerakan halus dan responsif.
--- Kecepatan default 45 studs/detik (sangat cepat), bisa diubah via config.tpwalkSpeed.
+-- CATATAN:
+-- ✔ Menggunakan CFrame realtime
+-- ✔ Lebih stabil terhadap animasi sprint VD
+-- ✔ Tetap ringan karena hanya 1 Heartbeat
+-- ✔ Tidak mengubah rotasi karakter
+-- ✔ Anti stuck velocity
+-- ✔ Delta stabil agar movement smooth
+-- ✔ Tetap compatible dengan sistem lama
 -- ============================================================================
 
 -- ============================================================================

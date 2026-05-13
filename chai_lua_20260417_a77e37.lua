@@ -1872,17 +1872,23 @@ local function stopShieldMonitor()
 end
 
 -- ============================================================================
--- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ALWAYS ACTIVE (no distance trigger)
+-- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ONLY WHEN MOVING (CONTROLLED)
 -- ============================================================================
 local function applyTpwalkBoost()
     if not config.tpwalkEnabled then return end
     if isTpwalkActive then return end
     if not localHumanoid then return end
+
+    -- Hanya aktif jika player sedang bergerak (MoveDirection tidak nol)
+    local moveDirection = localHumanoid.MoveDirection
+    if moveDirection.Magnitude < 0.1 then return end
+
     if originalTpwalkSpeed == 16 then originalTpwalkSpeed = localHumanoid.WalkSpeed end
     local boostSpeed = originalTpwalkSpeed * config.tpwalkSpeedMultiplier
     localHumanoid.WalkSpeed = boostSpeed
     isTpwalkActive = true
-    -- CFrame dash: teleport kecil ke depan setiap 0.1 detik selama durasi
+
+    -- CFrame dash: teleport kecil ke depan setiap 0.1 detik selama durasi, mengikuti arah gerakan
     local startTime = tick()
     local dashConnection
     dashConnection = RunService.Heartbeat:Connect(function()
@@ -1891,35 +1897,53 @@ local function applyTpwalkBoost()
             return
         end
         if localRootPart then
-            local forward = localRootPart.CFrame.LookVector * 2
-            localRootPart.CFrame = localRootPart.CFrame + forward
+            local moveDir = localHumanoid.MoveDirection
+            if moveDir.Magnitude > 0.1 then
+                local forward = moveDir.Unit * 2
+                localRootPart.CFrame = localRootPart.CFrame + forward
+            else
+                -- Jika berhenti bergerak saat dash, hentikan boost lebih awal
+                if dashConnection then dashConnection:Disconnect() end
+                isTpwalkActive = false
+                if localHumanoid then localHumanoid.WalkSpeed = originalTpwalkSpeed end
+            end
         end
     end)
+
     task.spawn(function()
         task.wait(config.tpwalkDuration)
         if localHumanoid then localHumanoid.WalkSpeed = originalTpwalkSpeed end
         isTpwalkActive = false
         if dashConnection then dashConnection:Disconnect() end
     end)
-    print("[Tpwalk] Speed boosted to " .. boostSpeed .. " for " .. config.tpwalkDuration .. " seconds + dash effect")
+
+    print("[Tpwalk] Speed boosted to " .. boostSpeed .. " for " .. config.tpwalkDuration .. " seconds + dash effect (only when moving)")
 end
 
 -- ============================================================================
--- ALWAYS ACTIVE: langsung apply tpwalk boost tanpa pengecekan jarak killer
+-- MONITOR: aktifkan boost hanya saat player bergerak, matikan jika berhenti
 -- ============================================================================
 local function checkTpwalkProximity()
     if not config.tpwalkEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-    -- Hapus pengecekan jarak killer, langsung aktifkan boost jika belum aktif
-    if not isTpwalkActive then
+    if not getLocalCharacter() or not localRootPart or not localHumanoid then return end
+
+    local moveDirection = localHumanoid.MoveDirection
+    local isMoving = moveDirection.Magnitude > 0.1
+
+    if isMoving and not isTpwalkActive then
         applyTpwalkBoost()
+    elseif not isMoving and isTpwalkActive then
+        -- Jika berhenti bergerak saat boost aktif, matikan boost segera
+        if localHumanoid then localHumanoid.WalkSpeed = originalTpwalkSpeed end
+        isTpwalkActive = false
+        print("[Tpwalk] Boost cancelled because player stopped moving")
     end
 end
 
 local function startTpwalkMonitor()
     if tpwalkConnection then return end
     tpwalkConnection = RunService.Heartbeat:Connect(checkTpwalkProximity)
-    print("[Tpwalk] Monitor started (ALWAYS ACTIVE - no distance trigger)")
+    print("[Tpwalk] Monitor started (active only when moving - controlled movement)")
 end
 
 local function stopTpwalkMonitor()

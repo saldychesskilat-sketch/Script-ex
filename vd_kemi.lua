@@ -314,7 +314,7 @@ local function createLoginPanel()
     infoText.Parent = loginFrame
 
     -- Key link placeholder
-    local keyLink = "https://example.com/getkey"
+    local keyLink = "https://direct-link.net/4593541/0MYRtZaxukFp"
 
     -- Submit action
     submitBtn.MouseButton1Click:Connect(function()
@@ -323,7 +323,7 @@ local function createLoginPanel()
             return
         end
         local enteredKey = keyInput.Text
-        if enteredKey == "kemilinux22" then
+        if enteredKey == "kemilinux227" then
             createNotification("Key Accepted! Loading script...", "success")
             submitDebounce = true
             -- Show loading animation

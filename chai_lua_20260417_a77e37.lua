@@ -890,11 +890,14 @@ end
 -- ============================================================================
 -- FUNGSI UNTUK MENGGANTI YANG LAMA (PANGGIL startESP() SAAT INISIALISASI)
 -- ============================================================================
+
+
 -- ============================================================================
 -- FEATURE 4: SPEED BOOST + TPWALK
 -- ADVANCED OPTIMIZED VERSION (ANTI CONFLICT)
--- Menggunakan namespace khusus agar tidak bentrok dengan feature lain
--- Menggunakan PivotTo untuk movement lebih stabil
+-- Continuous Forward Teleport System
+-- Karakter akan terus bergerak maju 1 stud setiap detik
+-- Tetap berjalan meskipun karakter diam atau tidak menekan tombol movement
 -- ============================================================================
 
 -- ============================================================================
@@ -904,7 +907,7 @@ end
 local TPWALK_SYSTEM = {}
 
 TPWALK_SYSTEM.Active = false
-TPWALK_SYSTEM.Speed = 100
+TPWALK_SYSTEM.Speed = 1
 TPWALK_SYSTEM.Connection = nil
 TPWALK_SYSTEM.LastMoveDirection = Vector3.zero
 TPWALK_SYSTEM.CharacterConnection = nil
@@ -953,58 +956,37 @@ local function startTPWalk(speed)
             return
         end
 
-        -- Ambil arah gerakan
-        local moveDir = localHumanoid.MoveDirection
+        -- Simpan arah depan karakter
+        TPWALK_SYSTEM.LastMoveDirection =
+            localRootPart.CFrame.LookVector.Unit
 
-        -- Simpan arah terakhir
-        if moveDir.Magnitude > 0.05 then
-            TPWALK_SYSTEM.LastMoveDirection =
-                moveDir.Unit
-        end
+        -- Velocity correction ringan
+        local currentVelocity =
+            localRootPart.AssemblyLinearVelocity
 
-        -- Jika player bergerak
-        if moveDir.Magnitude > 0.05 then
+        localRootPart.AssemblyLinearVelocity =
+            Vector3.new(
+                currentVelocity.X,
+                0,
+                currentVelocity.Z
+            )
 
-            -- Velocity correction ringan
-            local currentVelocity =
-                localRootPart.AssemblyLinearVelocity
+        -- Hitung perpindahan maju
+        local movementOffset =
+            TPWALK_SYSTEM.LastMoveDirection *
+            speed *
+            deltaTime
 
-            localRootPart.AssemblyLinearVelocity =
-                Vector3.new(
-                    currentVelocity.X,
-                    0,
-                    currentVelocity.Z
-                )
+        -- Target posisi baru
+        local targetCFrame =
+            localRootPart.CFrame + movementOffset
 
-            -- Multiplier internal
-            local internalBoostMultiplier = 1.45
+        -- Teleport smooth menggunakan PivotTo
+        pcall(function()
 
-            -- Hitung perpindahan
-            local movementOffset =
-                TPWALK_SYSTEM.LastMoveDirection *
-                (speed * internalBoostMultiplier) *
-                deltaTime
+            localCharacter:PivotTo(targetCFrame)
 
-            -- Gunakan PivotTo agar lebih stabil
-            local targetCFrame =
-                localRootPart.CFrame + movementOffset
-
-            pcall(function()
-
-                localCharacter:PivotTo(targetCFrame)
-
-            end)
-
-        else
-
-            -- Smooth stop
-            TPWALK_SYSTEM.LastMoveDirection =
-                TPWALK_SYSTEM.LastMoveDirection:Lerp(
-                    Vector3.zero,
-                    0.18
-                )
-
-        end
+        end)
 
         -- Anti-air correction
         if localHumanoid.FloorMaterial == Enum.Material.Air then
@@ -1032,8 +1014,9 @@ local function startTPWalk(speed)
     end)
 
     print(
-        "[SpeedBoost] TPWalk aktif | Speed = "
+        "[SpeedBoost] Continuous Forward TPWalk Active | Speed = "
         .. tostring(speed)
+        .. " stud/s"
     )
 
 end
@@ -1170,20 +1153,23 @@ end
 -- ============================================================================
 -- CATATAN:
 --
--- 1. Menggunakan namespace TPWALK_SYSTEM agar tidak bentrok.
--- 2. Menggunakan PivotTo agar movement lebih stabil.
--- 3. Menggunakan Heartbeat agar sinkron physics.
--- 4. Menghindari duplicate CharacterAdded connection.
--- 5. Tidak lagi memakai variable global raw.
--- 6. Lebih aman terhadap overwrite feature lain.
--- 7. Struktur utama tetap dipertahankan.
+-- 1. Karakter akan terus bergerak maju otomatis.
+-- 2. Tidak membutuhkan input keyboard.
+-- 3. Menggunakan LookVector sebagai arah teleport.
+-- 4. Menggunakan PivotTo agar movement stabil.
+-- 5. Tetap aktif meskipun karakter diam.
+-- 6. Anti-conflict menggunakan namespace TPWALK_SYSTEM.
+-- 7. Sinkron dengan physics menggunakan Heartbeat.
 --
 -- Rekomendasi:
 --
--- TPWALK_SYSTEM.Speed = 70   -> Smooth
--- TPWALK_SYSTEM.Speed = 110  -> Cepat
--- TPWALK_SYSTEM.Speed = 160  -> Blink
+-- TPWALK_SYSTEM.Speed = 1   -> sangat lambat
+-- TPWALK_SYSTEM.Speed = 5   -> smooth
+-- TPWALK_SYSTEM.Speed = 20  -> cepat
+-- TPWALK_SYSTEM.Speed = 60  -> blink speed
 --
+-- ============================================================================
+
 -- ============================================================================
 -- ============================================================================
 -- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD + PRE-TELEPORT)

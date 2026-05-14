@@ -2675,7 +2675,7 @@ local function createSettingsContent()
     local chatLabel = Instance.new("TextLabel")
     chatLabel.Size = UDim2.new(1, -10, 0, 20)
     chatLabel.Position = UDim2.new(0, 5, 0, 0.2)
-    chatLabel.Text = "REPORT CHAT"
+    chatLabel.Text = ""
     chatLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     chatLabel.BackgroundTransparency = 1
     chatLabel.Font = Enum.Font.GothamBold

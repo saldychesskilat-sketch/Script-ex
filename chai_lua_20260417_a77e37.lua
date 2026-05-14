@@ -2530,45 +2530,42 @@ end
 -- FEATURE 17: MODERN GUI (UPGRADED - FIXED MINIMIZE + INFO/ABOUT TABS)
 -- ============================================================================
 
+-- ============================================================================
+-- FEATURE 17: MODERN GUI (UPGRADED - MINIMIZE TO FLOATING BAR + INFO TAB)
+-- ============================================================================
+
 -- Variabel global untuk floating bar
 local floatingBar = nil
 local isFloatingVisible = false
 
--- Teks untuk menu Info (font diperkecil agar muat tanpa scroll)
+-- Teks untuk menu Info (bisa diedit langsung di sini)
 local infoText = [[
 CYBERHEROES SCRIPT v10.1
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚡ Fitur:
-• Auto Win (finishline + lobby)
-• Auto Task (anti-hook + lever gate)
-• Auto Generator (full ESP)
+• Auto Win (teleport ke finishline + lobby)
+• Auto Task (anti-hook + lever gate + escape)
+• Auto Generator (ESP lengkap generator, survivor, killer, hook)
 • Tpwalk (2x speed + dash)
-• Mass Kill (teleport depan)
-• Auto Parry (Swort/Parry Dagger)
-• God Mode (health regen + stealth)
-• Stealth Invisibility (seat method)
+• Mass Kill (teleport depan + remote event)
+• Auto Parry (deteksi Swort/Parrying Dagger)
+• God Mode (health regen + stealth jarak)
+• Stealth Invisibility (seat method + pre-teleport)
 • Shield, No Collide, Auto Aim, Skill Check Bypass
 
-📦 Update v10.1:
-• Fix teleport depan mass kill
-• Minimize GUI ke floating bar
-• Menu INFO & ABOUT
+📦 Update Terbaru v10.1:
+• Fix teleport depan untuk mass kill (lebih cepat)
+• Minimize GUI ke floating bar (drag & restore)
+• Tambah menu INFO dengan scroll text
+• Optimasi performa keseluruhan
 
-👤 Credits: kemi (CyberHeroes)
-⚠️ Hanya untuk edukasi & testing pribadi
-]]
-
--- Teks untuk menu About (pendek)
-local aboutText = [[
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CYBERHEROES DELTA EXECUTOR v10.1
-Script by: kemi
+👤 Credits:
+Script by kemi (CyberHeroes)
 Support: Delta Executor, Synapse X, Krnl
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Terima kasih telah menggunakan script ini.
-Gunakan dengan bijak dan bertanggung jawab.
-Untuk laporan bug atau saran, hubungi creator.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Warning:
+Gunakan hanya untuk edukasi dan testing di server pribadi.
+Jangan digunakan untuk mengganggu pengalaman pemain lain.
 ]]
 
 -- ============================================================================
@@ -2614,7 +2611,7 @@ local function updateTheme()
 end
 
 -- ============================================================================
--- SETTINGS CONTENT (sama seperti sebelumnya, tidak diubah)
+-- SETTINGS CONTENT (sama seperti sebelumnya)
 -- ============================================================================
 local function createSettingsContent()
     if settingsContent then settingsContent:Destroy() end
@@ -2750,7 +2747,7 @@ local function createSettingsContent()
 end
 
 -- ============================================================================
--- INFO CONTENT (tanpa scroll, font kecil)
+-- INFO CONTENT (baru)
 -- ============================================================================
 local infoContent = nil
 local function createInfoContent()
@@ -2760,54 +2757,46 @@ local function createInfoContent()
     infoContent.BackgroundTransparency = 1
     infoContent.Parent = contentPanel
 
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -10, 1, -10)
+    scrollFrame.Position = UDim2.new(0, 5, 0, 5)
+    scrollFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
+    scrollFrame.BackgroundTransparency = 0.3
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 6
+    scrollFrame.Parent = infoContent
+    local scrollCorner = Instance.new("UICorner")
+    scrollCorner.CornerRadius = UDim.new(0, 4)
+    scrollCorner.Parent = scrollFrame
+
     local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, -10, 1, -10)
-    textLabel.Position = UDim2.new(0, 5, 0, 5)
+    textLabel.Size = UDim2.new(1, 0, 0, 0)
     textLabel.Text = infoText
     textLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     textLabel.BackgroundTransparency = 1
     textLabel.Font = Enum.Font.Gotham
-    textLabel.TextSize = 8           -- Ukuran lebih kecil agar muat
+    textLabel.TextSize = 10
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.TextYAlignment = Enum.TextYAlignment.Top
     textLabel.TextWrapped = true
-    textLabel.Parent = infoContent
+    textLabel.Parent = scrollFrame
+
+    -- Hitung tinggi teks
+    textLabel.Text = infoText
+    local textBounds = textLabel.TextBounds
+    textLabel.Size = UDim2.new(1, 0, 0, textBounds.Y + 20)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textBounds.Y + 30)
 end
 
 -- ============================================================================
--- ABOUT CONTENT (baru, tanpa scroll)
--- ============================================================================
-local aboutContent = nil
-local function createAboutContent()
-    if aboutContent then aboutContent:Destroy() end
-    aboutContent = Instance.new("Frame")
-    aboutContent.Size = UDim2.new(1, 0, 1, 0)
-    aboutContent.BackgroundTransparency = 1
-    aboutContent.Parent = contentPanel
-
-    local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, -10, 1, -10)
-    textLabel.Position = UDim2.new(0, 5, 0, 5)
-    textLabel.Text = aboutText
-    textLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    textLabel.BackgroundTransparency = 1
-    textLabel.Font = Enum.Font.Gotham
-    textLabel.TextSize = 10
-    textLabel.TextXAlignment = Enum.TextXAlignment.Center
-    textLabel.TextYAlignment = Enum.TextYAlignment.Center
-    textLabel.TextWrapped = true
-    textLabel.Parent = aboutContent
-end
-
--- ============================================================================
--- FLOATING BAR (MINI GUI) - DIPERBAIKI AGAR RESTORE BEKERJA
+-- FLOATING BAR (MINI GUI)
 -- ============================================================================
 local function createFloatingBar()
-    -- Hapus yang lama jika ada
-    if floatingBar then
-        pcall(function() floatingBar:Destroy() end)
-        floatingBar = nil
+    if floatingBar and floatingBar.Parent then
+        floatingBar.Visible = true
+        return floatingBar
     end
+    if floatingBar then floatingBar:Destroy() end
 
     local barGui = Instance.new("ScreenGui")
     barGui.Name = "CyberHeroes_FloatingBar"
@@ -2859,7 +2848,7 @@ local function createFloatingBar()
     -- Draggable
     makeDraggable(barFrame)
 
-    -- Klik untuk restore (pastikan mainFrame ada dan visible)
+    -- Klik untuk restore
     barFrame.MouseButton1Click:Connect(function()
         if mainFrame then
             mainFrame.Visible = true
@@ -2875,7 +2864,7 @@ local function createFloatingBar()
 end
 
 -- ============================================================================
--- GUI BUTTONS (sama)
+-- GUI BUTTONS (sama, tidak diubah)
 -- ============================================================================
 local function createGridButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
@@ -3013,7 +3002,7 @@ local function createPermanentTeleportButton()
 end
 
 -- ============================================================================
--- MAIN GUI (dengan minimize ke floating bar, dan perbaikan tombol)
+-- MAIN GUI (dengan minimize ke floating bar)
 -- ============================================================================
 local function createGUI()
     if screenGui then screenGui:Destroy() end
@@ -3084,7 +3073,6 @@ local function createGUI()
     local minCorner = Instance.new("UICorner")
     minCorner.CornerRadius = UDim.new(0, 3)
     minCorner.Parent = minimizeBtn
-
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 22, 0, 22)
     closeBtn.Position = UDim2.new(1, -26, 0, 1)
@@ -3100,11 +3088,10 @@ local function createGUI()
     closeCorner.CornerRadius = UDim.new(0, 3)
     closeCorner.Parent = closeBtn
 
-    -- Fungsi minimize yang benar
+    -- Fungsi minimize: sembunyikan mainFrame, tampilkan floating bar
     local function minimizeGUI()
         config.guiVisible = false
         if mainFrame then mainFrame.Visible = false end
-        -- Buat atau tampilkan floating bar
         if not floatingBar or not floatingBar.Parent then
             createFloatingBar()
         else
@@ -3113,6 +3100,7 @@ local function createGUI()
         isFloatingVisible = true
     end
 
+    -- Fungsi close sama dengan minimize (tidak menghancurkan)
     minimizeBtn.MouseButton1Click:Connect(minimizeGUI)
     closeBtn.MouseButton1Click:Connect(minimizeGUI)
 
@@ -3184,7 +3172,7 @@ local function createGUI()
         createGridButton(contentPanel, feat.name, feat.text, initialState)
     end
 
-    -- Navigation handlers (dengan destroy konten lain)
+    -- Navigation handlers
     homeItem.MouseButton1Click:Connect(function()
         homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)
         featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -3193,7 +3181,6 @@ local function createGUI()
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
         gridLayout.Parent = contentPanel
     end)
     featuresItem.MouseButton1Click:Connect(function()
@@ -3204,7 +3191,6 @@ local function createGUI()
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
         gridLayout.Parent = contentPanel
     end)
     settingsItem.MouseButton1Click:Connect(function()
@@ -3215,7 +3201,6 @@ local function createGUI()
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         gridLayout.Parent = nil
         if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
         createSettingsContent()
     end)
     infoItem.MouseButton1Click:Connect(function()
@@ -3226,7 +3211,6 @@ local function createGUI()
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         gridLayout.Parent = nil
         if settingsContent then settingsContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
         createInfoContent()
     end)
     aboutItem.MouseButton1Click:Connect(function()
@@ -3235,10 +3219,9 @@ local function createGUI()
         featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        gridLayout.Parent = nil
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-        createAboutContent()
+        gridLayout.Parent = contentPanel
     end)
 
     makeDraggable(mainFrame)

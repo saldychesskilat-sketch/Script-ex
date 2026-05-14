@@ -2636,6 +2636,42 @@ local function updateTheme()
     if statusLabel then statusLabel.TextColor3 = config.guiThemeColor end
 end
 
+local function createFloatingLogo()
+    if floatingLogo and floatingLogo.Parent then return end
+    if floatingLogo then floatingLogo:Destroy() end
+    
+    local logoGui = Instance.new("ScreenGui")
+    logoGui.Name = "CyberHeroes_FloatingLogo"
+    logoGui.ResetOnSpawn = false
+    logoGui.Parent = CoreGui
+    
+    local logoButton = Instance.new("TextButton")
+    logoButton.Size = UDim2.new(0, 100, 0, 30)
+    logoButton.Position = UDim2.new(0.85, 0, 0.05, 0)
+    logoButton.Text = "⚡ CHEAT"
+    logoButton.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+    logoButton.TextColor3 = config.guiThemeColor
+    logoButton.Font = Enum.Font.GothamBold
+    logoButton.BorderSizePixel = 0
+    logoButton.Parent = logoGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = logoButton
+    
+    logoButton.MouseButton1Click:Connect(function()
+        if mainFrame then
+            mainFrame.Visible = true
+            config.guiVisible = true
+            logoGui:Destroy()
+            floatingLogo = nil
+        end
+    end)
+    
+    makeDraggable(logoButton)
+    floatingLogo = logoGui
+end
+
 -- ============================================================================
 -- SETTINGS CONTENT (sama seperti sebelumnya, hanya dirapihkan)
 -- ============================================================================

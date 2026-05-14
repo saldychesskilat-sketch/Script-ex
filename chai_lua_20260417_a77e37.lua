@@ -2789,15 +2789,17 @@ local function createInfoContent()
 end
 
 -- ============================================================================
--- FLOATING BAR (MINI GUI)
+-- FLOATING BAR (MINI GUI) - VERSI DIPERBAIKI
 -- ============================================================================
 local function createFloatingBar()
+    -- Jika sudah ada dan masih hidup, cukup tampilkan
     if floatingBar and floatingBar.Parent then
         floatingBar.Visible = true
         return floatingBar
     end
     if floatingBar then floatingBar:Destroy() end
 
+    -- Buat ScreenGui untuk floating bar
     local barGui = Instance.new("ScreenGui")
     barGui.Name = "CyberHeroes_FloatingBar"
     barGui.ResetOnSpawn = false
@@ -2814,6 +2816,7 @@ local function createFloatingBar()
     barFrame.BorderSizePixel = 0
     barFrame.Parent = barGui
 
+    -- Styling
     local barCorner = Instance.new("UICorner")
     barCorner.CornerRadius = UDim.new(0, 8)
     barCorner.Parent = barFrame
@@ -2845,18 +2848,68 @@ local function createFloatingBar()
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.Parent = barFrame
 
-    -- Draggable
-    makeDraggable(barFrame)
+    -- === Mekanisme drag (manual, tidak menggunakan makeDraggable agar lebih akurat) ===
+    local dragging = false
+    local dragStartPos, dragStartOffset
 
-    -- Klik untuk restore
-    barFrame.MouseButton1Click:Connect(function()
-        if mainFrame then
-            mainFrame.Visible = true
-            config.guiVisible = true
-            barGui:Destroy()
-            floatingBar = nil
-            isFloatingVisible = false
+    barFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStartPos = input.Position
+            dragStartOffset = barFrame.Position
         end
+    end)
+
+    barFrame.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStartPos
+            barFrame.Position = UDim2.new(
+                dragStartOffset.X.Scale,
+                dragStartOffset.X.Offset + delta.X,
+                dragStartOffset.Y.Scale,
+                dragStartOffset.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    barFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    -- === Klik untuk restore (hanya jika tidak drag) ===
+    local isDrag = false
+    barFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isDrag = false
+        end
+    end)
+    barFrame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            isDrag = true
+        end
+    end)
+    barFrame.InputEnded:Connect(function(input)
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isDrag then
+            if mainFrame then
+                mainFrame.Visible = true
+                config.guiVisible = true
+                barGui:Destroy()
+                floatingBar = nil
+                isFloatingVisible = false
+            end
+        end
+    end)
+
+    -- Efek hover
+    barFrame.MouseEnter:Connect(function()
+        TweenService:Create(barFrame, TweenInfo.new(0.15), {BackgroundTransparency = 0.05}):Play()
+        TweenService:Create(barStroke, TweenInfo.new(0.15), {Transparency = 0.1, Thickness = 2}):Play()
+    end)
+    barFrame.MouseLeave:Connect(function()
+        TweenService:Create(barFrame, TweenInfo.new(0.15), {BackgroundTransparency = 0.2}):Play()
+        TweenService:Create(barStroke, TweenInfo.new(0.15), {Transparency = 0.4, Thickness = 1.5}):Play()
     end)
 
     floatingBar = barGui
@@ -3088,17 +3141,18 @@ local function createGUI()
     closeCorner.CornerRadius = UDim.new(0, 3)
     closeCorner.Parent = closeBtn
 
-    -- Fungsi minimize: sembunyikan mainFrame, tampilkan floating bar
+        -- Fungsi minimize: sembunyikan mainFrame, tampilkan floating bar
     local function minimizeGUI()
         config.guiVisible = false
         if mainFrame then mainFrame.Visible = false end
-        if not floatingBar or not floatingBar.Parent then
-            createFloatingBar()
-        else
-            floatingBar.Visible = true
+        -- Hancurkan floating bar lama jika ada agar tidak bentrok
+        if floatingBar then
+            pcall(function() floatingBar:Destroy() end)
+            floatingBar = nil
         end
+        createFloatingBar() -- buat baru
         isFloatingVisible = true
-    end
+end
 
     -- Fungsi close sama dengan minimize (tidak menghancurkan)
     minimizeBtn.MouseButton1Click:Connect(minimizeGUI)

@@ -2527,7 +2527,7 @@ local function teleportToNearestSurvivor()
 end
 
 -- ============================================================================
--- FEATURE 17: MODERN GUI (FIXED - MINIMIZE, INFO SCROLL, ABOUT CONTENT)
+-- FEATURE 17: MODERN GUI (UPGRADED - FIXED MINIMIZE, INFO SCROLL, ABOUT TAB)
 -- ============================================================================
 
 -- Variabel global untuk floating bar
@@ -2564,33 +2564,41 @@ Gunakan hanya untuk edukasi dan testing di server pribadi.
 Jangan digunakan untuk mengganggu pengalaman pemain lain.
 ]]
 
--- Teks untuk menu About
+-- Teks untuk menu About (bisa diedit langsung)
 local aboutText = [[
-═══════════════════════════════════════
-        CYBERHEROES SCRIPT v10.1
-═══════════════════════════════════════
+════════════════════════════════════════════════════
+           CYBERHEROES DELTA EXECUTOR
+════════════════════════════════════════════════════
 
-👤 Creator     : kemi (CyberHeroes)
-🛠️  Executor    : Delta Executor, Synapse X, Krnl
-📅 Build Date  : 2026-05-14
-🌐 Version     : 10.1
+👨‍💻 CREATOR: kemi
+🛡️ ALIAS: CyberHeroes
+📅 VERSION: 10.1 (Build 2025)
 
-📖 Deskripsi:
-Script auto-farm dan auto-kill untuk game Violence District.
-Fitur lengkap dengan GUI modern, drag, minimize ke floating bar.
+⚙️ EXECUTOR COMPATIBILITY:
+   • Delta Executor
+   • Synapse X
+   • Krnl
+   • ScriptWare
 
-💡 Kontribusi:
-Jika menemukan bug atau ingin request fitur, hubungi creator via Discord.
+💡 SPECIAL THANKS:
+   • Semua tester dan kontributor
+   • Komunitas CyberHeroes Indonesia
 
-⚠️ Disclaimer:
-Script ini dibuat untuk tujuan edukasi dan testing.
-Gunakan dengan bijak dan tanggung jawab sendiri.
+📢 CONTACT & SOCIAL:
+   • Discord: CyberHeroes Official
+   • GitHub: /CyberHeroes-Project
 
-═══════════════════════════════════════
+📝 DISCLAIMER:
+Script ini dibuat untuk tujuan edukasi dan
+pengujian keamanan. Gunakan hanya di server
+yang Anda miliki izin. Penyalahgunaan di luar
+tanggung jawab creator.
+
+════════════════════════════════════════════════════
 ]]
 
 -- ============================================================================
--- DRAGGABLE
+-- DRAGGABLE (tidak berubah)
 -- ============================================================================
 local function makeDraggable(frame)
     local dragging = false
@@ -2632,7 +2640,7 @@ local function updateTheme()
 end
 
 -- ============================================================================
--- SETTINGS CONTENT
+-- SETTINGS CONTENT (sama seperti sebelumnya)
 -- ============================================================================
 local function createSettingsContent()
     if settingsContent then settingsContent:Destroy() end
@@ -2768,7 +2776,7 @@ local function createSettingsContent()
 end
 
 -- ============================================================================
--- INFO CONTENT (FIXED SCROLL)
+-- INFO CONTENT (FIXED: scroll teks berfungsi)
 -- ============================================================================
 local infoContent = nil
 local function createInfoContent()
@@ -2802,15 +2810,16 @@ local function createInfoContent()
     textLabel.TextWrapped = true
     textLabel.Parent = scrollFrame
 
-    -- Atur ukuran textLabel berdasarkan konten
+    -- Hitung tinggi teks dengan benar
     textLabel.Text = infoText
-    local textBounds = textLabel.TextBounds
-    textLabel.Size = UDim2.new(1, 0, 0, textBounds.Y + 20)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textBounds.Y + 30)
+    task.wait(0.05)
+    local textHeight = textLabel.TextBounds.Y + 20
+    textLabel.Size = UDim2.new(1, 0, 0, textHeight)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight + 10)
 end
 
 -- ============================================================================
--- ABOUT CONTENT (BARU)
+-- ABOUT CONTENT (baru)
 -- ============================================================================
 local aboutContent = nil
 local function createAboutContent()
@@ -2845,20 +2854,21 @@ local function createAboutContent()
     textLabel.Parent = scrollFrame
 
     textLabel.Text = aboutText
-    local textBounds = textLabel.TextBounds
-    textLabel.Size = UDim2.new(1, 0, 0, textBounds.Y + 20)
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textBounds.Y + 30)
+    task.wait(0.05)
+    local textHeight = textLabel.TextBounds.Y + 20
+    textLabel.Size = UDim2.new(1, 0, 0, textHeight)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight + 10)
 end
 
 -- ============================================================================
--- FLOATING BAR (MINI GUI)
+-- FLOATING BAR (MINI GUI) - DIPERBAIKI
 -- ============================================================================
 local function createFloatingBar()
-    if floatingBar and floatingBar.Parent then
-        floatingBar.Visible = true
-        return floatingBar
+    -- Hapus floating bar yang sudah ada jika ada
+    if floatingBar then
+        pcall(function() floatingBar:Destroy() end)
+        floatingBar = nil
     end
-    if floatingBar then floatingBar:Destroy() end
 
     local barGui = Instance.new("ScreenGui")
     barGui.Name = "CyberHeroes_FloatingBar"
@@ -2907,9 +2917,10 @@ local function createFloatingBar()
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.Parent = barFrame
 
+    -- Draggable
     makeDraggable(barFrame)
 
-    -- Klik untuk restore GUI utama
+    -- Klik untuk restore GUI
     barFrame.MouseButton1Click:Connect(function()
         if mainFrame then
             mainFrame.Visible = true
@@ -2925,7 +2936,22 @@ local function createFloatingBar()
 end
 
 -- ============================================================================
--- GUI BUTTONS
+-- FUNGSI MINIMIZE (HIDE GUI, TAMPILKAN FLOATING BAR)
+-- ============================================================================
+local function minimizeGUI()
+    if not mainFrame then return end
+    config.guiVisible = false
+    mainFrame.Visible = false
+    if not floatingBar or not floatingBar.Parent then
+        createFloatingBar()
+    else
+        floatingBar.Visible = true
+    end
+    isFloatingVisible = true
+end
+
+-- ============================================================================
+-- GUI BUTTONS (sama, tidak diubah)
 -- ============================================================================
 local function createGridButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
@@ -3029,7 +3055,7 @@ local function createSidebarItem(parent, text, icon, active)
 end
 
 -- ============================================================================
--- PERMANENT TELEPORT BUTTON
+-- PERMANENT TELEPORT BUTTON (tidak berubah)
 -- ============================================================================
 local function createPermanentTeleportButton()
     if teleportButtonGui then teleportButtonGui:Destroy() end
@@ -3063,7 +3089,7 @@ local function createPermanentTeleportButton()
 end
 
 -- ============================================================================
--- MAIN GUI
+-- MAIN GUI (dengan minimize ke floating bar yang berfungsi)
 -- ============================================================================
 local function createGUI()
     if screenGui then screenGui:Destroy() end
@@ -3149,18 +3175,7 @@ local function createGUI()
     closeCorner.CornerRadius = UDim.new(0, 3)
     closeCorner.Parent = closeBtn
 
-    -- Fungsi minimize: sembunyikan mainFrame, tampilkan floating bar
-    local function minimizeGUI()
-        config.guiVisible = false
-        if mainFrame then mainFrame.Visible = false end
-        if not floatingBar or not floatingBar.Parent then
-            createFloatingBar()
-        else
-            floatingBar.Visible = true
-        end
-        isFloatingVisible = true
-    end
-
+    -- Tombol minimize dan close sekarang memanggil fungsi yang sama
     minimizeBtn.MouseButton1Click:Connect(minimizeGUI)
     closeBtn.MouseButton1Click:Connect(minimizeGUI)
 
@@ -3175,7 +3190,7 @@ local function createGUI()
     sidebarCorner.CornerRadius = UDim.new(0, 0)
     sidebarCorner.Parent = sidebar
     local sidebarList = Instance.new("Frame")
-    sidebarList.Size = UDim2.new(1, 0, 0, 150)
+    sidebarList.Size = UDim2.new(1, 0, 0, 180) -- diperbesar untuk menampung semua item
     sidebarList.Position = UDim2.new(0, 0, 0.05, 0)
     sidebarList.BackgroundTransparency = 1
     sidebarList.Parent = sidebar
@@ -3232,16 +3247,20 @@ local function createGUI()
         createGridButton(contentPanel, feat.name, feat.text, initialState)
     end
 
-    -- Navigation handlers
+    -- Navigation handlers (membersihkan konten sebelumnya)
+    local function clearAllContents()
+        if settingsContent then settingsContent:Destroy(); settingsContent = nil end
+        if infoContent then infoContent:Destroy(); infoContent = nil end
+        if aboutContent then aboutContent:Destroy(); aboutContent = nil end
+    end
+
     homeItem.MouseButton1Click:Connect(function()
         homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)
         featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        if settingsContent then settingsContent:Destroy() end
-        if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
+        clearAllContents()
         gridLayout.Parent = contentPanel
     end)
     featuresItem.MouseButton1Click:Connect(function()
@@ -3250,9 +3269,7 @@ local function createGUI()
         settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        if settingsContent then settingsContent:Destroy() end
-        if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
+        clearAllContents()
         gridLayout.Parent = contentPanel
     end)
     settingsItem.MouseButton1Click:Connect(function()
@@ -3261,9 +3278,8 @@ local function createGUI()
         featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
+        clearAllContents()
         gridLayout.Parent = nil
-        if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
         createSettingsContent()
     end)
     infoItem.MouseButton1Click:Connect(function()
@@ -3272,9 +3288,8 @@ local function createGUI()
         featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
+        clearAllContents()
         gridLayout.Parent = nil
-        if settingsContent then settingsContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
         createInfoContent()
     end)
     aboutItem.MouseButton1Click:Connect(function()
@@ -3283,9 +3298,8 @@ local function createGUI()
         featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
+        clearAllContents()
         gridLayout.Parent = nil
-        if settingsContent then settingsContent:Destroy() end
-        if infoContent then infoContent:Destroy() end
         createAboutContent()
     end)
 
@@ -3344,7 +3358,9 @@ local function createGUI()
 
     mainFrame.BackgroundTransparency = 0.3
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
-end 
+end
+
+    
 -- ============================================================================
 -- RESTORE FEATURE STATES FUNCTION (LENGKAP)
 -- ============================================================================

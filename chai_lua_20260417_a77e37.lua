@@ -1998,10 +1998,10 @@ local function stopNoCollideMonitor()
 end
 
 -- ============================================================================
--- FEATURE 12: MASS KILL LOOP (USING HILT HITBOX - IMPROVED)
+-- FEATURE 12: MASS KILL LOOP (OPTIMIZED - TELEPORT FRONT + FASTER EXECUTION)
 -- ============================================================================
 
--- Utility functions (pastikan sudah ada, jika belum ditambahkan)
+-- Utility functions
 local function getLocalCharacter()
     local char = localPlayer.Character
     if char then
@@ -2010,14 +2010,18 @@ local function getLocalCharacter()
     return char
 end
 
-local function teleportBehind(targetRoot)
+-- ** TELEPORT KE DEPAN PLAYER (bukan belakang) dengan cepat **
+local function teleportFront(targetRoot)
     if not targetRoot or not localRootPart then return false end
     local targetCFrame = targetRoot.CFrame
-    local behindPos = targetCFrame.Position - targetCFrame.LookVector * 2
-    pcall(function() localRootPart.CFrame = CFrame.new(behindPos) end)
-    return true
+    local frontPos = targetCFrame.Position + targetCFrame.LookVector * 2
+    local success = pcall(function()
+        localRootPart.CFrame = CFrame.new(frontPos)
+    end)
+    return success
 end
 
+-- Lock camera ke target (opsional, tidak mengganggu kecepatan)
 local function lockCameraTo(position)
     if not camera then return end
     pcall(function() camera.CFrame = CFrame.new(camera.CFrame.Position, position) end)
@@ -2048,7 +2052,7 @@ local function getAllSurvivors()
     return survivors
 end
 
--- Simulasi tekan tombol E
+-- Simulasi tekan tombol E (dipersingkat)
 local function simulatePressE()
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
@@ -2060,7 +2064,7 @@ local function simulatePressE()
     end)
 end
 
--- Cari hilt hitbox (opsional, untuk fallback)
+-- Cari hilt hitbox (opsional)
 local function findHiltHitbox()
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if obj.Name:lower():find("hilt") then
@@ -2071,7 +2075,7 @@ local function findHiltHitbox()
 end
 
 -- ============================================================================
--- HIT SURVIVOR DENGAN PRIORITAS REMOTE EVENT (METODE BIRU YANG BERHASIL)
+-- HIT SURVIVOR DENGAN PRIORITAS REMOTE EVENT (DIOPTIMASI, HILANGKAN DELAY)
 -- ============================================================================
 local function hitSurvivorWithRemote(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then return false end
@@ -2081,8 +2085,7 @@ local function hitSurvivorWithRemote(targetPlayer)
 
     local hitSuccess = false
 
-    -- METHOD 1: REMOTE EVENT (PRIORITAS UTAMA - TERBUKTI BERHASIL)
-    -- Cari semua remote event dengan kata kunci damage/hit/kill/attack
+    -- METHOD 1: REMOTE EVENT (PRIORITAS UTAMA)
     local remoteEvents = {}
     for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
         if remote:IsA("RemoteEvent") then
@@ -2092,23 +2095,14 @@ local function hitSurvivorWithRemote(targetPlayer)
             end
         end
     end
-    -- Coba semua remote event yang ditemukan
     for _, remote in ipairs(remoteEvents) do
-        pcall(function()
-            remote:FireServer(targetPlayer)
-            hitSuccess = true
-        end)
-        pcall(function()
-            remote:FireServer(targetPlayer, "attack")
-            hitSuccess = true
-        end)
-        pcall(function()
-            remote:FireServer(targetPlayer.Character)
-            hitSuccess = true
-        end)
+        pcall(function() remote:FireServer(targetPlayer) end)
+        pcall(function() remote:FireServer(targetPlayer, "attack") end)
+        pcall(function() remote:FireServer(targetPlayer.Character) end)
+        hitSuccess = true
     end
 
-    -- METHOD 2: Direct health manipulation (fallback cepat)
+    -- METHOD 2: Direct health manipulation
     if not hitSuccess then
         pcall(function() humanoid.Health = 0 end)
         hitSuccess = true
@@ -2120,7 +2114,7 @@ local function hitSurvivorWithRemote(targetPlayer)
         hitSuccess = true
     end
 
-    -- METHOD 4: Interaksi dengan hilt (jika ada)
+    -- METHOD 4: Interaksi dengan hilt (tanpa delay)
     if not hitSuccess then
         local hilt = findHiltHitbox()
         if hilt then
@@ -2135,13 +2129,13 @@ local function hitSurvivorWithRemote(targetPlayer)
             end
             local proximityPrompt = hilt:FindFirstChildWhichIsA("ProximityPrompt")
             if proximityPrompt and proximityPrompt.Enabled then
-                pcall(function() proximityPrompt:Hold(); task.wait(0.01); proximityPrompt:Release() end)
+                pcall(function() proximityPrompt:Hold(); proximityPrompt:Release() end) -- tanpa task.wait
                 hitSuccess = true
             end
         end
     end
 
-    -- METHOD 5: Simulasi tekan E (terakhir)
+    -- METHOD 5: Simulasi tekan E
     if not hitSuccess then
         simulatePressE()
         hitSuccess = true
@@ -2151,7 +2145,7 @@ local function hitSurvivorWithRemote(targetPlayer)
 end
 
 -- ============================================================================
--- MASS KILL LOOP (STEP BY STEP, PRIORITAS REMOTE EVENT)
+-- MASS KILL LOOP (LEBIH CEPAT: TELEPORT FRONT + LANGSUNG HIT)
 -- ============================================================================
 local function massKillLoop()
     if not config.massKillEnabled then return end
@@ -2160,18 +2154,14 @@ local function massKillLoop()
     local survivors = getAllSurvivors()
     if #survivors == 0 then return end
 
-    -- Ambil target random (bisa diganti dengan terdekat)
+    -- Ambil target random
     local target = survivors[math.random(1, #survivors)]
     if target and target.Character then
         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso")
         if targetRoot then
-            teleportBehind(targetRoot)
-            lockCameraTo(targetRoot.Position)
-            if hitSurvivorWithRemote(target) then
-                print("[MassKill] Hit " .. target.Name .. " using REMOTE EVENT (successful)")
-            else
-                print("[MassKill] Failed to hit " .. target.Name)
-            end
+            teleportFront(targetRoot)           -- Teleport ke depan player
+            lockCameraTo(targetRoot.Position)   -- Kunci kamera
+            hitSurvivorWithRemote(target)       -- Hit langsung
         end
     end
 end
@@ -2184,7 +2174,7 @@ local massKillLoopConnection = nil
 local function startMassKillLoop()
     if massKillLoopConnection then return end
     massKillLoopConnection = RunService.Heartbeat:Connect(massKillLoop)
-    print("[MassKill] Mass kill loop started (using REMOTE EVENT method)")
+    print("[MassKill] Mass kill loop started (teleport FRONT + optimized hit)")
 end
 
 local function stopMassKillLoop()

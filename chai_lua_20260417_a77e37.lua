@@ -2805,23 +2805,13 @@ local function createInfoContent()
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.TextYAlignment = Enum.TextYAlignment.Top
     textLabel.TextWrapped = true
-    textLabel.AutomaticSize = Enum.AutomaticSize.Y
     textLabel.Parent = scrollFrame
 
-    -- Tunggu render untuk mendapatkan ukuran yang benar
-    task.defer(function()
-        textLabel.Text = infoText
-        local textHeight = textLabel.AbsoluteSize.Y
-        if textHeight > 0 then
-            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight + 10)
-        else
-            -- fallback: hitung manual
-            local bounds = textLabel.TextBounds
-            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, bounds.Y + 20)
-        end
-    end)
+    -- Hitung tinggi teks secara langsung (tanpa task.defer)
+    local bounds = textLabel.TextBounds
+    textLabel.Size = UDim2.new(1, 0, 0, bounds.Y + 10)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, bounds.Y + 20)
 end
-
 -- ============================================================================
 -- ABOUT CONTENT (baru)
 -- ============================================================================
@@ -2855,19 +2845,11 @@ local function createAboutContent()
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.TextYAlignment = Enum.TextYAlignment.Top
     textLabel.TextWrapped = true
-    textLabel.AutomaticSize = Enum.AutomaticSize.Y
     textLabel.Parent = scrollFrame
 
-    task.defer(function()
-        textLabel.Text = aboutText
-        local textHeight = textLabel.AbsoluteSize.Y
-        if textHeight > 0 then
-            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight + 10)
-        else
-            local bounds = textLabel.TextBounds
-            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, bounds.Y + 20)
-        end
-    end)
+    local bounds = textLabel.TextBounds
+    textLabel.Size = UDim2.new(1, 0, 0, bounds.Y + 10)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, bounds.Y + 20)
 end
 
 -- ============================================================================
@@ -3268,29 +3250,29 @@ local function createGUI()
             currentContentFrame:Destroy()
             currentContentFrame = nil
         end
-        gridLayout.Visible = true
+        if gridLayout then gridLayout.Visible = true end
     end
 
     local function showSettings()
-        gridLayout.Visible = false
+        if gridLayout then gridLayout.Visible = false end
         if currentContentFrame then currentContentFrame:Destroy() end
         createSettingsContent()
         currentContentFrame = settingsContent
     end
 
     local function showInfo()
-        gridLayout.Visible = false
+        if gridLayout then gridLayout.Visible = false end
         if currentContentFrame then currentContentFrame:Destroy() end
         createInfoContent()
         currentContentFrame = infoContent
     end
 
     local function showAbout()
-        gridLayout.Visible = false
+        if gridLayout then gridLayout.Visible = false end
         if currentContentFrame then currentContentFrame:Destroy() end
         createAboutContent()
         currentContentFrame = aboutContent
-    end
+end
 
     -- Navigation handlers
     homeItem.MouseButton1Click:Connect(function()

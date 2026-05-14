@@ -2528,24 +2528,14 @@ end
 
 
 -- ============================================================================
--- FEATURE 17: MODERN GUI (OPTIMIZED - MINIMIZE FLOATING BAR, INFO/ABOUT TABS)
+-- FEATURE 17: MODERN GUI (FULLY FIXED - MINIMIZE FLOATING BAR + TAB SYSTEM)
 -- ============================================================================
 
--- ============================================================================
--- FEATURE 17: MODERN GUI (FULLY FIXED - MINIMIZE TO FLOATING BUTTON + INFO & ABOUT TABS)
--- ============================================================================
-
--- Variabel global untuk floating bar (sekarang menggunakan TextButton)
-local floatingButton = nil
+-- Variabel global untuk floating bar
+local floatingBar = nil
 local isFloatingVisible = false
 
--- Container untuk features grid (agar bisa disembunyikan tanpa merusak layout)
-local featureContainer = nil
-local settingsContainer = nil
-local infoContainer = nil
-local aboutContainer = nil
-
--- Teks untuk menu INFO (bisa diedit langsung)
+-- Teks untuk menu Info
 local infoText = [[
 CYBERHEROES SCRIPT v10.1
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2572,40 +2562,40 @@ Support: Delta Executor, Synapse X, Krnl
 
 ⚠️ Warning:
 Gunakan hanya untuk edukasi dan testing di server pribadi.
-Jangan digunakan untuk mengganggu pengalaman pemain lain.
 ]]
 
--- Teks untuk menu ABOUT
+-- Teks untuk About
 local aboutText = [[
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                  CYBERHEROES DELTA EXECUTOR
-                          v10.1
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+═══════════════════════════════════════════
+            CYBERHEROES SCRIPT
+═══════════════════════════════════════════
 
-👨‍💻 Creator: kemi
-🛡️ Aliansi: CyberHeroes
-⚙️ Executor Support: Delta Executor, Synapse X, Krnl
-📅 Build Date: May 2025
+📌 Creator        : kemi (CyberHeroes)
+📌 Script Name    : CyberHeroes Delta Executor
+📌 Version        : v10.1
+📌 Supported      : Delta Executor, Synapse X, Krnl, ScriptWare
 
-💡 Deskripsi:
-Script auto-farm dan auto-kill untuk game Violence District.
-Dirancang untuk membantu survivor dan killer dengan fitur canggih.
+📝 Description:
+All-in-one script untuk game Violence District.
+Fitur lengkap untuk Survivor dan Killer.
+Dikembangkan untuk edukasi dan testing keamanan.
 
 🔧 Fitur Utama:
-- Auto Win & Auto Task
-- ESP Lengkap (Player, Generator, Hook)
-- Auto Kill & Mass Kill
-- Stealth, Shield, No Collide
-- TPWalk, Speed Boost, God Mode
+• Auto Win, Auto Task, Auto Generator
+• ESP (player, generator, hook)
+• Tpwalk, Mass Kill, Auto Parry
+• God Mode, Stealth, Shield, No Collide
+• Auto Aim, Skill Check Bypass
 
-📜 Lisensi: Free for educational use only.
-🚫 Dilarang memperjualbelikan script ini.
+📢 Catatan:
+Script ini open-source dan diperbarui secara berkala.
+Laporkan bug di Discord CyberHeroes.
 
-Terima kasih telah menggunakan CyberHeroes!
+═══════════════════════════════════════════
 ]]
 
 -- ============================================================================
--- DRAGGABLE (tidak berubah)
+-- DRAGGABLE (untuk semua frame)
 -- ============================================================================
 local function makeDraggable(frame)
     local dragging = false
@@ -2644,16 +2634,60 @@ local function updateTheme()
         end
     end
     if statusLabel then statusLabel.TextColor3 = config.guiThemeColor end
-    if floatingButton and floatingButton.Parent then
-        local stroke = floatingButton:FindFirstChild("UIStroke")
-        if stroke then stroke.Color = config.guiThemeColor end
-        local textLabel = floatingButton:FindFirstChild("TextLabel")
-        if textLabel then textLabel.TextColor3 = config.guiThemeColor end
+end
+
+-- ============================================================================
+-- CONTENT CONTAINERS
+-- ============================================================================
+local featuresContainer = nil
+local settingsContainer = nil
+local infoContainer = nil
+local aboutContainer = nil
+
+-- ============================================================================
+-- FEATURES CONTENT (grid buttons)
+-- ============================================================================
+local function createFeaturesContainer()
+    if featuresContainer then featuresContainer:Destroy() end
+    featuresContainer = Instance.new("Frame")
+    featuresContainer.Size = UDim2.new(1, 0, 1, 0)
+    featuresContainer.BackgroundTransparency = 1
+    featuresContainer.Parent = contentPanel
+
+    local gridLayout = Instance.new("UIGridLayout")
+    gridLayout.CellSize = UDim2.new(0, 80, 0, 32)
+    gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)
+    gridLayout.FillDirection = Enum.FillDirection.Horizontal
+    gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    gridLayout.Parent = featuresContainer
+
+    local features = {
+        {name="autoWinEnabled", text="AUTO WIN"},
+        {name="autoTaskEnabled", text="AUTO TASK"},
+        {name="espEnabled", text="ESP"},
+        {name="speedBoostEnabled", text="SPEED BOOST"},
+        {name="stealthEnabled", text="STEALTH"},
+        {name="godModeEnabled", text="GOD MODE"},
+        {name="infiniteAmmoEnabled", text="INF AMMO"},
+        {name="shieldEnabled", text="SHIELD"},
+        {name="tpwalkEnabled", text="TPWALK"},
+        {name="noCollideEnabled", text="NO COLLIDE"},
+        {name="massKillEnabled", text="MASS KILL"},
+        {name="autoGeneratorEnabled", text="AUTO GEN"},
+        {name="autoSkillCheckEnabled", text="SKILL CHECK"},
+        {name="autoAimEnabled", text="AUTO AIM"},
+        {name="restartScript", text="RESTART"}
+    }
+    for _, feat in ipairs(features) do
+        local initialState = (feat.name ~= "restartScript") and config[feat.name] or false
+        createGridButton(featuresContainer, feat.name, feat.text, initialState)
     end
 end
 
 -- ============================================================================
--- SETTINGS CONTENT (perbaikan minor)
+-- SETTINGS CONTENT (sama seperti sebelumnya)
 -- ============================================================================
 local function createSettingsContent()
     if settingsContainer then settingsContainer:Destroy() end
@@ -2661,9 +2695,8 @@ local function createSettingsContent()
     settingsContainer.Size = UDim2.new(1, 0, 1, 0)
     settingsContainer.BackgroundTransparency = 1
     settingsContainer.Parent = contentPanel
-    settingsContainer.Visible = true
 
-    -- Sama seperti sebelumnya, tapi kita taruh di settingsContainer
+    -- Warna theme
     local colorLabel = Instance.new("TextLabel")
     colorLabel.Size = UDim2.new(1, -10, 0, 20)
     colorLabel.Position = UDim2.new(0, 5, 0, 5)
@@ -2686,6 +2719,17 @@ local function createSettingsContent()
     colorRed.MouseButton1Click:Connect(function()
         config.guiThemeColor = Color3.fromRGB(255, 0, 0)
         updateTheme()
+        if floatingBar and floatingBar.Parent then
+            local barFrame = floatingBar:FindFirstChild("FloatingBar")
+            if barFrame then
+                local stroke = barFrame:FindFirstChildWhichIsA("UIStroke")
+                if stroke then stroke.Color = config.guiThemeColor end
+                local icon = barFrame:FindFirstChildOfClass("TextLabel")
+                if icon then icon.TextColor3 = config.guiThemeColor end
+                local text = barFrame:FindFirstChildOfClass("TextLabel", true)
+                if text and text ~= icon then text.TextColor3 = config.guiThemeColor end
+            end
+        end
     end)
 
     local colorCyan = Instance.new("TextButton")
@@ -2700,6 +2744,17 @@ local function createSettingsContent()
     colorCyan.MouseButton1Click:Connect(function()
         config.guiThemeColor = Color3.fromRGB(0, 255, 255)
         updateTheme()
+        if floatingBar and floatingBar.Parent then
+            local barFrame = floatingBar:FindFirstChild("FloatingBar")
+            if barFrame then
+                local stroke = barFrame:FindFirstChildWhichIsA("UIStroke")
+                if stroke then stroke.Color = config.guiThemeColor end
+                local icon = barFrame:FindFirstChildOfClass("TextLabel")
+                if icon then icon.TextColor3 = config.guiThemeColor end
+                local text = barFrame:FindFirstChildOfClass("TextLabel", true)
+                if text and text ~= icon then text.TextColor3 = config.guiThemeColor end
+            end
+        end
     end)
 
     local colorYellow = Instance.new("TextButton")
@@ -2714,8 +2769,20 @@ local function createSettingsContent()
     colorYellow.MouseButton1Click:Connect(function()
         config.guiThemeColor = Color3.fromRGB(255, 255, 0)
         updateTheme()
+        if floatingBar and floatingBar.Parent then
+            local barFrame = floatingBar:FindFirstChild("FloatingBar")
+            if barFrame then
+                local stroke = barFrame:FindFirstChildWhichIsA("UIStroke")
+                if stroke then stroke.Color = config.guiThemeColor end
+                local icon = barFrame:FindFirstChildOfClass("TextLabel")
+                if icon then icon.TextColor3 = config.guiThemeColor end
+                local text = barFrame:FindFirstChildOfClass("TextLabel", true)
+                if text and text ~= icon then text.TextColor3 = config.guiThemeColor end
+            end
+        end
     end)
 
+    -- Chat report
     local chatLabel = Instance.new("TextLabel")
     chatLabel.Size = UDim2.new(1, -10, 0, 20)
     chatLabel.Position = UDim2.new(0, 5, 0, 0.2)
@@ -2791,7 +2858,7 @@ local function createSettingsContent()
 end
 
 -- ============================================================================
--- INFO CONTENT (perbaikan ukuran text)
+-- INFO CONTENT (scroll fixed)
 -- ============================================================================
 local function createInfoContent()
     if infoContainer then infoContainer:Destroy() end
@@ -2799,7 +2866,6 @@ local function createInfoContent()
     infoContainer.Size = UDim2.new(1, 0, 1, 0)
     infoContainer.BackgroundTransparency = 1
     infoContainer.Parent = contentPanel
-    infoContainer.Visible = true
 
     local scrollFrame = Instance.new("ScrollingFrame")
     scrollFrame.Size = UDim2.new(1, -10, 1, -10)
@@ -2825,16 +2891,16 @@ local function createInfoContent()
     textLabel.TextWrapped = true
     textLabel.Parent = scrollFrame
 
-    -- Tunggu satu frame agar properti text terupdate
-    task.defer(function()
-        local textHeight = textLabel.TextBounds.Y + 20
-        textLabel.Size = UDim2.new(1, 0, 0, textHeight)
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight + 10)
-    end)
+    -- Update canvas size berdasarkan tinggi text
+    textLabel.Text = infoText
+    local textBounds = textLabel.TextBounds
+    local textHeight = textBounds.Y + 20
+    textLabel.Size = UDim2.new(1, 0, 0, textHeight)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight)
 end
 
 -- ============================================================================
--- ABOUT CONTENT (baru)
+-- ABOUT CONTENT (scroll, sama seperti info)
 -- ============================================================================
 local function createAboutContent()
     if aboutContainer then aboutContainer:Destroy() end
@@ -2842,7 +2908,6 @@ local function createAboutContent()
     aboutContainer.Size = UDim2.new(1, 0, 1, 0)
     aboutContainer.BackgroundTransparency = 1
     aboutContainer.Parent = contentPanel
-    aboutContainer.Visible = true
 
     local scrollFrame = Instance.new("ScrollingFrame")
     scrollFrame.Size = UDim2.new(1, -10, 1, -10)
@@ -2868,92 +2933,14 @@ local function createAboutContent()
     textLabel.TextWrapped = true
     textLabel.Parent = scrollFrame
 
-    task.defer(function()
-        local textHeight = textLabel.TextBounds.Y + 20
-        textLabel.Size = UDim2.new(1, 0, 0, textHeight)
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight + 10)
-    end)
+    local textBounds = textLabel.TextBounds
+    local textHeight = textBounds.Y + 20
+    textLabel.Size = UDim2.new(1, 0, 0, textHeight)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textHeight)
 end
 
 -- ============================================================================
--- FLOATING BUTTON (TextButton, draggable, clickable)
--- ============================================================================
-local function createFloatingButton()
-    if floatingButton and floatingButton.Parent then
-        floatingButton.Visible = true
-        return floatingButton
-    end
-    if floatingButton then floatingButton:Destroy() end
-
-    local btnGui = Instance.new("ScreenGui")
-    btnGui.Name = "CyberHeroes_FloatingButton"
-    btnGui.ResetOnSpawn = false
-    btnGui.IgnoreGuiInset = true
-    btnGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    btnGui.Parent = CoreGui
-
-    local btn = Instance.new("TextButton")
-    btn.Name = "FloatingButton"
-    btn.Size = UDim2.new(0, 150, 0, 40)
-    btn.Position = UDim2.new(0.02, 0, 0.08, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
-    btn.BackgroundTransparency = 0.2
-    btn.BorderSizePixel = 0
-    btn.Text = ""
-    btn.AutoButtonColor = false
-    btn.Parent = btnGui
-
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 8)
-    btnCorner.Parent = btn
-
-    local btnStroke = Instance.new("UIStroke")
-    btnStroke.Color = config.guiThemeColor
-    btnStroke.Thickness = 1.5
-    btnStroke.Transparency = 0.4
-    btnStroke.Parent = btn
-
-    local icon = Instance.new("TextLabel")
-    icon.Size = UDim2.new(0, 35, 1, 0)
-    icon.Position = UDim2.new(0, 5, 0, 0)
-    icon.Text = "⚡"
-    icon.TextColor3 = config.guiThemeColor
-    icon.BackgroundTransparency = 1
-    icon.Font = Enum.Font.GothamBold
-    icon.TextSize = 20
-    icon.Parent = btn
-
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1, -45, 1, 0)
-    text.Position = UDim2.new(0, 45, 0, 0)
-    text.Text = "CYBERHEROES"
-    text.TextColor3 = config.guiThemeColor
-    text.BackgroundTransparency = 1
-    text.Font = Enum.Font.GothamBold
-    text.TextSize = 12
-    text.TextXAlignment = Enum.TextXAlignment.Left
-    text.Parent = btn
-
-    -- Draggable (gunakan makeDraggable pada btn)
-    makeDraggable(btn)
-
-    -- Event klik untuk restore
-    btn.MouseButton1Click:Connect(function()
-        if mainFrame then
-            mainFrame.Visible = true
-            config.guiVisible = true
-            btnGui:Destroy()
-            floatingButton = nil
-            isFloatingVisible = false
-        end
-    end)
-
-    floatingButton = btnGui
-    return floatingButton
-end
-
--- ============================================================================
--- GUI BUTTONS (sama)
+-- CREATE GRID BUTTON (sama, fungsi asli)
 -- ============================================================================
 local function createGridButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
@@ -3038,6 +3025,9 @@ local function createGridButton(parent, name, text, initialState, onChange)
     return button
 end
 
+-- ============================================================================
+-- SIDEBAR ITEM (dengan active background)
+-- ============================================================================
 local function createSidebarItem(parent, text, icon, active)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, 0, 0, 28)
@@ -3054,6 +3044,65 @@ local function createSidebarItem(parent, text, icon, active)
     corner.CornerRadius = UDim.new(0, 4)
     corner.Parent = button
     return button
+end
+
+-- ============================================================================
+-- FLOATING BAR (TextButton agar bisa diklik)
+-- ============================================================================
+local function createFloatingBar()
+    if floatingBar and floatingBar.Parent then
+        floatingBar.Visible = true
+        return floatingBar
+    end
+    if floatingBar then floatingBar:Destroy() end
+
+    local barGui = Instance.new("ScreenGui")
+    barGui.Name = "CyberHeroes_FloatingBar"
+    barGui.ResetOnSpawn = false
+    barGui.IgnoreGuiInset = true
+    barGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    barGui.Parent = CoreGui
+
+    -- Gunakan TextButton agar dapat diklik
+    local barButton = Instance.new("TextButton")
+    barButton.Name = "FloatingBar"
+    barButton.Size = UDim2.new(0, 150, 0, 40)
+    barButton.Position = UDim2.new(0.02, 0, 0.08, 0)
+    barButton.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+    barButton.BackgroundTransparency = 0.2
+    barButton.BorderSizePixel = 0
+    barButton.Text = "⚡  CYBERHEROES"
+    barButton.TextColor3 = config.guiThemeColor
+    barButton.TextSize = 14
+    barButton.Font = Enum.Font.GothamBold
+    barButton.Parent = barGui
+
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 8)
+    barCorner.Parent = barButton
+
+    local barStroke = Instance.new("UIStroke")
+    barStroke.Color = config.guiThemeColor
+    barStroke.Thickness = 1.5
+    barStroke.Transparency = 0.4
+    barStroke.Parent = barButton
+
+    -- Draggable pada button
+    makeDraggable(barButton)
+
+    -- Klik untuk restore
+    barButton.MouseButton1Click:Connect(function()
+        if mainFrame then
+            mainFrame.Visible = true
+            config.guiVisible = true
+            barGui:Destroy()
+            floatingBar = nil
+            isFloatingVisible = false
+        end
+    end)
+
+    floatingBar = barGui
+    return floatingBar
 end
 
 -- ============================================================================
@@ -3091,7 +3140,7 @@ local function createPermanentTeleportButton()
 end
 
 -- ============================================================================
--- MAIN GUI (dengan container dan visibility management)
+-- MAIN GUI (dengan tab system container)
 -- ============================================================================
 local function createGUI()
     if screenGui then screenGui:Destroy() end
@@ -3148,7 +3197,7 @@ local function createGUI()
     versionLabel.TextXAlignment = Enum.TextXAlignment.Left
     versionLabel.Parent = titleBar
 
-    -- Tombol minimize dan close (sekarang menggunakan TextButton)
+    -- Minimize dan close button
     local minimizeBtn = Instance.new("TextButton")
     minimizeBtn.Size = UDim2.new(0, 22, 0, 22)
     minimizeBtn.Position = UDim2.new(1, -50, 0, 1)
@@ -3163,7 +3212,6 @@ local function createGUI()
     local minCorner = Instance.new("UICorner")
     minCorner.CornerRadius = UDim.new(0, 3)
     minCorner.Parent = minimizeBtn
-
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 22, 0, 22)
     closeBtn.Position = UDim2.new(1, -26, 0, 1)
@@ -3179,14 +3227,13 @@ local function createGUI()
     closeCorner.CornerRadius = UDim.new(0, 3)
     closeCorner.Parent = closeBtn
 
-    -- Fungsi minimize: sembunyikan mainFrame dan tampilkan floating button
     local function minimizeGUI()
         config.guiVisible = false
         if mainFrame then mainFrame.Visible = false end
-        if not floatingButton or not floatingButton.Parent then
-            createFloatingButton()
+        if not floatingBar or not floatingBar.Parent then
+            createFloatingBar()
         else
-            floatingButton.Visible = true
+            floatingBar.Visible = true
         end
         isFloatingVisible = true
     end
@@ -3206,7 +3253,7 @@ local function createGUI()
     sidebarCorner.CornerRadius = UDim.new(0, 0)
     sidebarCorner.Parent = sidebar
     local sidebarList = Instance.new("Frame")
-    sidebarList.Size = UDim2.new(1, 0, 0, 180)
+    sidebarList.Size = UDim2.new(1, 0, 0, 150)
     sidebarList.Position = UDim2.new(0, 0, 0.05, 0)
     sidebarList.BackgroundTransparency = 1
     sidebarList.Parent = sidebar
@@ -3216,6 +3263,7 @@ local function createGUI()
     sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     sidebarLayout.Parent = sidebarList
 
+    -- Tombol sidebar dengan background aktif awal
     local homeItem = createSidebarItem(sidebarList, "HOME", "🏠", true)
     local featuresItem = createSidebarItem(sidebarList, "FEATURES", "⚡", false)
     local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "⚙️", false)
@@ -3233,103 +3281,80 @@ local function createGUI()
     contentPanel.BackgroundTransparency = 1
     contentPanel.Parent = mainFrame
 
-    -- Container untuk features grid (akan disembunyikan saat pindah tab)
-    featureContainer = Instance.new("Frame")
-    featureContainer.Size = UDim2.new(1, 0, 1, 0)
-    featureContainer.BackgroundTransparency = 1
-    featureContainer.Parent = contentPanel
-    featureContainer.Visible = true
+    -- Buat container awal
+    createFeaturesContainer()
+    createSettingsContent() -- disimpan di settingsContainer
+    createInfoContent()
+    createAboutContent()
 
-    local gridLayout = Instance.new("UIGridLayout")
-    gridLayout.CellSize = UDim2.new(0, 80, 0, 32)
-    gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)
-    gridLayout.FillDirection = Enum.FillDirection.Horizontal
-    gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-    gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    gridLayout.Parent = featureContainer
+    -- Sembunyikan semua kecuali features
+    settingsContainer.Visible = false
+    infoContainer.Visible = false
+    aboutContainer.Visible = false
+    featuresContainer.Visible = true
 
-    local features = {
-        {name="autoWinEnabled", text="AUTO WIN"},
-        {name="autoTaskEnabled", text="AUTO TASK"},
-        {name="espEnabled", text="ESP"},
-        {name="speedBoostEnabled", text="SPEED BOOST"},
-        {name="stealthEnabled", text="STEALTH"},
-        {name="godModeEnabled", text="GOD MODE"},
-        {name="infiniteAmmoEnabled", text="INF AMMO"},
-        {name="shieldEnabled", text="SHIELD"},
-        {name="tpwalkEnabled", text="TPWALK"},
-        {name="noCollideEnabled", text="NO COLLIDE"},
-        {name="massKillEnabled", text="MASS KILL"},
-        {name="autoGeneratorEnabled", text="AUTO GEN"},
-        {name="autoSkillCheckEnabled", text="SKILL CHECK"},
-        {name="autoAimEnabled", text="AUTO AIM"},
-        {name="restartScript", text="RESTART"}
-    }
-    for _, feat in ipairs(features) do
-        local initialState = (feat.name ~= "restartScript") and config[feat.name] or false
-        createGridButton(featureContainer, feat.name, feat.text, initialState)
-    end
-
-    -- Navigation handlers (mengatur visibility container)
-    homeItem.MouseButton1Click:Connect(function()
-        homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)
+    -- Fungsi untuk reset semua background sidebar (non aktif)
+    local function resetSidebar()
+        homeItem.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
+        featuresItem.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
+        settingsItem.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
+        infoItem.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
+        aboutItem.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
+        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
         aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featureContainer.Visible = true
-        if settingsContainer then settingsContainer.Visible = false end
-        if infoContainer then infoContainer.Visible = false end
-        if aboutContainer then aboutContainer.Visible = false end
+    end
+
+    homeItem.MouseButton1Click:Connect(function()
+        resetSidebar()
+        homeItem.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+        homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)
+        featuresContainer.Visible = true
+        settingsContainer.Visible = false
+        infoContainer.Visible = false
+        aboutContainer.Visible = false
     end)
 
     featuresItem.MouseButton1Click:Connect(function()
+        resetSidebar()
+        featuresItem.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
         featuresItem.TextColor3 = Color3.fromRGB(0, 230, 255)
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featureContainer.Visible = true
-        if settingsContainer then settingsContainer.Visible = false end
-        if infoContainer then infoContainer.Visible = false end
-        if aboutContainer then aboutContainer.Visible = false end
+        featuresContainer.Visible = true
+        settingsContainer.Visible = false
+        infoContainer.Visible = false
+        aboutContainer.Visible = false
     end)
 
     settingsItem.MouseButton1Click:Connect(function()
+        resetSidebar()
+        settingsItem.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
         settingsItem.TextColor3 = Color3.fromRGB(0, 230, 255)
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featureContainer.Visible = false
-        if not settingsContainer then createSettingsContent() else settingsContainer.Visible = true end
-        if infoContainer then infoContainer.Visible = false end
-        if aboutContainer then aboutContainer.Visible = false end
+        featuresContainer.Visible = false
+        settingsContainer.Visible = true
+        infoContainer.Visible = false
+        aboutContainer.Visible = false
     end)
 
     infoItem.MouseButton1Click:Connect(function()
+        resetSidebar()
+        infoItem.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
         infoItem.TextColor3 = Color3.fromRGB(0, 230, 255)
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featureContainer.Visible = false
-        if settingsContainer then settingsContainer.Visible = false end
-        if not infoContainer then createInfoContent() else infoContainer.Visible = true end
-        if aboutContainer then aboutContainer.Visible = false end
+        featuresContainer.Visible = false
+        settingsContainer.Visible = false
+        infoContainer.Visible = true
+        aboutContainer.Visible = false
     end)
 
     aboutItem.MouseButton1Click:Connect(function()
+        resetSidebar()
+        aboutItem.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
         aboutItem.TextColor3 = Color3.fromRGB(0, 230, 255)
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
-        featureContainer.Visible = false
-        if settingsContainer then settingsContainer.Visible = false end
-        if infoContainer then infoContainer.Visible = false end
-        if not aboutContainer then createAboutContent() else aboutContainer.Visible = true end
+        featuresContainer.Visible = false
+        settingsContainer.Visible = false
+        infoContainer.Visible = false
+        aboutContainer.Visible = true
     end)
 
     makeDraggable(mainFrame)

@@ -2810,7 +2810,7 @@ local function createFloatingBar()
     local barFrame = Instance.new("Frame")
     barFrame.Name = "FloatingBar"
     barFrame.Size = UDim2.new(0, 150, 0, 40)
-    barFrame.Position = UDim2.new(0.02, 0, 0.08, 0)
+    barFrame.Position = UDim2.new(0.5, -75, 0.05, 0)
     barFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
     barFrame.BackgroundTransparency = 0.2
     barFrame.BorderSizePixel = 0

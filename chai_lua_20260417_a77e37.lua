@@ -2840,7 +2840,7 @@ local function createFloatingBar()
     local textLabel = Instance.new("TextLabel")
     textLabel.Size = UDim2.new(1, -45, 1, 0)
     textLabel.Position = UDim2.new(0, 45, 0, 0)
-    textLabel.Text = "kemilinux"
+    textLabel.Text = "KEMILINUX"
     textLabel.TextColor3 = config.guiThemeColor
     textLabel.BackgroundTransparency = 1
     textLabel.Font = Enum.Font.GothamBold

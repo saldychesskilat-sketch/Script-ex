@@ -3032,7 +3032,7 @@ local function createPermanentTeleportButton()
     teleportButton = Instance.new("TextButton")
     teleportButton.Name = "TeleportButton"
     teleportButton.Size = UDim2.new(0, 45, 0, 45)
-    teleportButton.Position = UDim2.new(0.02, 0, 0.85, 0)
+    teleportButton.Position = UDim2.new(0.02, 0, 0.85, -30)  -- naik 30 piksel
     teleportButton.Text = "⚡\nTP"
     teleportButton.TextWrapped = true
     teleportButton.BackgroundColor3 = Color3.fromRGB(40, 5, 5)

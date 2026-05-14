@@ -2013,7 +2013,7 @@ end
 local function teleportBehind(targetRoot)
     if not targetRoot or not localRootPart then return false end
     local targetCFrame = targetRoot.CFrame
-    local behindPos = targetCFrame.Position - targetCFrame.LookVector * 2
+    local behindPos = targetCFrame.Position - targetCFrame.LookVector * 3
     pcall(function() localRootPart.CFrame = CFrame.new(behindPos) end)
     return true
 end
@@ -2052,12 +2052,12 @@ end
 local function simulatePressE()
     pcall(function()
         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.05)
+        task.wait(0.005)
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
     end)
     pcall(function()
         VirtualUser:Button1Down(Vector2.new(500, 500))
-        task.wait(0.05)
+        task.wait(0.005)
         VirtualUser:Button1Up(Vector2.new(500, 500))
     end)
 end
@@ -2137,7 +2137,7 @@ local function hitSurvivorWithRemote(targetPlayer)
             end
             local proximityPrompt = hilt:FindFirstChildWhichIsA("ProximityPrompt")
             if proximityPrompt and proximityPrompt.Enabled then
-                pcall(function() proximityPrompt:Hold(); task.wait(0.1); proximityPrompt:Release() end)
+                pcall(function() proximityPrompt:Hold(); task.wait(0.01); proximityPrompt:Release() end)
                 hitSuccess = true
             end
         end
@@ -2168,7 +2168,7 @@ local function massKillLoop()
         local targetRoot = target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Torso")
         if targetRoot then
             teleportBehind(targetRoot)
-            task.wait(0.05)
+            task.wait(0.005)
             lockCameraTo(targetRoot.Position)
             if hitSurvivorWithRemote(target) then
                 print("[MassKill] Hit " .. target.Name .. " using REMOTE EVENT (successful)")
@@ -2177,7 +2177,7 @@ local function massKillLoop()
             end
         end
     end
-    task.wait(0.2)  -- Delay untuk menghindari spam
+    task.wait(0.00002)  -- Delay untuk menghindari spam
 end
 
 -- ============================================================================

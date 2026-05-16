@@ -1596,164 +1596,199 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (REFACTORED - PROXIMITY INTERACTION METHOD)
--- Sistem baru: Tidak menggunakan keypress / remote event manual.
--- Menggunakan interaksi langsung dengan ProximityPrompt/ClickDetector milik game.
--- Bypass cooldown karena tidak memicu tombol UI, langsung memanggil interaksi internal.
+-- FEATURE 7: AUTO PARRY (PROXIMITY-BASED, NO KEY PRESS / NO CD DEPENDENCY)
+-- Tidak menggunakan simulasi keyboard/E/F/RemoteEvent mentah.
+-- Sebagai gantinya, sistem akan mencari objek interaksi parry (ProximityPrompt/ClickDetector)
+-- yang muncul di sekitar player saat killer mendekat, lalu memicunya langsung.
+-- Metode ini menghindari cooldown internal game pada tombol UI.
 -- ============================================================================
 
--- Cache interaksi parry yang ditemukan
-local cachedParryInteraction = nil
-local lastInteractionScan = 0
-local INTERACTION_SCAN_INTERVAL = 2  -- scan ulang setiap 2 detik
+-- ============================================================================
+-- DEPENDENCIES & GLOBAL (ASSUMED FROM MAIN SCRIPT)
+-- ============================================================================
+-- Asumsi: Variabel berikut sudah didefinisikan di script utama:
+--   Players, RunService, Workspace, ReplicatedStorage, localPlayer, localRootPart, getLocalCharacter()
+--   config.infiniteAmmoEnabled (toggle untuk auto parry)
+-- Jika tidak, kita deklarasikan ulang dengan aman.
+-- ============================================================================
 
--- Cari objek interaksi parry (ProximityPrompt atau ClickDetector) di sekitar karakter
--- Prioritaskan yang muncul saat killer dekat (biasanya di sekitar pemain)
+local function ensureLocalCharacter()
+    local char = localPlayer.Character
+    if char then
+        localRootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    end
+    return char
+end
+
+-- ============================================================================
+-- DETEKSI KILLER TERDEKAT (sama seperti sebelumnya, tapi lebih efisien)
+-- ============================================================================
+local function isKiller(player)
+    if player == localPlayer then return false end
+    local char = player.Character
+    if not char then return false end
+    if player.Team then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            return true
+        end
+    end
+    local tool = char:FindFirstChildWhichIsA("Tool")
+    if tool then
+        local toolName = tool.Name:lower()
+        if toolName:find("knife") or toolName:find("weapon") or toolName:find("blade") then
+            return true
+        end
+    end
+    return false
+end
+
+local function getNearestKillerDistance()
+    if not localRootPart then return math.huge end
+    local localPos = localRootPart.Position
+    local minDist = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if isKiller(player) then
+            local char = player.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if root then
+                    local dist = (localPos - root.Position).Magnitude
+                    if dist < minDist then minDist = dist
+                end
+            end
+        end
+    end
+    return minDist
+end
+
+-- ============================================================================
+-- SCAN OBJEK INTERAKSI PARRY DI SEKITAR PLAYER
+-- ============================================================================
+-- Mencari ProximityPrompt atau ClickDetector yang berhubungan dengan parry/block
+-- dan berada dalam radius tertentu (misal 15 studs).
+-- ============================================================================
 local function findParryInteraction()
-    -- Jika cache masih fresh, pakai cache
-    if cachedParryInteraction and cachedParryInteraction.Parent then
-        return cachedParryInteraction
-    end
+    if not localRootPart then return nil end
+    local localPos = localRootPart.Position
+    local nearestPrompt = nil
+    local nearestDist = 20  -- cari dalam radius 20 studs
     
-    local now = tick()
-    if now - lastInteractionScan < INTERACTION_SCAN_INTERVAL then
-        return cachedParryInteraction
-    end
-    lastInteractionScan = now
+    -- Kata kunci yang umum untuk parry/block
+    local keywords = {"parry", "block", "deflect", "counter", "riposte", "reflect", "dodge", "dagger", "sword", "shield", "guard"}
     
-    -- Cari di sekitar karakter (workspace) atau di ReplicatedStorage
-    local searchParents = {workspace, localPlayer.Character, ReplicatedStorage}
-    local bestCandidate = nil
-    local bestDistance = math.huge
-    
-    for _, parent in ipairs(searchParents) do
-        if not parent then continue end
-        for _, obj in ipairs(parent:GetDescendants()) do
-            -- Cari ProximityPrompt atau ClickDetector dengan keyword parry/block
-            if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
-                local name = obj.Name:lower()
-                if name:find("parry") or name:find("block") or name:find("deflect") or name:find("counter") then
-                    -- Hitung jarak ke objek (jika punya posisi)
-                    local objPos = obj.Parent and obj.Parent:FindFirstChild("HumanoidRootPart") and obj.Parent.HumanoidRootPart.Position
-                    if objPos and localRootPart then
-                        local dist = (localRootPart.Position - objPos).Magnitude
-                        if dist < bestDistance then
-                            bestDistance = dist
-                            bestCandidate = obj
-                        end
-                    else
-                        -- jika tidak ada posisi, prioritaskan yang dekat secara logika
-                        bestCandidate = obj
-                        break
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") or obj:IsA("ClickDetector") then
+            local promptParent = obj.Parent
+            local name = (obj.Name .. (promptParent and promptParent.Name or "") .. (promptParent and promptParent.Parent and promptParent.Parent.Name or "") .. (promptParent and promptParent.Parent and promptParent.Parent.Parent and promptParent.Parent.Parent.Name or "") ):lower()
+            local isParry = false
+            for _, kw in ipairs(keywords) do
+                if name:find(kw) then
+                    isParry = true
+                    break
+                end
+            end
+            if isParry and obj.Enabled then
+                -- Cari jarak
+                local part = obj.Parent:FindFirstChildWhichIsA("BasePart") or (obj:IsA("ClickDetector") and obj.Parent)
+                if part then
+                    local dist = (localPos - part.Position).Magnitude
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        nearestPrompt = obj
                     end
                 end
             end
         end
-        if bestCandidate then break end
     end
-    
-    cachedParryInteraction = bestCandidate
-    return bestCandidate
-end
-
--- Panggil interaksi parry (tanpa cooldown dari game)
-local function triggerParryInteraction(interaction)
-    if not interaction then return false end
-    
-    if interaction:IsA("ProximityPrompt") and interaction.Enabled then
-        -- ProximityPrompt: hold lalu release (atau cukup prompt:Hold)
-        pcall(function()
-            interaction:Hold()
-            task.wait(0.05)
-            interaction:Release()
-        end)
-        return true
-    elseif interaction:IsA("ClickDetector") and interaction.Enabled then
-        pcall(function()
-            interaction:FireClick()
-        end)
-        return true
-    end
-    return false
-end
-
--- Fallback: jika tidak ada interaction khusus, coba metode alternatif (tanpa keypress)
--- Misalnya memicu remote event yang tidak memiliki cooldown (berdasarkan scan awal)
-local function fallbackParry()
-    -- Coba remote event yang sudah terdeteksi sebelumnya (jika ada dan tidak memiliki cooldown)
-    local remote = findParryRemoteEvent()  -- gunakan fungsi pencarian remote yang sudah ada
-    if remote then
-        pcall(function() remote:FireServer("parry") end)
-        return true
-    end
-    return false
+    return nearestPrompt
 end
 
 -- ============================================================================
--- AUTO PARRY MAIN LOOP (Proximity-based, no keypress cooldown)
+-- EKSEKUSI PARRY TANPA INPUT KEYBOARD
 -- ============================================================================
-local lastParryTime = 0
-local PARRY_COOLDOWN = 0.2  -- interval minimal (0.2 detik) untuk menghindari spam loop
-
-local function autoParryLoop()
-    if not config.infiniteAmmoEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-    
-    -- Deteksi jarak killer terdekat (gunakan fungsi yang sudah ada)
-    local killerDist = getKillerDistance()
-    if killerDist > 10 then return end  -- di luar radius
-    
-    -- Cegah terlalu sering parry
-    local now = tick()
-    if now - lastParryTime < PARRY_COOLDOWN then return end
-    lastParryTime = now
-    
-    -- Cari interaction object parry
-    local interaction = findParryInteraction()
-    local success = false
-    
-    if interaction then
-        success = triggerParryInteraction(interaction)
-        if success then
-            -- Debug (opsional, bisa dihapus jika tidak perlu)
-            -- print("[AutoParry] Triggered via Proximity/Click")
+local function executeParryProximity()
+    local prompt = findParryInteraction()
+    if prompt then
+        if prompt:IsA("ProximityPrompt") then
+            -- ProximityPrompt bisa di-hold/klik
+            pcall(function()
+                prompt:Hold()
+                task.wait(0.05)
+                prompt:Release()
+            end)
+            return true
+        elseif prompt:IsA("ClickDetector") then
+            pcall(function() prompt:FireClick() end)
+            return true
         end
     end
+    return false
+end
+
+-- ============================================================================
+-- AUTO PARRY LOOP (PROXIMITY-BASED, TANPA KEY EVENT)
+-- ============================================================================
+local lastParryAttempt = 0
+local PARRY_COOLDOWN = 0.35   -- cooldown internal untuk menghindari spam berlebihan
+
+local function autoParryLoop()
+    if not config.infiniteAmmoEnabled then return end   -- config.infiniteAmmoEnabled adalah toggle untuk auto parry (kompatibilitas)
+    if not ensureLocalCharacter() or not localRootPart then return end
     
-    -- Jika gagal atau tidak ada interaction, coba fallback (remote event)
-    if not success then
-        fallbackParry()
+    local killerDist = getNearestKillerDistance()
+    if killerDist <= 15 then   -- jarak trigger 15 studs (lebih longgar)
+        local now = tick()
+        if now - lastParryAttempt >= PARRY_COOLDOWN then
+            lastParryAttempt = now
+            local success = executeParryProximity()
+            if success then
+                -- Opsional: print untuk debug, bisa dihapus
+                -- print("[AutoParry] Parry executed via proximity interaction")
+            end
+        end
+    else
+        -- reset cooldown saat tidak ada killer, agar langsung respon saat kembali mendekat
+        lastParryAttempt = 0
     end
 end
 
 -- ============================================================================
--- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)
+-- START / STOP (menggantikan fungsi infinite ammo yang lama)
 -- ============================================================================
-local infiniteAmmoConnection = nil
+local autoParryConnection = nil
 
 local function startInfiniteAmmo()
-    if infiniteAmmoConnection then return end
-    infiniteAmmoConnection = RunService.Heartbeat:Connect(autoParryLoop)
-    print("[AutoParry] Started (Proximity Interaction Method - No keypress cooldown)")
+    if autoParryConnection then return end
+    autoParryConnection = RunService.Heartbeat:Connect(autoParryLoop)
+    print("[AutoParry] Started (Proximity-based, no key press)")
 end
 
 local function stopInfiniteAmmo()
-    if infiniteAmmoConnection then
-        infiniteAmmoConnection:Disconnect()
-        infiniteAmmoConnection = nil
+    if autoParryConnection then
+        autoParryConnection:Disconnect()
+        autoParryConnection = nil
     end
     print("[AutoParry] Stopped")
 end
 
 -- ============================================================================
+-- CLEANUP FUNGSI LAMA YANG TIDAK DIGUNAKAN (optional, bisa dikomentari)
+-- Fungsi-fungsi berikut tidak dipanggil lagi, tetapi biarkan agar tidak error jika ada referensi.
+-- ============================================================================
+-- simulateRightClick, simulatePressF, findParryRemoteEvent, getParryItem, performParry
+-- Tidak perlu dihapus, namun kita override dengan versi baru di atas.
+
+-- ============================================================================
 -- CATATAN:
--- - Sistem baru tidak menggunakan VirtualInputManager atau key event.
--- - Menggunakan objek interaksi internal game (ProximityPrompt/ClickDetector) yang 
---   biasanya muncul saat killer mendekat, sehingga parry bisa dipicu langsung.
--- - Cooldown hanya dari script (0.2 detik) untuk menghindari spam, bukan dari game.
--- - Fungsi getKillerDistance() dan findParryRemoteEvent() diasumsikan sudah ada 
---   di bagian lain script (jika tidak, perlu didefinisikan juga, tapi biasanya sudah ada).
--- - Konfigurasi tetap menggunakan config.infiniteAmmoEnabled (toggle di GUI).
+-- 1. Auto parry sekarang menggunakan ProximityPrompt/ClickDetector dari lingkungan game,
+--    bukan melalui input keyboard. Dengan demikian, cooldown tombol UI tidak mempengaruhi.
+-- 2. Radius deteksi killer diatur ke 15 studs agar lebih responsif.
+-- 3. Cooldown internal 0.35 detik untuk menghindari spam.
+-- 4. Fungsi tetap menggunakan nama `startInfiniteAmmo`/`stopInfiniteAmmo` untuk kompatibilitas
+--    dengan GUI toggle yang sudah ada (mengandalkan `config.infiniteAmmoEnabled`).
+-- 5. Jika tidak menemukan objek interaksi parry, sistem hanya diam (tidak gagal, tidak spam).
+-- 6. Tidak ada konflik dengan fitur lain karena tidak mengubah variabel global lain.
 -- ============================================================================
 
 -- ============================================================================

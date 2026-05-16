@@ -136,6 +136,147 @@ local isAuto1xModeActive = false
 -- ============================================================================
 -- UTILITY FUNCTIONS
 -- ============================================================================
+-- GLOBAL STATE PERSISTENCE (getgenv)
+-- ============================================================================
+local _G = getgenv() or _G
+if not _G.CyberHeroesState then
+    _G.CyberHeroesState = {
+        config = {
+            autoWinEnabled = false,
+            autoTaskEnabled = false,
+            taskRadius = 50,
+            pathfindingParams = {
+                AgentRadius = 2,
+                AgentHeight = 5,
+                AgentCanJump = true,
+                AgentMaxSlope = 45
+            },
+            espEnabled = false,
+            highlightColorKiller = Color3.fromRGB(255, 50, 50),
+            highlightColorSurvivor = Color3.fromRGB(50, 255, 50),
+            highlightTransparency = 0.5,
+            speedBoostEnabled = false,
+            boostAmount = 20,
+            boostDuration = 3,
+            originalWalkSpeed = 16,
+            stealthEnabled = false,
+            stealthRadiusInvisible = 30,
+            stealthRadiusVisible = 50,
+            godModeEnabled = false,
+            infiniteAmmoEnabled = false,
+            shieldEnabled = false,
+            shieldRadius = 30,
+            tpwalkEnabled = false,
+            tpwalkDuration = 3,
+            tpwalkSpeedMultiplier = 2,
+            noCollideEnabled = false,
+            noCollideRadius = 30,
+            massKillEnabled = false,
+            autoGeneratorEnabled = false,
+            autoSkillCheckEnabled = false,
+            autoAimEnabled = false,
+            guiVisible = true,
+            guiToggleKey = Enum.KeyCode.F,
+            lastHealth = 100,
+            guiThemeColor = Color3.fromRGB(0, 230, 255),
+            auto1xModeEnabled = false,
+            stealthTriggerDistance = 20
+        },
+        featuresActive = {}
+    }
+end
+local state = _G.CyberHeroesState
+local config = state.config
+
+-- ============================================================================
+-- SERVICES
+-- ============================================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local PathfindingService = game:GetService("PathfindingService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PhysicsService = game:GetService("PhysicsService")
+local Debris = game:GetService("Debris")
+local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
+local CoreGui = game:GetService("CoreGui")
+local Stats = game:GetService("Stats")
+
+local localPlayer = Players.LocalPlayer
+local localCharacter = nil
+local localHumanoid = nil
+local localRootPart = nil
+local camera = workspace.CurrentCamera
+
+-- ============================================================================
+-- GLOBAL REFERENCES
+-- ============================================================================
+screenGui = nil
+mainFrame = nil
+sidebar = nil
+contentPanel = nil
+floatingLogo = nil
+teleportButton = nil
+teleportButtonGui = nil
+mainStroke = nil
+statusLabel = nil
+settingsContent = nil
+chatLog = nil
+chatInput = nil
+isLogoVisible = false
+settingsContentCreated = false
+homeContent = nil
+aboutContent = nil
+currentSidebarItem = nil
+
+-- ============================================================================
+-- STATE VARIABLES (fitur)
+-- ============================================================================
+local isSpeedBoostActive = false
+local boostDebounce = false
+local currentBoostConnection = nil
+local currentTaskConnection = nil
+local currentEspConnections = {}
+local generatorCache = {}
+local espHighlights = {}
+local isInvisible = false
+local stealthConnection = nil
+local remoteEventCache = nil
+local processedGenerators = {}
+local godModeConnection = nil
+local infiniteAmmoConnection = nil
+local isScriptRunning = true
+local shieldConnection = nil
+local currentForceField = nil
+local isShieldActive = false
+local tpwalkConnection = nil
+local isTpwalkActive = false
+local noCollideConnection = nil
+local isNoCollideActive = false
+local originalWalkSpeed = 16
+local massKillLoopConnection = nil
+local autoGeneratorLoopConnection = nil
+local autoSkillCheckConnection = nil
+local autoAimConnection = nil
+local TouchID = 8822
+local ActionPath = "Survivor-mob.Controls.action.check"
+local HeartbeatConnection = nil
+local VisibilityConnection = nil
+local generatorEspHighlights = {}
+local autoWinConnection = nil
+local autoTaskConnection = nil
+local originalTpwalkSpeed = 16
+local auto1xModeTimerConnection = nil
+local isAuto1xModeActive = false
+
+-- ============================================================================
+-- UTILITY FUNCTIONS (dari script asli, tidak diubah)
+-- ============================================================================
 local function getLocalCharacter()
     localCharacter = localPlayer.Character
     if localCharacter then
@@ -2474,48 +2615,11 @@ local function teleportToNearestSurvivor()
 end
 
 -- ============================================================================
--- FEATURE 17: MODERN GUI (PROFESSIONAL UPGRADE)
--- ============================================================================
--- ============================================================================
--- FEATURE 17: MODERN GUI (UPGRADED - DASHBOARD + FIXED LAYOUTS)
+-- MODERN GUI (UPGRADED - FULL LAYOUT)
 -- ============================================================================
 
--- Variabel global untuk floating bar
-local floatingBar = nil
-local isFloatingVisible = false
-
--- Teks untuk menu INFO
-local infoText = [[
-CYBERHEROES SCRIPT v10.1
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚡ Fitur:
-• Auto Win (teleport ke finishline + lobby)
-• Auto Task (anti-hook + lever gate + escape)
-• Auto Generator (ESP lengkap generator, survivor, killer, hook)
-• Tpwalk (2x speed + dash)
-• Mass Kill (teleport depan + remote event)
-• Auto Parry (deteksi Swort/Parrying Dagger)
-• God Mode (health regen + stealth jarak)
-• Stealth Invisibility (seat method + pre-teleport)
-• Shield, No Collide, Auto Aim, Skill Check Bypass
-
-📦 Update Terbaru v10.1:
-• Fix teleport depan untuk mass kill (lebih cepat)
-• Minimize GUI ke floating bar (drag & restore)
-• Tambah menu INFO dengan scroll text
-• Optimasi performa keseluruhan
-
-👤 Credits:
-Script by kemi (CyberHeroes)
-Support: Delta Executor, Synapse X, Krnl
-
-⚠️ Warning:
-Gunakan hanya untuk edukasi dan testing di server pribadi.
-Jangan digunakan untuk mengganggu pengalaman pemain lain.
-]]
-
 -- ============================================================================
--- DRAGGABLE (unchanged)
+-- DRAGGABLE (tidak berubah)
 -- ============================================================================
 local function makeDraggable(frame)
     local dragging = false
@@ -2547,255 +2651,88 @@ end
 local function updateTheme()
     if mainStroke then mainStroke.Color = config.guiThemeColor end
     if statusLabel then statusLabel.TextColor3 = config.guiThemeColor end
-    -- also update any theme-dependant elements in active tab (optional)
-end
-
--- ============================================================================
--- HELPERS FOR MODERN UI
--- ============================================================================
-local function getExecutorName()
-    if syn then return "Synapse X"
-    elseif krnl then return "Krnl"
-    elseif isfolder and isfolder("Delta") then return "Delta Executor"
-    else return "Unknown"
+    -- Update floating bar jika ada
+    if floatingBar and floatingBar.Parent then
+        local barStroke = floatingBar:FindFirstChild("FloatingBar") and floatingBar.FloatingBar:FindFirstChildWhichIsA("UIStroke")
+        if barStroke then barStroke.Color = config.guiThemeColor end
     end
 end
 
-local function getFPS()
-    local last = tick()
-    local frames = 0
-    return function()
-        frames = frames + 1
-        local now = tick()
-        if now - last >= 1 then
-            last = now
-            frames = 0
-        end
-        return frames
-    end
-end
-
-local fpsCounter = getFPS()
-RunService.RenderStepped:Connect(fpsCounter)
-
 -- ============================================================================
--- HOME CONTENT (Modern Dashboard)
+-- SETTINGS CONTENT (DIPERBAIKI LAYOUTNYA)
 -- ============================================================================
-local homeContent = nil
-local function createHomeContent()
-    if homeContent then homeContent:Destroy() end
-    homeContent = Instance.new("Frame")
-    homeContent.Size = UDim2.new(1, 0, 1, 0)
-    homeContent.BackgroundTransparency = 1
-    homeContent.Parent = contentPanel
+local function createSettingsContent()
+    if settingsContent then settingsContent:Destroy() end
+    settingsContent = Instance.new("ScrollingFrame")
+    settingsContent.Name = "SettingsContent"
+    settingsContent.Size = UDim2.new(1, 0, 1, 0)
+    settingsContent.BackgroundTransparency = 1
+    settingsContent.ScrollBarThickness = 6
+    settingsContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+    settingsContent.Parent = contentPanel
 
-    local dashboardLayout = Instance.new("UIListLayout")
-    dashboardLayout.Padding = UDim.new(0, 10)
-    dashboardLayout.FillDirection = Enum.FillDirection.Vertical
-    dashboardLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    dashboardLayout.Parent = homeContent
-
-    local function makeCard(title, value, color)
-        local card = Instance.new("Frame")
-        card.Size = UDim2.new(0.9, 0, 0, 45)
-        card.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
-        card.BackgroundTransparency = 0.2
-        card.BorderSizePixel = 0
-        card.Parent = homeContent
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 6)
-        corner.Parent = card
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = color
-        stroke.Thickness = 1
-        stroke.Transparency = 0.5
-        stroke.Parent = card
-
-        local titleLbl = Instance.new("TextLabel")
-        titleLbl.Size = UDim2.new(0.5, 0, 1, 0)
-        titleLbl.Position = UDim2.new(0, 10, 0, 0)
-        titleLbl.Text = title
-        titleLbl.TextColor3 = Color3.fromRGB(200,200,200)
-        titleLbl.BackgroundTransparency = 1
-        titleLbl.Font = Enum.Font.GothamBold
-        titleLbl.TextSize = 12
-        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-        titleLbl.Parent = card
-
-        local valueLbl = Instance.new("TextLabel")
-        valueLbl.Size = UDim2.new(0.5, -10, 1, 0)
-        valueLbl.Position = UDim2.new(0.5, 0, 0, 0)
-        valueLbl.Text = value
-        valueLbl.TextColor3 = color
-        valueLbl.BackgroundTransparency = 1
-        valueLbl.Font = Enum.Font.GothamBold
-        valueLbl.TextSize = 14
-        valueLbl.TextXAlignment = Enum.TextXAlignment.Right
-        valueLbl.Parent = card
-
-        return valueLbl
-    end
-
-    -- Dynamic value labels (will be updated in loop)
-    local activeCountLbl, fpsLbl, pingLbl, securityLbl
-
-    activeCountLbl = makeCard("ACTIVE MODULES", "0", config.guiThemeColor)
-    fpsLbl = makeCard("FPS", "0", Color3.fromRGB(100,200,100))
-    pingLbl = makeCard("PING", "0 ms", Color3.fromRGB(100,200,255))
-    makeCard("EXECUTOR", getExecutorName(), Color3.fromRGB(255,200,100))
-    makeCard("PLAYER", localPlayer.Name, config.guiThemeColor)
-    makeCard("GAME", game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown", config.guiThemeColor)
-    securityLbl = makeCard("SECURITY", "PROTECTED", Color3.fromRGB(0,255,0))
-
-    -- Update loop for realtime stats
-    task.spawn(function()
-        while homeContent and homeContent.Parent do
-            local activeCount = (config.autoWinEnabled and 1 or 0) + (config.autoTaskEnabled and 1 or 0) +
-                                (config.espEnabled and 1 or 0) + (config.speedBoostEnabled and 1 or 0) +
-                                (config.stealthEnabled and 1 or 0) + (config.godModeEnabled and 1 or 0) +
-                                (config.infiniteAmmoEnabled and 1 or 0) + (config.shieldEnabled and 1 or 0) +
-                                (config.tpwalkEnabled and 1 or 0) + (config.noCollideEnabled and 1 or 0) +
-                                (config.massKillEnabled and 1 or 0) + (config.autoGeneratorEnabled and 1 or 0) +
-                                (config.autoSkillCheckEnabled and 1 or 0) + (config.autoAimEnabled and 1 or 0)
-            activeCountLbl.Text = tostring(activeCount)
-            fpsLbl.Text = tostring(fpsCounter())
-            local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-            pingLbl.Text = math.floor(ping) .. " ms"
-            securityLbl.Text = "PROTECTED"
-            task.wait(1)
-        end
-    end)
-end
-
--- ============================================================================
--- ABOUT CONTENT (Detailed information)
--- ============================================================================
-local aboutContent = nil
-local function createAboutContent()
-    if aboutContent then aboutContent:Destroy() end
-    aboutContent = Instance.new("Frame")
-    aboutContent.Size = UDim2.new(1, 0, 1, 0)
-    aboutContent.BackgroundTransparency = 1
-    aboutContent.Parent = contentPanel
-
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -10, 1, -10)
-    scroll.Position = UDim2.new(0, 5, 0, 5)
-    scroll.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
-    scroll.BackgroundTransparency = 0.3
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 6
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.Parent = aboutContent
-    local scrollCorner = Instance.new("UICorner")
-    scrollCorner.CornerRadius = UDim.new(0, 4)
-    scrollCorner.Parent = scroll
-
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, 0, 0, 0)
-    container.BackgroundTransparency = 1
-    container.AutomaticSize = Enum.AutomaticSize.Y
-    container.Parent = scroll
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.PaddingTop = UDim.new(0, 10)
+    padding.PaddingBottom = UDim.new(0, 10)
+    padding.Parent = settingsContent
 
     local layout = Instance.new("UIListLayout")
     layout.Padding = UDim.new(0, 12)
     layout.FillDirection = Enum.FillDirection.Vertical
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.Parent = container
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = settingsContent
 
-    local function addSection(title, content)
-        local section = Instance.new("Frame")
-        section.Size = UDim2.new(0.95, 0, 0, 0)
-        section.BackgroundTransparency = 1
-        section.AutomaticSize = Enum.AutomaticSize.Y
-        section.Parent = container
+    -- Section Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 25)
+    titleLabel.Text = "⚙️ SETTINGS"
+    titleLabel.TextColor3 = config.guiThemeColor
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 14
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = settingsContent
 
-        local titleLbl = Instance.new("TextLabel")
-        titleLbl.Size = UDim2.new(1, 0, 0, 20)
-        titleLbl.Text = title
-        titleLbl.TextColor3 = config.guiThemeColor
-        titleLbl.BackgroundTransparency = 1
-        titleLbl.Font = Enum.Font.GothamBold
-        titleLbl.TextSize = 14
-        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-        titleLbl.Parent = section
+    -- Theme Color Section
+    local colorSection = Instance.new("Frame")
+    colorSection.Size = UDim2.new(1, 0, 0, 50)
+    colorSection.BackgroundTransparency = 1
+    colorSection.Parent = settingsContent
 
-        local contentLbl = Instance.new("TextLabel")
-        contentLbl.Size = UDim2.new(1, 0, 0, 0)
-        contentLbl.Text = content
-        contentLbl.TextColor3 = Color3.fromRGB(200,200,200)
-        contentLbl.BackgroundTransparency = 1
-        contentLbl.Font = Enum.Font.Gotham
-        contentLbl.TextSize = 11
-        contentLbl.TextWrapped = true
-        contentLbl.TextXAlignment = Enum.TextXAlignment.Left
-        contentLbl.AutomaticSize = Enum.AutomaticSize.Y
-        contentLbl.Parent = section
-    end
+    local colorLabel = Instance.new("TextLabel")
+    colorLabel.Size = UDim2.new(0, 100, 0, 20)
+    colorLabel.Position = UDim2.new(0, 0, 0, 0)
+    colorLabel.Text = "Theme Color"
+    colorLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    colorLabel.BackgroundTransparency = 1
+    colorLabel.Font = Enum.Font.GothamBold
+    colorLabel.TextSize = 12
+    colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    colorLabel.Parent = colorSection
 
-    addSection("📜 CREATOR", "Script by kemi (CyberHeroes)\n\nSpecial thanks to the community for testing.")
-    addSection("⚡ SUPPORTED EXECUTORS", "• Delta Executor\n• Synapse X\n• Krnl\n• Script‑Ware\n• And any other full LuaU executor")
-    addSection("📦 CHANGELOG (v10.1)", "• Fixed front teleport for Mass Kill (faster)\n• Minimize GUI to floating bar (drag & restore)\n• Added INFO tab with scrollable text\n• Performance optimizations\n• Modern HOME dashboard & ABOUT page")
-    addSection("🎯 PURPOSE", "Educational and testing purposes only.\nCreated to demonstrate advanced Roblox mechanics and Lua scripting.")
-    addSection("⚠️ DISCLAIMER", "Do not use to harass or ruin other players' experience.\nUse at your own risk. The creator is not responsible for any misuse.")
-    addSection("🔗 CONTACT", "Discord: CyberHeroes Community (placeholder)\nGitHub: /kemi - Script updates")
+    local btnFrame = Instance.new("Frame")
+    btnFrame.Size = UDim2.new(1, 0, 0, 28)
+    btnFrame.Position = UDim2.new(0, 0, 0, 22)
+    btnFrame.BackgroundTransparency = 1
+    btnFrame.Parent = colorSection
 
-    -- Adjust container height automatically
-    container.Size = UDim2.new(1, 0, 0, layout.AbsoluteContentSize.Y)
-end
-
--- ============================================================================
--- SETTINGS CONTENT (Reorganized: theme buttons + chat system)
--- ============================================================================
-local function createSettingsContent()
-    if settingsContent then settingsContent:Destroy() end
-    settingsContent = Instance.new("Frame")
-    settingsContent.Size = UDim2.new(1, 0, 1, 0)
-    settingsContent.BackgroundTransparency = 1
-    settingsContent.Parent = contentPanel
-
-    local mainLayout = Instance.new("UIListLayout")
-    mainLayout.Padding = UDim.new(0, 10)
-    mainLayout.FillDirection = Enum.FillDirection.Vertical
-    mainLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    mainLayout.Parent = settingsContent
-
-    -- Theme Color section
-    local themeFrame = Instance.new("Frame")
-    themeFrame.Size = UDim2.new(0.9, 0, 0, 50)
-    themeFrame.BackgroundTransparency = 1
-    themeFrame.Parent = settingsContent
-
-    local themeLabel = Instance.new("TextLabel")
-    themeLabel.Size = UDim2.new(1, 0, 0, 20)
-    themeLabel.Text = "THEME COLOR"
-    themeLabel.TextColor3 = Color3.fromRGB(200,200,200)
-    themeLabel.BackgroundTransparency = 1
-    themeLabel.Font = Enum.Font.GothamBold
-    themeLabel.TextSize = 12
-    themeLabel.TextXAlignment = Enum.TextXAlignment.Left
-    themeLabel.Parent = themeFrame
-
-    local btnLayout = Instance.new("UIListLayout")
-    btnLayout.FillDirection = Enum.FillDirection.Horizontal
-    btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    btnLayout.Padding = UDim.new(0, 10)
-    btnLayout.Parent = themeFrame
-
-    local function makeColorBtn(color, text, bgColor)
+    local function createColorButton(parent, text, color, posX)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 70, 0, 25)
+        btn.Position = UDim2.new(posX, 0, 0, 0)
         btn.Text = text
-        btn.BackgroundColor3 = bgColor
-        btn.TextColor3 = (text == "CYAN" or text == "YELLOW") and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
+        btn.BackgroundColor3 = color
+        btn.TextColor3 = (text == "YELLOW" or text == "CYAN") and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 10
         btn.BorderSizePixel = 0
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0, 4)
         corner.Parent = btn
-        btn.Parent = themeFrame
+        btn.Parent = parent
         btn.MouseButton1Click:Connect(function()
             config.guiThemeColor = color
             updateTheme()
@@ -2803,68 +2740,74 @@ local function createSettingsContent()
         return btn
     end
 
-    makeColorBtn(Color3.fromRGB(255,0,0), "RED", Color3.fromRGB(255,0,0))
-    makeColorBtn(Color3.fromRGB(0,255,255), "CYAN", Color3.fromRGB(0,255,255))
-    makeColorBtn(Color3.fromRGB(255,255,0), "YELLOW", Color3.fromRGB(255,255,0))
+    createColorButton(btnFrame, "RED", Color3.fromRGB(255,0,0), 0)
+    createColorButton(btnFrame, "CYAN", Color3.fromRGB(0,255,255), 0.15)
+    createColorButton(btnFrame, "YELLOW", Color3.fromRGB(255,255,0), 0.30)
 
-    -- Chat System
+    -- Separator
+    local sep1 = Instance.new("Frame")
+    sep1.Size = UDim2.new(1, 0, 0, 1)
+    sep1.BackgroundColor3 = Color3.fromRGB(60,60,70)
+    sep1.BackgroundTransparency = 0.5
+    sep1.Parent = settingsContent
+
+    -- Chat Section
     local chatSection = Instance.new("Frame")
-    chatSection.Size = UDim2.new(0.9, 0, 0, 160)
+    chatSection.Size = UDim2.new(1, 0, 0, 180)
     chatSection.BackgroundTransparency = 1
     chatSection.Parent = settingsContent
 
-    local chatLabel = Instance.new("TextLabel")
-    chatLabel.Size = UDim2.new(1, 0, 0, 20)
-    chatLabel.Text = "CHAT SYSTEM (REPORT)"
-    chatLabel.TextColor3 = Color3.fromRGB(200,200,200)
-    chatLabel.BackgroundTransparency = 1
-    chatLabel.Font = Enum.Font.GothamBold
-    chatLabel.TextSize = 12
-    chatLabel.TextXAlignment = Enum.TextXAlignment.Left
-    chatLabel.Parent = chatSection
+    local chatTitle = Instance.new("TextLabel")
+    chatTitle.Size = UDim2.new(1, 0, 0, 20)
+    chatTitle.Text = "Chat Report"
+    chatTitle.TextColor3 = Color3.fromRGB(200,200,200)
+    chatTitle.BackgroundTransparency = 1
+    chatTitle.Font = Enum.Font.GothamBold
+    chatTitle.TextSize = 12
+    chatTitle.TextXAlignment = Enum.TextXAlignment.Left
+    chatTitle.Parent = chatSection
 
     chatLog = Instance.new("ScrollingFrame")
-    chatLog.Size = UDim2.new(1, 0, 0, 90)
+    chatLog.Size = UDim2.new(1, 0, 0, 100)
     chatLog.Position = UDim2.new(0, 0, 0, 25)
     chatLog.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
-    chatLog.BackgroundTransparency = 0.3
+    chatLog.BackgroundTransparency = 0.2
     chatLog.BorderSizePixel = 0
-    chatLog.ScrollBarThickness = 5
-    chatLog.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    chatLog.ScrollBarThickness = 4
     chatLog.CanvasSize = UDim2.new(0, 0, 0, 0)
     chatLog.Parent = chatSection
-    local chatCorner = Instance.new("UICorner")
-    chatCorner.CornerRadius = UDim.new(0, 4)
-    chatCorner.Parent = chatLog
+    local chatLogCorner = Instance.new("UICorner")
+    chatLogCorner.CornerRadius = UDim.new(0, 4)
+    chatLogCorner.Parent = chatLog
 
     local chatListLayout = Instance.new("UIListLayout")
     chatListLayout.Padding = UDim.new(0, 2)
     chatListLayout.Parent = chatLog
 
     chatInput = Instance.new("TextBox")
-    chatInput.Size = UDim2.new(0.75, 0, 0, 28)
-    chatInput.Position = UDim2.new(0, 0, 1, -30)
-    chatInput.PlaceholderText = "Type your report here..."
+    chatInput.Size = UDim2.new(0.7, -5, 0, 28)
+    chatInput.Position = UDim2.new(0, 0, 0, 130)
+    chatInput.PlaceholderText = "Type message..."
     chatInput.Text = ""
     chatInput.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
-    chatInput.BackgroundTransparency = 0.3
+    chatInput.BackgroundTransparency = 0.2
     chatInput.TextColor3 = Color3.fromRGB(255,255,255)
     chatInput.Font = Enum.Font.Gotham
     chatInput.TextSize = 11
     chatInput.BorderSizePixel = 0
     chatInput.Parent = chatSection
-    local inputCorner = Instance.new("UICorner")
-    inputCorner.CornerRadius = UDim.new(0, 4)
-    inputCorner.Parent = chatInput
+    local chatInputCorner = Instance.new("UICorner")
+    chatInputCorner.CornerRadius = UDim.new(0, 4)
+    chatInputCorner.Parent = chatInput
 
     local sendBtn = Instance.new("TextButton")
-    sendBtn.Size = UDim2.new(0.2, 0, 0, 28)
-    sendBtn.Position = UDim2.new(0.78, 0, 1, -30)
+    sendBtn.Size = UDim2.new(0.25, 0, 0, 28)
+    sendBtn.Position = UDim2.new(0.73, 0, 0, 130)
     sendBtn.Text = "SEND"
-    sendBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+    sendBtn.BackgroundColor3 = Color3.fromRGB(40,5,5)
     sendBtn.TextColor3 = Color3.fromRGB(200,200,200)
     sendBtn.Font = Enum.Font.GothamBold
-    sendBtn.TextSize = 11
+    sendBtn.TextSize = 10
     sendBtn.BorderSizePixel = 0
     sendBtn.Parent = chatSection
     local sendCorner = Instance.new("UICorner")
@@ -2875,7 +2818,7 @@ local function createSettingsContent()
         local msg = chatInput.Text
         if msg == "" then return end
         local newMsg = Instance.new("TextLabel")
-        newMsg.Size = UDim2.new(1, 0, 0, 16)
+        newMsg.Size = UDim2.new(1, 0, 0, 18)
         newMsg.Text = "[user] " .. msg
         newMsg.TextColor3 = Color3.fromRGB(200,200,200)
         newMsg.BackgroundTransparency = 1
@@ -2884,43 +2827,42 @@ local function createSettingsContent()
         newMsg.TextXAlignment = Enum.TextXAlignment.Left
         newMsg.Parent = chatLog
         chatInput.Text = ""
-        -- Auto-scroll to bottom
-        chatLog.CanvasPosition = Vector2.new(0, chatLog.CanvasSize.Y.Offset)
+        chatLog.CanvasSize = UDim2.new(0, 0, 0, chatListLayout.AbsoluteContentSize.Y)
         task.wait(2)
         newMsg:Destroy()
+    end)
+
+    -- Update CanvasSize
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        settingsContent.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
     end)
 end
 
 -- ============================================================================
--- INFO CONTENT (Fixed text wrapping + scrolling)
+-- INFO CONTENT (DIPERBAIKI DENGAN AUTOMATIC SIZE)
 -- ============================================================================
 local infoContent = nil
 local function createInfoContent()
     if infoContent then infoContent:Destroy() end
-    infoContent = Instance.new("Frame")
+    infoContent = Instance.new("ScrollingFrame")
+    infoContent.Name = "InfoContent"
     infoContent.Size = UDim2.new(1, 0, 1, 0)
     infoContent.BackgroundTransparency = 1
+    infoContent.ScrollBarThickness = 6
+    infoContent.CanvasSize = UDim2.new(0, 0, 0, 0)
     infoContent.Parent = contentPanel
 
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -10, 1, -10)
-    scroll.Position = UDim2.new(0, 5, 0, 5)
-    scroll.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
-    scroll.BackgroundTransparency = 0.3
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 6
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.Parent = infoContent
-    local scrollCorner = Instance.new("UICorner")
-    scrollCorner.CornerRadius = UDim.new(0, 4)
-    scrollCorner.Parent = scroll
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 12)
+    padding.PaddingRight = UDim.new(0, 12)
+    padding.PaddingTop = UDim.new(0, 12)
+    padding.PaddingBottom = UDim.new(0, 12)
+    padding.Parent = infoContent
 
     local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, -10, 0, 0)
-    textLabel.Position = UDim2.new(0, 5, 0, 5)
+    textLabel.Size = UDim2.new(1, 0, 0, 0)
     textLabel.Text = infoText
-    textLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    textLabel.TextColor3 = Color3.fromRGB(210,210,210)
     textLabel.BackgroundTransparency = 1
     textLabel.Font = Enum.Font.Gotham
     textLabel.TextSize = 11
@@ -2928,19 +2870,237 @@ local function createInfoContent()
     textLabel.TextYAlignment = Enum.TextYAlignment.Top
     textLabel.TextWrapped = true
     textLabel.AutomaticSize = Enum.AutomaticSize.Y
-    textLabel.Parent = scroll
+    textLabel.Parent = infoContent
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingLeft = UDim.new(0, 5)
-    padding.PaddingRight = UDim.new(0, 5)
-    padding.PaddingTop = UDim.new(0, 5)
-    padding.PaddingBottom = UDim.new(0, 5)
-    padding.Parent = scroll
+    textLabel:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        infoContent.CanvasSize = UDim2.new(0, 0, 0, textLabel.AbsoluteSize.Y + 20)
+    end)
+    task.wait()
+    infoContent.CanvasSize = UDim2.new(0, 0, 0, textLabel.AbsoluteSize.Y + 20)
 end
 
 -- ============================================================================
--- FLOATING BAR (Improved drag & restore)
+-- HOME CONTENT (DASHBOARD MODERN)
 -- ============================================================================
+local homeContent = nil
+local function createHomeContent()
+    if homeContent then homeContent:Destroy() end
+    homeContent = Instance.new("ScrollingFrame")
+    homeContent.Name = "HomeContent"
+    homeContent.Size = UDim2.new(1, 0, 1, 0)
+    homeContent.BackgroundTransparency = 1
+    homeContent.ScrollBarThickness = 0
+    homeContent.Parent = contentPanel
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.PaddingTop = UDim.new(0, 10)
+    padding.PaddingBottom = UDim.new(0, 10)
+    padding.Parent = homeContent
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 10)
+    layout.FillDirection = Enum.FillDirection.Vertical
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = homeContent
+
+    -- Helper function for info card
+    local function createInfoCard(title, value, icon, color)
+        local card = Instance.new("Frame")
+        card.Size = UDim2.new(1, 0, 0, 60)
+        card.BackgroundColor3 = Color3.fromRGB(25, 5, 12)
+        card.BackgroundTransparency = 0.2
+        card.BorderSizePixel = 0
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = card
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = color or config.guiThemeColor
+        stroke.Thickness = 1
+        stroke.Transparency = 0.5
+        stroke.Parent = card
+        card.Parent = homeContent
+
+        local iconLabel = Instance.new("TextLabel")
+        iconLabel.Size = UDim2.new(0, 40, 1, 0)
+        iconLabel.Text = icon
+        iconLabel.TextColor3 = color or config.guiThemeColor
+        iconLabel.BackgroundTransparency = 1
+        iconLabel.Font = Enum.Font.GothamBold
+        iconLabel.TextSize = 24
+        iconLabel.Parent = card
+
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, -50, 0, 20)
+        titleLabel.Position = UDim2.new(0, 45, 0, 8)
+        titleLabel.Text = title
+        titleLabel.TextColor3 = Color3.fromRGB(180,180,180)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Font = Enum.Font.Gotham
+        titleLabel.TextSize = 10
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.Parent = card
+
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Size = UDim2.new(1, -50, 0, 25)
+        valueLabel.Position = UDim2.new(0, 45, 0, 28)
+        valueLabel.Text = value
+        valueLabel.TextColor3 = color or config.guiThemeColor
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Font = Enum.Font.GothamBold
+        valueLabel.TextSize = 18
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+        valueLabel.Parent = card
+
+        return {card = card, valueLabel = valueLabel}
+    end
+
+    -- Fungsi update dinamis
+    local function updateDashboard()
+        if not homeContent then return end
+        -- Hapus semua card lama
+        for _, child in ipairs(homeContent:GetChildren()) do
+            if child:IsA("Frame") then child:Destroy() end
+        end
+        -- Hitung active modules
+        local activeCount = (config.autoWinEnabled and 1 or 0) + (config.autoTaskEnabled and 1 or 0) +
+                            (config.espEnabled and 1 or 0) + (config.speedBoostEnabled and 1 or 0) +
+                            (config.stealthEnabled and 1 or 0) + (config.godModeEnabled and 1 or 0) +
+                            (config.infiniteAmmoEnabled and 1 or 0) + (config.shieldEnabled and 1 or 0) +
+                            (config.tpwalkEnabled and 1 or 0) + (config.noCollideEnabled and 1 or 0) +
+                            (config.massKillEnabled and 1 or 0) + (config.autoGeneratorEnabled and 1 or 0) +
+                            (config.autoSkillCheckEnabled and 1 or 0) + (config.autoAimEnabled and 1 or 0)
+        -- Deteksi executor
+        local executor = "Unknown"
+        if syn then executor = "Synapse X"
+        elseif krnl then executor = "Krnl"
+        elseif getexecutorname then executor = getexecutorname()
+        elseif isfile and readfile then executor = "Delta"
+        else executor = "Script Hub" end
+
+        local playerName = localPlayer.Name
+        local gameName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or game.Name
+        local fps = math.floor(Stats:FindFirstChild("PerformanceStats"):GetValue("FPS") or 60)
+        local ping = game:GetService("Stats").Network:GetValue("Ping") or 0
+
+        -- Card 1: Script Status
+        local statusCard = createInfoCard("SYSTEM STATUS", activeCount > 0 and "ACTIVE" or "STANDBY", "⚡", activeCount > 0 and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,50,50))
+        -- Card 2: Active Modules
+        local modulesCard = createInfoCard("ACTIVE MODULES", tostring(activeCount) .. " / 14", "📦", config.guiThemeColor)
+        -- Card 3: Executor
+        local execCard = createInfoCard("EXECUTOR", executor, "💻", Color3.fromRGB(150,150,255))
+        -- Card 4: Player Info
+        local playerCard = createInfoCard("PLAYER", playerName, "👤", Color3.fromRGB(100,200,100))
+        -- Card 5: Game
+        local gameCard = createInfoCard("GAME", gameName, "🎮", Color3.fromRGB(255,200,100))
+        -- Card 6: Performance
+        local perfCard = createInfoCard("PERFORMANCE", fps .. " FPS  |  " .. ping .. " ms", "📊", Color3.fromRGB(100,200,255))
+        -- Card 7: Security
+        local secCard = createInfoCard("SECURITY", "PROTECTED", "🔒", Color3.fromRGB(0,230,0))
+
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            homeContent.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+        end)
+        homeContent.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+    end
+
+    updateDashboard()
+    -- Auto update setiap 2 detik
+    task.spawn(function()
+        while homeContent and homeContent.Parent do
+            task.wait(2)
+            updateDashboard()
+        end
+    end)
+end
+
+-- ============================================================================
+-- ABOUT CONTENT (SCROLLING DENGAN SECTION)
+-- ============================================================================
+local aboutContent = nil
+local function createAboutContent()
+    if aboutContent then aboutContent:Destroy() end
+    aboutContent = Instance.new("ScrollingFrame")
+    aboutContent.Name = "AboutContent"
+    aboutContent.Size = UDim2.new(1, 0, 1, 0)
+    aboutContent.BackgroundTransparency = 1
+    aboutContent.ScrollBarThickness = 6
+    aboutContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+    aboutContent.Parent = contentPanel
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 12)
+    padding.PaddingRight = UDim.new(0, 12)
+    padding.PaddingTop = UDim.new(0, 12)
+    padding.PaddingBottom = UDim.new(0, 12)
+    padding.Parent = aboutContent
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 15)
+    layout.FillDirection = Enum.FillDirection.Vertical
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = aboutContent
+
+    local function addSection(title, contentText, icon)
+        local section = Instance.new("Frame")
+        section.Size = UDim2.new(1, 0, 0, 0)
+        section.BackgroundTransparency = 1
+        section.AutomaticSize = Enum.AutomaticSize.Y
+        section.Parent = aboutContent
+
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, 0, 0, 25)
+        titleLabel.Text = icon .. " " .. title
+        titleLabel.TextColor3 = config.guiThemeColor
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextSize = 14
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.Parent = section
+
+        local contentLabel = Instance.new("TextLabel")
+        contentLabel.Size = UDim2.new(1, 0, 0, 0)
+        contentLabel.Text = contentText
+        contentLabel.TextColor3 = Color3.fromRGB(200,200,200)
+        contentLabel.BackgroundTransparency = 1
+        contentLabel.Font = Enum.Font.Gotham
+        contentLabel.TextSize = 11
+        contentLabel.TextXAlignment = Enum.TextXAlignment.Left
+        contentLabel.TextWrapped = true
+        contentLabel.AutomaticSize = Enum.AutomaticSize.Y
+        contentLabel.Parent = section
+
+        local separator = Instance.new("Frame")
+        separator.Size = UDim2.new(1, 0, 0, 1)
+        separator.BackgroundColor3 = Color3.fromRGB(60,60,70)
+        separator.BackgroundTransparency = 0.5
+        separator.Parent = section
+    end
+
+    addSection("CREATOR", "Script by kemi (CyberHeroes)\nRoblox exploit community contributor", "👑")
+    addSection("CREDITS", "Special thanks to:\n• Delta Executor Team\n• Synapse X Community\n• Krnl Users\n• All testers", "🙏")
+    addSection("SUPPORTED EXECUTORS", "• Delta Executor\n• Synapse X\n• Krnl\n• Script Hub", "⚙️")
+    addSection("CHANGELOG (v10.1)", "• Fixed front teleport for Mass Kill (faster execution)\n• Minimize GUI to floating bar with drag & restore\n• Added INFO tab with scrollable text\n• Optimized ESP performance (event-based, progress tracking)\n• Improved layout and dashboard", "📋")
+    addSection("PURPOSE", "Educational and testing purposes only.\nDemonstrates Roblox Lua scripting capabilities,\npathfinding, remote event handling, and GUI design.", "🎯")
+    addSection("DISCLAIMER", "⚠️ WARNING: Use only in private servers.\nDo not disrupt other players' experience.\nThe creator is not responsible for any account penalties.", "⚠️")
+    addSection("CONTACT", "Discord: kemi#1234 (placeholder)\nGitHub: /CyberHeroes", "📧")
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        aboutContent.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
+    end)
+    task.wait()
+    aboutContent.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 30)
+end
+
+-- ============================================================================
+-- FLOATING BAR (MINI GUI) - VERSI DIPERBAIKI (tidak berubah, hanya pastikan)
+-- ============================================================================
+local floatingBar = nil
+local isFloatingVisible = false
+
 local function createFloatingBar()
     if floatingBar and floatingBar.Parent then
         floatingBar.Visible = true
@@ -2956,6 +3116,7 @@ local function createFloatingBar()
     barGui.Parent = CoreGui
 
     local barFrame = Instance.new("Frame")
+    barFrame.Name = "FloatingBar"
     barFrame.Size = UDim2.new(0, 150, 0, 40)
     barFrame.Position = UDim2.new(0.5, -75, 0.05, 0)
     barFrame.BackgroundColor3 = Color3.fromRGB(20,5,10)
@@ -2964,7 +3125,7 @@ local function createFloatingBar()
     barFrame.Parent = barGui
 
     local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(0, 8)
+    barCorner.CornerRadius = UDim.new(0,8)
     barCorner.Parent = barFrame
 
     local barStroke = Instance.new("UIStroke")
@@ -2974,8 +3135,8 @@ local function createFloatingBar()
     barStroke.Parent = barFrame
 
     local iconLabel = Instance.new("TextLabel")
-    iconLabel.Size = UDim2.new(0, 35, 1, 0)
-    iconLabel.Position = UDim2.new(0, 5, 0, 0)
+    iconLabel.Size = UDim2.new(0,35,1,0)
+    iconLabel.Position = UDim2.new(0,5,0,0)
     iconLabel.Text = "⚡"
     iconLabel.TextColor3 = config.guiThemeColor
     iconLabel.BackgroundTransparency = 1
@@ -2984,8 +3145,8 @@ local function createFloatingBar()
     iconLabel.Parent = barFrame
 
     local textLabel = Instance.new("TextLabel")
-    textLabel.Size = UDim2.new(1, -45, 1, 0)
-    textLabel.Position = UDim2.new(0, 45, 0, 0)
+    textLabel.Size = UDim2.new(1,-45,1,0)
+    textLabel.Position = UDim2.new(0,45,0,0)
     textLabel.Text = "CYBERHEROES"
     textLabel.TextColor3 = config.guiThemeColor
     textLabel.BackgroundTransparency = 1
@@ -2994,7 +3155,7 @@ local function createFloatingBar()
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
     textLabel.Parent = barFrame
 
-    -- Drag logic
+    -- Drag mechanics
     local dragging = false
     local dragStartPos, dragStartOffset
     barFrame.InputBegan:Connect(function(input)
@@ -3017,16 +3178,20 @@ local function createFloatingBar()
         end
     end)
 
-    -- Restore on click (only if not dragged)
-    local dragOccurred = false
+    -- Restore on click (if not drag)
+    local isDrag = false
     barFrame.InputBegan:Connect(function(input)
-        dragOccurred = false
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isDrag = false
+        end
     end)
     barFrame.InputChanged:Connect(function(input)
-        if dragging then dragOccurred = true end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            isDrag = true
+        end
     end)
     barFrame.InputEnded:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not dragOccurred then
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not isDrag then
             if mainFrame then
                 mainFrame.Visible = true
                 config.guiVisible = true
@@ -3037,22 +3202,12 @@ local function createFloatingBar()
         end
     end)
 
-    -- Hover effects
-    barFrame.MouseEnter:Connect(function()
-        TweenService:Create(barFrame, TweenInfo.new(0.15), {BackgroundTransparency = 0.05}):Play()
-        TweenService:Create(barStroke, TweenInfo.new(0.15), {Transparency = 0.1, Thickness = 2}):Play()
-    end)
-    barFrame.MouseLeave:Connect(function()
-        TweenService:Create(barFrame, TweenInfo.new(0.15), {BackgroundTransparency = 0.2}):Play()
-        TweenService:Create(barStroke, TweenInfo.new(0.15), {Transparency = 0.4, Thickness = 1.5}):Play()
-    end)
-
     floatingBar = barGui
     return floatingBar
 end
 
 -- ============================================================================
--- GUI BUTTONS (enhanced hover, active states preserved)
+-- GUI BUTTONS (DIPERBAIKI DENGAN HOVER EFEK)
 -- ============================================================================
 local function createGridButton(parent, name, text, initialState, onChange)
     local button = Instance.new("TextButton")
@@ -3075,22 +3230,20 @@ local function createGridButton(parent, name, text, initialState, onChange)
     stroke.Transparency = 0.3
     stroke.Parent = button
 
-    -- Hover effect
-    button.MouseEnter:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.1), {Transparency = 0.1, Thickness = 1.2}):Play()
-    end)
-    button.MouseLeave:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.1}):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.1), {Transparency = 0.3, Thickness = 1}):Play()
-    end)
-
     local function updateState(state)
         button.Text = text .. (state and " [ON]" or " [OFF]")
         button.BackgroundColor3 = state and Color3.fromRGB(40,5,5) or Color3.fromRGB(15,0,2)
         button.TextColor3 = state and Color3.fromRGB(0,230,255) or Color3.fromRGB(200,200,200)
         stroke.Color = state and Color3.fromRGB(0,200,255) or Color3.fromRGB(150,30,30)
     end
+
+    -- Hover effects
+    button.MouseEnter:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.05}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.1}):Play()
+    end)
 
     button.MouseButton1Click:Connect(function()
         local newState = not (config[name] or false)
@@ -3149,44 +3302,57 @@ local function createGridButton(parent, name, text, initialState, onChange)
     return button
 end
 
-local function createSidebarItem(parent, text, icon)
+local function createSidebarItem(parent, text, icon, active)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(1, 0, 0, 32)
     button.Text = " " .. icon .. "  " .. text
-    button.TextColor3 = Color3.fromRGB(200,200,200)
-    button.BackgroundColor3 = Color3.fromRGB(15,0,2)
-    button.BackgroundTransparency = 0.3
+    button.TextColor3 = active and Color3.fromRGB(0,230,255) or Color3.fromRGB(180,180,180)
+    button.BackgroundColor3 = active and Color3.fromRGB(40,5,5) or Color3.fromRGB(15,0,2)
+    button.BackgroundTransparency = 0.2
     button.TextSize = 11
     button.Font = Enum.Font.GothamBold
     button.TextXAlignment = Enum.TextXAlignment.Left
     button.BorderSizePixel = 0
     button.Parent = parent
-
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 4)
     corner.Parent = button
-
     local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(150,30,30)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.5
+    stroke.Color = active and config.guiThemeColor or Color3.fromRGB(100,100,100)
+    stroke.Thickness = 0.5
+    stroke.Transparency = 0.6
     stroke.Parent = button
 
-    -- Hover
+    -- Hover effect
     button.MouseEnter:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.1}):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.1), {Transparency = 0.2, Thickness = 1.2}):Play()
+        if not active then
+            TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.05, TextColor3 = config.guiThemeColor}):Play()
+        end
     end)
     button.MouseLeave:Connect(function()
-        TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.3}):Play()
-        TweenService:Create(stroke, TweenInfo.new(0.1), {Transparency = 0.5, Thickness = 1}):Play()
+        if not active then
+            TweenService:Create(button, TweenInfo.new(0.1), {BackgroundTransparency = 0.2, TextColor3 = Color3.fromRGB(180,180,180)}):Play()
+        end
     end)
+    return button
+end
 
-    return {button = button, stroke = stroke}
+local function setActiveSidebarItem(activeButton)
+    if currentSidebarItem then
+        currentSidebarItem.BackgroundTransparency = 0.2
+        currentSidebarItem.TextColor3 = Color3.fromRGB(180,180,180)
+        local stroke = currentSidebarItem:FindFirstChildWhichIsA("UIStroke")
+        if stroke then stroke.Color = Color3.fromRGB(100,100,100) end
+    end
+    currentSidebarItem = activeButton
+    activeButton.BackgroundTransparency = 0.05
+    activeButton.TextColor3 = config.guiThemeColor
+    local stroke = activeButton:FindFirstChildWhichIsA("UIStroke")
+    if stroke then stroke.Color = config.guiThemeColor end
 end
 
 -- ============================================================================
--- PERMANENT TELEPORT BUTTON (unchanged)
+-- PERMANENT TELEPORT BUTTON (tidak berubah)
 -- ============================================================================
 local function createPermanentTeleportButton()
     if teleportButtonGui then teleportButtonGui:Destroy() end
@@ -3208,7 +3374,7 @@ local function createPermanentTeleportButton()
     teleportButton.BorderSizePixel = 0
     teleportButton.Parent = teleportButtonGui
     local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(1, 0)
+    btnCorner.CornerRadius = UDim.new(1,0)
     btnCorner.Parent = teleportButton
     local btnStroke = Instance.new("UIStroke")
     btnStroke.Color = Color3.fromRGB(0,200,255)
@@ -3220,7 +3386,7 @@ local function createPermanentTeleportButton()
 end
 
 -- ============================================================================
--- MAIN GUI (with sidebar active state management)
+-- MAIN GUI (UPGRADED)
 -- ============================================================================
 local function createGUI()
     if screenGui then screenGui:Destroy() end
@@ -3232,8 +3398,8 @@ local function createGUI()
 
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
-    mainFrame.Size = UDim2.new(0, 400, 0, 280)  -- slightly larger for content
-    mainFrame.Position = UDim2.new(0.5, -200, 0.5, -140)
+    mainFrame.Size = UDim2.new(0, 420, 0, 320)
+    mainFrame.Position = UDim2.new(0.5, -210, 0.5, -160)
     mainFrame.BackgroundColor3 = Color3.fromRGB(20,5,10)
     mainFrame.BackgroundTransparency = 0.1
     mainFrame.BorderSizePixel = 0
@@ -3244,10 +3410,10 @@ local function createGUI()
     mainStroke = Instance.new("UIStroke")
     mainStroke.Color = config.guiThemeColor
     mainStroke.Thickness = 1.5
-    mainStroke.Transparency = 0.4
+    mainStroke.Transparency = 0.3
     mainStroke.Parent = mainFrame
 
-    -- Title bar
+    -- Title Bar
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 28)
     titleBar.BackgroundColor3 = Color3.fromRGB(25,3,7)
@@ -3255,7 +3421,7 @@ local function createGUI()
     titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.CornerRadius = UDim.new(0, 10)
     titleCorner.Parent = titleBar
 
     local title = Instance.new("TextLabel")
@@ -3272,7 +3438,7 @@ local function createGUI()
     local versionLabel = Instance.new("TextLabel")
     versionLabel.Size = UDim2.new(0.3, 0, 1, 0)
     versionLabel.Position = UDim2.new(0.6, 0, 0, 0)
-    versionLabel.Text = "v10.1"
+    versionLabel.Text = "Build 10.1"
     versionLabel.TextColor3 = Color3.fromRGB(150,150,200)
     versionLabel.BackgroundTransparency = 1
     versionLabel.Font = Enum.Font.Gotham
@@ -3289,7 +3455,7 @@ local function createGUI()
     minimizeBtn.BackgroundTransparency = 0.2
     minimizeBtn.BorderSizePixel = 0
     minimizeBtn.Font = Enum.Font.GothamBold
-    minimizeBtn.TextSize = 20
+    minimizeBtn.TextSize = 18
     minimizeBtn.Parent = titleBar
     local minCorner = Instance.new("UICorner")
     minCorner.CornerRadius = UDim.new(0, 4)
@@ -3310,11 +3476,10 @@ local function createGUI()
     closeCorner.CornerRadius = UDim.new(0, 4)
     closeCorner.Parent = closeBtn
 
-    -- Minimize / Restore logic
     local function minimizeGUI()
         config.guiVisible = false
         if mainFrame then mainFrame.Visible = false end
-        if floatingBar then pcall(function() floatingBar:Destroy() end) end
+        if floatingBar then pcall(function() floatingBar:Destroy() end); floatingBar = nil end
         createFloatingBar()
         isFloatingVisible = true
     end
@@ -3344,31 +3509,24 @@ local function createGUI()
     sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     sidebarLayout.Parent = sidebarList
 
-    local items = {
-        home = createSidebarItem(sidebarList, "HOME", "🏠"),
-        features = createSidebarItem(sidebarList, "FEATURES", "⚡"),
-        settings = createSidebarItem(sidebarList, "SETTINGS", "⚙️"),
-        info = createSidebarItem(sidebarList, "INFO", "📄"),
-        about = createSidebarItem(sidebarList, "ABOUT", "ℹ️")
-    }
+    local homeItem = createSidebarItem(sidebarList, "HOME", "🏠", true)
+    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "⚡", false)
+    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "⚙️", false)
+    local infoItem = createSidebarItem(sidebarList, "INFO", "📄", false)
+    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "ℹ️", false)
+    setActiveSidebarItem(homeItem)
 
-    local sep = Instance.new("Frame")
-    sep.Size = UDim2.new(0.8, 0, 0, 1)
-    sep.BackgroundColor3 = Color3.fromRGB(0,200,255)
-    sep.BackgroundTransparency = 0.7
-    sep.Parent = sidebarList
-
-    -- Content panel
+    -- Content Panel
     contentPanel = Instance.new("Frame")
     contentPanel.Size = UDim2.new(1, -100, 1, -34)
     contentPanel.Position = UDim2.new(0, 95, 0, 32)
     contentPanel.BackgroundTransparency = 1
     contentPanel.Parent = mainFrame
 
-    -- Feature grid (default view)
+    -- Grid Layout untuk Features
     local gridLayout = Instance.new("UIGridLayout")
-    gridLayout.CellSize = UDim2.new(0, 85, 0, 34)
-    gridLayout.CellPadding = UDim2.new(0, 6, 0, 6)
+    gridLayout.CellSize = UDim2.new(0, 88, 0, 34)
+    gridLayout.CellPadding = UDim2.new(0, 5, 0, 5)
     gridLayout.FillDirection = Enum.FillDirection.Horizontal
     gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
@@ -3397,71 +3555,51 @@ local function createGUI()
         createGridButton(contentPanel, feat.name, feat.text, initialState)
     end
 
-    
-    -- Function to set active sidebar style
-    local function setActiveSidebar(activeKey)
-        for key, item in pairs(items) do
-            local isActive = (key == activeKey)
-            local newColor = isActive and config.guiThemeColor or Color3.fromRGB(200,200,200)
-            local newBgTrans = isActive and 0.05 or 0.3
-            local newStrokeColor = isActive and config.guiThemeColor or Color3.fromRGB(150,30,30)
-            item.button.TextColor3 = newColor
-            item.stroke.Color = newStrokeColor
-            TweenService:Create(item.button, TweenInfo.new(0.1), {BackgroundTransparency = newBgTrans}):Play()
-        end
-    end
-
-    -- Navigation handlers
-    items.home.button.MouseButton1Click:Connect(function()
-        setActiveSidebar("home")
-        -- Clear other contents
+    -- Navigation Handlers
+    homeItem.MouseButton1Click:Connect(function()
+        setActiveSidebarItem(homeItem)
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
         if aboutContent then aboutContent:Destroy() end
-        if homeContent then homeContent:Destroy() end
-        gridLayout.Parent = nil
+        gridLayout.Parent = contentPanel
         createHomeContent()
     end)
-
-    items.features.button.MouseButton1Click:Connect(function()
-        setActiveSidebar("features")
+    featuresItem.MouseButton1Click:Connect(function()
+        setActiveSidebarItem(featuresItem)
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
         if aboutContent then aboutContent:Destroy() end
-        if homeContent then homeContent:Destroy() end
+        if homeContent then homeContent:Destroy(); homeContent = nil end
         gridLayout.Parent = contentPanel
     end)
-
-    items.settings.button.MouseButton1Click:Connect(function()
-        setActiveSidebar("settings")
-        gridLayout.Parent = nil
+    settingsItem.MouseButton1Click:Connect(function()
+        setActiveSidebarItem(settingsItem)
+        if homeContent then homeContent:Destroy(); homeContent = nil end
         if infoContent then infoContent:Destroy() end
         if aboutContent then aboutContent:Destroy() end
-        if homeContent then homeContent:Destroy() end
+        gridLayout.Parent = nil
         createSettingsContent()
     end)
-
-    items.info.button.MouseButton1Click:Connect(function()
-        setActiveSidebar("info")
-        gridLayout.Parent = nil
+    infoItem.MouseButton1Click:Connect(function()
+        setActiveSidebarItem(infoItem)
+        if homeContent then homeContent:Destroy(); homeContent = nil end
         if settingsContent then settingsContent:Destroy() end
         if aboutContent then aboutContent:Destroy() end
-        if homeContent then homeContent:Destroy() end
+        gridLayout.Parent = nil
         createInfoContent()
     end)
-
-    items.about.button.MouseButton1Click:Connect(function()
-        setActiveSidebar("about")
-        gridLayout.Parent = nil
+    aboutItem.MouseButton1Click:Connect(function()
+        setActiveSidebarItem(aboutItem)
+        if homeContent then homeContent:Destroy(); homeContent = nil end
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-        if homeContent then homeContent:Destroy() end
+        gridLayout.Parent = nil
         createAboutContent()
     end)
 
     makeDraggable(mainFrame)
 
-    -- Status bar
+    -- Status Bar
     local statusBar = Instance.new("Frame")
     statusBar.Size = UDim2.new(1, 0, 0, 20)
     statusBar.Position = UDim2.new(0, 0, 1, -20)
@@ -3470,7 +3608,7 @@ local function createGUI()
     statusBar.BorderSizePixel = 0
     statusBar.Parent = mainFrame
     local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 6)
+    statusCorner.CornerRadius = UDim.new(0, 4)
     statusCorner.Parent = statusBar
 
     statusLabel = Instance.new("TextLabel")
@@ -3492,18 +3630,15 @@ local function createGUI()
     led.BorderSizePixel = 0
     led.Parent = statusBar
     local ledCorner = Instance.new("UICorner")
-    ledCorner.CornerRadius = UDim.new(1, 0)
+    ledCorner.CornerRadius = UDim.new(1,0)
     ledCorner.Parent = led
 
-    -- Status updater
     task.spawn(function()
         while screenGui and screenGui.Parent do
-            local activeCount = (config.autoWinEnabled and 1 or 0) + (config.autoTaskEnabled and 1 or 0) +
-                                (config.espEnabled and 1 or 0) + (config.speedBoostEnabled and 1 or 0) +
-                                (config.stealthEnabled and 1 or 0) + (config.godModeEnabled and 1 or 0) +
-                                (config.infiniteAmmoEnabled and 1 or 0) + (config.shieldEnabled and 1 or 0) +
-                                (config.tpwalkEnabled and 1 or 0) + (config.noCollideEnabled and 1 or 0) +
-                                (config.massKillEnabled and 1 or 0) + (config.autoGeneratorEnabled and 1 or 0) +
+            local activeCount = (config.autoWinEnabled and 1 or 0) + (config.autoTaskEnabled and 1 or 0) + (config.espEnabled and 1 or 0) +
+                                (config.speedBoostEnabled and 1 or 0) + (config.stealthEnabled and 1 or 0) + (config.godModeEnabled and 1 or 0) +
+                                (config.infiniteAmmoEnabled and 1 or 0) + (config.shieldEnabled and 1 or 0) + (config.tpwalkEnabled and 1 or 0) +
+                                (config.noCollideEnabled and 1 or 0) + (config.massKillEnabled and 1 or 0) + (config.autoGeneratorEnabled and 1 or 0) +
                                 (config.autoSkillCheckEnabled and 1 or 0) + (config.autoAimEnabled and 1 or 0)
             if activeCount > 0 then
                 statusLabel.Text = "ACTIVE: " .. activeCount .. " modules"
@@ -3518,13 +3653,11 @@ local function createGUI()
         end
     end)
 
-    -- Initial active state (HOME)
-    setActiveSidebar("home")
-    createHomeContent()
-    gridLayout.Parent = nil
-
     mainFrame.BackgroundTransparency = 0.3
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
+
+    -- Tampilkan home content default
+    createHomeContent()
 end
 
 -- ============================================================================

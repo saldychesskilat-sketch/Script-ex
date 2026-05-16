@@ -3397,6 +3397,70 @@ local function createPermanentTeleportButton()
 end
 
 -- ============================================================================
+-- FLOATING LOGO (RGB, COLLAPSIBLE GUI TOGGLE)
+-- ============================================================================
+local function createFloatingLogo()
+    if floatingLogo and floatingLogo.Parent then
+        floatingLogo.Visible = true
+        return floatingLogo
+    end
+    if floatingLogo then floatingLogo:Destroy() end
+
+    local logoGui = Instance.new("ScreenGui")
+    logoGui.Name = "CyberHeroes_FloatingLogo"
+    logoGui.ResetOnSpawn = false
+    logoGui.IgnoreGuiInset = true
+    logoGui.Parent = CoreGui
+
+    floatingLogo = Instance.new("ImageButton")
+    floatingLogo.Name = "FloatingLogo"
+    floatingLogo.Size = UDim2.new(0, 45, 0, 45)
+    floatingLogo.Position = UDim2.new(0.5, -22, 0.85, -22)
+    floatingLogo.BackgroundColor3 = Color3.fromRGB(25, 5, 5)
+    floatingLogo.BackgroundTransparency = 0.2
+    floatingLogo.BorderSizePixel = 0
+    floatingLogo.Image = "rbxasset://textures/loading/robloxlogo.png"
+    floatingLogo.ImageColor3 = Color3.fromRGB(255, 80, 80)
+    floatingLogo.ImageTransparency = 0.2
+    floatingLogo.Parent = logoGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = floatingLogo
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 50, 50)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.4
+    stroke.Parent = floatingLogo
+
+    -- RGB color cycling
+    local hue = 0
+    task.spawn(function()
+        while floatingLogo and floatingLogo.Parent do
+            hue = (hue + 0.01) % 1
+            local color = (hue < 0.5) and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(0, 200, 255)
+            floatingLogo.ImageColor3 = color
+            stroke.Color = color
+            task.wait(0.1)
+        end
+    end)
+
+    floatingLogo.MouseButton1Click:Connect(function()
+        if mainFrame then
+            mainFrame.Visible = true
+            config.guiVisible = true
+            floatingLogo.Parent:Destroy()
+            floatingLogo = nil
+            isLogoVisible = false
+        end
+    end)
+
+    return floatingLogo
+end
+
+
+-- ============================================================================
 -- MAIN GUI (FULLY FIXED)
 -- ============================================================================
 local function createGUI()
@@ -3707,7 +3771,6 @@ local function restoreFeatureStates()
     
     if config.speedBoostEnabled and not currentBoostConnection then
         startSpeedBoostMonitor()
-        createSpeedSlider()
        elseif not config.speedBoostEnabled and currentBoostConnection then
         stopSpeedBoostMonitor()
     end

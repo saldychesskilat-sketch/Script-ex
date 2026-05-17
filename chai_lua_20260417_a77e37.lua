@@ -525,109 +525,123 @@ local function stopAutoTask()
 end
 
 -- ============================================================================
--- FEATURE 3: ESP SYSTEM (UPGRADED - PLAYER + OBJECTS + GENERATOR PROGRESS + NEW OBJECTS)
+-- FEATURE 3: ESP SYSTEM (UPGRADED - PLAYER + OBJECTS + GENERATOR PROGRESS + LiverGoal/F_O)
+-- Menggabungkan pendekatan dari open source script (GetGameValue, ApplyHighlight, Billboard)
 -- ============================================================================
 
--- Storage untuk ESP player
-local espHighlights = {}
-
--- Storage untuk ESP objek (non-player)
-local objectEspHighlights = {}
-
--- Storage untuk generator progress billboard
+-- Storage
+local espHighlights = {}           -- untuk player
+local objectEspHighlights = {}     -- untuk objek (hook, generator, LiverGoal, F_O)
 local generatorProgressBillboards = {}
+local activeGenerators = {}        -- daftar generator aktif untuk update progress
 
--- Storage untuk koneksi event
+-- Event connections
 local playerAddedConn = nil
 local playerRemovingConn = nil
 local descendantAddedConn = nil
 local descendantRemovingConn = nil
 local heartbeatConn = nil
+local fullRefreshConn = nil
 
 -- Warna untuk objek baru
-local COLOR_LIVERGOAL = Color3.fromRGB(160, 32, 240)  -- ungu
+local COLOR_LIVERGOAL = Color3.fromRGB(160, 32, 240)   -- ungu
 local COLOR_F_O = Color3.fromRGB(200, 0, 255)          -- ungu terang
 
 -- ============================================================================
--- UTILITY UNTUK PROGRESS GENERATOR (dari script referensi)
+-- UTILITY (diadaptasi dari referensi)
 -- ============================================================================
-local function getGeneratorProgress(generator)
-    -- Coba dari atribut atau nilai child
-    local progressAttr = generator:GetAttribute("RepairProgress")
-    if progressAttr ~= nil then return progressAttr end
-    local progressValue = generator:FindFirstChild("Progress")
-    if progressValue and (progressValue:IsA("NumberValue") or progressValue:IsA("IntValue")) then
-        return progressValue.Value
-    end
-    local repairProgress = generator:FindFirstChild("RepairProgress")
-    if repairProgress and (repairProgress:IsA("NumberValue") or repairProgress:IsA("IntValue")) then
-        return repairProgress.Value
+local function GetGameValue(obj, name)
+    if not obj then return nil end
+    local attr = obj:GetAttribute(name)
+    if attr ~= nil then return attr end
+    local child = obj:FindFirstChild(name)
+    if child then
+        local success, val = pcall(function() return child.Value end)
+        if success then return val end
     end
     return nil
 end
 
-local function updateGeneratorProgressBillboard(generator)
-    if not generator then return end
-    local progress = getGeneratorProgress(generator)
-    if progress ~= nil then
-        local percent = math.floor(progress)
-        local billboard = generator:FindFirstChild("CyberHeroes_Progress")
-        if not billboard then
-            billboard = Instance.new("BillboardGui")
-            billboard.Name = "CyberHeroes_Progress"
-            billboard.Adornee = generator
-            billboard.Size = UDim2.new(0, 100, 0, 20)
-            billboard.StudsOffset = Vector3.new(0, 2, 0)
-            billboard.Parent = generator
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Name = "ProgressText"
-            textLabel.Size = UDim2.new(1, 0, 1, 0)
-            textLabel.BackgroundTransparency = 1
-            textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            textLabel.TextStrokeTransparency = 0.5
-            textLabel.Font = Enum.Font.GothamBold
-            textLabel.TextSize = 14
-            textLabel.Text = "0%"
-            textLabel.Parent = billboard
-            generatorProgressBillboards[generator] = billboard
-        end
-        local textLabel = billboard:FindFirstChild("ProgressText")
-        if textLabel then
-            textLabel.Text = percent .. "%"
-            if percent >= 100 then
-                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-            elseif percent >= 50 then
-                textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-            else
-                textLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            end
-        end
-        if percent >= 100 then
-            task.delay(2, function()
-                if generator and generator.Parent then
-                    local progBill = generator:FindFirstChild("CyberHeroes_Progress")
-                    if progBill then progBill:Destroy() end
-                    generatorProgressBillboards[generator] = nil
-                end
-            end)
-        end
+local function ApplyHighlight(object, color, transparency)
+    transparency = transparency or 0.5
+    local h = object:FindFirstChild("CyberHeroes_Highlight")
+    if not h then
+        h = Instance.new("Highlight")
+        h.Name = "CyberHeroes_Highlight"
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = object
     end
+    h.Adornee = object
+    h.FillColor = color
+    h.FillTransparency = transparency
+    h.OutlineColor = color
+    h.OutlineTransparency = 0.2
+    return h
+end
+
+local function CreateBillboardTag(text, color, size, textSize, offset)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "CyberHeroes_Billboard"
+    billboard.AlwaysOnTop = true
+    billboard.Size = size or UDim2.new(0, 120, 0, 30)
+    billboard.StudsOffset = offset or Vector3.new(0, 2, 0)
+    local label = Instance.new("TextLabel")
+    label.Name = "TextLabel"
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = color
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.new(0,0,0)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = textSize or 12
+    label.TextWrapped = true
+    label.Parent = billboard
+    return billboard
 end
 
 -- ============================================================================
--- ESP PLAYER (dengan deteksi killer/survivor)
+-- GENERATOR PROGRESS (menggunakan GetGameValue)
+-- ============================================================================
+local function updateGeneratorProgress(generator)
+    if not generator or not generator.Parent then return true end
+    local percent = GetGameValue(generator, "RepairProgress") or GetGameValue(generator, "Progress") or 0
+    if percent >= 100 then
+        local bill = generator:FindFirstChild("GenProgressBillboard")
+        if bill then bill:Destroy() end
+        local hl = generator:FindFirstChild("CyberHeroes_Highlight")
+        if hl then hl:Destroy() end
+        return true
+    end
+    local cp = math.clamp(percent, 0, 100)
+    local finalColor = cp < 50 and Color3.fromRGB(0,150,255):Lerp(Color3.fromRGB(180,180,0), cp/50) or Color3.fromRGB(180,180,0):Lerp(Color3.fromRGB(0,150,0), (cp-50)/50)
+    local percentStr = string.format("[%.1f%%]", percent)
+    local bill = generator:FindFirstChild("GenProgressBillboard")
+    if not bill then
+        bill = CreateBillboardTag(percentStr, finalColor, UDim2.new(0,100,0,20), 11, Vector3.new(0,2,0))
+        bill.Name = "GenProgressBillboard"
+        local anchor = generator:FindFirstChild("defaultMaterial", true) or generator
+        bill.Adornee = anchor
+        bill.Parent = generator
+    else
+        local lbl = bill:FindFirstChild("TextLabel")
+        if lbl then
+            lbl.Text = percentStr
+            lbl.TextColor3 = finalColor
+        end
+    end
+    return false
+end
+
+-- ============================================================================
+-- ESP PLAYER (dengan team detection dan mask optional dari referensi)
 -- ============================================================================
 local function createHighlightForPlayer(player)
     if espHighlights[player.UserId] then
-        if espHighlights[player.UserId].Highlight then
-            espHighlights[player.UserId].Highlight:Destroy()
-        end
-        if espHighlights[player.UserId].Billboard then
-            espHighlights[player.UserId].Billboard:Destroy()
-        end
-        if espHighlights[player.UserId].TeamChanged then
-            espHighlights[player.UserId].TeamChanged:Disconnect()
-        end
+        local old = espHighlights[player.UserId]
+        if old.Highlight then old.Highlight:Destroy() end
+        if old.Billboard then old.Billboard:Destroy() end
+        if old.TeamChanged then old.TeamChanged:Disconnect() end
         espHighlights[player.UserId] = nil
     end
 
@@ -654,31 +668,18 @@ local function createHighlightForPlayer(player)
     local isKiller = getPlayerType()
     local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
 
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "CyberHeroes_ESP"
-    highlight.FillColor = highlightColor
-    highlight.FillTransparency = config.highlightTransparency
-    highlight.OutlineColor = highlightColor
-    highlight.OutlineTransparency = 0.2
-    highlight.Adornee = character
-    highlight.Parent = character
-
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "CyberHeroes_NameTag"
-    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 120, 0, 30)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    local highlight = ApplyHighlight(character, highlightColor, config.highlightTransparency)
+    local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso")
+    local distance = 0
+    if localRootPart and rootPart then
+        distance = math.floor((rootPart.Position - localRootPart.Position).Magnitude)
+    end
+    local nameText = player.Name .. "\n[" .. distance .. " studs]"
+    local billboard = CreateBillboardTag(nameText, highlightColor, UDim2.new(0,120,0,30), 11, Vector3.new(0,2,0))
+    billboard.Adornee = rootPart or character
     billboard.Parent = character
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 1, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = highlightColor
-    nameLabel.TextStrokeTransparency = 0.5
-    nameLabel.TextScaled = true
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.Parent = billboard
 
+    -- Team change monitoring
     local teamChangedConn = nil
     if player.Team then
         teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
@@ -688,8 +689,8 @@ local function createHighlightForPlayer(player)
                 highlight.FillColor = newColor
                 highlight.OutlineColor = newColor
             end
-            if nameLabel then
-                nameLabel.TextColor3 = newColor
+            if billboard and billboard:FindFirstChild("TextLabel") then
+                billboard:FindFirstChild("TextLabel").TextColor3 = newColor
             end
         end)
     end
@@ -697,8 +698,8 @@ local function createHighlightForPlayer(player)
     espHighlights[player.UserId] = {
         Highlight = highlight,
         Billboard = billboard,
-        NameLabel = nameLabel,
-        TeamChanged = teamChangedConn
+        TeamChanged = teamChangedConn,
+        Character = character
     }
 end
 
@@ -720,65 +721,45 @@ local function updateAllESP()
 end
 
 -- ============================================================================
--- ESP OBJEK (HOOK, GENERATOR, LiverGoal, F_O) dengan highlight dan progress
+-- ESP OBJEK (HOOK, GENERATOR, LiverGoal, F_O) dengan progress untuk generator
 -- ============================================================================
 local function createObjectESP(obj, objType)
     if objectEspHighlights[obj] then return end
     local color
     if objType == "HOOK" then
-        color = Color3.fromRGB(255, 165, 0)  -- orange
+        color = Color3.fromRGB(255, 165, 0)      -- orange
     elseif objType == "GENERATOR" then
-        color = Color3.fromRGB(0, 150, 255)  -- biru
+        color = Color3.fromRGB(0, 150, 255)      -- biru
     elseif objType == "LiverGoal" then
-        color = COLOR_LIVERGOAL  -- ungu
+        color = COLOR_LIVERGOAL                  -- ungu
     elseif objType == "F_O" then
-        color = COLOR_F_O         -- ungu terang
+        color = COLOR_F_O                        -- ungu terang
     else
-        color = Color3.fromRGB(200, 200, 200)
+        color = Color3.fromRGB(200,200,200)
     end
 
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "CyberHeroes_Object_ESP"
-    highlight.FillColor = color
-    highlight.FillTransparency = 0.5
-    highlight.OutlineColor = color
-    highlight.OutlineTransparency = 0.2
-    highlight.Adornee = obj
-    highlight.Parent = obj
+    local highlight = ApplyHighlight(obj, color, 0.5)
     objectEspHighlights[obj] = { Highlight = highlight }
 
-    -- Jika generator, tambahkan progress billboard dan pantau perubahan progress
     if objType == "GENERATOR" then
-        updateGeneratorProgressBillboard(obj)
-        -- Pantau perubahan progress
-        local progressValue = obj:FindFirstChild("Progress")
-        if not progressValue then
-            progressValue = obj:FindFirstChild("RepairProgress")
-        end
-        if progressValue and (progressValue:IsA("NumberValue") or progressValue:IsA("IntValue")) then
-            local progressConn
-            progressConn = progressValue:GetPropertyChangedSignal("Value"):Connect(function()
-                if obj and obj.Parent then
-                    updateGeneratorProgressBillboard(obj)
-                else
-                    if progressConn then progressConn:Disconnect() end
-                end
-            end)
-            objectEspHighlights[obj].ProgressConn = progressConn
-        end
+        table.insert(activeGenerators, obj)
+        -- Progress update pertama
+        updateGeneratorProgress(obj)
+        -- Pantau perubahan progress melalui GetGameValue (tidak bisa pakai .Changed langsung, kita akan lakukan periodic atau pakai descendant attribute? 
+        -- Di referensi mereka menggunakan loop heartbeat untuk update generator progress. Kita akan tambahkan nanti di heartbeat.
     end
 end
 
 local function clearObjectESP()
     for obj, data in pairs(objectEspHighlights) do
         if data.Highlight then pcall(function() data.Highlight:Destroy() end) end
-        if data.ProgressConn then pcall(function() data.ProgressConn:Disconnect() end) end
     end
     objectEspHighlights = {}
-    for _, billboard in pairs(generatorProgressBillboards) do
-        pcall(function() billboard:Destroy() end)
+    for _, g in ipairs(activeGenerators) do
+        local bill = g:FindFirstChild("GenProgressBillboard")
+        if bill then bill:Destroy() end
     end
-    generatorProgressBillboards = {}
+    activeGenerators = {}
 end
 
 local function onDescendantAdded(instance)
@@ -797,17 +778,18 @@ end
 
 local function onDescendantRemoving(instance)
     if objectEspHighlights[instance] then
-        if objectEspHighlights[instance].Highlight then
-            pcall(function() objectEspHighlights[instance].Highlight:Destroy() end)
-        end
-        if objectEspHighlights[instance].ProgressConn then
-            pcall(function() objectEspHighlights[instance].ProgressConn:Disconnect() end)
-        end
+        pcall(function() objectEspHighlights[instance].Highlight:Destroy() end)
         objectEspHighlights[instance] = nil
     end
-    local progBill = instance:FindFirstChild("CyberHeroes_Progress")
-    if progBill then pcall(function() progBill:Destroy() end) end
-    generatorProgressBillboards[instance] = nil
+    -- Hapus dari activeGenerators
+    for i, g in ipairs(activeGenerators) do
+        if g == instance then
+            table.remove(activeGenerators, i)
+            break
+        end
+    end
+    local progBill = instance:FindFirstChild("GenProgressBillboard")
+    if progBill then progBill:Destroy() end
 end
 
 local function initialObjectScan()
@@ -827,17 +809,18 @@ local function initialObjectScan()
 end
 
 -- ============================================================================
--- START ESP (MAIN FUNCTION)
+-- START ESP (MAIN)
 -- ============================================================================
 local function startESP()
-    -- Cleanup event connections sebelumnya
+    -- Cleanup previous connections
     if playerAddedConn then playerAddedConn:Disconnect() end
     if playerRemovingConn then playerRemovingConn:Disconnect() end
     if descendantAddedConn then descendantAddedConn:Disconnect() end
     if descendantRemovingConn then descendantRemovingConn:Disconnect() end
     if heartbeatConn then heartbeatConn:Disconnect() end
+    if fullRefreshConn then fullRefreshConn:Disconnect() end
 
-    -- Player ESP: event-based
+    -- Player events
     playerAddedConn = Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
             task.wait(0.5)
@@ -853,41 +836,25 @@ local function startESP()
         end
     end)
 
-    -- Untuk player yang sudah ada, pasang event CharacterAdded
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             player.CharacterAdded:Connect(function()
-                if config.espEnabled then
-                    createHighlightForPlayer(player)
-                end
+                if config.espEnabled then createHighlightForPlayer(player) end
             end)
         end
     end
 
-    -- Object ESP: event-based
+    -- Object events
     descendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
     descendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
-
-    -- Initial scan untuk objek yang sudah ada
     initialObjectScan()
-
-    -- Update semua player yang sudah ada
     updateAllESP()
 
-    -- Heartbeat untuk menjaga konsistensi (jika karakter berubah tanpa event)
+    -- Heartbeat untuk update progress generator dan ESP konsistensi
+    local lastGeneratorUpdate = 0
     heartbeatConn = RunService.Heartbeat:Connect(function()
-        if config.espEnabled then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer then
-                    local currentChar = player.Character
-                    local stored = espHighlights[player.UserId]
-                    if not stored or not stored.Highlight or stored.Highlight.Adornee ~= currentChar then
-                        createHighlightForPlayer(player)
-                    end
-                end
-            end
-        else
-            -- Jika ESP dimatikan, bersihkan semua
+        if not config.espEnabled then
+            -- Bersihkan semua jika ESP mati
             for _, data in pairs(espHighlights) do
                 if data.Highlight then data.Highlight:Destroy() end
                 if data.Billboard then data.Billboard:Destroy() end
@@ -895,11 +862,67 @@ local function startESP()
             end
             espHighlights = {}
             clearObjectESP()
+            return
+        end
+
+        -- Update generator progress (setiap 0.2 detik)
+        local now = tick()
+        if now - lastGeneratorUpdate > 0.2 then
+            lastGeneratorUpdate = now
+            for i = #activeGenerators, 1, -1 do
+                local g = activeGenerators[i]
+                if g and g.Parent then
+                    if updateGeneratorProgress(g) then
+                        -- generator selesai, hapus dari daftar
+                        table.remove(activeGenerators, i)
+                    end
+                else
+                    table.remove(activeGenerators, i)
+                end
+            end
+        end
+
+        -- Update player distance setiap saat (refresh billboard text)
+        for _, data in pairs(espHighlights) do
+            if data.Billboard and data.Billboard.Adornee then
+                local root = data.Billboard.Adornee
+                local dist = 0
+                if localRootPart and root and root:IsA("BasePart") then
+                    dist = math.floor((root.Position - localRootPart.Position).Magnitude)
+                end
+                local lbl = data.Billboard:FindFirstChild("TextLabel")
+                if lbl then
+                    local playerName = string.match(lbl.Text, "^[^\n]+")
+                    if playerName then
+                        lbl.Text = playerName .. "\n[" .. dist .. " studs]"
+                    end
+                end
+            end
         end
     end)
 
-    print("[ESP] Upgraded: Players + Objects + Generator Progress + LiverGoal & F_O (purple)")
+    -- Full refresh ESP setiap 5 detik (opsional, untuk menjaga objek baru yang mungkin terlewat)
+    fullRefreshConn = RunService.Heartbeat:Connect(function()
+        if not config.espEnabled then return end
+        local now = tick()
+        if now - (fullRefreshConn.lastRun or 0) > 5 then
+            fullRefreshConn.lastRun = now
+            -- Refresh objek (tidak perlu full rescan, cukup pastikan LiverGoal/F_O tetap ada)
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if (obj.Name == "LiverGoal" or obj.Name == "F_O") and not objectEspHighlights[obj] then
+                    createObjectESP(obj, obj.Name)
+                end
+            end
+        end
+    end)
+
+    print("[ESP] Upgraded: Players + Objects (Hook, Generator, LiverGoal, F_O) + Generator Progress")
 end
+
+-- Pastikan fungsi startESP ini dipanggil di init (seperti sebelumnya)
+-- Sisa script (auto win, auto task, dll) tidak diubah.
+    
+
 
 -- ============================================================================
 -- TPWALK NAMESPACE

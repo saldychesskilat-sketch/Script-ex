@@ -526,13 +526,14 @@ end
 
 
 -- ============================================================================
--- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED (EVENT-BASED, REAL-TIME, PROGRESS, RELIABLE)
+-- ============================================================================
+-- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED (EVENT-BASED, REAL-TIME, PROGRESS)
 -- ============================================================================
 
 -- Storage untuk ESP player
 local espHighlights = {}
 
--- Storage untuk ESP objek (non-player) - NOW STORES FULL METADATA
+-- Storage untuk ESP objek (non-player)
 local objectEspHighlights = {}
 
 -- Storage untuk progress BillboardGui generator
@@ -545,119 +546,64 @@ local descendantAddedConn = nil
 local descendantRemovingConn = nil
 
 -- ============================================================================
--- UTILITY FUNCTIONS UNTUK PROGRESS GENERATOR (ENHANCED)
+-- UTILITY FUNCTIONS UNTUK PROGRESS GENERATOR
 -- ============================================================================
-
--- Mencari nilai progress generator dengan berbagai kemungkinan
 local function getGeneratorProgress(generator)
-    -- Cari child bernama Progress (NumberValue/IntValue)
     local progressValue = generator:FindFirstChild("Progress")
     if progressValue and (progressValue:IsA("NumberValue") or progressValue:IsA("IntValue")) then
         return progressValue.Value
     end
-    -- Cari Attribute "Progress"
-    if generator:GetAttribute("Progress") then
-        return generator:GetAttribute("Progress")
-    end
-    -- Cari child bernama "P" atau "Prog"
-    local altProgress = generator:FindFirstChild("P") or generator:FindFirstChild("Prog")
-    if altProgress and (altProgress:IsA("NumberValue") or altProgress:IsA("IntValue")) then
-        return altProgress.Value
-    end
-    -- Cari nilai progress di dalam part (misal StringValue dengan teks "50%")
-    for _, child in ipairs(generator:GetChildren()) do
-        if child:IsA("StringValue") and child.Name:lower():find("progress") then
-            local num = tonumber(child.Value:match("%d+"))
-            if num then return num end
-        end
-    end
     return nil
 end
 
--- Update atau buat BillboardGui untuk progress generator (REAL-TIME, NO DUPLICATE)
-local function updateGeneratorProgressBillboard(generator)
-    if not generator or not generator.Parent then return end
+local function updateGeneratorProgressBillboard(generator, highlight)
+    if not generator or not highlight then return end
     local progress = getGeneratorProgress(generator)
-    if not progress then return end
-
-    local percent = math.floor(progress)
-    -- Cari atau buat BillboardGui
-    local billboard = generator:FindFirstChild("CyberHeroes_Progress")
-    if not billboard then
-        billboard = Instance.new("BillboardGui")
-        billboard.Name = "CyberHeroes_Progress"
-        billboard.Adornee = generator
-        billboard.Size = UDim2.new(0, 100, 0, 20)
-        billboard.StudsOffset = Vector3.new(0, 2, 0)
-        billboard.Parent = generator
-        local textLabel = Instance.new("TextLabel")
-        textLabel.Name = "ProgressText"
-        textLabel.Size = UDim2.new(1, 0, 1, 0)
-        textLabel.BackgroundTransparency = 1
-        textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        textLabel.TextStrokeTransparency = 0.5
-        textLabel.Font = Enum.Font.GothamBold
-        textLabel.TextSize = 14
-        textLabel.Text = "0%"
-        textLabel.Parent = billboard
-    end
-    local textLabel = billboard:FindFirstChild("ProgressText")
-    if textLabel then
-        textLabel.Text = percent .. "%"
+    if progress then
+        local percent = math.floor(progress)
+        -- Cari atau buat BillboardGui untuk progress
+        local billboard = generator:FindFirstChild("CyberHeroes_Progress")
+        if not billboard then
+            billboard = Instance.new("BillboardGui")
+            billboard.Name = "CyberHeroes_Progress"
+            billboard.Adornee = generator
+            billboard.Size = UDim2.new(0, 100, 0, 20)
+            billboard.StudsOffset = Vector3.new(0, 2, 0)
+            billboard.Parent = generator
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Name = "ProgressText"
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            textLabel.TextStrokeTransparency = 0.5
+            textLabel.Font = Enum.Font.GothamBold
+            textLabel.TextSize = 14
+            textLabel.Text = "0%"
+            textLabel.Parent = billboard
+        end
+        local textLabel = billboard:FindFirstChild("ProgressText")
+        if textLabel then
+            textLabel.Text = percent .. "%"
+            -- Ubah warna berdasarkan persentase
+            if percent >= 100 then
+                textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+            elseif percent >= 50 then
+                textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+            else
+                textLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            end
+        end
+        -- Jika progress >= 100, hapus highlight dan billboard setelah beberapa saat (opsional)
         if percent >= 100 then
-            textLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        elseif percent >= 50 then
-            textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-        else
-            textLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        end
-    end
-
-    -- Jika progress >= 100, jadwalkan penghapusan (tapi tidak langsung, agar tidak terlalu cepat hilang)
-    if percent >= 100 then
-        task.delay(3, function()
-            if generator and generator.Parent then
-                local progBill = generator:FindFirstChild("CyberHeroes_Progress")
-                if progBill then progBill:Destroy() end
-            end
-        end)
-    end
-end
-
--- ============================================================================
--- FUNGSI UNTUK MENDAPATKAN BASE PART UTAMA DARI OBJEK (UNTUK HIGHLIGHT YANG STABIL)
--- ============================================================================
-local function getPrimaryPart(obj)
-    if obj:IsA("BasePart") then return obj end
-    if obj:IsA("Model") then
-        if obj.PrimaryPart then return obj.PrimaryPart end
-        -- Cari part terbesar atau HumanoidRootPart
-        local parts = {}
-        for _, child in ipairs(obj:GetChildren()) do
-            if child:IsA("BasePart") then
-                table.insert(parts, child)
-            end
-        end
-        if #parts > 0 then
-            -- Prioritaskan part dengan nama "HumanoidRootPart", "Root", "Handle"
-            for _, part in ipairs(parts) do
-                local name = part.Name:lower()
-                if name:find("humanoidrootpart") or name:find("root") or name:find("handle") then
-                    return part
+            task.delay(2, function()
+                if generator and generator.Parent then
+                    local progBill = generator:FindFirstChild("CyberHeroes_Progress")
+                    if progBill then progBill:Destroy() end
                 end
-            end
-            -- Jika tidak ada, ambil part pertama
-            return parts[1]
+            end)
         end
     end
-    -- Jika objek memiliki PrimaryPart melalui atribut (misal tool)
-    if obj:GetAttribute("PrimaryPart") then
-        local part = obj:GetAttribute("PrimaryPart")
-        if part and part:IsA("BasePart") then return part end
-    end
-    return nil
 end
-
 
 -- ============================================================================
 -- FUNGSI UNTUK MEMBUAT HIGHLIGHT PADA PLAYER (DENGAN PENDETEKSIAN PERUBAHAN TEAM)
@@ -769,195 +715,98 @@ local function updateAllESP()
 end
 
 -- ============================================================================
--- OBJEK ESP (HOOK, GENERATOR, LIVERGOAL, F_O) - ENHANCED, RELIABLE, DEFERRED LOADING
+-- OBJEK ESP (HOOK, GENERATOR) - EVENT-BASED, REAL-TIME, PROGRESS
 -- ============================================================================
 
--- Fungsi untuk menentukan tipe objek berdasarkan nama (case-insensitive, lebih fleksibel)
-local function getObjectType(instance)
-    local name = instance.Name:upper()
-    if name:find("HOOK") then
-        return "HOOK"
-    elseif name:find("GENERATOR") or name:find("GEN") or name:find("REPAIR") then
-        return "generator"
-    elseif name == "LIVERGOAL" then
-        return "LIVERGOAL"
-    elseif name == "F_O" then
-        return "F_O"
-    end
-    return nil
-end
-
--- Warna untuk masing-masing tipe
-local function getColorForType(objType)
+local function createObjectESP(obj, objType)
+    if objectEspHighlights[obj] then return end
+    local color
     if objType == "HOOK" then
-        return Color3.fromRGB(255, 165, 0)  -- orange
+        color = Color3.fromRGB(255, 165, 0)  -- orange untuk hook
     elseif objType == "generator" then
-        return Color3.fromRGB(0, 150, 255)  -- biru
-    elseif objType == "LIVERGOAL" or objType == "F_O" then
-        return Color3.fromRGB(160, 32, 240) -- ungu
+        color = Color3.fromRGB(0, 150, 255)  -- biru untuk generator
+    else
+        color = Color3.fromRGB(200, 200, 200)
     end
-    return Color3.fromRGB(200, 200, 200)
-end
-
--- Membuat ESP untuk objek (dengan deferred retry jika belum siap)
-local function createObjectESP(obj, objType, retryCount)
-    retryCount = retryCount or 0
-    if retryCount > 3 then return end  -- maks 3 kali percobaan
-
-    -- Cari base part yang valid untuk ditempeli highlight
-    local targetPart = getPrimaryPart(obj)
-    if not targetPart then
-        -- Jika belum ada part, coba lagi setelah 0.3 detik (deferred)
-        task.delay(0.3, function()
-            if obj and obj.Parent then
-                createObjectESP(obj, objType, retryCount + 1)
-            end
-        end)
-        return
-    end
-
-    -- Jika sudah ada highlight, jangan buat duplikat
-    if objectEspHighlights[obj] then
-        -- Namun pastikan highlight masih menempel pada part yang benar
-        local existing = objectEspHighlights[obj].Highlight
-        if existing and existing.Adornee ~= targetPart then
-            existing.Adornee = targetPart
-        end
-        return
-    end
-
-    local color = getColorForType(objType)
-
     local highlight = Instance.new("Highlight")
     highlight.Name = "CyberHeroes_Object_ESP"
     highlight.FillColor = color
     highlight.FillTransparency = 0.5
     highlight.OutlineColor = color
     highlight.OutlineTransparency = 0.2
-    highlight.Adornee = targetPart
-    highlight.Parent = targetPart
+    highlight.Adornee = obj
+    highlight.Parent = obj
+    objectEspHighlights[obj] = highlight
 
-    -- Simpan data lengkap
-    local data = {
-        Highlight = highlight,
-        ObjType = objType,
-        TargetPart = targetPart
-    }
-
-    -- Jika generator, tambahkan progress tracking
+    -- Jika objek adalah generator, buat progress tracking
     if objType == "generator" then
         -- Update progress awal
-        updateGeneratorProgressBillboard(obj)
-        -- Pantau perubahan nilai Progress (multiple sources)
-        local progressConnections = {}
-        local function onProgressChanged()
-            updateGeneratorProgressBillboard(obj)
-        end
-        -- Cari child Progress (NumberValue/IntValue)
+        updateGeneratorProgressBillboard(obj, highlight)
+        -- Pantau perubahan nilai Progress
         local progressValue = obj:FindFirstChild("Progress")
         if progressValue and (progressValue:IsA("NumberValue") or progressValue:IsA("IntValue")) then
-            local conn = progressValue:GetPropertyChangedSignal("Value"):Connect(onProgressChanged)
-            table.insert(progressConnections, conn)
-        end
-        -- Cari attribute Progress
-        local attrConn = nil
-        if obj:GetAttribute("Progress") then
-            attrConn = obj:GetAttributeChangedSignal("Progress"):Connect(onProgressChanged)
-            table.insert(progressConnections, attrConn)
-        end
-        -- Cari alternatif (P, Prog)
-        local altProgress = obj:FindFirstChild("P") or obj:FindFirstChild("Prog")
-        if altProgress and (altProgress:IsA("NumberValue") or altProgress:IsA("IntValue")) then
-            local conn = altProgress:GetPropertyChangedSignal("Value"):Connect(onProgressChanged)
-            table.insert(progressConnections, conn)
-        end
-        if #progressConnections > 0 then
-            data.ProgressConnections = progressConnections
-        end
-        -- Juga pantau perubahan Child untuk mendeteksi Progress yang muncul kemudian
-        local childAddedConn = obj.ChildAdded:Connect(function(child)
-            if child.Name:lower():find("progress") or child.Name == "P" or child.Name == "Prog" then
-                if child:IsA("NumberValue") or child:IsA("IntValue") then
-                    local conn = child:GetPropertyChangedSignal("Value"):Connect(onProgressChanged)
-                    table.insert(progressConnections, conn)
-                    onProgressChanged()
+            local progressConn
+            progressConn = progressValue:GetPropertyChangedSignal("Value"):Connect(function()
+                if obj and obj.Parent then
+                    updateGeneratorProgressBillboard(obj, highlight)
+                else
+                    if progressConn then progressConn:Disconnect() end
                 end
-            end
-        end)
-        data.ChildAddedConn = childAddedConn
-    end
-
-    objectEspHighlights[obj] = data
-end
-
--- Menghapus ESP objek dengan cleanup lengkap
-local function removeObjectESP(obj)
-    local data = objectEspHighlights[obj]
-    if data then
-        if data.Highlight then pcall(function() data.Highlight:Destroy() end) end
-        if data.ProgressConnections then
-            for _, conn in ipairs(data.ProgressConnections) do
-                pcall(function() conn:Disconnect() end)
-            end
+            end)
+            -- Simpan connection untuk cleanup
+            objectEspHighlights[obj].ProgressConn = progressConn
         end
-        if data.ChildAddedConn then pcall(function() data.ChildAddedConn:Disconnect() end) end
-        objectEspHighlights[obj] = nil
     end
-    -- Hapus progress billboard jika ada
-    local progBill = obj:FindFirstChild("CyberHeroes_Progress")
-    if progBill then pcall(function() progBill:Destroy() end) end
 end
 
--- Clear semua object ESP
 local function clearObjectESP()
     for obj, data in pairs(objectEspHighlights) do
         if data.Highlight then pcall(function() data.Highlight:Destroy() end) end
-        if data.ProgressConnections then
-            for _, conn in ipairs(data.ProgressConnections) do
-                pcall(function() conn:Disconnect() end)
-            end
-        end
-        if data.ChildAddedConn then pcall(function() data.ChildAddedConn:Disconnect() end) end
+        if data.ProgressConn then pcall(function() data.ProgressConn:Disconnect() end) end
     end
     objectEspHighlights = {}
-    -- Hapus semua progress billboard yang mungkin tertinggal
     for _, billboard in pairs(generatorProgressBillboards) do
         pcall(function() billboard:Destroy() end)
     end
     generatorProgressBillboards = {}
 end
 
--- ============================================================================
--- EVENT HANDLERS (DESCENDANT ADDED / REMOVING) - ENHANCED
--- ============================================================================
-
+-- Event ketika objek baru ditambahkan ke Workspace (real-time)
 local function onDescendantAdded(instance)
     if not config.espEnabled then return end
-    local objType = getObjectType(instance)
-    if objType then
-        -- Defer sedikit untuk memastikan instance memiliki children (jika perlu)
-        task.defer(function()
-            if instance and instance.Parent then
-                createObjectESP(instance, objType)
-            end
-        end)
+    local nameUpper = instance.Name:upper()
+    if nameUpper:find("HOOK") then
+        createObjectESP(instance, "HOOK")
+    elseif nameUpper:find("GENERATOR") or nameUpper:find("GEN") or nameUpper:find("REPAIR") then
+        createObjectESP(instance, "generator")
     end
 end
 
+-- Event ketika objek dihapus (cleanup)
 local function onDescendantRemoving(instance)
     if objectEspHighlights[instance] then
-        removeObjectESP(instance)
+        if objectEspHighlights[instance].Highlight then
+            pcall(function() objectEspHighlights[instance].Highlight:Destroy() end)
+        end
+        if objectEspHighlights[instance].ProgressConn then
+            pcall(function() objectEspHighlights[instance].ProgressConn:Disconnect() end)
+        end
+        objectEspHighlights[instance] = nil
     end
-    -- Juga periksa jika instance adalah bagian dari model yang dihapus (tidak diperlukan karena event onDescendantRemoving akan dipanggil untuk setiap anak)
+    -- Hapus juga progress billboard jika ada
+    local progBill = instance:FindFirstChild("CyberHeroes_Progress")
+    if progBill then pcall(function() progBill:Destroy() end) end
 end
 
--- Fungsi scanning awal (hanya untuk objek yang sudah ada)
+-- Fungsi untuk melakukan scanning awal (hanya sekali saat start)
 local function initialObjectScan()
     if not config.espEnabled then return end
     for _, obj in ipairs(workspace:GetDescendants()) do
-        local objType = getObjectType(obj)
-        if objType then
-            createObjectESP(obj, objType)
+        local nameUpper = obj.Name:upper()
+        if nameUpper:find("HOOK") then
+            createObjectESP(obj, "HOOK")
+        elseif nameUpper:find("GENERATOR") or nameUpper:find("GEN") or nameUpper:find("REPAIR") then
+            createObjectESP(obj, "generator")
         end
     end
 end
@@ -973,10 +822,10 @@ local function startESP()
     if descendantAddedConn then descendantAddedConn:Disconnect() end
     if descendantRemovingConn then descendantRemovingConn:Disconnect() end
 
-    -- Player ESP: event-based (sama seperti asli, tidak diubah)
+    -- Player ESP: event-based
     playerAddedConn = Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
-            task.wait(0.5)
+            task.wait(0.5) -- tunggu karakter spawn
             createHighlightForPlayer(player)
         end
     end)
@@ -995,6 +844,7 @@ local function startESP()
         end
     end)
 
+    -- Event untuk karakter player yang baru muncul (CharacterAdded)
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             player.CharacterAdded:Connect(function()
@@ -1005,7 +855,7 @@ local function startESP()
         end
     end
 
-    -- Object ESP: event-based (enhanced)
+    -- Object ESP: event-based (DescendantAdded/Removing)
     descendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
     descendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
 
@@ -1015,7 +865,7 @@ local function startESP()
     -- Update semua player yang sudah ada
     updateAllESP()
 
-    -- Loop ringan untuk menjaga player ESP tetap up-to-date (sama seperti asli)
+    -- Loop ringan hanya untuk memastikan player ESP tetap up-to-date (jika karakter berganti tanpa event? sebenarnya sudah ada CharacterAdded, namun untuk jaga-jaga)
     RunService.Heartbeat:Connect(function()
         if config.espEnabled then
             for _, player in ipairs(Players:GetPlayers()) do
@@ -1039,14 +889,11 @@ local function startESP()
         end
     end)
 
-    print("[ESP] System upgraded: reliable object detection, deferred retry, full metadata storage, stable progress tracking")
+    print("[ESP] System upgraded: event-based, real-time, progress tracking for generators")
 end
 
 -- ============================================================================
--- CATATAN: Kode di atas adalah pengganti langsung untuk bagian ESP SYSTEM
--- dari script asli. Pastikan untuk menempatkannya di lokasi yang sama dan
--- menghapus implementasi ESP lama. Semua fungsi lain (player ESP, config, dll)
--- tetap dipertahankan.
+-- FUNGSI UNTUK MENGGANTI YANG LAMA (PANGGIL startESP() SAAT INISIALISASI)
 -- ============================================================================
 -- ============================================================================
 -- TPWALK NAMESPACE

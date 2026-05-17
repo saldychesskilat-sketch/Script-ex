@@ -3443,6 +3443,7 @@ local function restoreFeatureStates()
     
     if config.speedBoostEnabled and not currentBoostConnection then
         startSpeedBoostMonitor()
+        createSpeedSlider()
        elseif not config.speedBoostEnabled and currentBoostConnection then
         stopSpeedBoostMonitor()
     end

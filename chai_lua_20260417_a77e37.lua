@@ -954,18 +954,6 @@ end
 -- ============================================================================
 -- FUNGSI UNTUK MENGATASI TOGGLE ESP (HARUS DIPANGGIL DARI TOMBOL GUI)
 -- ============================================================================
--- CATATAN: Di dalam createGridButton untuk "espEnabled", setelah mengubah config.espEnabled,
--- panggil:
---    if config.espEnabled then 
---        refreshAllObjectESP()
---        updateAllESP()
---    else
---        updateAllESP()  -- yang ini sudah clear player ESP dan object ESP (via clearObjectESP)
---    end
---
--- Namun karena clearObjectESP dipanggil di updateAllESP saat espEnabled false, object ESP tetap hilang.
--- Saat true, refreshAllObjectESP akan memulihkan semua object.
--- ============================================================================
 
 -- ============================================================================
 -- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE

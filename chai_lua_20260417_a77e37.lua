@@ -527,20 +527,12 @@ end
 
 -- ============================================================================
 -- ============================================================================
+-- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED WITH REFERENCE SCRIPT FEATURES
 -- ============================================================================
-
--- Storage untuk ESP player (tidak diubah)
-local espHighlights = {}
-
--- Storage untuk ESP objek (non-player) - dengan metadata lengkap
-local objectEspHighlights = {}
-
--- Event connections untuk cleanup
-local playerAddedConn = nil
-local playerRemovingConn = nil
-local descendantAddedConn = nil
-local descendantRemovingConn = nil
+-- Catatan: variabel espHighlights, generatorEspHighlights, generatorProgressBillboards
+-- sudah dideklarasikan di bagian STATE VARIABLES script utama.
+-- Kita hanya menambahkan fungsi-fungsi baru dan mengganti implementasi yang sudah ada.
 
 -- Konfigurasi warna dari script referensi
 local ObjectColors = {
@@ -618,17 +610,14 @@ end
 -- Update progress generator (sama dengan script referensi)
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
-    -- Coba ambil progress dari berbagai sumber
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
     if percent >= 100 then
-        -- Hapus highlight dan billboard jika sudah selesai
         local h = generator:FindFirstChild("CyberHeroes_Highlight")
         if h then h:Destroy() end
         local bill = generator:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
         return true
     end
-    -- Warna gradien seperti script referensi (merah -> kuning -> hijau)
     local cp = math.clamp(percent, 0, 100)
     local finalColor
     if cp < 50 then
@@ -636,17 +625,15 @@ local function updateGeneratorProgress(generator)
     else
         finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
     end
-    -- Pastikan highlight tetap ada
     applyHighlight(generator, finalColor)
     createProgressBillboard(generator, percent, finalColor)
     return false
 end
 
 -- ============================================================================
--- FUNGSI UNTUK MEMBUAT HIGHLIGHT PADA PLAYER (TIDAK BERUBAH)
+-- FUNGSI UNTUK MEMBUAT HIGHLIGHT PADA PLAYER (REPLACE YANG LAMA)
 -- ============================================================================
-local function createHighlightForPlayer(player)
-    -- Kode asli dari script utama, tidak diubah
+function createHighlightForPlayer(player)
     if espHighlights[player.UserId] then
         if espHighlights[player.UserId].Highlight then
             espHighlights[player.UserId].Highlight:Destroy()
@@ -732,7 +719,7 @@ local function createHighlightForPlayer(player)
 end
 
 -- Update semua ESP player
-local function updateAllESP()
+function updateAllESP()
     if not config.espEnabled then
         for _, data in pairs(espHighlights) do
             if data.Highlight then data.Highlight:Destroy() end
@@ -750,11 +737,10 @@ local function updateAllESP()
 end
 
 -- ============================================================================
--- OBJEK ESP (GENERATOR, HOOK, GATE, PALLET, WINDOW) - ENHANCED
+-- OBJEK ESP (GENERATOR, HOOK, GATE, PALLET, WINDOW)
 -- ============================================================================
 local function createObjectESP(obj, objType)
-    if objectEspHighlights[obj] then return end
-
+    if generatorEspHighlights[obj] then return end
     local color
     if objType == "Generator" then
         color = ObjectColors.Generator
@@ -767,58 +753,49 @@ local function createObjectESP(obj, objType)
     elseif objType == "Window" then
         color = ObjectColors.Window
     end
-
     local highlight = applyHighlight(obj, color)
-    objectEspHighlights[obj] = { Highlight = highlight, ObjType = objType }
+    generatorEspHighlights[obj] = highlight
 
-    -- Jika generator, mulai tracking progress
     if objType == "Generator" then
-        updateGeneratorProgress(obj) -- initial update
-        -- Pantau perubahan progress (gunakan sinyal perubahan attribute atau child)
-        local function onProgressUpdate()
-            if obj and obj.Parent then
-                updateGeneratorProgress(obj)
-            else
-                -- cleanup jika objek hilang
-                if objectEspHighlights[obj] then
-                    objectEspHighlights[obj] = nil
-                end
-            end
-        end
-        -- Cek berbagai sumber progress
+        updateGeneratorProgress(obj)
         local progressVal = obj:FindFirstChild("Progress") or obj:FindFirstChild("RepairProgress")
         if progressVal and (progressVal:IsA("NumberValue") or progressVal:IsA("IntValue")) then
-            local conn = progressVal:GetPropertyChangedSignal("Value"):Connect(onProgressUpdate)
-            objectEspHighlights[obj].ProgressConn = conn
+            local conn = progressVal:GetPropertyChangedSignal("Value"):Connect(function()
+                if obj and obj.Parent then updateGeneratorProgress(obj) end
+            end)
+            -- Simpan connection untuk cleanup (bisa menggunakan attribute)
+            obj:SetAttribute("_progressConn", conn)
         end
-        -- Juga cek attribute
-        if obj:GetAttribute("Progress") or obj:GetAttribute("RepairProgress") then
-            local conn = obj:GetAttributeChangedSignal("Progress"):Connect(onProgressUpdate)
-            if not objectEspHighlights[obj].ProgressConn then
-                objectEspHighlights[obj].ProgressConn = conn
-            end
-        end
+        local attrConn = obj:GetAttributeChangedSignal("Progress"):Connect(function()
+            if obj and obj.Parent then updateGeneratorProgress(obj) end
+        end)
+        obj:SetAttribute("_attrProgressConn", attrConn)
     end
 end
 
 local function removeObjectESP(obj)
-    local data = objectEspHighlights[obj]
-    if data then
-        if data.Highlight then data.Highlight:Destroy() end
-        if data.ProgressConn then data.ProgressConn:Disconnect() end
-        objectEspHighlights[obj] = nil
-    end
-    -- Hapus juga billboard generator jika ada
+    local highlight = generatorEspHighlights[obj]
+    if highlight then highlight:Destroy() end
+    generatorEspHighlights[obj] = nil
+    local conn = obj:GetAttribute("_progressConn")
+    if conn then conn:Disconnect() end
+    local attrConn = obj:GetAttribute("_attrProgressConn")
+    if attrConn then attrConn:Disconnect() end
     local bill = obj:FindFirstChild("GenBitchHook")
     if bill then bill:Destroy() end
 end
 
 local function clearObjectESP()
-    for obj, data in pairs(objectEspHighlights) do
-        if data.Highlight then data.Highlight:Destroy() end
-        if data.ProgressConn then data.ProgressConn:Disconnect() end
+    for obj, highlight in pairs(generatorEspHighlights) do
+        if highlight then highlight:Destroy() end
+        local conn = obj:GetAttribute("_progressConn")
+        if conn then conn:Disconnect() end
+        local attrConn = obj:GetAttribute("_attrProgressConn")
+        if attrConn then attrConn:Disconnect() end
+        local bill = obj:FindFirstChild("GenBitchHook")
+        if bill then bill:Destroy() end
     end
-    objectEspHighlights = {}
+    generatorEspHighlights = {}
 end
 
 -- ============================================================================
@@ -841,7 +818,7 @@ local function onDescendantAdded(instance)
 end
 
 local function onDescendantRemoving(instance)
-    if objectEspHighlights[instance] then
+    if generatorEspHighlights[instance] then
         removeObjectESP(instance)
     end
 end
@@ -865,10 +842,10 @@ local function initialObjectScan()
 end
 
 -- ============================================================================
--- START ESP (PLAYER + OBJECTS) - OPTIMIZED, EVENT-BASED
+-- START ESP (PLAYER + OBJECTS) - REPLACE FUNCTION YANG LAMA
 -- ============================================================================
 local function startESP()
-    -- Cleanup event connections sebelumnya jika ada
+    -- Cleanup koneksi event sebelumnya jika ada
     if playerAddedConn then playerAddedConn:Disconnect() end
     if playerRemovingConn then playerRemovingConn:Disconnect() end
     if descendantAddedConn then descendantAddedConn:Disconnect() end
@@ -940,11 +917,10 @@ local function startESP()
 end
 
 -- ============================================================================
--- CATATAN: Kode di atas adalah pengganti langsung untuk bagian ESP SYSTEM
--- dari script utama. Pastikan untuk menempatkannya di lokasi yang sama.
--- Semua fungsi lain (player ESP, config, dll) tetap dipertahankan.
+-- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE
+-- (jika ada di script asli, kita tidak perlu menggantinya, karena kita sudah punya clearObjectESP)
+-- Untuk kompatibilitas, kita biarkan fungsi lama tetap ada.
 -- ============================================================================
-
     
 -- ============================================================================
 -- TPWALK NAMESPACE
@@ -1196,25 +1172,6 @@ local function stopSpeedBoostMonitor()
 
 end
 
--- ============================================================================
--- CATATAN:
---
--- 1. Karakter akan terus bergerak maju otomatis.
--- 2. Tidak membutuhkan input keyboard.
--- 3. Menggunakan LookVector sebagai arah teleport.
--- 4. Menggunakan PivotTo agar movement stabil.
--- 5. Tetap aktif meskipun karakter diam.
--- 6. Anti-conflict menggunakan namespace TPWALK_SYSTEM.
--- 7. Sinkron dengan physics menggunakan Heartbeat.
---
--- Rekomendasi:
---
--- TPWALK_SYSTEM.Speed = 1   -> sangat lambat
--- TPWALK_SYSTEM.Speed = 5   -> smooth
--- TPWALK_SYSTEM.Speed = 20  -> cepat
--- TPWALK_SYSTEM.Speed = 60  -> blink speed
---
--- ============================================================================
 
 -- ============================================================================
 -- ============================================================================

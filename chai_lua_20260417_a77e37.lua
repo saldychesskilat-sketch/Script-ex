@@ -3404,7 +3404,8 @@ local function restoreFeatureStates()
     end
     
     if config.espEnabled then
-    refreshAllObjectESP()  
+    clearObjectESP()
+    initialObjectScan()
     updateAllESP()
 else
     updateAllESP()

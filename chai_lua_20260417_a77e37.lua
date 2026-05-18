@@ -529,10 +529,8 @@ end
 -- ============================================================================
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED WITH REFERENCE SCRIPT FEATURES
+-- FIX: Immediate object detection after map loads + real-time progress update
 -- ============================================================================
--- Catatan: variabel espHighlights, generatorEspHighlights, generatorProgressBillboards
--- sudah dideklarasikan di bagian STATE VARIABLES script utama.
--- Kita hanya menambahkan fungsi-fungsi baru dan mengganti implementasi yang sudah ada.
 
 -- Konfigurasi warna dari script referensi
 local ObjectColors = {
@@ -758,18 +756,6 @@ local function createObjectESP(obj, objType)
 
     if objType == "Generator" then
         updateGeneratorProgress(obj)
-        local progressVal = obj:FindFirstChild("Progress") or obj:FindFirstChild("RepairProgress")
-        if progressVal and (progressVal:IsA("NumberValue") or progressVal:IsA("IntValue")) then
-            local conn = progressVal:GetPropertyChangedSignal("Value"):Connect(function()
-                if obj and obj.Parent then updateGeneratorProgress(obj) end
-            end)
-            -- Simpan connection untuk cleanup (bisa menggunakan attribute)
-            obj:SetAttribute("_progressConn", conn)
-        end
-        local attrConn = obj:GetAttributeChangedSignal("Progress"):Connect(function()
-            if obj and obj.Parent then updateGeneratorProgress(obj) end
-        end)
-        obj:SetAttribute("_attrProgressConn", attrConn)
     end
 end
 
@@ -777,10 +763,6 @@ local function removeObjectESP(obj)
     local highlight = generatorEspHighlights[obj]
     if highlight then highlight:Destroy() end
     generatorEspHighlights[obj] = nil
-    local conn = obj:GetAttribute("_progressConn")
-    if conn then conn:Disconnect() end
-    local attrConn = obj:GetAttribute("_attrProgressConn")
-    if attrConn then attrConn:Disconnect() end
     local bill = obj:FindFirstChild("GenBitchHook")
     if bill then bill:Destroy() end
 end
@@ -788,10 +770,6 @@ end
 local function clearObjectESP()
     for obj, highlight in pairs(generatorEspHighlights) do
         if highlight then highlight:Destroy() end
-        local conn = obj:GetAttribute("_progressConn")
-        if conn then conn:Disconnect() end
-        local attrConn = obj:GetAttribute("_attrProgressConn")
-        if attrConn then attrConn:Disconnect() end
         local bill = obj:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
     end
@@ -841,29 +819,31 @@ local function initialObjectScan()
     end
 end
 
-
 -- Variabel untuk throttling object scan
 local lastObjectScanTime = 0
-local OBJECT_SCAN_INTERVAL = 2 -- scan ulang setiap 2 detik
+local OBJECT_SCAN_INTERVAL = 2
 
--- Fungsi untuk memastikan objek ESP tetap update (dipanggil periodik)
-local function ensureObjectsScanned()
-    if not config.espEnabled then return end
-    -- Scan ulang untuk menangkap objek yang mungkin muncul belakangan
-    initialObjectScan()
+-- Fungsi untuk update progress semua generator secara periodik (REAL-TIME)
+local progressUpdateConnection = nil
+local function updateAllGeneratorProgress()
+    for obj, _ in pairs(generatorEspHighlights) do
+        if obj and obj.Parent and (obj.Name == "Generator" or obj.Name:find("Generator")) then
+            updateGeneratorProgress(obj)
+        end
+    end
 end
 
 -- ============================================================================
--- START ESP (PLAYER + OBJECTS) - REPLACE FUNCTION YANG LAMA
+-- START ESP (PLAYER + OBJECTS) - DENGAN PERIODIC PROGRESS UPDATE
 -- ============================================================================
 local function startESP()
-    -- Cleanup koneksi event sebelumnya jika ada
     if playerAddedConn then playerAddedConn:Disconnect() end
     if playerRemovingConn then playerRemovingConn:Disconnect() end
     if descendantAddedConn then descendantAddedConn:Disconnect() end
     if descendantRemovingConn then descendantRemovingConn:Disconnect() end
+    if progressUpdateConnection then progressUpdateConnection:Disconnect() end
 
-    -- Player ESP: event-based
+    -- Player ESP
     playerAddedConn = Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
             task.wait(0.5)
@@ -895,29 +875,36 @@ local function startESP()
         end
     end
 
-    -- Object ESP: event-based
+    -- Object ESP
     descendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
     descendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
 
-    -- Initial scan (segera, tapi mungkin map belum ada)
+    -- Scan awal
     initialObjectScan()
+    -- Scan tambahan setelah 2 detik (untuk memastikan map sudah terload)
+    task.delay(2, initialObjectScan)
 
-    -- PERBAIKAN: Periodic scan untuk menangkap objek yang muncul setelah map di-load
-    -- Ini akan memastikan generator, hook, dll. muncul meskipun terlambat masuk
+    -- Periodic scan (setiap 2 detik) untuk menangkap objek yang muncul belakangan
     local scanConnection
     scanConnection = RunService.Heartbeat:Connect(function()
         local now = tick()
         if config.espEnabled and now - lastObjectScanTime >= OBJECT_SCAN_INTERVAL then
             lastObjectScanTime = now
-            ensureObjectsScanned()
+            initialObjectScan()
         end
-        -- Jika ESP dimatikan, matikan juga periodic scan
         if not config.espEnabled then
             if scanConnection then scanConnection:Disconnect() end
         end
     end)
 
-    -- Update player ESP tetap berjalan
+    -- PERIODIC PROGRESS UPDATE (setiap 0.5 detik agar real-time)
+    progressUpdateConnection = RunService.Heartbeat:Connect(function()
+        if config.espEnabled then
+            updateAllGeneratorProgress()
+        end
+    end)
+
+    -- Update player ESP secara berkala
     RunService.Heartbeat:Connect(function()
         if config.espEnabled then
             for _, player in ipairs(Players:GetPlayers()) do
@@ -937,21 +924,16 @@ local function startESP()
             end
             espHighlights = {}
             clearObjectESP()
+            if progressUpdateConnection then progressUpdateConnection:Disconnect() end
         end
     end)
 
-    print("[ESP] System upgraded with periodic object scan (generator, gate, pallet, window, hook)")
+    print("[ESP] System upgraded with periodic progress updates (real-time) and multiple object scans")
 end
 
 -- ============================================================================
 -- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE
--- (jika ada di script asli, kita tidak perlu menggantinya, karena kita sudah punya clearObjectESP)
--- ============================================================================
-
--- ============================================================================
--- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE
--- (jika ada di script asli, kita tidak perlu menggantinya, karena kita sudah punya clearObjectESP)
--- Untuk kompatibilitas, kita biarkan fungsi lama tetap ada.
+-- (jika ada di script asli, kita tidak perlu menggantinya)
 -- ============================================================================
     
 -- ============================================================================

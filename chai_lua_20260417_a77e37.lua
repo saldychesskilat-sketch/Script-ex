@@ -2272,65 +2272,96 @@ local function stopMassKillLoop()
 end
 
 -- ============================================================================
--- FEATURE 13: AUTO GENERATOR (FULL ESP: generator, survivor, killer, hook)
+-- FEATURE 13: AUTO GENERATOR (INSTANT REPAIR + ESP)
+-- Langsung mengubah nilai Progress menjadi 100 agar generator selesai instan
 -- ============================================================================
-local function isGenerator(obj)
-    if processedGenerators[obj] ~= nil then return processedGenerators[obj] end
-    local name = obj.Name:lower()
-    local result = name:find("generator") or name:find("gen") or name:find("repair") or name:find("fix") or
-                   obj:FindFirstChild("Progress") or obj:FindFirstChild("Completed") or
-                   obj:FindFirstChildWhichIsA("ClickDetector") or
-                   obj:FindFirstChildWhichIsA("ProximityPrompt")
-    processedGenerators[obj] = result
-    return result
-end
 
-local function createGeneratorESP(obj, objType)
-    if generatorEspHighlights[obj] then return end
-    local color
-    if objType == "generator" then
-        color = Color3.fromRGB(0, 200, 255)
-    elseif objType == "hook" then
-        color = Color3.fromRGB(255, 100, 100)
-    elseif objType == "survivor" then
-        color = Color3.fromRGB(50, 255, 50)
-    elseif objType == "killer" then
-        color = Color3.fromRGB(255, 50, 50)
-    else
-        color = Color3.fromRGB(200, 200, 200)
+-- Fungsi untuk instant repair satu generator
+local function instantRepairGenerator(generator)
+    if not generator then return false end
+
+    -- Method 1: Cari NumberValue / IntValue bernama Progress
+    local progressVal = generator:FindFirstChild("Progress")
+    if progressVal and (progressVal:IsA("NumberValue") or progressVal:IsA("IntValue")) then
+        progressVal.Value = 100
+        print("[AutoGenerator] Set Progress to 100 on", generator.Name)
+        return true
     end
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "CyberHeroes_ESP_" .. objType
-    highlight.FillColor = color
-    highlight.FillTransparency = 0.5
-    highlight.OutlineColor = color
-    highlight.OutlineTransparency = 0.2
-    highlight.Adornee = obj
-    highlight.Parent = obj
-    generatorEspHighlights[obj] = highlight
-end
 
-local function removeAllGeneratorESP()
-    for obj, highlight in pairs(generatorEspHighlights) do
-        if highlight then pcall(function() highlight:Destroy() end) end
+    -- Method 2: Cari BoolValue Completed
+    local completedVal = generator:FindFirstChild("Completed")
+    if completedVal and completedVal:IsA("BoolValue") then
+        completedVal.Value = true
+        print("[AutoGenerator] Set Completed to true on", generator.Name)
+        return true
     end
-    generatorEspHighlights = {}
+
+    -- Method 3: Cari attribute RepairProgress
+    local attrProgress = generator:GetAttribute("RepairProgress")
+    if attrProgress then
+        generator:SetAttribute("RepairProgress", 100)
+        print("[AutoGenerator] Set RepairProgress attribute to 100 on", generator.Name)
+        return true
+    end
+
+    -- Method 4: Pancing remote event (fallback) - tetap instan
+    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+        if remote:IsA("RemoteEvent") then
+            local rName = remote.Name:lower()
+            if rName:find("repair") or rName:find("complete") or rName:find("fix") then
+                pcall(function() remote:FireServer(generator) end)
+                pcall(function() remote:FireServer(generator, "complete") end)
+                print("[AutoGenerator] Fired remote event for", generator.Name)
+                return true
+            end
+        end
+    end
+
+    print("[AutoGenerator] Failed to instantly repair", generator.Name)
+    return false
 end
 
+-- Hapus ESP generator yang sudah selesai (opsional, dipanggil setelah repair)
+local function removeGeneratorESP(gen)
+    if generatorEspHighlights[gen] then
+        pcall(function() generatorEspHighlights[gen]:Destroy() end)
+        generatorEspHighlights[gen] = nil
+    end
+    local bill = gen:FindFirstChild("GenBitchHook")
+    if bill then bill:Destroy() end
+end
+
+-- Update ESP (sama seperti sebelumnya, tapi tidak perlu update progress karena langsung selesai)
 local function updateAutoGeneratorESP()
     if not config.autoGeneratorEnabled then
         removeAllGeneratorESP()
         return
     end
+
     -- Generator ESP
     for _, obj in ipairs(Workspace:GetDescendants()) do
         if isGenerator(obj) then
-            createGeneratorESP(obj, "generator")
+            -- Cek apakah generator sudah selesai
+            local completed = false
+            local prog = obj:FindFirstChild("Progress")
+            if prog and (prog:IsA("NumberValue") or prog:IsA("IntValue")) then
+                completed = (prog.Value >= 100)
+            end
+            local compBool = obj:FindFirstChild("Completed")
+            if compBool and compBool:IsA("BoolValue") then
+                completed = completed or compBool.Value
+            end
+            if not completed then
+                createGeneratorESP(obj, "generator")
+            else
+                removeGeneratorESP(obj)
+            end
         elseif obj.Name:lower():find("hook") or obj.Name:lower():find("hilt") then
             createGeneratorESP(obj, "hook")
         end
     end
-    -- Player ESP (survivor/killer)
+
+    -- Player ESP (survivor/killer) – tetap sama
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and player.Character then
             local isKiller = false
@@ -2339,7 +2370,9 @@ local function updateAutoGeneratorESP()
             end
             if not isKiller then
                 local tool = player.Character:FindFirstChildWhichIsA("Tool")
-                if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
+                if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                    isKiller = true
+                end
             end
             local objType = isKiller and "killer" or "survivor"
             createGeneratorESP(player.Character, objType)
@@ -2347,50 +2380,35 @@ local function updateAutoGeneratorESP()
     end
 end
 
-local function getNearestGeneratorOptimized()
-    local nearest = nil
-    local minDistance = math.huge
-    if not localRootPart then return nil end
-    local localPos = localRootPart.Position
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if isGenerator(obj) then
-            local completed = false
-            local progress = obj:FindFirstChild("Progress")
-            if progress and (progress:IsA("NumberValue") or progress:IsA("IntValue")) then
-                completed = progress.Value >= 100
-            end
-            local completedBool = obj:FindFirstChild("Completed")
-            if completedBool and completedBool:IsA("BoolValue") then
-                completed = completed or completedBool.Value
-            end
-            if not completed then
-                local pos = obj:GetPivot().Position
-                local distance = (localPos - pos).Magnitude
-                if distance < minDistance and distance <= config.taskRadius then
-                    minDistance = distance
-                    nearest = obj
-                end
-            end
-        end
-    end
-    return nearest
-end
-
+-- Loop utama: cari generator terdekat yang belum selesai, lalu repair instan
 local function autoGeneratorLoop()
     if not config.autoGeneratorEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
     local nearestGen = getNearestGeneratorOptimized()
     if nearestGen then
-        local genPos = nearestGen:GetPivot().Position
-        teleportTo(genPos)
-        task.wait(0.1)
-        simulatePressE()
-        print("[AutoGenerator] Started repair on generator")
+        -- Repair instan tanpa teleport (opsional, bisa ditambahkan teleport untuk efek visual)
+        local success = instantRepairGenerator(nearestGen)
+        if success then
+            -- Hapus ESP generator yang sudah selesai
+            removeGeneratorESP(nearestGen)
+            -- Opsional: teleport ke posisi generator agar terlihat "menyentuh"
+            local genPos = nearestGen:GetPivot().Position
+            teleportTo(genPos)
+            print("[AutoGenerator] Instantly repaired generator at", genPos)
+        else
+            -- Fallback ke metode lama jika instant gagal
+            local genPos = nearestGen:GetPivot().Position
+            teleportTo(genPos)
+            task.wait(0.1)
+            simulatePressE()
+            print("[AutoGenerator] Used fallback repair on generator")
+        end
     end
-    task.wait(1.0)
+    task.wait(0.5) -- loop lebih cepat karena repair instan
 end
 
+-- Start / Stop (sama seperti sebelumnya, hanya mengganti fungsi loop)
 local function startAutoGeneratorLoop()
     if autoGeneratorLoopConnection then return end
     autoGeneratorLoopConnection = RunService.Heartbeat:Connect(autoGeneratorLoop)
@@ -2400,15 +2418,16 @@ local function startAutoGeneratorLoop()
             task.wait(2)
         end
     end)
-    print("[AutoGenerator] Auto generator started (full ESP: generator, survivor, killer, hook)")
+    print("[AutoGenerator] Started (INSTANT REPAIR mode)")
 end
+
 local function stopAutoGeneratorLoop()
     if autoGeneratorLoopConnection then
         autoGeneratorLoopConnection:Disconnect()
         autoGeneratorLoopConnection = nil
     end
     removeAllGeneratorESP()
-    print("[AutoGenerator] Auto generator stopped")
+    print("[AutoGenerator] Stopped")
 end
 
 --========================

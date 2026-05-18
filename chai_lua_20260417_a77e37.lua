@@ -533,7 +533,7 @@ end
 
 -- Konfigurasi warna objek (sama seperti referensi)
 local ObjectColors = {
-    Generator = Color3.fromRGB(150, 0, 200),   -- ungu
+    Generator = Color3.fromRGB(255, 255, 0),
     Gate      = Color3.fromRGB(255, 255, 255), -- putih
     Pallet    = Color3.fromRGB(74, 255, 181),  -- hijau toska
     Window    = Color3.fromRGB(74, 255, 181),  -- sama dengan pallet

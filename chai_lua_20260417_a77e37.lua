@@ -528,7 +528,7 @@ end
 -- ============================================================================
 -- ============================================================================
 -- ============================================================================
--- ESP SYSTEM (PLAYER + OBJECTS) - FULL REFRESH ON TOGGLE + REAL-TIME PROGRESS
+-- ESP SYSTEM (PLAYER + OBJECTS) - FULL REAL-TIME, PERSISTENT ON TOGGLE
 -- ============================================================================
 
 -- Konfigurasi warna dari script referensi
@@ -604,7 +604,7 @@ local function createProgressBillboard(generator, percent, color)
     return billboard
 end
 
--- Update progress generator (sama dengan script referensi)
+-- Update progress generator (dipanggil setiap frame atau saat progress berubah)
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
@@ -628,9 +628,10 @@ local function updateGeneratorProgress(generator)
 end
 
 -- ============================================================================
--- FUNGSI UNTUK MEMBUAT HIGHLIGHT PADA PLAYER (REPLACE YANG LAMA)
+-- PLAYER ESP (tetap)
 -- ============================================================================
 function createHighlightForPlayer(player)
+    -- (kode asli tidak diubah, sama seperti sebelumnya)
     if espHighlights[player.UserId] then
         if espHighlights[player.UserId].Highlight then
             espHighlights[player.UserId].Highlight:Destroy()
@@ -715,7 +716,6 @@ function createHighlightForPlayer(player)
     }
 end
 
--- Update semua ESP player
 function updateAllESP()
     if not config.espEnabled then
         for _, data in pairs(espHighlights) do
@@ -734,7 +734,7 @@ function updateAllESP()
 end
 
 -- ============================================================================
--- OBJEK ESP (GENERATOR, HOOK, GATE, PALLET, WINDOW)
+-- OBJECT ESP (GENERATOR, HOOK, GATE, PALLET, WINDOW) - REAL-TIME & PERSISTENT
 -- ============================================================================
 local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
@@ -755,6 +755,18 @@ local function createObjectESP(obj, objType)
 
     if objType == "Generator" then
         updateGeneratorProgress(obj)
+        -- Pantau perubahan progress (event-based)
+        local progressVal = obj:FindFirstChild("Progress") or obj:FindFirstChild("RepairProgress")
+        if progressVal and (progressVal:IsA("NumberValue") or progressVal:IsA("IntValue")) then
+            local conn = progressVal:GetPropertyChangedSignal("Value"):Connect(function()
+                if obj and obj.Parent then updateGeneratorProgress(obj) end
+            end)
+            obj:SetAttribute("_progressConn", conn)
+        end
+        local attrConn = obj:GetAttributeChangedSignal("Progress"):Connect(function()
+            if obj and obj.Parent then updateGeneratorProgress(obj) end
+        end)
+        obj:SetAttribute("_attrProgressConn", attrConn)
     end
 end
 
@@ -762,23 +774,30 @@ local function removeObjectESP(obj)
     local highlight = generatorEspHighlights[obj]
     if highlight then highlight:Destroy() end
     generatorEspHighlights[obj] = nil
+    local conn = obj:GetAttribute("_progressConn")
+    if conn then conn:Disconnect() end
+    local attrConn = obj:GetAttribute("_attrProgressConn")
+    if attrConn then attrConn:Disconnect() end
     local bill = obj:FindFirstChild("GenBitchHook")
     if bill then bill:Destroy() end
 end
 
-local function clearObjectESP()
+function clearObjectESP()
     for obj, highlight in pairs(generatorEspHighlights) do
         if highlight then highlight:Destroy() end
+        local conn = obj:GetAttribute("_progressConn")
+        if conn then conn:Disconnect() end
+        local attrConn = obj:GetAttribute("_attrProgressConn")
+        if attrConn then attrConn:Disconnect() end
         local bill = obj:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
     end
     generatorEspHighlights = {}
 end
 
--- REFRESH OBJECT ESP: panggil ini saat ESP diaktifkan ulang
-local function refreshAllObjectESP()
+function refreshAllObjectESP()
     clearObjectESP()
-    -- Pindai ulang semua objek
+    -- Pindai ulang semua objek di workspace
     for _, obj in ipairs(workspace:GetDescendants()) do
         local name = obj.Name
         if name == "Generator" then
@@ -793,7 +812,7 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "Window")
         end
     end
-    print("[ESP] Object ESP refreshed (cleared and rescanned)")
+    print("[ESP] Object ESP refreshed")
 end
 
 -- ============================================================================
@@ -821,49 +840,17 @@ local function onDescendantRemoving(instance)
     end
 end
 
-local function initialObjectScan()
-    if not config.espEnabled then return end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        local name = obj.Name
-        if name == "Generator" then
-            createObjectESP(obj, "Generator")
-        elseif name == "Hook" then
-            createObjectESP(obj, "Hook")
-        elseif name == "Gate" then
-            createObjectESP(obj, "Gate")
-        elseif name == "Pallet" or name == "Palletwrong" then
-            createObjectESP(obj, "Pallet")
-        elseif name == "Window" then
-            createObjectESP(obj, "Window")
-        end
-    end
-end
-
--- Variabel untuk throttling object scan
-local lastObjectScanTime = 0
-local OBJECT_SCAN_INTERVAL = 2
-
--- Fungsi untuk update progress semua generator secara periodik (REAL-TIME)
-local progressUpdateConnection = nil
-local function updateAllGeneratorProgress()
-    for obj, _ in pairs(generatorEspHighlights) do
-        if obj and obj.Parent and (obj.Name == "Generator" or obj.Name:find("Generator")) then
-            updateGeneratorProgress(obj)
-        end
-    end
-end
-
 -- ============================================================================
--- START ESP (PLAYER + OBJECTS) - DENGAN PERIODIC PROGRESS UPDATE
+-- START ESP (PLAYER + OBJECTS) - DENGAN PERIODIC UPDATE UNTUK PROGRESS
 -- ============================================================================
 local function startESP()
+    -- Cleanup event connections sebelumnya
     if playerAddedConn then playerAddedConn:Disconnect() end
     if playerRemovingConn then playerRemovingConn:Disconnect() end
     if descendantAddedConn then descendantAddedConn:Disconnect() end
     if descendantRemovingConn then descendantRemovingConn:Disconnect() end
-    if progressUpdateConnection then progressUpdateConnection:Disconnect() end
 
-    -- Player ESP
+    -- Player ESP events
     playerAddedConn = Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
             task.wait(0.5)
@@ -895,16 +882,15 @@ local function startESP()
         end
     end
 
-    -- Object ESP
+    -- Object ESP events
     descendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
     descendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
 
     -- Scan awal
     initialObjectScan()
-    -- Scan tambahan setelah 2 detik (untuk memastikan map sudah terload)
-    task.delay(2, initialObjectScan)
+    task.delay(2, initialObjectScan) -- scan ulang setelah map termuat
 
-    -- Periodic scan (setiap 2 detik) untuk menangkap objek yang muncul belakangan
+    -- Periodic scan untuk objek baru (ringan, setiap 2 detik)
     local scanConnection
     scanConnection = RunService.Heartbeat:Connect(function()
         local now = tick()
@@ -917,14 +903,20 @@ local function startESP()
         end
     end)
 
-    -- PERIODIC PROGRESS UPDATE (setiap 0.5 detik agar real-time)
+    -- Periodic progress update (REAL-TIME, setiap frame)
+    -- Connection ini tetap hidup selamanya, hanya mengecek config.espEnabled di dalamnya
+    if progressUpdateConnection then progressUpdateConnection:Disconnect() end
     progressUpdateConnection = RunService.Heartbeat:Connect(function()
         if config.espEnabled then
-            updateAllGeneratorProgress()
+            for obj, _ in pairs(generatorEspHighlights) do
+                if obj and obj.Parent and (obj.Name == "Generator" or obj.Name:find("Generator")) then
+                    updateGeneratorProgress(obj)
+                end
+            end
         end
     end)
 
-    -- Update player ESP secara berkala
+    -- Player ESP update periodik (jaga-jaga)
     RunService.Heartbeat:Connect(function()
         if config.espEnabled then
             for _, player in ipairs(Players:GetPlayers()) do
@@ -937,6 +929,7 @@ local function startESP()
                 end
             end
         else
+            -- Jika ESP dimatikan, bersihkan semua (player dan object)
             for _, data in pairs(espHighlights) do
                 if data.Highlight then data.Highlight:Destroy() end
                 if data.Billboard then data.Billboard:Destroy() end
@@ -944,19 +937,14 @@ local function startESP()
             end
             espHighlights = {}
             clearObjectESP()
-            if progressUpdateConnection then progressUpdateConnection:Disconnect() end
         end
     end)
 
-    print("[ESP] System upgraded with periodic progress updates (real-time) and multiple object scans")
+    print("[ESP] System ready: real-time progress, persistent object ESP")
 end
 
 -- ============================================================================
--- FUNGSI UNTUK MENGATASI TOGGLE ESP (HARUS DIPANGGIL DARI TOMBOL GUI)
--- ============================================================================
-
--- ============================================================================
--- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE
+-- FUNGSI UNTUK MENGATASI TOGGLE ESP (PANGGIL DARI TOMBOL GUI)
 -- ============================================================================
     
 -- ============================================================================
@@ -3404,11 +3392,11 @@ local function restoreFeatureStates()
     end
     
     if config.espEnabled then
-    clearObjectESP()
-    initialObjectScan()
-    updateAllESP()
-else
-    updateAllESP()
+        clearObjectESP()
+        initialObjectScan()
+        updateAllESP()
+    else
+        updateAllESP()
     end
     
     print("[State] Feature state restoration complete")

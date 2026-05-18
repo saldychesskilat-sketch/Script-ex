@@ -533,9 +533,9 @@ end
 
 -- Konfigurasi warna objek (sama seperti referensi)
 local ObjectColors = {
-    Generator = Color3.fromRGB(255, 0, 0),
+    Generator = Color3.fromRGB(255, 50, 50),
     Gate      = Color3.fromRGB(255, 255, 255),
-    Pallet    = Color3.fromRGB(74, 255, 181),  
+    Pallet    = Color3.fromRGB(128, 128, 128),  
     Hook      = Color3.fromRGB(255, 165, 0)
 }
 

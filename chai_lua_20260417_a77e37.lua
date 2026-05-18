@@ -528,36 +528,32 @@ end
 -- ============================================================================
 -- ============================================================================
 -- ============================================================================
--- ESP SYSTEM (TERINTEGRASI DENGAN CONFIG SCRIPT UTAMA) - FIXED VERSION
+-- ESP SYSTEM (PLAYER + OBJECTS) - FULLY FUNCTIONAL WITH START/STOP
 -- ============================================================================
 
--- Konfigurasi warna objek
+-- Konfigurasi warna objek (sama seperti referensi)
 local ObjectColors = {
-    Generator = Color3.fromRGB(150, 0, 200),
-    Gate      = Color3.fromRGB(255, 255, 255),
-    Pallet    = Color3.fromRGB(74, 255, 181),
-    Window    = Color3.fromRGB(74, 255, 181),
-    Hook      = Color3.fromRGB(132, 255, 169)
+    Generator = Color3.fromRGB(150, 0, 200),   -- ungu
+    Gate      = Color3.fromRGB(255, 255, 255), -- putih
+    Pallet    = Color3.fromRGB(74, 255, 181),  -- hijau toska
+    Window    = Color3.fromRGB(74, 255, 181),  -- sama dengan pallet
+    Hook      = Color3.fromRGB(132, 255, 169)  -- hijau muda
 }
 
--- Variabel internal ESP
-local espConnection = nil
-local espIndicatorGui = nil
-local espHighlightObjects = {}
-local espActiveGenerators = {}
-local espLastFullRefresh = 0
-local espLastUpdateTick = 0
+-- Variabel ESP (global untuk script utama)
+espHighlights = espHighlights or {}              -- player ESP
+generatorEspHighlights = generatorEspHighlights or {}  -- object ESP
+espConnection = nil
+espDescendantAddedConn = nil
+espDescendantRemovingConn = nil
+espPlayerAddedConn = nil
+espPlayerRemovingConn = nil
+espProgressUpdateConn = nil
+espPeriodicScanConn = nil
+lastObjectScanTime = 0
+OBJECT_SCAN_INTERVAL = 2
 
--- Koneksi event
-local espDescendantAddedConn = nil
-local espDescendantRemovingConn = nil
-local espPlayerAddedConn = nil
-local espPlayerRemovingConn = nil
-local espCharacterConns = {}
-
--- ============================================================================
--- UTILITY FUNCTIONS
--- ============================================================================
+-- Helper untuk mendapatkan nilai dari objek (attribute atau child value)
 local function getGameValue(obj, name)
     if not obj then return nil end
     local attr = obj:GetAttribute(name)
@@ -570,440 +566,382 @@ local function getGameValue(obj, name)
     return nil
 end
 
-local function applyHighlight(obj, color)
-    if not obj or not obj.Parent then return end
-    local h = obj:FindFirstChild("CyberHeroes_ESP_Highlight")
+-- ============================================================================
+-- FUNGSI UNTUK MEMBUAT HIGHLIGHT (SERUPA DENGAN SCRIPT REFERENSI)
+-- ============================================================================
+local function applyHighlight(object, color)
+    local h = object:FindFirstChild("CyberHeroes_Highlight")
     if not h then
         h = Instance.new("Highlight")
-        h.Name = "CyberHeroes_ESP_Highlight"
+        h.Name = "CyberHeroes_Highlight"
+        h.FillColor = color
+        h.OutlineColor = color
+        h.FillTransparency = 0.5
+        h.OutlineTransparency = 0.2
         h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        h.Parent = obj
+        h.Parent = object
+    else
+        h.FillColor = color
+        h.OutlineColor = color
     end
-    h.FillColor = color
-    h.OutlineColor = color
-    h.FillTransparency = 0.6
-    h.OutlineTransparency = 0.3
-    h.Adornee = obj
+    h.Adornee = object
     return h
 end
 
-local function removeHighlight(obj)
-    if not obj then return end
-    local h = obj:FindFirstChild("CyberHeroes_ESP_Highlight")
-    if h then h:Destroy() end
-end
-
-local function createBillboard(parent, text, color, size, offset)
-    if not parent then return nil end
-    local bill = Instance.new("BillboardGui")
-    bill.Name = "CyberHeroes_Billboard"
-    bill.AlwaysOnTop = true
-    bill.Size = size or UDim2.new(0, 120, 0, 25)
-    bill.StudsOffset = offset or Vector3.new(0, 2.5, 0)
-    local label = Instance.new("TextLabel")
-    label.Name = "Label"
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = color
-    label.TextStrokeTransparency = 0
-    label.TextStrokeColor3 = Color3.new(0,0,0)
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 10
-    label.RichText = true
-    label.Parent = bill
-    bill.Parent = parent
-    return bill
-end
-
--- ============================================================================
--- SETUP INDICATOR GUI
--- ============================================================================
-local function setupIndicatorGui()
-    if espIndicatorGui then
-        pcall(function() espIndicatorGui:Destroy() end)
-        espIndicatorGui = nil
-    end
-    espIndicatorGui = Instance.new("ScreenGui")
-    espIndicatorGui.Name = "CyberHeroes_ESP_Indicator"
-    espIndicatorGui.ResetOnSpawn = false
-    espIndicatorGui.IgnoreGuiInset = true
-    espIndicatorGui.DisplayOrder = 999
-    local parent = localPlayer:FindFirstChild("PlayerGui")
-    if not parent then
-        parent = Instance.new("ScreenGui")
-        parent.Name = "CyberHeroes_InternalGui"
-        parent.Parent = localPlayer
-    end
-    espIndicatorGui.Parent = parent
-end
-
--- ============================================================================
--- UPDATE PLAYER NAMETAG (jarak, status chased/hooked/knocked, mask killer)
--- ============================================================================
-local function updatePlayerNametag(player)
-    if not espIndicatorGui or not espIndicatorGui.Parent then return end
-    if not player.Character then
-        for _, child in ipairs(espIndicatorGui:GetChildren()) do
-            if child.Name == player.Name or child.Name == player.Name.."_Chased" or child.Name == player.Name.."_Killer" then
-                child:Destroy()
-            end
-        end
-        return
-    end
-
-    local char = player.Character
-    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not rootPart then return end
-
-    local teamName = (player.Team and player.Team.Name:lower()) or ""
-    local isKiller = teamName:find("killer") ~= nil
-    local selectedKiller = getGameValue(player, "SelectedKiller")
-    local rawMask = getGameValue(player, "Mask") or getGameValue(char, "Mask")
-    local isKnocked = getGameValue(char, "Knocked")
-    local isHooked = getGameValue(char, "IsHooked")
-    local isChased = getGameValue(char, "IsChased")
-
-    local color = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
-    if isHooked then
-        color = Color3.fromRGB(255, 182, 193)
-    elseif humanoid and humanoid.Health < humanoid.MaxHealth then
-        color = isKnocked and Color3.fromRGB(200, 100, 0) or Color3.fromRGB(200, 200, 0)
-    end
-
-    local distance = 0
-    if localRootPart then
-        distance = math.floor((rootPart.Position - localRootPart.Position).Magnitude)
-    end
-
-    local displayName = player.Name
-    if isKiller and selectedKiller and tostring(selectedKiller) ~= "" then
-        displayName = tostring(selectedKiller)
-    end
-
-    local billboard = rootPart:FindFirstChild("CyberHeroes_Billboard")
-    local nameText = string.format("%s\n[%d studs]", displayName, distance)
+-- Membuat BillboardGui untuk progress generator
+local function createProgressBillboard(generator, percent, color)
+    local billboard = generator:FindFirstChild("GenBitchHook")
     if not billboard then
-        billboard = createBillboard(rootPart, nameText, color, UDim2.new(0,120,0,30), Vector3.new(0,2,0))
-    else
-        local lbl = billboard:FindFirstChild("Label")
-        if lbl then
-            lbl.Text = nameText
-            lbl.TextColor3 = color
-        end
-    end
+        billboard = Instance.new("BillboardGui")
+        billboard.Name = "GenBitchHook"
+        billboard.AlwaysOnTop = true
+        billboard.Size = UDim2.new(0, 100, 0, 20)
+        billboard.StudsOffset = Vector3.new(0, 2, 0)
+        billboard.Parent = generator
 
-    applyHighlight(char, color)
-
-    -- Mask display
-    local maskBill = rootPart:FindFirstChild("CyberHeroes_MaskBillboard")
-    if maskBill then maskBill:Destroy() end
-    if isKiller and rawMask then
-        local maskName = tostring(rawMask):lower()
-        local maskDisplay = {
-            richard = "Rooster", tony = "Tiger", brandon = "Panther",
-            cobra = "Cobra", richter = "Rat", rabbit = "Rabbit", alex = "Chainsaw"
-        }
-        local maskColor = {
-            richard = Color3.fromRGB(255,0,0), tony = Color3.fromRGB(255,255,0),
-            brandon = Color3.fromRGB(160,32,240), cobra = Color3.fromRGB(0,255,0),
-            richter = Color3.fromRGB(0,0,0), rabbit = Color3.fromRGB(255,105,180),
-            alex = Color3.fromRGB(255,255,255)
-        }
-        local shown = maskDisplay[maskName]
-        if shown then
-            local mb = createBillboard(rootPart, shown, maskColor[maskName] or Color3.new(1,1,1), UDim2.new(0,80,0,20), Vector3.new(0,3.5,0))
-            mb.Name = "CyberHeroes_MaskBillboard"
-            mb.Parent = rootPart
-        end
+        local label = Instance.new("TextLabel")
+        label.Name = "ProgressText"
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.new(0,0,0)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 12
+        label.Parent = billboard
     end
-
-    -- Chased indicator
-    local chasedLabel = espIndicatorGui:FindFirstChild(player.Name.."_Chased")
-    if isChased then
-        if not chasedLabel then
-            chasedLabel = Instance.new("TextLabel")
-            chasedLabel.Name = player.Name.."_Chased"
-            chasedLabel.BackgroundTransparency = 1
-            chasedLabel.Font = Enum.Font.GothamBold
-            chasedLabel.TextSize = 24
-            chasedLabel.TextStrokeTransparency = 0
-            chasedLabel.Text = "⚠️"
-            chasedLabel.AnchorPoint = Vector2.new(0.5,0.5)
-            chasedLabel.Parent = espIndicatorGui
-        end
-        local screenPos, onScreen = camera:WorldToScreenPoint(rootPart.Position)
-        if onScreen then
-            chasedLabel.Visible = false
-        else
-            chasedLabel.Visible = true
-            local viewCenter = camera.ViewportSize / 2
-            local dir = Vector2.new(screenPos.X, screenPos.Y) - viewCenter
-            if screenPos.Z < 0 then dir = -dir end
-            local maxScale = math.max(math.abs(dir.X)/(viewCenter.X-30), math.abs(dir.Y)/(viewCenter.Y-30))
-            chasedLabel.Position = UDim2.new(0, viewCenter.X + dir.X/(maxScale==0 and 1 or maxScale),
-                                             0, viewCenter.Y + dir.Y/(maxScale==0 and 1 or maxScale))
-        end
-    else
-        if chasedLabel then chasedLabel:Destroy() end
+    local label = billboard:FindFirstChild("ProgressText")
+    if label then
+        label.Text = string.format("[%.1f%%]", percent)
+        label.TextColor3 = color
     end
-
-    -- Killer label offscreen
-    local killerLabel = espIndicatorGui:FindFirstChild(player.Name.."_Killer")
-    if isKiller then
-        if not killerLabel then
-            killerLabel = Instance.new("TextLabel")
-            killerLabel.Name = player.Name.."_Killer"
-            killerLabel.BackgroundTransparency = 1
-            killerLabel.Font = Enum.Font.GothamBold
-            killerLabel.TextSize = 10
-            killerLabel.TextStrokeTransparency = 0
-            killerLabel.Size = UDim2.new(0,120,0,30)
-            killerLabel.AnchorPoint = Vector2.new(0.5,0.5)
-            killerLabel.Parent = espIndicatorGui
-        end
-        killerLabel.Text = string.format("%s\n[%d]", displayName, distance)
-        killerLabel.TextColor3 = color
-        local screenPos, onScreen = camera:WorldToScreenPoint(rootPart.Position)
-        if not onScreen then
-            killerLabel.Visible = true
-            local viewCenter = camera.ViewportSize / 2
-            local dir = Vector2.new(screenPos.X, screenPos.Y) - viewCenter
-            if screenPos.Z < 0 then dir = -dir end
-            local maxScale = math.max(math.abs(dir.X)/(viewCenter.X-30), math.abs(dir.Y)/(viewCenter.Y-30))
-            killerLabel.Position = UDim2.new(0, viewCenter.X + dir.X/(maxScale==0 and 1 or maxScale),
-                                             0, viewCenter.Y + dir.Y/(maxScale==0 and 1 or maxScale))
-        else
-            killerLabel.Visible = false
-        end
-    else
-        if killerLabel then killerLabel:Destroy() end
-    end
+    return billboard
 end
 
--- ============================================================================
--- GENERATOR PROGRESS BILLBOARD
--- ============================================================================
+-- Update progress generator (warna gradien + hilangkan jika sudah 100%)
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
     if percent >= 100 then
-        local bill = generator:FindFirstChild("CyberHeroes_GenBillboard")
+        local h = generator:FindFirstChild("CyberHeroes_Highlight")
+        if h then h:Destroy() end
+        local bill = generator:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
-        removeHighlight(generator)
         return true
     end
-    local percentStr = string.format("[%.1f%%]", percent)
-    local bill = generator:FindFirstChild("CyberHeroes_GenBillboard")
-    if not bill then
-        bill = createBillboard(generator, percentStr, ObjectColors.Generator, UDim2.new(0,100,0,20), Vector3.new(0,2,0))
-        bill.Name = "CyberHeroes_GenBillboard"
+    local cp = math.clamp(percent, 0, 100)
+    local finalColor
+    if cp < 50 then
+        finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
     else
-        local lbl = bill:FindFirstChild("Label")
-        if lbl then
-            lbl.Text = percentStr
-            local ratio = math.clamp(percent/100, 0, 1)
-            local col = Color3.new(1, ratio, 0):Lerp(Color3.new(0,1,0), ratio)
-            lbl.TextColor3 = col
+        finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
+    end
+    applyHighlight(generator, finalColor)
+    createProgressBillboard(generator, percent, finalColor)
+    return false
+end
+
+-- Update semua progress generator (dipanggil periodic)
+local function updateAllGeneratorProgress()
+    for obj, _ in pairs(generatorEspHighlights) do
+        if obj and obj.Parent and (obj.Name == "Generator") then
+            updateGeneratorProgress(obj)
         end
     end
-    return false
+end
+
+-- ============================================================================
+-- PLAYER ESP (dengan deteksi killer/survivor, jarak, status)
+-- ============================================================================
+local function createHighlightForPlayer(player)
+    if espHighlights[player.UserId] then
+        if espHighlights[player.UserId].Highlight then
+            espHighlights[player.UserId].Highlight:Destroy()
+        end
+        if espHighlights[player.UserId].Billboard then
+            espHighlights[player.UserId].Billboard:Destroy()
+        end
+        if espHighlights[player.UserId].TeamChanged then
+            espHighlights[player.UserId].TeamChanged:Disconnect()
+        end
+        espHighlights[player.UserId] = nil
+    end
+
+    local character = player.Character
+    if not character then return end
+
+    local function getPlayerType()
+        local isKiller = false
+        if player.Team then
+            local teamName = player.Team.Name:lower()
+            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                isKiller = true
+            end
+        end
+        if not isKiller then
+            local tool = character:FindFirstChildWhichIsA("Tool")
+            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                isKiller = true
+            end
+        end
+        return isKiller
+    end
+
+    local isKiller = getPlayerType()
+    local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "CyberHeroes_ESP"
+    highlight.FillColor = highlightColor
+    highlight.FillTransparency = config.highlightTransparency
+    highlight.OutlineColor = highlightColor
+    highlight.OutlineTransparency = 0.2
+    highlight.Adornee = character
+    highlight.Parent = character
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "CyberHeroes_NameTag"
+    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    billboard.Size = UDim2.new(0, 120, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Parent = character
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = highlightColor
+    nameLabel.TextStrokeTransparency = 0.5
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Parent = billboard
+
+    local teamChangedConn = nil
+    if player.Team then
+        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
+            local newIsKiller = getPlayerType()
+            local newColor = newIsKiller and config.highlightColorKiller or config.highlightColorSurvivor
+            if highlight then
+                highlight.FillColor = newColor
+                highlight.OutlineColor = newColor
+            end
+            if nameLabel then
+                nameLabel.TextColor3 = newColor
+            end
+        end)
+    end
+
+    espHighlights[player.UserId] = {
+        Highlight = highlight,
+        Billboard = billboard,
+        NameLabel = nameLabel,
+        TeamChanged = teamChangedConn
+    }
+end
+
+local function updateAllESP()
+    if not config.espEnabled then
+        for _, data in pairs(espHighlights) do
+            if data.Highlight then data.Highlight:Destroy() end
+            if data.Billboard then data.Billboard:Destroy() end
+            if data.TeamChanged then data.TeamChanged:Disconnect() end
+        end
+        espHighlights = {}
+        return
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            createHighlightForPlayer(player)
+        end
+    end
 end
 
 -- ============================================================================
 -- OBJECT ESP (Generator, Hook, Gate, Pallet, Window)
 -- ============================================================================
-local function refreshObjectESP()
-    for obj, _ in pairs(espHighlightObjects) do
-        removeHighlight(obj)
-        local bill = obj:FindFirstChild("CyberHeroes_GenBillboard")
+local function createObjectESP(obj, objType)
+    if generatorEspHighlights[obj] then return end
+    local color
+    if objType == "Generator" then
+        color = ObjectColors.Generator
+    elseif objType == "Hook" then
+        color = ObjectColors.Hook
+    elseif objType == "Gate" then
+        color = ObjectColors.Gate
+    elseif objType == "Pallet" then
+        color = ObjectColors.Pallet
+    elseif objType == "Window" then
+        color = ObjectColors.Window
+    end
+    local highlight = applyHighlight(obj, color)
+    generatorEspHighlights[obj] = highlight
+
+    if objType == "Generator" then
+        updateGeneratorProgress(obj)
+    end
+end
+
+local function removeObjectESP(obj)
+    local highlight = generatorEspHighlights[obj]
+    if highlight then highlight:Destroy() end
+    generatorEspHighlights[obj] = nil
+    local bill = obj:FindFirstChild("GenBitchHook")
+    if bill then bill:Destroy() end
+end
+
+local function clearObjectESP()
+    for obj, highlight in pairs(generatorEspHighlights) do
+        if highlight then highlight:Destroy() end
+        local bill = obj:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
     end
-    espHighlightObjects = {}
-    espActiveGenerators = {}
+    generatorEspHighlights = {}
+end
 
-    local searchRoot = workspace:FindFirstChild("Map") or workspace
-    for _, obj in ipairs(searchRoot:GetDescendants()) do
+-- Refresh semua object ESP (pindai ulang seluruh workspace)
+local function refreshAllObjectESP()
+    clearObjectESP()
+    for _, obj in ipairs(workspace:GetDescendants()) do
         local name = obj.Name
-        local color = nil
         if name == "Generator" then
-            color = ObjectColors.Generator
-            table.insert(espActiveGenerators, obj)
-            updateGeneratorProgress(obj)
-        elseif name == "Hook" and (obj:IsA("BasePart") or obj:IsA("MeshPart")) then
-            color = ObjectColors.Hook
+            createObjectESP(obj, "Generator")
+        elseif name == "Hook" then
+            createObjectESP(obj, "Hook")
         elseif name == "Gate" then
-            color = ObjectColors.Gate
+            createObjectESP(obj, "Gate")
         elseif name == "Pallet" or name == "Palletwrong" then
-            color = ObjectColors.Pallet
+            createObjectESP(obj, "Pallet")
         elseif name == "Window" then
-            color = ObjectColors.Window
-        end
-        if color then
-            applyHighlight(obj, color)
-            espHighlightObjects[obj] = true
+            createObjectESP(obj, "Window")
         end
     end
+    print("[ESP] Object ESP refreshed")
 end
 
--- ============================================================================
--- EVENT HANDLERS
--- ============================================================================
-local function onDescendantAdded(inst)
+-- Event handlers untuk objek yang muncul/hilang
+local function onDescendantAdded(instance)
     if not config.espEnabled then return end
-    local name = inst.Name
+    local name = instance.Name
     if name == "Generator" then
-        applyHighlight(inst, ObjectColors.Generator)
-        espHighlightObjects[inst] = true
-        table.insert(espActiveGenerators, inst)
-        updateGeneratorProgress(inst)
-    elseif name == "Hook" and (inst:IsA("BasePart") or inst:IsA("MeshPart")) then
-        applyHighlight(inst, ObjectColors.Hook)
-        espHighlightObjects[inst] = true
+        createObjectESP(instance, "Generator")
+    elseif name == "Hook" then
+        createObjectESP(instance, "Hook")
     elseif name == "Gate" then
-        applyHighlight(inst, ObjectColors.Gate)
-        espHighlightObjects[inst] = true
+        createObjectESP(instance, "Gate")
     elseif name == "Pallet" or name == "Palletwrong" then
-        applyHighlight(inst, ObjectColors.Pallet)
-        espHighlightObjects[inst] = true
+        createObjectESP(instance, "Pallet")
     elseif name == "Window" then
-        applyHighlight(inst, ObjectColors.Window)
-        espHighlightObjects[inst] = true
+        createObjectESP(instance, "Window")
     end
 end
 
-local function onDescendantRemoving(inst)
-    if espHighlightObjects[inst] then
-        removeHighlight(inst)
-        local bill = inst:FindFirstChild("CyberHeroes_GenBillboard")
-        if bill then bill:Destroy() end
-        espHighlightObjects[inst] = nil
-        if inst.Name == "Generator" then
-            for i, g in ipairs(espActiveGenerators) do
-                if g == inst then table.remove(espActiveGenerators, i); break end
-            end
-        end
+local function onDescendantRemoving(instance)
+    if generatorEspHighlights[instance] then
+        removeObjectESP(instance)
     end
 end
 
--- ============================================================================
--- LIGHTING & KILLER WARNING
--- ============================================================================
-local function applyLighting()
-    pcall(function()
-        Lighting.Ambient = Color3.fromRGB(255,255,255)
-        Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
-        Lighting.Brightness = 2
-        Lighting.ClockTime = 14
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 9e9
-    end)
-end
-
-local function updateKillerWarning()
-    if not localRootPart then return end
-    local killerNear = false
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= localPlayer then
-            local team = p.Team
-            if team and team.Name:lower():find("killer") and p.Character then
-                local root = p.Character:FindFirstChild("HumanoidRootPart")
-                if root and (root.Position - localRootPart.Position).Magnitude < 99 then
-                    killerNear = true
-                    break
-                end
-            end
-        end
-    end
-    local warn = localRootPart:FindFirstChild("CyberHeroes_KillerWarn")
-    if killerNear then
-        if not warn then
-            warn = createBillboard(localRootPart, "⚠️", Color3.fromRGB(255,0,0), UDim2.new(0,60,0,60), Vector3.new(0,4,0))
-            warn.Name = "CyberHeroes_KillerWarn"
-        end
-    else
-        if warn then warn:Destroy() end
-    end
-end
-
--- ============================================================================
--- MAIN ESP LOOP
--- ============================================================================
-local function espHeartbeat()
+-- Periodic scan untuk menjamin objek yang muncul belakangan tetap terdeteksi
+local function periodicObjectScan()
     if not config.espEnabled then return end
-    applyLighting()
-
     local now = tick()
-    if now - espLastFullRefresh > 5 then
-        espLastFullRefresh = now
-        refreshObjectESP()
-    end
-
-    updateKillerWarning()
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= localPlayer then
-            updatePlayerNametag(p)
-        end
-    end
-
-    for i = #espActiveGenerators, 1, -1 do
-        local g = espActiveGenerators[i]
-        if g and g.Parent then
-            if updateGeneratorProgress(g) then
-                table.remove(espActiveGenerators, i)
-            end
-        else
-            table.remove(espActiveGenerators, i)
-        end
+    if now - lastObjectScanTime >= OBJECT_SCAN_INTERVAL then
+        lastObjectScanTime = now
+        refreshAllObjectESP()
     end
 end
 
 -- ============================================================================
--- START / STOP ESP
+-- START ESP (mengaktifkan semua komponen)
 -- ============================================================================
 local function startESP()
-    if espConnection then return end
-    if not config.espEnabled then return end
+    if espConnection then return end  -- sudah berjalan
 
-    setupIndicatorGui()
-    refreshObjectESP()
+    -- Bersihkan koneksi lama jika ada
+    if espDescendantAddedConn then espDescendantAddedConn:Disconnect() end
+    if espDescendantRemovingConn then espDescendantRemovingConn:Disconnect() end
+    if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
+    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end
+    if espProgressUpdateConn then espProgressUpdateConn:Disconnect() end
+    if espPeriodicScanConn then espPeriodicScanConn:Disconnect() end
 
-    espDescendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
-    espDescendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
+    -- Player ESP events
     espPlayerAddedConn = Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
             task.wait(0.5)
-            updatePlayerNametag(player)
+            createHighlightForPlayer(player)
         end
     end)
     espPlayerRemovingConn = Players.PlayerRemoving:Connect(function(player)
-        if espIndicatorGui then
-            for _, child in ipairs(espIndicatorGui:GetChildren()) do
-                if child.Name == player.Name or child.Name == player.Name.."_Chased" or child.Name == player.Name.."_Killer" then
-                    child:Destroy()
-                end
+        if espHighlights[player.UserId] then
+            if espHighlights[player.UserId].Highlight then
+                espHighlights[player.UserId].Highlight:Destroy()
             end
+            if espHighlights[player.UserId].Billboard then
+                espHighlights[player.UserId].Billboard:Destroy()
+            end
+            if espHighlights[player.UserId].TeamChanged then
+                espHighlights[player.UserId].TeamChanged:Disconnect()
+            end
+            espHighlights[player.UserId] = nil
         end
-        if player.Character then removeHighlight(player.Character) end
     end)
 
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= localPlayer then
-            local conn = p.CharacterAdded:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            player.CharacterAdded:Connect(function()
                 if config.espEnabled then
-                    updatePlayerNametag(p)
+                    createHighlightForPlayer(player)
                 end
             end)
-            espCharacterConns[p] = conn
         end
     end
 
-    espConnection = RunService.Heartbeat:Connect(espHeartbeat)
-    print("[ESP] Enhanced ESP started")
+    -- Object ESP events
+    espDescendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
+    espDescendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
+
+    -- Scan awal
+    refreshAllObjectESP()
+
+    -- Periodic scan untuk memastikan semua objek terdeteksi
+    espPeriodicScanConn = RunService.Heartbeat:Connect(periodicObjectScan)
+
+    -- Periodic update progress generator (real-time)
+    espProgressUpdateConn = RunService.Heartbeat:Connect(function()
+        if config.espEnabled then
+            updateAllGeneratorProgress()
+        end
+    end)
+
+    -- Loop untuk menjaga player ESP tetap up-to-date
+    espConnection = RunService.Heartbeat:Connect(function()
+        if config.espEnabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= localPlayer then
+                    local currentChar = player.Character
+                    local stored = espHighlights[player.UserId]
+                    if not stored or not stored.Highlight or stored.Highlight.Adornee ~= currentChar then
+                        createHighlightForPlayer(player)
+                    end
+                end
+            end
+        else
+            -- Jika ESP dimatikan, bersihkan semua
+            for _, data in pairs(espHighlights) do
+                if data.Highlight then data.Highlight:Destroy() end
+                if data.Billboard then data.Billboard:Destroy() end
+                if data.TeamChanged then data.TeamChanged:Disconnect() end
+            end
+            espHighlights = {}
+            clearObjectESP()
+        end
+    end)
+
+    print("[ESP] ESP started (player + object ESP with real-time progress)")
 end
 
+-- ============================================================================
+-- STOP ESP (membersihkan semua)
+-- ============================================================================
 local function stopESP()
     if espConnection then
         espConnection:Disconnect()
@@ -1013,32 +951,37 @@ local function stopESP()
     if espDescendantRemovingConn then espDescendantRemovingConn:Disconnect() end
     if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
     if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end
-    for _, conn in pairs(espCharacterConns) do
-        conn:Disconnect()
-    end
-    table.clear(espCharacterConns)
+    if espProgressUpdateConn then espProgressUpdateConn:Disconnect() end
+    if espPeriodicScanConn then espPeriodicScanConn:Disconnect() end
 
-    for obj, _ in pairs(espHighlightObjects) do
-        removeHighlight(obj)
-        local bill = obj:FindFirstChild("CyberHeroes_GenBillboard")
-        if bill then bill:Destroy() end
+    -- Bersihkan semua highlight dan billboard
+    for _, data in pairs(espHighlights) do
+        if data.Highlight then data.Highlight:Destroy() end
+        if data.Billboard then data.Billboard:Destroy() end
+        if data.TeamChanged then data.TeamChanged:Disconnect() end
     end
-    espHighlightObjects = {}
-    espActiveGenerators = {}
-
-    if espIndicatorGui then
-        pcall(function() espIndicatorGui:Destroy() end)
-        espIndicatorGui = nil
-    end
-
-    if localRootPart then
-        local warn = localRootPart:FindFirstChild("CyberHeroes_KillerWarn")
-        if warn then warn:Destroy() end
-    end
+    espHighlights = {}
+    clearObjectESP()
 
     print("[ESP] ESP stopped")
 end
 
+-- ============================================================================
+-- UPDATE ALL ESP (dipanggil saat config.espEnabled berubah melalui GUI)
+-- ============================================================================
+local function updateAllESP()
+    if config.espEnabled then
+        startESP()
+    else
+        stopESP()
+    end
+end
+
+-- ============================================================================
+-- CATATAN: Kode di atas menggantikan seluruh bagian ESP SYSTEM dalam script utama.
+-- Pastikan tidak ada definisi ganda untuk variabel seperti espHighlights, generatorEspHighlights.
+-- Fungsi updateAllESP() sekarang akan memulai atau menghentikan ESP sesuai config.espEnabled.
+-- ============================================================================
 
 -- ============================================================================
 -- TPWALK NAMESPACE
@@ -3039,9 +2982,9 @@ local function createGridButton(parent, name, text, initialState, onChange)
         elseif name == "autoTaskEnabled" then  
             config.autoTaskEnabled = newState  
             if newState then startAutoTask() else stopAutoTask() end  
-        elseif name == "espEnabled" then  
-            config.espEnabled = newState
-            if newState then startESP() else stopESP() end
+        elseif name == "espEnabled" then
+                config.espEnabled = newState
+                updateAllESP()
         elseif name == "speedBoostEnabled" then  
             config.speedBoostEnabled = newState  
             if not newState then if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end end  

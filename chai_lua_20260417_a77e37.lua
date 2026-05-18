@@ -841,6 +841,18 @@ local function initialObjectScan()
     end
 end
 
+
+-- Variabel untuk throttling object scan
+local lastObjectScanTime = 0
+local OBJECT_SCAN_INTERVAL = 2 -- scan ulang setiap 2 detik
+
+-- Fungsi untuk memastikan objek ESP tetap update (dipanggil periodik)
+local function ensureObjectsScanned()
+    if not config.espEnabled then return end
+    -- Scan ulang untuk menangkap objek yang mungkin muncul belakangan
+    initialObjectScan()
+end
+
 -- ============================================================================
 -- START ESP (PLAYER + OBJECTS) - REPLACE FUNCTION YANG LAMA
 -- ============================================================================
@@ -887,10 +899,25 @@ local function startESP()
     descendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
     descendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
 
+    -- Initial scan (segera, tapi mungkin map belum ada)
     initialObjectScan()
-    updateAllESP()
 
-    -- Loop ringan untuk menjaga player ESP tetap up-to-date
+    -- PERBAIKAN: Periodic scan untuk menangkap objek yang muncul setelah map di-load
+    -- Ini akan memastikan generator, hook, dll. muncul meskipun terlambat masuk
+    local scanConnection
+    scanConnection = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if config.espEnabled and now - lastObjectScanTime >= OBJECT_SCAN_INTERVAL then
+            lastObjectScanTime = now
+            ensureObjectsScanned()
+        end
+        -- Jika ESP dimatikan, matikan juga periodic scan
+        if not config.espEnabled then
+            if scanConnection then scanConnection:Disconnect() end
+        end
+    end)
+
+    -- Update player ESP tetap berjalan
     RunService.Heartbeat:Connect(function()
         if config.espEnabled then
             for _, player in ipairs(Players:GetPlayers()) do
@@ -913,8 +940,13 @@ local function startESP()
         end
     end)
 
-    print("[ESP] System upgraded with generator progress, gate, pallet, window, hook detection")
+    print("[ESP] System upgraded with periodic object scan (generator, gate, pallet, window, hook)")
 end
+
+-- ============================================================================
+-- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE
+-- (jika ada di script asli, kita tidak perlu menggantinya, karena kita sudah punya clearObjectESP)
+-- ============================================================================
 
 -- ============================================================================
 -- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE

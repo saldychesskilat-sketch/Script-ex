@@ -533,11 +533,10 @@ end
 
 -- Konfigurasi warna objek (sama seperti referensi)
 local ObjectColors = {
-    Generator = Color3.fromRGB(255, 255, 0),
-    Gate      = Color3.fromRGB(255, 255, 255), -- putih
-    Pallet    = Color3.fromRGB(74, 255, 181),  -- hijau toska
-    Window    = Color3.fromRGB(74, 255, 181),  -- sama dengan pallet
-    Hook      = Color3.fromRGB(132, 255, 169)  -- hijau muda
+    Generator = Color3.fromRGB(255, 0, 0),
+    Gate      = Color3.fromRGB(255, 255, 255),
+    Pallet    = Color3.fromRGB(74, 255, 181),  
+    Hook      = Color3.fromRGB(255, 165, 0)
 }
 
 -- Variabel ESP (global untuk script utama)
@@ -768,8 +767,6 @@ local function createObjectESP(obj, objType)
         color = ObjectColors.Gate
     elseif objType == "Pallet" then
         color = ObjectColors.Pallet
-    elseif objType == "Window" then
-        color = ObjectColors.Window
     end
     local highlight = applyHighlight(obj, color)
     generatorEspHighlights[obj] = highlight
@@ -809,8 +806,6 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "Gate")
         elseif name == "Pallet" or name == "Palletwrong" then
             createObjectESP(obj, "Pallet")
-        elseif name == "Window" then
-            createObjectESP(obj, "Window")
         end
     end
     print("[ESP] Object ESP refreshed")
@@ -828,8 +823,6 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "Gate")
     elseif name == "Pallet" or name == "Palletwrong" then
         createObjectESP(instance, "Pallet")
-    elseif name == "Window" then
-        createObjectESP(instance, "Window")
     end
 end
 
@@ -866,7 +859,7 @@ local function startESP()
     -- Player ESP events
     espPlayerAddedConn = Players.PlayerAdded:Connect(function(player)
         if config.espEnabled then
-            task.wait(0.5)
+            task.wait(1)
             createHighlightForPlayer(player)
         end
     end)

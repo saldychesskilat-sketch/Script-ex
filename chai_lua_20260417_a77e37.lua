@@ -3503,7 +3503,11 @@ local function restoreFeatureStates()
         stopAutoAim()
     end
     
-    
+    if config.espEnabled and not espConnection then
+    startESP()
+elseif not config.espEnabled and espConnection then
+    stopESP()
+end
     
     print("[State] Feature state restoration complete")
 end

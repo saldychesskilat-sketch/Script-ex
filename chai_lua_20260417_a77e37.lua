@@ -528,8 +528,7 @@ end
 -- ============================================================================
 -- ============================================================================
 -- ============================================================================
--- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED WITH REFERENCE SCRIPT FEATURES
--- FIX: Immediate object detection after map loads + real-time progress update
+-- ESP SYSTEM (PLAYER + OBJECTS) - FULL REFRESH ON TOGGLE + REAL-TIME PROGRESS
 -- ============================================================================
 
 -- Konfigurasi warna dari script referensi
@@ -776,6 +775,27 @@ local function clearObjectESP()
     generatorEspHighlights = {}
 end
 
+-- REFRESH OBJECT ESP: panggil ini saat ESP diaktifkan ulang
+local function refreshAllObjectESP()
+    clearObjectESP()
+    -- Pindai ulang semua objek
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        local name = obj.Name
+        if name == "Generator" then
+            createObjectESP(obj, "Generator")
+        elseif name == "Hook" then
+            createObjectESP(obj, "Hook")
+        elseif name == "Gate" then
+            createObjectESP(obj, "Gate")
+        elseif name == "Pallet" or name == "Palletwrong" then
+            createObjectESP(obj, "Pallet")
+        elseif name == "Window" then
+            createObjectESP(obj, "Window")
+        end
+    end
+    print("[ESP] Object ESP refreshed (cleared and rescanned)")
+end
+
 -- ============================================================================
 -- EVENT HANDLERS (DESCENDANT ADDED / REMOVING)
 -- ============================================================================
@@ -932,8 +952,23 @@ local function startESP()
 end
 
 -- ============================================================================
+-- FUNGSI UNTUK MENGATASI TOGGLE ESP (HARUS DIPANGGIL DARI TOMBOL GUI)
+-- ============================================================================
+-- CATATAN: Di dalam createGridButton untuk "espEnabled", setelah mengubah config.espEnabled,
+-- panggil:
+--    if config.espEnabled then 
+--        refreshAllObjectESP()
+--        updateAllESP()
+--    else
+--        updateAllESP()  -- yang ini sudah clear player ESP dan object ESP (via clearObjectESP)
+--    end
+--
+-- Namun karena clearObjectESP dipanggil di updateAllESP saat espEnabled false, object ESP tetap hilang.
+-- Saat true, refreshAllObjectESP akan memulihkan semua object.
+-- ============================================================================
+
+-- ============================================================================
 -- PASTIKAN FUNGSI removeAllGeneratorESP dan updateAutoGeneratorESP TIDAK OVERRIDE
--- (jika ada di script asli, kita tidak perlu menggantinya)
 -- ============================================================================
     
 -- ============================================================================
@@ -3381,7 +3416,10 @@ local function restoreFeatureStates()
     end
     
     if config.espEnabled then
-        updateAllESP()
+    refreshAllObjectESP()  
+    updateAllESP()
+else
+    updateAllESP()
     end
     
     print("[State] Feature state restoration complete")

@@ -2602,25 +2602,183 @@ local function autoGeneratorTask()
                         end
 
                         -- ====================================================
-                        -- INTERACT DENGAN GENERATOR
-                        -- ====================================================
+-- INTERACT DENGAN GENERATOR
+-- ====================================================
 
-                        local prompt =
-                            targetGenerator:FindFirstChildWhichIsA(
-                                "ProximityPrompt",
-                                true
-                            )
+local interacted = false
 
-                        if prompt then
+-- METHOD 1 : CLICK DETECTOR
+local clickDetector =
+    targetGenerator:FindFirstChildWhichIsA(
+        "ClickDetector",
+        true
+    )
 
-                            pcall(function()
+if clickDetector then
 
-                                if fireproximityprompt then
-                                    fireproximityprompt(prompt)
-                                end
+    pcall(function()
 
-                            end)
-                        end
+        if fireclickdetector then
+
+            -- simulasi click kiri
+            fireclickdetector(clickDetector)
+
+            interacted = true
+
+            print(
+                "[AutoGenerator] ClickDetector interacted"
+            )
+        end
+
+    end)
+end
+
+-- METHOD 2 : PROXIMITY PROMPT
+if not interacted then
+
+    local prompt =
+        targetGenerator:FindFirstChildWhichIsA(
+            "ProximityPrompt",
+            true
+        )
+
+    if prompt then
+
+        pcall(function()
+
+            if fireproximityprompt then
+
+                fireproximityprompt(prompt)
+
+                interacted = true
+
+                print(
+                    "[AutoGenerator] Prompt interacted"
+                )
+            end
+
+        end)
+    end
+end
+
+-- METHOD 3 : TOOL ACTIVATE
+if not interacted then
+
+    pcall(function()
+
+        local tool =
+            localPlayer.Character
+            and localPlayer.Character:FindFirstChildWhichIsA(
+                "Tool"
+            )
+
+        if tool and tool.Activate then
+
+            tool:Activate()
+
+            interacted = true
+
+            print(
+                "[AutoGenerator] Tool activated"
+            )
+        end
+
+    end)
+end
+
+-- ====================================================
+-- TUNGGU PROSES REPAIR DIMULAI
+-- ====================================================
+
+if interacted then
+
+    local repairStarted = false
+    local repairTick = tick()
+
+    repeat
+
+        task.wait(0.15)
+
+        -- cek progress mulai naik
+        local progressVal =
+            targetGenerator:FindFirstChild("Progress")
+
+        if progressVal
+        and (
+            progressVal:IsA("IntValue")
+            or progressVal:IsA("NumberValue")
+        ) then
+
+            if progressVal.Value > 0 then
+                repairStarted = true
+            end
+        end
+
+        -- cek attribute
+        pcall(function()
+
+            local attr =
+                targetGenerator:GetAttribute(
+                    "RepairProgress"
+                )
+
+            if attr and attr > 0 then
+                repairStarted = true
+            end
+
+        end)
+
+        -- auto skillcheck selama repair
+        local remote = getGeneratorRemote()
+
+        if remote then
+
+            pcall(function()
+
+                remote:FireServer(true)
+
+                remote:FireServer(
+                    targetGenerator,
+                    true
+                )
+
+                remote:FireServer(
+                    targetGenerator,
+                    "Perfect"
+                )
+
+                remote:FireServer("Perfect")
+
+            end)
+        end
+
+    until repairStarted
+    or tick() - repairTick >= 4
+
+    -- =================================================
+    -- JIKA REPAIR BERJALAN BARU LANJUT
+    -- =================================================
+
+    if repairStarted then
+
+        print(
+            "[AutoGenerator] Repair started :",
+            targetGenerator.Name
+        )
+
+        instantRepairGenerator(targetGenerator)
+
+        -- tunggu generator selesai
+        task.wait(2)
+
+    else
+
+        print(
+            "[AutoGenerator] Failed start repair :",
+            targetGenerator.Name
+        )
+    end
+                            end
 
                         -- ====================================================
                         -- AUTO SKILLCHECK

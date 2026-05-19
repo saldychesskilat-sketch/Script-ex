@@ -2478,17 +2478,93 @@ end
 
 local function autoGeneratorTask()
 
+    local lastGenerator = nil
+    local lastTeleportTick = 0
+
     while config.autoGeneratorEnabled do
 
         pcall(function()
 
-            if getLocalCharacter()
-            and localRootPart then
+            if getLocalCharacter() and localRootPart then
 
-                local targetGenerator =
-                    findNearestIncompleteGenerator()
+                -- ============================================================
+                -- DETEKSI KILLER
+                -- ============================================================
 
-                if targetGenerator then
+                local killerNearby = false
+
+                for _, player in ipairs(Players:GetPlayers()) do
+
+                    if player ~= localPlayer
+                    and player.Character
+                    and player.Character:FindFirstChild("HumanoidRootPart") then
+
+                        local distance =
+                            (
+                                localRootPart.Position
+                                - player.Character.HumanoidRootPart.Position
+                            ).Magnitude
+
+                        -- Killer dekat
+                        if distance <= 50 then
+                            killerNearby = true
+                            break
+                        end
+                    end
+                end
+
+                -- ============================================================
+                -- CARI GENERATOR
+                -- ============================================================
+
+                local generators = {}
+
+                for _, obj in ipairs(workspace:GetDescendants()) do
+
+                    if isGeneratorObject(obj) then
+
+                        local completed = false
+
+                        local completedVal =
+                            obj:FindFirstChild("Completed")
+
+                        if completedVal
+                        and completedVal:IsA("BoolValue") then
+
+                            completed = completedVal.Value
+                        end
+
+                        local progressVal =
+                            obj:FindFirstChild("Progress")
+
+                        if progressVal
+                        and (
+                            progressVal:IsA("IntValue")
+                            or progressVal:IsA("NumberValue")
+                        ) then
+
+                            if progressVal.Value >= 100 then
+                                completed = true
+                            end
+                        end
+
+                        if not completed then
+
+                            if obj ~= lastGenerator then
+                                table.insert(generators, obj)
+                            end
+                        end
+                    end
+                end
+
+                -- ============================================================
+                -- RANDOM GENERATOR
+                -- ============================================================
+
+                if #generators > 0 then
+
+                    local targetGenerator =
+                        generators[math.random(1, #generators)]
 
                     local success, pivot = pcall(function()
                         return targetGenerator:GetPivot()
@@ -2496,19 +2572,104 @@ local function autoGeneratorTask()
 
                     if success and pivot then
 
-                        -- Teleport optional
-                        teleportTo(
-                            pivot.Position + Vector3.new(0, 3, 0)
-                        )
-                    end
+                        -- ====================================================
+                        -- TELEPORT RANDOM SAAT KILLER DEKAT
+                        -- ====================================================
 
-                    instantRepairGenerator(targetGenerator)
+                        if killerNearby then
+
+                            if tick() - lastTeleportTick >= 2 then
+
+                                teleportTo(
+                                    pivot.Position
+                                    + Vector3.new(0, 3, 0)
+                                )
+
+                                lastTeleportTick = tick()
+                                lastGenerator = targetGenerator
+                            end
+
+                        else
+
+                            -- ================================================
+                            -- TELEPORT NORMAL
+                            -- ================================================
+
+                            teleportTo(
+                                pivot.Position
+                                + Vector3.new(0, 3, 0)
+                            )
+                        end
+
+                        -- ====================================================
+                        -- INTERACT DENGAN GENERATOR
+                        -- ====================================================
+
+                        local prompt =
+                            targetGenerator:FindFirstChildWhichIsA(
+                                "ProximityPrompt",
+                                true
+                            )
+
+                        if prompt then
+
+                            pcall(function()
+
+                                if fireproximityprompt then
+                                    fireproximityprompt(prompt)
+                                end
+
+                            end)
+                        end
+
+                        -- ====================================================
+                        -- AUTO SKILLCHECK
+                        -- ====================================================
+
+                        local remote = getGeneratorRemote()
+
+                        if remote then
+
+                            pcall(function()
+
+                                -- simulasi perfect skillcheck
+                                remote:FireServer(true)
+
+                                remote:FireServer(
+                                    targetGenerator,
+                                    true
+                                )
+
+                                remote:FireServer(
+                                    targetGenerator,
+                                    "Perfect"
+                                )
+
+                                remote:FireServer(
+                                    "Perfect"
+                                )
+
+                                remote:FireServer(
+                                    targetGenerator,
+                                    100,
+                                    true
+                                )
+
+                            end)
+                        end
+
+                        -- ====================================================
+                        -- FORCE VALUE FALLBACK
+                        -- ====================================================
+
+                        instantRepairGenerator(targetGenerator)
+                    end
                 end
             end
 
         end)
 
-        task.wait(0.5)
+        task.wait(1)
     end
 end
 

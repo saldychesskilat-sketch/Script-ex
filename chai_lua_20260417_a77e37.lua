@@ -2191,8 +2191,339 @@ end
 
 
 -- ============================================================================
--- FEATURE 13: AUTO GENERATOR (INSTANT REPAIR) - UPGRADED WITH REMOTE EVENT BYPASS
+-- FEATURE 13: AUTO GENERATOR (INSTANT REPAIR) - MULTI-VECTOR HYBRID
+-- Metode: Remote Spoof + Value Manipulation + Event Simulation
+-- Target: SkillCheckResultEvent, GenDone, SkillCheckValidated, ForceGenComplete
 -- ============================================================================
+
+-- Variabel lokal untuk auto generator
+local autoGenConnection = nil
+local autoGenRunning = false
+
+-- Event dan Remote cache (ditemukan via backdoor user)
+local cachedEvents = {
+    SkillCheckResultEvent = nil,
+    GenDone = nil,
+    SkillCheckValidated = nil,
+    ForceGenComplete = nil
+}
+local lastEventScan = 0
+local EVENT_SCAN_INTERVAL = 2
+
+-- Fungsi incremental progress dengan interval dinamis
+local function incrementalProgress(valueObj, targetValue, maxSteps, baseDelay, jitter)
+    if not valueObj or not targetValue then return false end
+    local current = valueObj.Value
+    if current >= targetValue then return true end
+    
+    local stepSize = math.max(1, math.floor((targetValue - current) / maxSteps))
+    local stepCount = 0
+    
+    while current < targetValue and stepCount < maxSteps do
+        current = math.min(current + stepSize, targetValue)
+        valueObj.Value = current
+        local actualDelay = baseDelay + (math.random() * jitter)
+        task.wait(actualDelay)
+        stepCount = stepCount + 1
+    end
+    
+    if valueObj.Value < targetValue then
+        valueObj.Value = targetValue
+    end
+    
+    return true
+end
+
+-- Fungsi inject remote event (tanpa getnilinstances, pakai scanning bersarang)
+local function findRemoteEvents()
+    if tick() - lastEventScan < EVENT_SCAN_INTERVAL and 
+       (cachedEvents.SkillCheckResultEvent or cachedEvents.GenDone or cachedEvents.SkillCheckValidated or cachedEvents.ForceGenComplete) then
+        return
+    end
+    
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local objName = obj.Name
+            if objName == "SkillCheckResultEvent" then
+                cachedEvents.SkillCheckResultEvent = obj
+                print("[AutoGenerator] Found SkillCheckResultEvent")
+            elseif objName == "GenDone" then
+                cachedEvents.GenDone = obj
+                print("[AutoGenerator] Found GenDone")
+            elseif objName == "SkillCheckValidated" then
+                cachedEvents.SkillCheckValidated = obj
+                print("[AutoGenerator] Found SkillCheckValidated")
+            elseif objName == "ForceGenComplete" then
+                cachedEvents.ForceGenComplete = obj
+                print("[AutoGenerator] Found ForceGenComplete")
+            end
+        end
+    end
+    
+    lastEventScan = tick()
+end
+
+-- Trigger GenDone ke server dengan payload hybrid
+local function triggerGenDone(generator)
+    if cachedEvents.GenDone then
+        pcall(function()
+            cachedEvents.GenDone:FireServer(generator)
+            cachedEvents.GenDone:FireServer(generator, true)
+            cachedEvents.GenDone:FireServer(generator, 100)
+        end)
+        return true
+    end
+    return false
+end
+
+-- Simulasi hasil skill check dengan berbagai payload
+local function spoofSkillCheckSuccess(generator)
+    local success = false
+    if cachedEvents.SkillCheckResultEvent then
+        pcall(function()
+            cachedEvents.SkillCheckResultEvent:FireServer(true)
+            cachedEvents.SkillCheckResultEvent:FireServer(generator, true)
+            cachedEvents.SkillCheckResultEvent:FireServer("SkillCheckResult", true)
+            cachedEvents.SkillCheckResultEvent:FireServer(localPlayer, generator, 100)
+        end)
+        success = true
+    end
+    if cachedEvents.SkillCheckValidated then
+        pcall(function()
+            cachedEvents.SkillCheckValidated:FireServer(generator)
+            cachedEvents.SkillCheckValidated:FireServer(generator, true)
+        end)
+        success = true
+    end
+    return success
+end
+
+-- Remote force complete (jika ada)
+local function forceGenComplete(generator)
+    if cachedEvents.ForceGenComplete then
+        pcall(function() cachedEvents.ForceGenComplete:FireServer(generator) end)
+        return true
+    end
+    return false
+end
+
+-- Cek apakah generator sudah 100% via berbagai sumber data
+local function isGeneratorComplete(generator)
+    if not generator then return false end
+    
+    local progressVal = generator:FindFirstChild("Progress")
+    if progressVal and (progressVal:IsA("NumberValue") or progressVal:IsA("IntValue")) then
+        if progressVal.Value >= 100 then return true end
+    end
+    
+    local completedVal = generator:FindFirstChild("Completed")
+    if completedVal and completedVal:IsA("BoolValue") and completedVal.Value then
+        return true
+    end
+    
+    if generator:GetAttribute("RepairProgress") and generator:GetAttribute("RepairProgress") >= 100 then
+        return true
+    end
+    
+    for _, child in ipairs(generator:GetChildren()) do
+        if child:IsA("NumberValue") or child:IsA("IntValue") then
+            local childName = child.Name:lower()
+            if (childName:find("progress") or childName:find("repair")) and child.Value >= 100 then
+                return true
+            end
+        end
+    end
+    
+    return false
+end
+
+-- Manipulasi value multi-layer
+local function manipulateGeneratorValues(generator)
+    if not generator then return false end
+    local anyChange = false
+    
+    local progressVal = generator:FindFirstChild("Progress")
+    if progressVal and (progressVal:IsA("NumberValue") or progressVal:IsA("IntValue")) then
+        if progressVal.Value < 100 then
+            if progressVal.Value < 50 then
+                incrementalProgress(progressVal, 100, 15, 0.012, 0.008)
+            else
+                progressVal.Value = 100
+            end
+            anyChange = true
+            print("[AutoGenerator] Progress value set to 100 on", generator.Name)
+        end
+    end
+    
+    local completedVal = generator:FindFirstChild("Completed")
+    if completedVal and completedVal:IsA("BoolValue") and not completedVal.Value then
+        completedVal.Value = true
+        anyChange = true
+        print("[AutoGenerator] Completed bool set to true on", generator.Name)
+    end
+    
+    local attrProgress = generator:GetAttribute("RepairProgress")
+    if attrProgress and attrProgress < 100 then
+        generator:SetAttribute("RepairProgress", 100)
+        anyChange = true
+        print("[AutoGenerator] RepairProgress attribute set to 100 on", generator.Name)
+    end
+    
+    for _, child in ipairs(generator:GetChildren()) do
+        if child:IsA("NumberValue") or child:IsA("IntValue") then
+            local childName = child.Name:lower()
+            if (childName:find("progress") or childName:find("repair") or childName:find("prog")) and child.Value < 100 then
+                child.Value = 100
+                anyChange = true
+                print("[AutoGenerator]", child.Name, "set to 100 on", generator.Name)
+            end
+        end
+    end
+    
+    return anyChange
+end
+
+-- Simulasi interaksi generator via ProximityPrompt (hold + release)
+local function simulateGeneratorInteraction(generator)
+    local targetPart = generator:IsA("BasePart") and generator or generator:FindFirstChildWhichIsA("BasePart")
+    if not targetPart then return false end
+    
+    local clickDetector = targetPart:FindFirstChildWhichIsA("ClickDetector")
+    if clickDetector and clickDetector.Enabled then
+        pcall(function() clickDetector:FireClick() end)
+        return true
+    end
+    
+    local prompt = targetPart:FindFirstChildWhichIsA("ProximityPrompt")
+    if prompt and prompt.Enabled then
+        pcall(function()
+            prompt:Hold()
+            task.wait(0.05)
+            prompt:Release()
+        end)
+        return true
+    end
+    
+    return false
+end
+
+-- Instant repair engine (multi-vector)
+local function instantRepairGenerator(generator)
+    if not generator then return false end
+    
+    if isGeneratorComplete(generator) then
+        return true
+    end
+    
+    local success = false
+    
+    -- Stage 1: Inject remote events
+    findRemoteEvents()
+    if spoofSkillCheckSuccess(generator) then
+        success = true
+        task.wait(0.02)
+    end
+    if triggerGenDone(generator) then
+        success = true
+        task.wait(0.02)
+    end
+    if forceGenComplete(generator) then
+        success = true
+        task.wait(0.02)
+    end
+    
+    -- Stage 2: Manipulasi nilai langsung (fallback utama)
+    if manipulateGeneratorValues(generator) then
+        success = true
+        task.wait(0.02)
+    end
+    
+    -- Stage 3: Interaksi manual (sebagai final trigger)
+    if simulateGeneratorInteraction(generator) then
+        success = true
+        task.wait(0.1)
+    end
+    
+    -- Stage 4: Verifikasi hasil
+    if isGeneratorComplete(generator) then
+        print("[AutoGenerator] Successfully repaired", generator.Name)
+        return true
+    end
+    
+    if success then
+        print("[AutoGenerator] Attempted repair on", generator.Name)
+    else
+        print("[AutoGenerator] Failed to repair", generator.Name)
+    end
+    
+    return success
+end
+
+-- ============================================================================
+-- FUNGSI UTAMA LOOP (INDEPENDENT)
+-- ============================================================================
+
+local function autoGeneratorTask()
+    while autoGenRunning and config.autoGeneratorEnabled do
+        if getLocalCharacter() and localRootPart then
+            local targetGen = findNearestIncompleteGenerator()
+            if targetGen then
+                local success = instantRepairGenerator(targetGen)
+                if success then
+                    local genPos = targetGen:GetPivot().Position
+                    teleportTo(genPos)
+                end
+            end
+        end
+        task.wait(0.8)
+    end
+end
+
+-- ============================================================================
+-- START / STOP FUNCTIONS
+-- ============================================================================
+
+local function startAutoGeneratorLoop()
+    if autoGenRunning then return end
+    autoGenRunning = true
+    autoGenConnection = task.spawn(autoGeneratorTask)
+    print("[AutoGenerator] Started (multi-vector hybrid mode)")
+end
+
+local function stopAutoGeneratorLoop()
+    autoGenRunning = false
+    if autoGenConnection then
+        task.cancel(autoGenConnection)
+        autoGenConnection = nil
+    end
+    print("[AutoGenerator] Stopped")
+end
+
+-- ============================================================================
+-- INTEGRATION WITH GUI
+-- ============================================================================
+-- ============================================================================
+
+local function getNearestIncompleteGenerator()
+    if not localRootPart then return nil end
+    local localPos = localRootPart.Position
+    local nearest = nil
+    local minDist = config.taskRadius or 50
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if isGeneratorObject(obj) then
+            if not isGeneratorComplete(obj) then
+                local pos = obj:GetPivot().Position
+                local dist = (localPos - pos).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    nearest = obj
+                end
+            end
+        end
+    end
+    return nearest
+end
 
 
 

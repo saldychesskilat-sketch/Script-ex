@@ -2191,7 +2191,635 @@ end
 
 
 -- ============================================================================
+-- ============================================================================
+-- FEATURE 13: AUTO GENERATOR (SMART REPAIR + AUTO SKILLCHECK)
+-- MEKANISME BARU:
+-- > Teleport ke generator random
+-- > Simulasi interact manual
+-- > Repair manual menggunakan skillcheck GUI
+-- > Tunggu progress sampai 100%
+-- > Jika killer dekat -> pindah generator lain
+-- > Tidak membuat config/global baru
+-- > Tidak konflik dengan fitur lain
+-- ============================================================================
 
+-- ============================================================================
+-- DETEKSI OBJECT GENERATOR
+-- ============================================================================
+
+local function isGeneratorObject(obj)
+
+    if not obj then
+        return false
+    end
+
+    local name = tostring(obj.Name):lower()
+
+    if name:find("generator")
+    or name:find("gen")
+    or name == "generatorrepair"
+    or name:find("repair") then
+        return true
+    end
+
+    if obj:FindFirstChild("Progress")
+    or obj:FindFirstChild("Completed")
+    or obj:FindFirstChild("GenDone")
+    or obj:FindFirstChildWhichIsA("ProximityPrompt", true)
+    or obj:FindFirstChildWhichIsA("ClickDetector", true) then
+        return true
+    end
+
+    return false
+end
+
+-- ============================================================================
+-- AMBIL SEMUA GENERATOR BELUM SELESAI
+-- ============================================================================
+
+local function getIncompleteGenerators()
+
+    local generators = {}
+
+    for _, obj in ipairs(workspace:GetDescendants()) do
+
+        if isGeneratorObject(obj) then
+
+            local completed = false
+
+            local progress =
+                obj:FindFirstChild("Progress")
+
+            if progress
+            and (
+                progress:IsA("IntValue")
+                or progress:IsA("NumberValue")
+            ) then
+
+                if progress.Value >= 100 then
+                    completed = true
+                end
+            end
+
+            local completedVal =
+                obj:FindFirstChild("Completed")
+
+            if completedVal
+            and completedVal:IsA("BoolValue")
+            and completedVal.Value then
+
+                completed = true
+            end
+
+            pcall(function()
+
+                local attr =
+                    obj:GetAttribute("RepairProgress")
+
+                if attr and attr >= 100 then
+                    completed = true
+                end
+
+            end)
+
+            if not completed then
+                table.insert(generators, obj)
+            end
+        end
+    end
+
+    return generators
+end
+
+-- ============================================================================
+-- RANDOM GENERATOR
+-- ============================================================================
+
+local function getRandomGenerator(exclude)
+
+    local generators = getIncompleteGenerators()
+
+    if #generators <= 0 then
+        return nil
+    end
+
+    local filtered = {}
+
+    for _, gen in ipairs(generators) do
+
+        if gen ~= exclude then
+            table.insert(filtered, gen)
+        end
+    end
+
+    if #filtered <= 0 then
+        return generators[1]
+    end
+
+    return filtered[math.random(1, #filtered)]
+end
+
+-- ============================================================================
+-- DETEKSI KILLER / SCP
+-- ============================================================================
+
+local function isKillerNearby(radius)
+
+    if not localRootPart then
+        return false
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+
+        if player ~= localPlayer
+        and player.Character
+        and player.Character:FindFirstChild("HumanoidRootPart") then
+
+            local distance =
+                (
+                    localRootPart.Position
+                    - player.Character.HumanoidRootPart.Position
+                ).Magnitude
+
+            if distance <= radius then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+-- ============================================================================
+-- SIMULASI INTERACT MANUAL
+-- ============================================================================
+
+local function simulatePressE()
+
+    pcall(function()
+
+        VirtualInputManager:SendKeyEvent(
+            true,
+            Enum.KeyCode.E,
+            false,
+            game
+        )
+
+        task.wait(0.05)
+
+        VirtualInputManager:SendKeyEvent(
+            false,
+            Enum.KeyCode.E,
+            false,
+            game
+        )
+    end)
+
+    pcall(function()
+
+        VirtualUser:Button1Down(
+            Vector2.new(500, 500)
+        )
+
+        task.wait(0.05)
+
+        VirtualUser:Button1Up(
+            Vector2.new(500, 500)
+        )
+    end)
+end
+
+-- ============================================================================
+-- SKILLCHECK SYSTEM
+-- ============================================================================
+
+local ActionPath = "SkillCheckPromptGui.Check"
+local TouchID = 8822
+
+local function GetActionTarget()
+
+    local current =
+        localPlayer:FindFirstChild("PlayerGui")
+
+    if not current then
+        return nil
+    end
+
+    for segment in string.gmatch(
+        ActionPath,
+        "[^%.]+"
+    ) do
+
+        current =
+            current
+            and current:FindFirstChild(segment)
+    end
+
+    return current
+end
+
+local function TriggerMobileButton()
+
+    local b = GetActionTarget()
+
+    if b and b:IsA("GuiObject") then
+
+        local p = b.AbsolutePosition
+        local s = b.AbsoluteSize
+        local i = GuiService:GetGuiInset()
+
+        local cx =
+            p.X + (s.X / 2) + i.X
+
+        local cy =
+            p.Y + (s.Y / 2) + i.Y
+
+        pcall(function()
+
+            VirtualInputManager:SendTouchEvent(
+                TouchID,
+                0,
+                cx,
+                cy
+            )
+
+            task.wait(0.01)
+
+            VirtualInputManager:SendTouchEvent(
+                TouchID,
+                2,
+                cx,
+                cy
+            )
+        end)
+    end
+end
+
+local function InitializeAutoSkillCheck()
+
+    task.spawn(function()
+
+        local playerGui =
+            localPlayer:FindFirstChild("PlayerGui")
+
+        if not playerGui then
+            return
+        end
+
+        local prompt =
+            playerGui:FindFirstChild(
+                "SkillCheckPromptGui"
+            )
+
+        if not prompt then
+
+            prompt =
+                playerGui:WaitForChild(
+                    "SkillCheckPromptGui",
+                    10
+                )
+        end
+
+        local check =
+            prompt
+            and prompt:FindFirstChild("Check")
+
+        if not check then
+            return
+        end
+
+        local line =
+            check:FindFirstChild("Line")
+
+        local goal =
+            check:FindFirstChild("Goal")
+
+        if not line or not goal then
+            return
+        end
+
+        if config.autoSkillVisibilityConnection then
+
+            config.autoSkillVisibilityConnection:Disconnect()
+        end
+
+        config.autoSkillVisibilityConnection =
+            check:GetPropertyChangedSignal(
+                "Visible"
+            ):Connect(function()
+
+                if check.Visible then
+
+                    if config.autoSkillHeartbeat then
+                        config.autoSkillHeartbeat:Disconnect()
+                    end
+
+                    config.autoSkillHeartbeat =
+                        RunService.Heartbeat:Connect(function()
+
+                            local lr =
+                                line.Rotation % 360
+
+                            local gr =
+                                goal.Rotation % 360
+
+                            local ss =
+                                (gr + 104) % 360
+
+                            local se =
+                                (gr + 118) % 360
+
+                            local inRange = false
+
+                            if ss > se then
+
+                                if lr >= ss
+                                or lr <= se then
+
+                                    inRange = true
+                                end
+                            else
+
+                                if lr >= ss
+                                and lr <= se then
+
+                                    inRange = true
+                                end
+                            end
+
+                            if inRange then
+
+                                TriggerMobileButton()
+
+                                if config.autoSkillHeartbeat then
+
+                                    config.autoSkillHeartbeat:Disconnect()
+
+                                    config.autoSkillHeartbeat = nil
+                                end
+                            end
+                        end)
+
+                elseif config.autoSkillHeartbeat then
+
+                    config.autoSkillHeartbeat:Disconnect()
+
+                    config.autoSkillHeartbeat = nil
+                end
+            end)
+    end)
+end
+
+-- ============================================================================
+-- CEK PROGRESS GENERATOR
+-- ============================================================================
+
+local function isGeneratorCompleted(generator)
+
+    if not generator then
+        return true
+    end
+
+    local progress =
+        generator:FindFirstChild("Progress")
+
+    if progress
+    and (
+        progress:IsA("IntValue")
+        or progress:IsA("NumberValue")
+    ) then
+
+        if progress.Value >= 100 then
+            return true
+        end
+    end
+
+    local completed =
+        generator:FindFirstChild("Completed")
+
+    if completed
+    and completed:IsA("BoolValue")
+    and completed.Value then
+
+        return true
+    end
+
+    local attr =
+        generator:GetAttribute("RepairProgress")
+
+    if attr and attr >= 100 then
+        return true
+    end
+
+    return false
+end
+
+-- ============================================================================
+-- MAIN LOOP
+-- ============================================================================
+
+local function autoGeneratorTask()
+
+    local currentGenerator = nil
+    local lastTeleport = 0
+    local lastInteract = 0
+
+    InitializeAutoSkillCheck()
+
+    while config.autoGeneratorEnabled do
+
+        pcall(function()
+
+            if not getLocalCharacter()
+            or not localRootPart then
+
+                return
+            end
+
+            -- ============================================================
+            -- KILLER ESCAPE
+            -- ============================================================
+
+            local killerNearby =
+                isKillerNearby(30)
+
+            if killerNearby then
+
+                local newGenerator =
+                    getRandomGenerator(currentGenerator)
+
+                if newGenerator then
+
+                    currentGenerator = newGenerator
+
+                    local success, pivot =
+                        pcall(function()
+                            return currentGenerator:GetPivot()
+                        end)
+
+                    if success and pivot then
+
+                        teleportTo(
+                            pivot.Position
+                            + Vector3.new(0, 3, 0)
+                        )
+
+                        print(
+                            "[AutoGenerator] Killer nearby, switching generator"
+                        )
+
+                        task.wait(0.3)
+                    end
+                end
+            end
+
+            -- ============================================================
+            -- AMBIL GENERATOR BARU
+            -- ============================================================
+
+            if not currentGenerator
+            or isGeneratorCompleted(currentGenerator) then
+
+                currentGenerator =
+                    getRandomGenerator()
+
+                if currentGenerator then
+
+                    print(
+                        "[AutoGenerator] Target :",
+                        currentGenerator.Name
+                    )
+                end
+            end
+
+            -- ============================================================
+            -- TELEPORT KE GENERATOR
+            -- ============================================================
+
+            if currentGenerator then
+
+                local success, pivot =
+                    pcall(function()
+                        return currentGenerator:GetPivot()
+                    end)
+
+                if success and pivot then
+
+                    local distance =
+                        (
+                            localRootPart.Position
+                            - pivot.Position
+                        ).Magnitude
+
+                    if distance > 10 then
+
+                        if tick() - lastTeleport >= 1 then
+
+                            teleportTo(
+                                pivot.Position
+                                + Vector3.new(0, 3, 0)
+                            )
+
+                            lastTeleport = tick()
+                        end
+                    end
+                end
+
+                -- ========================================================
+                -- INTERACT MANUAL
+                -- ========================================================
+
+                if tick() - lastInteract >= 1 then
+
+                    simulatePressE()
+
+                    local prompt =
+                        currentGenerator:FindFirstChildWhichIsA(
+                            "ProximityPrompt",
+                            true
+                        )
+
+                    if prompt then
+
+                        pcall(function()
+
+                            if fireproximityprompt then
+
+                                fireproximityprompt(prompt)
+                            end
+                        end)
+                    end
+
+                    lastInteract = tick()
+                end
+
+                -- ========================================================
+                -- GENERATOR SELESAI
+                -- ========================================================
+
+                if isGeneratorCompleted(currentGenerator) then
+
+                    print(
+                        "[AutoGenerator] Completed :",
+                        currentGenerator.Name
+                    )
+
+                    currentGenerator = nil
+
+                    task.wait(0.5)
+                end
+            end
+        end)
+
+        task.wait(0.15)
+    end
+end
+
+-- ============================================================================
+-- START / STOP
+-- ============================================================================
+
+local function startAutoGeneratorLoop()
+
+    if config.autoGeneratorThread then
+        return
+    end
+
+    config.autoGeneratorEnabled = true
+
+    config.autoGeneratorThread =
+        task.spawn(autoGeneratorTask)
+
+    print("[AutoGenerator] Started")
+end
+
+local function stopAutoGeneratorLoop()
+
+    config.autoGeneratorEnabled = false
+
+    if config.autoGeneratorThread then
+
+        task.cancel(config.autoGeneratorThread)
+
+        config.autoGeneratorThread = nil
+    end
+
+    if config.autoSkillVisibilityConnection then
+
+        config.autoSkillVisibilityConnection:Disconnect()
+
+        config.autoSkillVisibilityConnection = nil
+    end
+
+    if config.autoSkillHeartbeat then
+
+        config.autoSkillHeartbeat:Disconnect()
+
+        config.autoSkillHeartbeat = nil
+    end
+
+    print("[AutoGenerator] Stopped")
+end
 
 --========================
 -- Skull check

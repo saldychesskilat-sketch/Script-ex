@@ -1838,7 +1838,7 @@ local function applyPOV()
         originalAmbient = Lighting.Ambient
     end
     camera.FieldOfView = math.clamp(originalFOV + 35, 70, 120)
-    Lighting.Brightness = 2.5
+    Lighting.Brightness = 3
     Lighting.Ambient = Color3.fromRGB(200, 200, 200)
     Lighting.ClockTime = 14
 end
@@ -1859,7 +1859,7 @@ local function enablePOV()
     if not lightPart or not lightPart.Parent then
         lightPart = Instance.new("Part")
         lightPart.Name = "CyberHeroes_LightEffect"
-        lightPart.Size = Vector3.new(10,10,10)
+        lightPart.Size = Vector3.new(15,15,15)
         lightPart.Anchored = true
         lightPart.CanCollide = false
         lightPart.Transparency = 0.8
@@ -1885,7 +1885,7 @@ local function enablePOV()
     -- Juga tangani saat karakter berganti (respawn, masuk game) yang mungkin mereset kamera
     local function onCharacterAdded()
         if config.povEnabled then
-            task.wait(0.1) -- tunggu kamera stabil
+            task.wait(1) -- tunggu kamera stabil
             applyPOV()
         end
     end

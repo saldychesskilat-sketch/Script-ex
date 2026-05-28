@@ -533,10 +533,11 @@ end
 
 -- Konfigurasi warna objek (sama seperti referensi)
 local ObjectColors = {
-    Generator = Color3.fromRGB(255, 50, 50),
+    Generator = Color3.fromRGB(255, 165, 0), 
     Gate      = Color3.fromRGB(255, 255, 255),
     Pallet    = Color3.fromRGB(128, 128, 128),  
-    Hook      = Color3.fromRGB(255, 165, 0)
+    Hook      = Color3.fromRGB(255, 165, 0),
+    SCP       = Color3.fromRGB(150, 0, 255)    
 }
 
 -- Variabel ESP (global untuk script utama)
@@ -767,6 +768,8 @@ local function createObjectESP(obj, objType)
         color = ObjectColors.Gate
     elseif objType == "Pallet" then
         color = ObjectColors.Pallet
+    elseif objType == "scp" then
+        color = ObjectColors.Pallet
     end
     local highlight = applyHighlight(obj, color)
     generatorEspHighlights[obj] = highlight
@@ -804,6 +807,8 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "Hook")
         elseif name == "Gate" then
             createObjectESP(obj, "Gate")
+        elseif name == "scp" then
+            createObjectESP(obj, "scp")
         elseif name == "Pallet" or name == "Palletwrong" then
             createObjectESP(obj, "Pallet")
         end
@@ -821,6 +826,8 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "Hook")
     elseif name == "Gate" then
         createObjectESP(instance, "Gate")
+    elseif name == "scp" then
+        createObjectESP(instance, "scp")
     elseif name == "Pallet" or name == "Palletwrong" then
         createObjectESP(instance, "Pallet")
     end

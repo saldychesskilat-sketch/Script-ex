@@ -1811,33 +1811,131 @@ end
 --   di bagian lain script (jika tidak, perlu didefinisikan juga, tapi biasanya sudah ada).
 -- - Konfigurasi tetap menggunakan config.infiniteAmmoEnabled (toggle di GUI).
 -- ============================================================================
--- ============================================================================
--- FEATURE 8: SCRIPT RESTART (FIXED & ENHANCED with Speed Boost Cleanup)
--- ===========================================================================
 
-local function restartScript()
-    print("[Restart] Restarting all systems...")
-    if autoWinConnection then autoWinConnection:Disconnect(); autoWinConnection = nil end
-    if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
-    if currentBoostConnection then currentBoostConnection:Disconnect(); currentBoostConnection = nil end
-    if stealthConnection then stealthConnection:Disconnect(); stealthConnection = nil end
-    if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
-    if infiniteAmmoConnection then infiniteAmmoConnection:Disconnect(); infiniteAmmoConnection = nil end
-    if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
-    if tpwalkConnection then tpwalkConnection:Disconnect(); tpwalkConnection = nil end
-    if noCollideConnection then noCollideConnection:Disconnect(); noCollideConnection = nil end
-    if massKillLoopConnection then massKillLoopConnection:Disconnect(); massKillLoopConnection = nil end
-    if autoGeneratorLoopConnection then autoGeneratorLoopConnection:Disconnect(); autoGeneratorLoopConnection = nil end
-    if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end
-    if autoAimConnection then autoAimConnection:Disconnect(); autoAimConnection = nil end
-    isSpeedBoostActive = false; boostDebounce = false; isInvisible = false; isShieldActive = false; isTpwalkActive = false; isNoCollideActive = false
-    processedGenerators = {}; espHighlights = {}
-    if currentForceField then currentForceField:Destroy(); currentForceField = nil end
-    if localHumanoid and originalWalkSpeed then localHumanoid.WalkSpeed = originalWalkSpeed end
-    task.wait(0.5)
-    startAllSystems()
-    print("[Restart] All systems restarted successfully!")
+-- ============================================================================
+-- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS)
+-- ============================================================================
+-- Hapus atau komentari seluruh fungsi restartScript() yang lama.
+-- Tambahkan kode berikut di area yang sama (sebelum createGUI).
+
+-- Tambahkan di CONFIGURATION (setelah config lainnya, misalnya di dalam state.config)
+config.povEnabled = config.povEnabled or false
+
+-- Variabel untuk menyimpan nilai asli
+local originalFOV = nil
+local originalBrightness = nil
+local originalAmbient = nil
+local povConnection = nil
+
+-- Aktifkan POV
+local function enablePOV()
+    if not camera then return end
+    if originalFOV == nil then
+        originalFOV = camera.FieldOfView
+        originalBrightness = Lighting.Brightness
+        originalAmbient = Lighting.Ambient
+    end
+    camera.FieldOfView = math.clamp(originalFOV + 35, 70, 120)
+    Lighting.Brightness = 2.5
+    Lighting.Ambient = Color3.fromRGB(200, 200, 200)
+    Lighting.ClockTime = 14  -- siang hari
+    -- Efek partikel cahaya (opsional)
+    local lightPart = Instance.new("Part")
+    lightPart.Name = "CyberHeroes_LightEffect"
+    lightPart.Size = Vector3.new(10,10,10)
+    lightPart.Anchored = true
+    lightPart.CanCollide = false
+    lightPart.Transparency = 0.8
+    lightPart.BrickColor = BrickColor.new("Bright yellow")
+    lightPart.Material = Enum.Material.Neon
+    lightPart.Parent = workspace
+    povConnection = RunService.RenderStepped:Connect(function()
+        if not config.povEnabled then
+            if povConnection then povConnection:Disconnect() end
+            lightPart:Destroy()
+            return
+        end
+        if camera then lightPart.Position = camera.CFrame.Position end
+    end)
+    config.povEnabled = true
+    print("[POV] Zoom out + Brightness ON")
 end
+
+-- Nonaktifkan POV
+local function disablePOV()
+    if originalFOV then camera.FieldOfView = originalFOV end
+    if originalBrightness then Lighting.Brightness = originalBrightness end
+    if originalAmbient then Lighting.Ambient = originalAmbient end
+    Lighting.ClockTime = os.date("!*t").hour  -- waktu normal
+    if povConnection then povConnection:Disconnect(); povConnection = nil end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "CyberHeroes_LightEffect" then obj:Destroy() end
+    end
+    config.povEnabled = false
+    print("[POV] Zoom out + Brightness OFF")
+end
+
+-- Toggle POV
+local function togglePOV()
+    if config.povEnabled then disablePOV() else enablePOV() end
+end
+
+-- ============================================================================
+-- MODIFIKASI DI DALAM FUNGSI createGridButton (bagian callback)
+-- ============================================================================
+-- Pada bagian elseif, ganti yang sebelumnya untuk "restartScript" menjadi "povMode".
+-- Contoh potongan kode yang harus dimodifikasi (letakkan di dalam createGridButton):
+
+
+-- ============================================================================
+-- MODIFIKASI DI DALAM FUNGSI createGUI (daftar features)
+-- ============================================================================
+-- Ganti baris {name="restartScript", text="RESTART"} menjadi:
+-- {name="povMode", text="POV"}
+
+-- Sehingga daftar features menjadi:
+
+-- local features = {
+--     {name="autoWinEnabled", text="AUTO WIN"},
+--     {name="autoTaskEnabled", text="AUTO TASK"},
+--     {name="espEnabled", text="ESP"},
+--     {name="speedBoostEnabled", text="SPEED BOOST"},
+--     {name="stealthEnabled", text="STEALTH"},
+--     {name="godModeEnabled", text="GOD MODE"},
+--     {name="infiniteAmmoEnabled", text="INF AMMO"},
+--     {name="shieldEnabled", text="SHIELD"},
+--     {name="tpwalkEnabled", text="TPWALK"},
+--     {name="noCollideEnabled", text="NO COLLIDE"},
+--     {name="massKillEnabled", text="MASS KILL"},
+--     {name="autoGeneratorEnabled", text="AUTO GEN"},
+--     {name="autoSkillCheckEnabled", text="SKILL CHECK"},
+--     {name="autoAimEnabled", text="AUTO AIM"},
+--     {name="povMode", text="POV"}    -- <-- GANTI
+-- }
+
+-- ============================================================================
+-- MODIFIKASI FUNGSI restoreFeatureStates
+-- ============================================================================
+-- Tambahkan penanganan POV di akhir fungsi (sebelum print("[State]...")).
+
+--     if config.povEnabled then
+--         enablePOV()
+--     else
+--         disablePOV()
+--     end
+
+-- ============================================================================
+-- MODIFIKASI FUNGSI startAllSystems
+-- ============================================================================
+-- Tambahkan baris:
+
+--     if config.povEnabled then enablePOV() else disablePOV() end
+
+-- Di dalam startAllSystems() (bisa diletakkan di awal atau akhir, terserah).
+
+-- ============================================================================
+-- CATATAN: Jika ada panggilan restartScript() di tempat lain (misalnya di tombol GUI lain), hapus atau ganti dengan togglePOV().
+-- ============================================================================
 -- ============================================================================
 -- FEATURE 9: AUTO SHIELD (ForceField Protection - ALWAYS ACTIVE WHEN ENABLED)
 -- Tidak menggunakan trigger jarak killer. Shield aktif terus saat fitur dinyalakan.
@@ -3168,8 +3266,8 @@ local function createGridButton(parent, name, text, initialState, onChange)
         elseif name == "autoAimEnabled" then  
             config.autoAimEnabled = newState  
             if newState then startAutoAim() else stopAutoAim() end  
-        elseif name == "restartScript" then  
-            restartScript()  
+        elseif name == "povMode" then
+            togglePOV()
             return  
         end  
         updateState(newState)  
@@ -3398,7 +3496,7 @@ end
         {name="autoGeneratorEnabled", text="AUTO GEN"},  
         {name="autoSkillCheckEnabled", text="SKILL CHECK"},  
         {name="autoAimEnabled", text="AUTO AIM"},  
-        {name="restartScript", text="RESTART"}  
+        {name="povMode", text="POV"}  
     }  
     for _, feat in ipairs(features) do  
         local initialState = (feat.name ~= "restartScript") and config[feat.name] or false  
@@ -3603,6 +3701,11 @@ local function restoreFeatureStates()
 elseif not config.espEnabled and espConnection then
     stopESP()
 end
+    if config.povEnabled then
+         enablePOV()
+     else
+         disablePOV()
+     end
     
     print("[State] Feature state restoration complete")
 end
@@ -3670,6 +3773,7 @@ local function startAllSystems()
     if config.autoSkillCheckEnabled then startAutoSkillCheck() end
     if config.autoAimEnabled then startAutoAim() end
     if config.espEnabled then startESP() end
+    if config.povEnabled then enablePOV() else disablePOV() end
 end
 
 local function init()

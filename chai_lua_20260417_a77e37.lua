@@ -1813,12 +1813,12 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS)
+-- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================
 -- Hapus atau komentari seluruh fungsi restartScript() yang lama.
 -- Tambahkan kode berikut di area yang sama (sebelum createGUI).
 
--- Tambahkan di CONFIGURATION (setelah config lainnya, misalnya di dalam state.config)
+-- Tambahkan di CONFIGURATION (setelah config lainnya)
 config.povEnabled = config.povEnabled or false
 
 -- Variabel untuk menyimpan nilai asli
@@ -1826,9 +1826,11 @@ local originalFOV = nil
 local originalBrightness = nil
 local originalAmbient = nil
 local povConnection = nil
+local lightPart = nil
 
--- Aktifkan POV
-local function enablePOV()
+-- Fungsi untuk menerapkan efek POV (dipanggil berkala)
+local function applyPOV()
+    if not config.povEnabled then return end
     if not camera then return end
     if originalFOV == nil then
         originalFOV = camera.FieldOfView
@@ -1838,104 +1840,87 @@ local function enablePOV()
     camera.FieldOfView = math.clamp(originalFOV + 35, 70, 120)
     Lighting.Brightness = 2.5
     Lighting.Ambient = Color3.fromRGB(200, 200, 200)
-    Lighting.ClockTime = 14  -- siang hari
-    -- Efek partikel cahaya (opsional)
-    local lightPart = Instance.new("Part")
-    lightPart.Name = "CyberHeroes_LightEffect"
-    lightPart.Size = Vector3.new(10,10,10)
-    lightPart.Anchored = true
-    lightPart.CanCollide = false
-    lightPart.Transparency = 0.8
-    lightPart.BrickColor = BrickColor.new("Bright yellow")
-    lightPart.Material = Enum.Material.Neon
-    lightPart.Parent = workspace
+    Lighting.ClockTime = 14
+end
+
+-- Aktifkan POV (persistent, akan terus menjaga efek)
+local function enablePOV()
+    if povConnection then return end
+    
+    if camera then
+        if originalFOV == nil then
+            originalFOV = camera.FieldOfView
+            originalBrightness = Lighting.Brightness
+            originalAmbient = Lighting.Ambient
+        end
+    end
+    
+    -- Buat efek partikel cahaya (mengikuti kamera)
+    if not lightPart or not lightPart.Parent then
+        lightPart = Instance.new("Part")
+        lightPart.Name = "CyberHeroes_LightEffect"
+        lightPart.Size = Vector3.new(10,10,10)
+        lightPart.Anchored = true
+        lightPart.CanCollide = false
+        lightPart.Transparency = 0.8
+        lightPart.BrickColor = BrickColor.new("Bright yellow")
+        lightPart.Material = Enum.Material.Neon
+        lightPart.Parent = workspace
+    end
+    
+    -- Koneksi utama untuk menjaga efek setiap frame (agar tidak direset oleh game)
     povConnection = RunService.RenderStepped:Connect(function()
         if not config.povEnabled then
             if povConnection then povConnection:Disconnect() end
-            lightPart:Destroy()
+            povConnection = nil
+            if lightPart then lightPart:Destroy() end
             return
         end
-        if camera then lightPart.Position = camera.CFrame.Position end
+        applyPOV()
+        if camera and lightPart then
+            lightPart.Position = camera.CFrame.Position
+        end
     end)
+    
+    -- Juga tangani saat karakter berganti (respawn, masuk game) yang mungkin mereset kamera
+    local function onCharacterAdded()
+        if config.povEnabled then
+            task.wait(0.1) -- tunggu kamera stabil
+            applyPOV()
+        end
+    end
+    if localPlayer.Character then
+        onCharacterAdded()
+    end
+    localPlayer.CharacterAdded:Connect(onCharacterAdded)
+    
     config.povEnabled = true
-    print("[POV] Zoom out + Brightness ON")
+    print("[POV] Zoom out + Brightness ON (persistent)")
 end
 
 -- Nonaktifkan POV
 local function disablePOV()
-    if originalFOV then camera.FieldOfView = originalFOV end
-    if originalBrightness then Lighting.Brightness = originalBrightness end
-    if originalAmbient then Lighting.Ambient = originalAmbient end
-    Lighting.ClockTime = os.date("!*t").hour  -- waktu normal
-    if povConnection then povConnection:Disconnect(); povConnection = nil end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "CyberHeroes_LightEffect" then obj:Destroy() end
+    if povConnection then
+        povConnection:Disconnect()
+        povConnection = nil
     end
+    if originalFOV and camera then
+        camera.FieldOfView = originalFOV
+    end
+    if originalBrightness then
+        Lighting.Brightness = originalBrightness
+        Lighting.Ambient = originalAmbient
+    end
+    Lighting.ClockTime = os.date("!*t").hour  -- waktu normal
+    if lightPart then lightPart:Destroy() end
     config.povEnabled = false
     print("[POV] Zoom out + Brightness OFF")
 end
 
--- Toggle POV
 local function togglePOV()
     if config.povEnabled then disablePOV() else enablePOV() end
 end
 
--- ============================================================================
--- MODIFIKASI DI DALAM FUNGSI createGridButton (bagian callback)
--- ============================================================================
--- Pada bagian elseif, ganti yang sebelumnya untuk "restartScript" menjadi "povMode".
--- Contoh potongan kode yang harus dimodifikasi (letakkan di dalam createGridButton):
-
-
--- ============================================================================
--- MODIFIKASI DI DALAM FUNGSI createGUI (daftar features)
--- ============================================================================
--- Ganti baris {name="restartScript", text="RESTART"} menjadi:
--- {name="povMode", text="POV"}
-
--- Sehingga daftar features menjadi:
-
--- local features = {
---     {name="autoWinEnabled", text="AUTO WIN"},
---     {name="autoTaskEnabled", text="AUTO TASK"},
---     {name="espEnabled", text="ESP"},
---     {name="speedBoostEnabled", text="SPEED BOOST"},
---     {name="stealthEnabled", text="STEALTH"},
---     {name="godModeEnabled", text="GOD MODE"},
---     {name="infiniteAmmoEnabled", text="INF AMMO"},
---     {name="shieldEnabled", text="SHIELD"},
---     {name="tpwalkEnabled", text="TPWALK"},
---     {name="noCollideEnabled", text="NO COLLIDE"},
---     {name="massKillEnabled", text="MASS KILL"},
---     {name="autoGeneratorEnabled", text="AUTO GEN"},
---     {name="autoSkillCheckEnabled", text="SKILL CHECK"},
---     {name="autoAimEnabled", text="AUTO AIM"},
---     {name="povMode", text="POV"}    -- <-- GANTI
--- }
-
--- ============================================================================
--- MODIFIKASI FUNGSI restoreFeatureStates
--- ============================================================================
--- Tambahkan penanganan POV di akhir fungsi (sebelum print("[State]...")).
-
---     if config.povEnabled then
---         enablePOV()
---     else
---         disablePOV()
---     end
-
--- ============================================================================
--- MODIFIKASI FUNGSI startAllSystems
--- ============================================================================
--- Tambahkan baris:
-
---     if config.povEnabled then enablePOV() else disablePOV() end
-
--- Di dalam startAllSystems() (bisa diletakkan di awal atau akhir, terserah).
-
--- ============================================================================
--- CATATAN: Jika ada panggilan restartScript() di tempat lain (misalnya di tombol GUI lain), hapus atau ganti dengan togglePOV().
--- ============================================================================
 -- ============================================================================
 -- FEATURE 9: AUTO SHIELD (ForceField Protection - ALWAYS ACTIVE WHEN ENABLED)
 -- Tidak menggunakan trigger jarak killer. Shield aktif terus saat fitur dinyalakan.

@@ -527,12 +527,13 @@ end
 
 -- ============================================================================
 -- ============================================================================
+
 -- ============================================================================
--- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED
+-- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED (FIXED)
 -- Fitur: Transparansi lebih tinggi, warna SCP ungu, warna killer dinamis
 -- ============================================================================
 
--- Konfigurasi warna objek
+-- Konfigurasi warna objek (tetap lokal)
 local ObjectColors = {
     Generator = Color3.fromRGB(255, 165, 0), 
     Gate      = Color3.fromRGB(255, 255, 255),
@@ -541,33 +542,33 @@ local ObjectColors = {
     SCP       = Color3.fromRGB(150, 0, 255)      -- UNGU untuk SCP
 }
 
--- Mapping warna killer berdasarkan nama (dari data user)
+-- Mapping warna killer berdasarkan nama
 local KillerColors = {
-    ["Jeff"]       = Color3.fromRGB(255, 255, 255), -- Putih
-    ["Slasher"]    = Color3.fromRGB(0, 255, 0),     -- Hijau
-    ["Hidden"]     = Color3.fromRGB(0, 0, 0),       -- Hitam
-    ["Masked"]     = Color3.fromRGB(255, 0, 0),     -- Merah
-    ["Veil"]       = Color3.fromRGB(128, 0, 255),   -- Ungu
-    ["Stalker"]    = Color3.fromRGB(0, 0, 139),     -- Biru Dongker
-    ["Abysswalker"]= Color3.fromRGB(0, 255, 255),   -- Cyan
-    ["Cure"]       = Color3.fromRGB(255, 255, 224)  -- Putih Tulang
+    ["Jeff"]       = Color3.fromRGB(255, 255, 255),
+    ["Slasher"]    = Color3.fromRGB(0, 255, 0),
+    ["Hidden"]     = Color3.fromRGB(0, 0, 0),
+    ["Masked"]     = Color3.fromRGB(255, 0, 0),
+    ["Veil"]       = Color3.fromRGB(128, 0, 255),
+    ["Stalker"]    = Color3.fromRGB(0, 0, 139),
+    ["Abysswalker"]= Color3.fromRGB(0, 255, 255),
+    ["Cure"]       = Color3.fromRGB(255, 255, 224)
 }
-local defaultKillerColor = Color3.fromRGB(255, 50, 50)  -- fallback merah
+local defaultKillerColor = Color3.fromRGB(255, 50, 50)
 
--- Variabel ESP (global)
-espHighlights = espHighlights or {}
-generatorEspHighlights = generatorEspHighlights or {}
-espConnection = nil
-espDescendantAddedConn = nil
-espDescendantRemovingConn = nil
-espPlayerAddedConn = nil
-espPlayerRemovingConn = nil
-espProgressUpdateConn = nil
-espPeriodicScanConn = nil
-lastObjectScanTime = 0
-OBJECT_SCAN_INTERVAL = 2
+-- Variabel ESP (gunakan local, tidak mengganggu global)
+local espHighlights = {}
+local generatorEspHighlights = {}
+local espConnection = nil
+local espDescendantAddedConn = nil
+local espDescendantRemovingConn = nil
+local espPlayerAddedConn = nil
+local espPlayerRemovingConn = nil
+local espProgressUpdateConn = nil
+local espPeriodicScanConn = nil
+local lastObjectScanTime = 0
+local OBJECT_SCAN_INTERVAL = 2
 
--- Helper untuk mendapatkan nilai dari objek
+-- Helper
 local function getGameValue(obj, name)
     if not obj then return nil end
     local attr = obj:GetAttribute(name)
@@ -580,11 +581,9 @@ local function getGameValue(obj, name)
     return nil
 end
 
--- ============================================================================
--- FUNGSI HIGHLIGHT DENGAN TRANSPARANSI TINGGI (FILL)
--- ============================================================================
+-- Highlight dengan transparansi tinggi
 local function applyHighlight(object, color, fillTransparency)
-    fillTransparency = fillTransparency or 0.7   -- lebih transparan
+    fillTransparency = fillTransparency or 0.7
     local h = object:FindFirstChild("CyberHeroes_Highlight")
     if not h then
         h = Instance.new("Highlight")
@@ -592,7 +591,7 @@ local function applyHighlight(object, color, fillTransparency)
         h.FillColor = color
         h.OutlineColor = color
         h.FillTransparency = fillTransparency
-        h.OutlineTransparency = 0.1            -- outline tetap jelas
+        h.OutlineTransparency = 0.1
         h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         h.Parent = object
     else
@@ -605,7 +604,6 @@ local function applyHighlight(object, color, fillTransparency)
     return h
 end
 
--- Billboard untuk progress generator
 local function createProgressBillboard(generator, percent, color)
     local billboard = generator:FindFirstChild("GenBitchHook")
     if not billboard then
@@ -634,7 +632,6 @@ local function createProgressBillboard(generator, percent, color)
     return billboard
 end
 
--- Update progress generator (warna gradien)
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
@@ -657,7 +654,6 @@ local function updateGeneratorProgress(generator)
     return false
 end
 
--- Update semua progress generator
 local function updateAllGeneratorProgress()
     for obj, _ in pairs(generatorEspHighlights) do
         if obj and obj.Parent and (obj.Name == "Generator") then
@@ -666,22 +662,18 @@ local function updateAllGeneratorProgress()
     end
 end
 
--- ============================================================================
--- PLAYER ESP (dengan warna killer spesifik & transparansi tinggi)
--- ============================================================================
+-- Warna killer berdasarkan nama
 local function getKillerColor(player)
-    -- Cari nama killer dari player.Name atau display name
     local name = player.Name
-    -- Coba cocokkan dengan mapping (case-insensitive)
     for killerName, color in pairs(KillerColors) do
         if string.find(string.lower(name), string.lower(killerName)) then
             return color
         end
     end
-    -- Fallback ke default
     return defaultKillerColor
 end
 
+-- Player ESP
 local function createHighlightForPlayer(player)
     if espHighlights[player.UserId] then
         if espHighlights[player.UserId].Highlight then
@@ -717,17 +709,12 @@ local function createHighlightForPlayer(player)
     end
 
     local isKiller = getPlayerType()
-    local highlightColor
-    if isKiller then
-        highlightColor = getKillerColor(player)
-    else
-        highlightColor = config.highlightColorSurvivor  -- hijau untuk survivor
-    end
+    local highlightColor = isKiller and getKillerColor(player) or config.highlightColorSurvivor
 
     local highlight = Instance.new("Highlight")
     highlight.Name = "CyberHeroes_ESP"
     highlight.FillColor = highlightColor
-    highlight.FillTransparency = 0.7          -- lebih transparan
+    highlight.FillTransparency = 0.7
     highlight.OutlineColor = highlightColor
     highlight.OutlineTransparency = 0.1
     highlight.Adornee = character
@@ -789,9 +776,7 @@ local function updateAllESP()
     end
 end
 
--- ============================================================================
--- OBJECT ESP (Generator, Hook, Gate, Pallet, SCP)
--- ============================================================================
+-- Object ESP
 local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
     local color
@@ -804,11 +789,10 @@ local function createObjectESP(obj, objType)
     elseif objType == "Pallet" then
         color = ObjectColors.Pallet
     elseif objType == "scp" then
-        color = ObjectColors.SCP      -- ungu untuk SCP
+        color = ObjectColors.SCP
     end
-    local highlight = applyHighlight(obj, color, 0.7)  -- transparan
+    local highlight = applyHighlight(obj, color, 0.7)
     generatorEspHighlights[obj] = highlight
-
     if objType == "Generator" then
         updateGeneratorProgress(obj)
     end
@@ -831,7 +815,6 @@ local function clearObjectESP()
     generatorEspHighlights = {}
 end
 
--- Refresh object ESP
 local function refreshAllObjectESP()
     clearObjectESP()
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -851,7 +834,6 @@ local function refreshAllObjectESP()
     print("[ESP] Object ESP refreshed")
 end
 
--- Event handlers
 local function onDescendantAdded(instance)
     if not config.espEnabled then return end
     local name = instance.Name
@@ -874,7 +856,6 @@ local function onDescendantRemoving(instance)
     end
 end
 
--- Periodic scan
 local function periodicObjectScan()
     if not config.espEnabled then return end
     local now = tick()
@@ -932,7 +913,6 @@ local function startESP()
     espDescendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
 
     refreshAllObjectESP()
-
     espPeriodicScanConn = RunService.Heartbeat:Connect(periodicObjectScan)
     espProgressUpdateConn = RunService.Heartbeat:Connect(function()
         if config.espEnabled then
@@ -997,11 +977,6 @@ local function updateAllESP()
     end
 end
 
--- ============================================================================
--- CATATAN: Kode di atas menggantikan seluruh bagian ESP SYSTEM.
--- Fitur: Transparansi fill 0.7, outline 0.1; SCP berwarna ungu;
--- Killer memiliki warna spesifik berdasarkan nama (Jeff: putih, Slasher: hijau, dll)
--- ============================================================================
 
 -- ============================================================================
 -- TPWALK NAMESPACE

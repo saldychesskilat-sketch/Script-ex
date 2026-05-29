@@ -1,5 +1,4 @@
 
-
 -- ============================================================================
 -- GLOBAL STATE PERSISTENCE (getgenv)
 -- ============================================================================
@@ -577,14 +576,14 @@ local function applyHighlight(object, color)
         h.Name = "CyberHeroes_Highlight"
         h.FillColor = color
         h.OutlineColor = color
-        h.FillTransparency = 0.99          -- LEBIH TRANSPARAN (sebelumnya 0.5)
-        h.OutlineTransparency = 0.2        -- outline tetap jelas
+        h.FillTransparency = 1
+        h.OutlineTransparency = 0.2
         h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         h.Parent = object
     else
         h.FillColor = color
         h.OutlineColor = color
-        h.FillTransparency = 0.75
+        h.FillTransparency = 1
         h.OutlineTransparency = 0.2
     end
     h.Adornee = object
@@ -696,7 +695,7 @@ local function createHighlightForPlayer(player)
     highlight.Name = "CyberHeroes_ESP"
     highlight.FillColor = highlightColor
     highlight.OutlineColor = highlightColor
-    highlight.FillTransparency = 0.75          -- LEBIH TRANSPARAN
+    highlight.FillTransparency = 1
     highlight.OutlineTransparency = 0.2
     highlight.Adornee = character
     highlight.Parent = character

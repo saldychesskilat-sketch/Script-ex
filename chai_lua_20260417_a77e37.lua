@@ -577,7 +577,7 @@ local function applyHighlight(object, color)
         h.Name = "CyberHeroes_Highlight"
         h.FillColor = color
         h.OutlineColor = color
-        h.FillTransparency = 0.75          -- LEBIH TRANSPARAN (sebelumnya 0.5)
+        h.FillTransparency = 0.99          -- LEBIH TRANSPARAN (sebelumnya 0.5)
         h.OutlineTransparency = 0.2        -- outline tetap jelas
         h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         h.Parent = object

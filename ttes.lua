@@ -328,6 +328,9 @@ end
 -- ============================================================================
 -- GUI CREATION (TOMBIK TERPISAH UNTUK SETIAP VARIASI)
 -- ============================================================================
+ -- ============================================================================
+-- GUI CREATION (COMPACT VERSION - 2x SMALLER)
+-- ============================================================================
 local function createGUI()
     if screenGui then screenGui:Destroy() end
     
@@ -337,18 +340,18 @@ local function createGUI()
     screenGui.Parent = CoreGui
     screenGui.ResetOnSpawn = false
     
-    -- Main Frame
+    -- Main Frame (ukuran diperkecil: 340x260)
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainPanel"
-    mainFrame.Size = UDim2.new(0, 650, 0, 480)
-    mainFrame.Position = UDim2.new(0.5, -325, 0.5, -240)
+    mainFrame.Size = UDim2.new(0, 340, 0, 260)
+    mainFrame.Position = UDim2.new(0.5, -170, 0.5, -130)
     mainFrame.BackgroundColor3 = Color3.fromRGB(18, 2, 5)
     mainFrame.BackgroundTransparency = 0.05
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
     
     local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 10)
+    mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
     
     local mainStroke = Instance.new("UIStroke")
@@ -357,44 +360,44 @@ local function createGUI()
     mainStroke.Transparency = 0.4
     mainStroke.Parent = mainFrame
     
-    -- Title Bar
+    -- Title Bar (lebih kecil)
     local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.Size = UDim2.new(1, 0, 0, 24)
     titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
     titleBar.BackgroundTransparency = 0.2
     titleBar.BorderSizePixel = 0
     titleBar.Parent = mainFrame
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.CornerRadius = UDim.new(0, 8)
     titleCorner.Parent = titleBar
     
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(0.7, 0, 1, 0)
     title.Position = UDim2.new(0.02, 0, 0, 0)
-    title.Text = "🔧 PARRY REMOTE TESTER - VIOLENCE DISTRICT"
+    title.Text = "🔧 PARRY TESTER"
     title.TextColor3 = Color3.fromRGB(0, 230, 255)
     title.BackgroundTransparency = 1
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 12
+    title.TextSize = 10
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = titleBar
     
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 25, 0, 25)
-    closeBtn.Position = UDim2.new(1, -28, 0, 2)
+    closeBtn.Size = UDim2.new(0, 20, 0, 20)
+    closeBtn.Position = UDim2.new(1, -22, 0, 2)
     closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
     closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
     closeBtn.BackgroundTransparency = 0.2
     closeBtn.BorderSizePixel = 0
     closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 12
+    closeBtn.TextSize = 10
     closeBtn.Parent = titleBar
     closeBtn.MouseButton1Click:Connect(function()
         screenGui:Destroy()
     end)
     
-    -- Draggable
+    -- Draggable (tetap)
     local dragging = false
     local dragStart, startPos
     mainFrame.InputBegan:Connect(function(input)
@@ -417,52 +420,52 @@ local function createGUI()
         end
     end)
     
-    -- LEFT PANEL: DAFTAR TOMBOL TEST
+    -- LEFT PANEL (lebar 110)
     local leftPanel = Instance.new("Frame")
-    leftPanel.Size = UDim2.new(0, 220, 1, -40)
-    leftPanel.Position = UDim2.new(0, 5, 0, 35)
+    leftPanel.Size = UDim2.new(0, 110, 1, -30)
+    leftPanel.Position = UDim2.new(0, 4, 0, 28)
     leftPanel.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     leftPanel.BackgroundTransparency = 0.2
     leftPanel.BorderSizePixel = 0
     leftPanel.Parent = mainFrame
     local leftCorner = Instance.new("UICorner")
-    leftCorner.CornerRadius = UDim.new(0, 6)
+    leftCorner.CornerRadius = UDim.new(0, 5)
     leftCorner.Parent = leftPanel
     
     -- Scrolling frame untuk tombol
     local buttonScroll = Instance.new("ScrollingFrame")
-    buttonScroll.Size = UDim2.new(1, -10, 1, -10)
-    buttonScroll.Position = UDim2.new(0, 5, 0, 5)
+    buttonScroll.Size = UDim2.new(1, -6, 1, -6)
+    buttonScroll.Position = UDim2.new(0, 3, 0, 3)
     buttonScroll.BackgroundTransparency = 1
     buttonScroll.BorderSizePixel = 0
-    buttonScroll.ScrollBarThickness = 4
+    buttonScroll.ScrollBarThickness = 3
     buttonScroll.Parent = leftPanel
     
     local buttonLayout = Instance.new("UIListLayout")
-    buttonLayout.Padding = UDim.new(0, 4)
+    buttonLayout.Padding = UDim.new(0, 3)
     buttonLayout.FillDirection = Enum.FillDirection.Vertical
     buttonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     buttonLayout.Parent = buttonScroll
     
-    -- RIGHT PANEL: LOG OUTPUT
+    -- RIGHT PANEL (lebar 212)
     local rightPanel = Instance.new("Frame")
-    rightPanel.Size = UDim2.new(0, 410, 1, -40)
-    rightPanel.Position = UDim2.new(0, 230, 0, 35)
+    rightPanel.Size = UDim2.new(0, 212, 1, -30)
+    rightPanel.Position = UDim2.new(0, 118, 0, 28)
     rightPanel.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     rightPanel.BackgroundTransparency = 0.2
     rightPanel.BorderSizePixel = 0
     rightPanel.Parent = mainFrame
     local rightCorner = Instance.new("UICorner")
-    rightCorner.CornerRadius = UDim.new(0, 6)
+    rightCorner.CornerRadius = UDim.new(0, 5)
     rightCorner.Parent = rightPanel
     
     -- Log Scrolling Frame
     local logScroll = Instance.new("ScrollingFrame")
-    logScroll.Size = UDim2.new(1, -10, 1, -10)
-    logScroll.Position = UDim2.new(0, 5, 0, 5)
+    logScroll.Size = UDim2.new(1, -6, 1, -6)
+    logScroll.Position = UDim2.new(0, 3, 0, 3)
     logScroll.BackgroundTransparency = 1
     logScroll.BorderSizePixel = 0
-    logScroll.ScrollBarThickness = 4
+    logScroll.ScrollBarThickness = 3
     logScroll.Parent = rightPanel
     
     logFrame = Instance.new("Frame")
@@ -480,23 +483,20 @@ local function createGUI()
     end)
     
     -- ==========================================================================
-    -- DAFTAR TOMBOL DENGAN WARNA BERBEDA UNTUK SETIAP VARIASI
+    -- DAFTAR TOMBOL (ukuran lebih kecil)
     -- ==========================================================================
     
-    -- Kumpulan remote yang akan diuji (bisa dicari dulu atau pakai manual)
     local remotesToTest = {}
     
-    -- Cari remote otomatis
     local function refreshRemotes()
         remotesToTest = findPotentialRemotes()
-        addLog("🔍 Found " .. #remotesToTest .. " remote events")
+        addLog("🔍 Found " .. #remotesToTest .. " remotes")
         return remotesToTest
     end
     
-    -- Buat tombol untuk setiap variasi argumen
     local argVariantsList = {
         {args = {}, name = "NO ARGS", color = Color3.fromRGB(80, 80, 80), desc = "FireServer()"},
-        {args = {"Parrying Dagger"}, name = "PARRYING DAGGER", color = Color3.fromRGB(200, 100, 0), desc = 'FireServer("Parrying Dagger")'},
+        {args = {"Parrying Dagger"}, name = "PARRY DAGGER", color = Color3.fromRGB(200, 100, 0), desc = 'FireServer("Parrying Dagger")'},
         {args = {"block"}, name = "BLOCK", color = Color3.fromRGB(0, 150, 200), desc = 'FireServer("block")'},
         {args = {"deflect"}, name = "DEFLECT", color = Color3.fromRGB(100, 200, 100), desc = 'FireServer("deflect")'},
         {args = {"counter"}, name = "COUNTER", color = Color3.fromRGB(200, 200, 0), desc = 'FireServer("counter")'},
@@ -504,35 +504,35 @@ local function createGUI()
         {args = {"damage"}, name = "DAMAGE", color = Color3.fromRGB(255, 50, 50), desc = 'FireServer("damage")'},
         {args = {"hit"}, name = "HIT", color = Color3.fromRGB(200, 100, 150), desc = 'FireServer("hit")'},
         {args = {"Dagger"}, name = "DAGGER", color = Color3.fromRGB(150, 50, 200), desc = 'FireServer("Dagger")'},
-        {args = {"parry", true}, name = "PARRY + TRUE", color = Color3.fromRGB(255, 150, 0), desc = 'FireServer("parry", true)'},
-        {args = {"Block"}, name = "BLOCK (capital)", color = Color3.fromRGB(0, 200, 255), desc = 'FireServer("Block")'},
-        {args = {"Parry"}, name = "PARRY (capital)", color = Color3.fromRGB(255, 100, 100), desc = 'FireServer("Parry")'},
+        {args = {"parry", true}, name = "PARRY+TRUE", color = Color3.fromRGB(255, 150, 0), desc = 'FireServer("parry", true)'},
+        {args = {"Block"}, name = "BLOCK(C)", color = Color3.fromRGB(0, 200, 255), desc = 'FireServer("Block")'},
+        {args = {"Parry"}, name = "PARRY(C)", color = Color3.fromRGB(255, 100, 100), desc = 'FireServer("Parry")'},
         {args = {"parry"}, name = "PARRY", color = Color3.fromRGB(255, 200, 100), desc = 'FireServer("parry")'},
-        {args = {"parry", "start"}, name = "PARRY START", color = Color3.fromRGB(200, 100, 50), desc = 'FireServer("parry", "start")'},
-        {args = {"block", 1}, name = "BLOCK + 1", color = Color3.fromRGB(50, 150, 200), desc = 'FireServer("block", 1)'},
-        {args = {"deflect", "on"}, name = "DEFLECT ON", color = Color3.fromRGB(50, 200, 100), desc = 'FireServer("deflect", "on")'},
-        {args = {"counter", "activate"}, name = "COUNTER ACT", color = Color3.fromRGB(200, 150, 0), desc = 'FireServer("counter", "activate")'},
-        {args = {"skill", "parry"}, name = "SKILL PARRY", color = Color3.fromRGB(150, 100, 200), desc = 'FireServer("skill", "parry")'},
-        {args = {"ability", "block"}, name = "ABILITY BLOCK", color = Color3.fromRGB(100, 150, 200), desc = 'FireServer("ability", "block")'},
-        {args = {"use", "parry"}, name = "USE PARRY", color = Color3.fromRGB(200, 80, 120), desc = 'FireServer("use", "parry")'},
-        {args = {"activate", "block"}, name = "ACTIVATE BLOCK", color = Color3.fromRGB(80, 200, 150), desc = 'FireServer("activate", "block")'},
+        {args = {"parry", "start"}, name = "PARRY START", color = Color3.fromRGB(200, 100, 50), desc = 'FireServer("parry","start")'},
+        {args = {"block", 1}, name = "BLOCK+1", color = Color3.fromRGB(50, 150, 200), desc = 'FireServer("block",1)'},
+        {args = {"deflect", "on"}, name = "DEFLECT ON", color = Color3.fromRGB(50, 200, 100), desc = 'FireServer("deflect","on")'},
+        {args = {"counter", "activate"}, name = "COUNTER ACT", color = Color3.fromRGB(200, 150, 0), desc = 'FireServer("counter","activate")'},
+        {args = {"skill", "parry"}, name = "SKILL PARRY", color = Color3.fromRGB(150, 100, 200), desc = 'FireServer("skill","parry")'},
+        {args = {"ability", "block"}, name = "ABILITY BLK", color = Color3.fromRGB(100, 150, 200), desc = 'FireServer("ability","block")'},
+        {args = {"use", "parry"}, name = "USE PARRY", color = Color3.fromRGB(200, 80, 120), desc = 'FireServer("use","parry")'},
+        {args = {"activate", "block"}, name = "ACTIVATE BLK", color = Color3.fromRGB(80, 200, 150), desc = 'FireServer("activate","block")'},
     }
     
-    -- Tombol "Scan Remotes" (refresh daftar remote)
+    -- Tombol Scan
     local scanBtn = Instance.new("TextButton")
-    scanBtn.Size = UDim2.new(0.9, 0, 0, 30)
-    scanBtn.Text = "🔍 SCAN & FIND REMOTES"
+    scanBtn.Size = UDim2.new(0.9, 0, 0, 24)
+    scanBtn.Text = "🔍 SCAN"
     scanBtn.BackgroundColor3 = Color3.fromRGB(30, 20, 50)
     scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     scanBtn.Font = Enum.Font.GothamBold
-    scanBtn.TextSize = 11
+    scanBtn.TextSize = 9
     scanBtn.Parent = buttonScroll
     local scanCorner = Instance.new("UICorner")
-    scanCorner.CornerRadius = UDim.new(0, 4)
+    scanCorner.CornerRadius = UDim.new(0, 3)
     scanCorner.Parent = scanBtn
     scanBtn.MouseButton1Click:Connect(function()
         refreshRemotes()
-        addLog("📡 Remotes found: " .. #remotesToTest)
+        addLog("📡 Remotes: " .. #remotesToTest)
         for _, r in ipairs(remotesToTest) do
             addLog("   - " .. r.Name)
         end
@@ -545,50 +545,48 @@ local function createGUI()
     sep.BackgroundTransparency = 0.5
     sep.Parent = buttonScroll
     
-    -- Tombol Auto Test All
+    -- Tombol Auto Test
     local autoTestBtn = Instance.new("TextButton")
-    autoTestBtn.Size = UDim2.new(0.9, 0, 0, 30)
-    autoTestBtn.Text = "⚡ AUTO TEST ALL REMOTES"
+    autoTestBtn.Size = UDim2.new(0.9, 0, 0, 24)
+    autoTestBtn.Text = "⚡ AUTO TEST"
     autoTestBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
     autoTestBtn.TextColor3 = Color3.fromRGB(255, 200, 100)
     autoTestBtn.Font = Enum.Font.GothamBold
-    autoTestBtn.TextSize = 11
+    autoTestBtn.TextSize = 9
     autoTestBtn.Parent = buttonScroll
     local autoCorner = Instance.new("UICorner")
-    autoCorner.CornerRadius = UDim.new(0, 4)
+    autoCorner.CornerRadius = UDim.new(0, 3)
     autoCorner.Parent = autoTestBtn
     autoTestBtn.MouseButton1Click:Connect(function()
         if #remotesToTest == 0 then
-            addLog("⚠️ No remotes found! Please scan first.")
+            addLog("⚠️ Scan first!")
             return
         end
         testAllRemotes()
     end)
     
-    -- Separator lagi
     local sep2 = Instance.new("Frame")
     sep2.Size = UDim2.new(0.9, 0, 0, 1)
     sep2.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
     sep2.BackgroundTransparency = 0.5
     sep2.Parent = buttonScroll
     
-    -- Tombol untuk setiap variasi argumen (menggunakan remote pertama yang ditemukan)
+    -- Tombol variasi (height 22, font 8)
     local function createVariationButton(variant)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.9, 0, 0, 32)
+        btn.Size = UDim2.new(0.9, 0, 0, 22)
         btn.Text = variant.name
         btn.BackgroundColor3 = variant.color
         btn.BackgroundTransparency = 0.3
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 10
+        btn.TextSize = 8
         btn.Parent = buttonScroll
         
         local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 4)
+        btnCorner.CornerRadius = UDim.new(0, 3)
         btnCorner.Parent = btn
         
-        -- Tooltip (desc) bisa di hover
         btn.MouseEnter:Connect(function()
             TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundTransparency = 0.1}):Play()
             addLog("ℹ️ " .. variant.desc)
@@ -599,38 +597,35 @@ local function createGUI()
         
         btn.MouseButton1Click:Connect(function()
             if #remotesToTest == 0 then
-                addLog("⚠️ No remotes found! Please scan first.")
+                addLog("⚠️ Scan first!")
                 return
             end
-            -- Gunakan remote pertama yang ditemukan, atau bisa juga loop semua
             local targetRemote = remotesToTest[1]
             if targetRemote then
-                addLog("🎯 Testing on remote: " .. targetRemote.Name)
+                addLog("🎯 Testing: " .. targetRemote.Name)
                 testSingleRemote(targetRemote, variant.args, variant.name)
             else
-                addLog("❌ No remote available")
+                addLog("❌ No remote")
             end
         end)
-        
         return btn
     end
     
-    -- Buat tombol untuk setiap variasi
     for _, variant in ipairs(argVariantsList) do
         createVariationButton(variant)
     end
     
-    -- Tombol Clear Log
+    -- Clear Log
     local clearBtn = Instance.new("TextButton")
-    clearBtn.Size = UDim2.new(0.9, 0, 0, 28)
-    clearBtn.Text = "🗑️ CLEAR LOG"
+    clearBtn.Size = UDim2.new(0.9, 0, 0, 22)
+    clearBtn.Text = "🗑️ CLEAR"
     clearBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
     clearBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
     clearBtn.Font = Enum.Font.GothamBold
-    clearBtn.TextSize = 10
+    clearBtn.TextSize = 8
     clearBtn.Parent = buttonScroll
     local clearCorner = Instance.new("UICorner")
-    clearCorner.CornerRadius = UDim.new(0, 4)
+    clearCorner.CornerRadius = UDim.new(0, 3)
     clearCorner.Parent = clearBtn
     clearBtn.MouseButton1Click:Connect(function()
         for _, log in ipairs(logList) do
@@ -640,38 +635,31 @@ local function createGUI()
         addLog("📋 Log cleared")
     end)
     
-    -- Status info di bawah log
+    -- Status bar di bawah
     local statusBar = Instance.new("Frame")
-    statusBar.Size = UDim2.new(1, -10, 0, 20)
-    statusBar.Position = UDim2.new(0, 5, 1, -22)
+    statusBar.Size = UDim2.new(1, -8, 0, 18)
+    statusBar.Position = UDim2.new(0, 4, 1, -20)
     statusBar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
     statusBar.BackgroundTransparency = 0.3
     statusBar.BorderSizePixel = 0
     statusBar.Parent = mainFrame
     local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 4)
+    statusCorner.CornerRadius = UDim.new(0, 3)
     statusCorner.Parent = statusBar
     
     local statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(1, -10, 1, 0)
-    statusLabel.Position = UDim2.new(0, 5, 0, 0)
-    statusLabel.Text = "Ready. Click SCAN to find remotes, then test each button."
+    statusLabel.Size = UDim2.new(1, -8, 1, 0)
+    statusLabel.Position = UDim2.new(0, 4, 0, 0)
+    statusLabel.Text = "Ready. Scan → test buttons."
     statusLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
     statusLabel.BackgroundTransparency = 1
     statusLabel.Font = Enum.Font.Gotham
-    statusLabel.TextSize = 9
+    statusLabel.TextSize = 8
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Parent = statusBar
     
-    -- Log awal
-    addLog("🧪 Parry Remote Tester v1.0 - Violence District")
-    addLog("💡 Click 'SCAN & FIND REMOTES' to discover remote events")
-    addLog("🎯 Then click any colored button to test that argument variation")
-    addLog("🟢 GREEN/SUCCESS = remote accepted (may produce sound/effect)")
-    addLog("🔴 RED/FAILED = remote rejected or no response")
-    addLog("")
-    addLog("⚡ Press F5 to toggle this GUI")
-    
+    addLog("🧪 PARRY TESTER (compact)")
+    addLog("💡 Click SCAN, then test each colored button")
     refreshRemotes()
 end
 

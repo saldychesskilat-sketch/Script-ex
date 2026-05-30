@@ -1678,7 +1678,7 @@ local function findParryRemoteEvent()
         return cachedParryRemote
     end
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and obj.Name == "ParryingDagger" then
+        if obj:IsA("RemoteEvent") and obj.Name == "Parrying Dagger" then
             cachedParryRemote = obj
             print("[AutoParry] Found ParryDagger remote event")
             return obj

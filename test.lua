@@ -158,7 +158,7 @@ end
 local function fireRemoteEvents(remoteEvents)
     for _, remote in ipairs(remoteEvents) do
         pcall(function() remote:FireServer() end)
-        pcall(function() remote:FireServer("parry") end)
+        pcall(function() remote:FireServer("Parrying Dagger") end)
         pcall(function() remote:FireServer("block") end)
         pcall(function() remote:FireServer("deflect") end)
         pcall(function() remote:FireServer("counter") end)

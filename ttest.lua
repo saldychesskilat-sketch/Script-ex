@@ -729,21 +729,6 @@ local function init()
     print("╚═══════════════════════════════════════════════════════════════════╝")
     createGUI()
 end
-
--- ============================================================================
--- KEYBIND TOGGLE
--- ============================================================================
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.F5 then
-        if screenGui and screenGui.Parent then
-            if isContinuous then stopContinuousMode() end
-            screenGui:Destroy()
-        else
-            createGUI()
-        end
-    end
-end)
-
+createGUI()
 task.wait(1)
 init()

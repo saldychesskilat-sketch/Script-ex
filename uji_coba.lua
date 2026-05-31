@@ -1666,49 +1666,44 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (BY CLIENT - NO CLIENT COOLDOWN)
--- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (UJI COBA ARGUMEN RAHASIA & TIME MANIPULATION)
+-- Mencari argumen yang mungkin memiliki cooldown terpisah atau bug waktu server.
 -- ============================================================================
 
 -- Cache remote event parry
 local cachedParryRemote = nil
+local cachedParryResultRemote = nil
 
--- Cari remote event "parry" di path yang benar
+-- Cari remote event "parry" dan "parryResult"
 local function findParryRemoteEvent()
     if cachedParryRemote and cachedParryRemote.Parent then
         return cachedParryRemote
     end
     
-    -- Coba akses langsung melalui path yang diketahui
     local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")
     if parryRemote then
         parryRemote = parryRemote:FindFirstChild("Items")
         if parryRemote then
             parryRemote = parryRemote:FindFirstChild("Parrying Dagger")
             if parryRemote then
-                parryRemote = parryRemote:FindFirstChild("parry")
-                if parryRemote and parryRemote:IsA("RemoteEvent") then
-                    cachedParryRemote = parryRemote
-                    print("[AutoParry] Found parry remote event at correct path")
-                    return parryRemote
+                local parry = parryRemote:FindFirstChild("parry")
+                if parry and parry:IsA("RemoteEvent") then
+                    cachedParryRemote = parry
+                    print("[AutoParry] Found parry remote")
                 end
+                local parryResult = parryRemote:FindFirstChild("parryResult")
+                if parryResult and parryResult:IsA("RemoteEvent") then
+                    cachedParryResultRemote = parryResult
+                    print("[AutoParry] Found parryResult remote")
+                end
+                return cachedParryRemote
             end
         end
     end
-    
-    -- Fallback: scan semua RemoteEvent di ReplicatedStorage
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and obj.Name == "parry" then
-            cachedParryRemote = obj
-            print("[AutoParry] Found parry remote event via scan:", obj.Name)
-            return obj
-        end
-    end
-    
     return nil
 end
 
--- Cari item Parrying Dagger di inventory player (Backpack atau Character)
+-- Cari item Parrying Dagger
 local function getParryingDaggerTool()
     local backpack = localPlayer:FindFirstChild("Backpack")
     local character = localPlayer.Character
@@ -1729,56 +1724,172 @@ local function getParryingDaggerTool()
     return nil
 end
 
--- Kirim remote event parry dengan argumen yang benar (tanpa cooldown client)
-local function fireParryRemote(targetPlayer)
-    local remote = findParryRemoteEvent()
-    if not remote then
-        print("[AutoParry] Parry remote not found!")
-        return false
-    end
-    
-    local dagger = getParryingDaggerTool()
-    
-    -- Variasi argumen yang mungkin diterima (urutan prioritas)
-    local argsVariants = {
-        {dagger},                     -- objek tool (jika ada)
-        {"Parrying Dagger"},          -- string nama item
-        {"parry"},
-        {"block"},
-        {dagger, targetPlayer},       -- tool + target
-        {"Parrying Dagger", targetPlayer},
-        {}                            -- tanpa argumen
-    }
-    
-    -- Jika tidak punya dagger, hapus varian yang menggunakan objek tool
-    if not dagger then
-        for i = #argsVariants, 1, -1 do
-            local args = argsVariants[i]
-            if #args > 0 and type(args[1]) == "userdata" then
-                table.remove(argsVariants, i)
-            end
-        end
-    end
-    
-    -- Kirim semua variasi argumen dalam satu loop (tanpa jeda cooldown client)
-    for _, args in ipairs(argsVariants) do
-        pcall(function()
-            if #args == 0 then
-                remote:FireServer()
-            elseif #args == 1 then
-                remote:FireServer(args[1])
-            elseif #args == 2 then
-                remote:FireServer(args[1], args[2])
+-- ============================================================================
+-- METODE 1: Mencari Argumen Rahasia
+-- Daftar argumen yang akan diuji (termasuk angka, string, dan kombinasi)
+-- ============================================================================
+local secretArgsList = {
+    -- Argumen umum (sudah ada)
+    {"Parrying Dagger"},
+    {"parry"},
+    {"block"},
+    {},
+    -- Argumen rahasia / percobaan
+    {"success"},
+    {"fail"},
+    {"complete"},
+    {"ready"},
+    {"parry", "success"},
+    {"block", "success"},
+    {"parry", 0},
+    {"parry", 1},
+    {"parry", -1},
+    {"parry", 999999},
+    {"parry", "reset"},
+    {"parry", "cooldown"},
+    {"parry", "bypass"},
+    {"parry", "test"},
+    {"debug"},
+    {"admin"},
+    {"true"},
+    {"false"},
+    {true},
+    {false},
+    {0},
+    {9999999999},
+    {-9999999999},
+    {"Parrying Dagger", "parry"},
+    {"Blade"},
+    {"Parrying Dagger", "block"},
+    {"Parrying Dagger", 1},
+    {"Parrying Dagger", 0},
+    {"Parrying Dagger", "success"},
+    {"Parrying Dagger", "fail"},
+    {"Parrying Dagger", "reset"},
+    {"parry", "force"},
+    {"block", "force"},
+    {"parry", "no_cooldown"},
+}
+
+-- ============================================================================
+-- METODE 2: Memutus Siklus Waktu Server (mengirim nilai waktu palsu sebagai argumen)
+-- Argumen yang berisi nilai waktu besar/negatif, serta argumen tambahan
+-- ============================================================================
+local timeManipulationArgs = {
+    -- Mengirim nilai tick() palsu sebagai argumen pertama atau kedua
+    { -9999999999 },
+    { 999999999999 },
+    { math.huge },
+    { -math.huge },
+    { "0" },
+    { "-9999999999" },
+    { "999999999999" },
+    -- Kombinasi dengan argumen normal + waktu palsu
+    {"Parrying Dagger", -9999999999},
+    {"parry", 999999999999},
+    {"block", math.huge},
+    {"Parrying Dagger", "parry", -9999999999},
+    {"parry", "block", 999999999999},
+    -- Mengirim waktu sebagai string yang bisa di-parse server
+    {"parry", "time", tostring(-1e12)},
+    {"Parrying Dagger", "timestamp", "0"},
+}
+
+-- Gabungkan semua argumen untuk diuji
+local allTestArgs = {}
+for _, v in ipairs(secretArgsList) do table.insert(allTestArgs, v) end
+for _, v in ipairs(timeManipulationArgs) do table.insert(allTestArgs, v) end
+
+-- Variabel untuk menyimpan hasil uji (argumen yang berhasil memicu parry tanpa cooldown)
+local successfulArgs = {}
+local testedIndex = 0
+local isTesting = false
+
+-- Pasang listener untuk parryResult (mendeteksi respon server)
+local function setupParryResultListener()
+    if cachedParryResultRemote then
+        cachedParryResultRemote.OnClientEvent:Connect(function(...)
+            local args = {...}
+            print("[AutoParry] parryResult received:", table.concat(args, ", "))
+            -- Jika server mengirim indikasi sukses, kita catat argumen yang digunakan saat itu
+            -- (perlu menyimpan argumen terakhir yang dikirim)
+            if lastTestedArgs then
+                local successStr = table.concat(lastTestedArgs, ", ")
+                print("[AutoParry] SUCCESS with args:", successStr)
+                table.insert(successfulArgs, lastTestedArgs)
             end
         end)
     end
+end
+
+-- Fungsi untuk mengirim remote dengan argumen tertentu
+local function fireParryRemoteWithArgs(args)
+    local remote = findParryRemoteEvent()
+    if not remote then return false end
     
+    pcall(function()
+        if #args == 0 then
+            remote:FireServer()
+        elseif #args == 1 then
+            remote:FireServer(args[1])
+        elseif #args == 2 then
+            remote:FireServer(args[1], args[2])
+        elseif #args == 3 then
+            remote:FireServer(args[1], args[2], args[3])
+        else
+            remote:FireServer(unpack(args))
+        end
+    end)
     return true
 end
 
+-- Variabel untuk menyimpan argumen yang sedang diuji
+local lastTestedArgs = nil
+
+-- Fungsi pengujian otomatis (loop melalui semua argumen)
+local function runAllTests()
+    if isTesting then
+        print("[AutoParry] Test already running")
+        return
+    end
+    isTesting = true
+    testedIndex = 0
+    successfulArgs = {}
+    
+    print("[AutoParry] Starting comprehensive test of", #allTestArgs, "argument variations")
+    
+    local function testNext()
+        testedIndex = testedIndex + 1
+        if testedIndex > #allTestArgs then
+            print("[AutoParry] Test completed. Successful args found:", #successfulArgs)
+            for i, args in ipairs(successfulArgs) do
+                print("  ", i, table.concat(args, ", "))
+            end
+            isTesting = false
+            return
+        end
+        
+        local args = allTestArgs[testedIndex]
+        lastTestedArgs = args
+        local argsStr = table.concat(args, ", ")
+        print(string.format("[AutoParry] Testing %d/%d: %s", testedIndex, #allTestArgs, argsStr))
+        
+        fireParryRemoteWithArgs(args)
+        
+        -- Tunggu sebentar untuk mendeteksi respon server
+        task.wait(0.3)
+        -- Lanjutkan ke test berikutnya
+        task.spawn(testNext)
+    end
+    
+    testNext()
+end
+
 -- ============================================================================
--- AUTO PARRY MAIN LOOP (tanpa client cooldown)
+-- MODIFIKASI AUTO PARRY LOOP (tetap ada, tapi bisa diganti dengan mode test)
 -- ============================================================================
+local lastParryTime = 0
+local PARRY_COOLDOWN = 0.15
 
 local function getKillerDistance()
     if not localRootPart then return math.huge end
@@ -1813,6 +1924,8 @@ local function getKillerDistance()
     return minDist
 end
 
+-- Auto parry loop normal (menggunakan argumen yang sudah diketahui berhasil dari test)
+-- Atau tetap menggunakan variasi argumen rahasia secara acak? Kita buat mode adaptive.
 local function autoParryLoop()
     if not config.infiniteAmmoEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
@@ -1820,53 +1933,42 @@ local function autoParryLoop()
     local killerDist = getKillerDistance()
     if killerDist > 15 then return end
 
-    -- Cari target killer terdekat
-    local targetPlayer = nil
-    local minDist = math.huge
-    local localPos = localRootPart.Position
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then
-                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
-                end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                        isKiller = true
-                    end
-                end
-                if isKiller then
-                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if root then
-                        local dist = (localPos - root.Position).Magnitude
-                        if dist < minDist then
-                            minDist = dist
-                            targetPlayer = player
-                        end
-                    end
-                end
-            end
-        end
-    end
+    local now = tick()
+    if now - lastParryTime < PARRY_COOLDOWN then return end
+    lastParryTime = now
 
-    -- Kirim remote event tanpa cooldown client (akan dieksekusi setiap frame)
-    if targetPlayer then
-        fireParryRemote(targetPlayer)
+    -- Jika ada argumen sukses dari test, gunakan itu. Jika tidak, gunakan argumen rahasia secara acak.
+    local argsToUse = nil
+    if #successfulArgs > 0 then
+        argsToUse = successfulArgs[math.random(1, #successfulArgs)]
+    else
+        -- Pilih salah satu argumen rahasia untuk dicoba (acak)
+        argsToUse = allTestArgs[math.random(1, #allTestArgs)]
+    end
+    
+    if argsToUse then
+        fireParryRemoteWithArgs(argsToUse)
+    else
+        -- Fallback ke argumen default
+        local dagger = getParryingDaggerTool()
+        if dagger then
+            fireParryRemoteWithArgs({dagger})
+        else
+            fireParryRemoteWithArgs({"Parrying Dagger"})
+        end
     end
 end
 
 -- ============================================================================
--- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)
+-- START / STOP AUTO PARRY
 -- ============================================================================
 local infiniteAmmoConnection = nil
 
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
+    setupParryResultListener()
     infiniteAmmoConnection = RunService.Heartbeat:Connect(autoParryLoop)
-    print("[AutoParry] Started (no client cooldown, firing every frame)")
+    print("[AutoParry] Started with argument rotation (testing mode available)")
 end
 
 local function stopInfiniteAmmo()

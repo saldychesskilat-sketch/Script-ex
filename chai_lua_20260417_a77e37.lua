@@ -1797,7 +1797,7 @@ end
 -- AUTO PARRY MAIN LOOP
 -- ============================================================================
 local lastParryTime = 0
-local PARRY_COOLDOWN = 0.15
+local PARRY_COOLDOWN = 2
 
 local function getKillerDistance()
     if not localRootPart then return math.huge end
@@ -1837,7 +1837,7 @@ local function autoParryLoop()
     if not getLocalCharacter() or not localRootPart then return end
 
     local killerDist = getKillerDistance()
-    if killerDist > 10 then return end
+    if killerDist > 15 then return end
 
     local now = tick()
     if now - lastParryTime < PARRY_COOLDOWN then return end

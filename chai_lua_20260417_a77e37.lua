@@ -1666,41 +1666,62 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - USING PARRYDAGGER REMOTE EVENT + BLADE ITEM)
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - USING CORRECT REMOTE EVENT)
+-- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
 -- ============================================================================
 
--- Cache remote event ParryDagger
+-- Cache remote event parry
 local cachedParryRemote = nil
 
--- Cari remote event "ParryDagger" di ReplicatedStorage
+-- Cari remote event "parry" di path yang benar
 local function findParryRemoteEvent()
     if cachedParryRemote and cachedParryRemote.Parent then
         return cachedParryRemote
     end
+    
+    -- Coba akses langsung melalui path yang diketahui
+    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")
+    if parryRemote then
+        parryRemote = parryRemote:FindFirstChild("Items")
+        if parryRemote then
+            parryRemote = parryRemote:FindFirstChild("Parrying Dagger")
+            if parryRemote then
+                parryRemote = parryRemote:FindFirstChild("parry")
+                if parryRemote and parryRemote:IsA("RemoteEvent") then
+                    cachedParryRemote = parryRemote
+                    print("[AutoParry] Found parry remote event at correct path")
+                    return parryRemote
+                end
+            end
+        end
+    end
+    
+    -- Fallback: scan semua RemoteEvent di ReplicatedStorage
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and obj.Name == "Parrying Dagger" then
+        if obj:IsA("RemoteEvent") and obj.Name == "parry" then
             cachedParryRemote = obj
-            print("[AutoParry] Found ParryDagger remote event")
+            print("[AutoParry] Found parry remote event via scan:", obj.Name)
             return obj
         end
     end
+    
     return nil
 end
 
--- Cari item Blade di inventory player (Backpack atau Character)
-local function getBladeTool()
+-- Cari item Parrying Dagger di inventory player (Backpack atau Character)
+local function getParryingDaggerTool()
     local backpack = localPlayer:FindFirstChild("Backpack")
     local character = localPlayer.Character
     if backpack then
         for _, tool in ipairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") and tool.Name == "Blade" then
+            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then
                 return tool
             end
         end
     end
     if character then
         for _, tool in ipairs(character:GetChildren()) do
-            if tool:IsA("Tool") and tool.Name == "Blade" then
+            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then
                 return tool
             end
         end
@@ -1708,51 +1729,76 @@ local function getBladeTool()
     return nil
 end
 
--- Kirim remote event ParryDagger dengan item Blade (bypass cooldown)
+-- Kirim remote event parry dengan argumen yang benar
 local function fireParryRemote(targetPlayer)
     local remote = findParryRemoteEvent()
     if not remote then
+        print("[AutoParry] Parry remote not found!")
         return false
     end
-    local blade = getBladeTool()
-    if not blade then
-        -- Jika tidak punya Blade, coba tetap kirim dengan nama item "Blade"
-        pcall(function()
-            remote:FireServer("Blade", targetPlayer)
-        end)
-        return true
-    else
-        pcall(function()
-            remote:FireServer(blade, targetPlayer)
-        end)
-        return true
+    
+    local dagger = getParryingDaggerTool()
+    
+    -- Variasi argumen yang mungkin diterima (urutan prioritas)
+    local argsVariants = {
+        {dagger},                     -- objek tool (jika ada)
+        {"Parrying Dagger"},          -- string nama item
+        {"parry"},
+        {"block"},
+        {dagger, targetPlayer},       -- tool + target
+        {"Parrying Dagger", targetPlayer},
+        {}                            -- tanpa argumen
+    }
+    
+    -- Jika tidak punya dagger, hapus varian yang menggunakan objek tool
+    if not dagger then
+        for i = #argsVariants, 1, -1 do
+            local args = argsVariants[i]
+            if #args > 0 and type(args[1]) == "userdata" then
+                table.remove(argsVariants, i)
+            end
+        end
     end
+    
+    local success = false
+    for _, args in ipairs(argsVariants) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            elseif #args == 1 then
+                remote:FireServer(args[1])
+            elseif #args == 2 then
+                remote:FireServer(args[1], args[2])
+            end
+        end)
+        success = true
+    end
+    
+    return success
 end
 
--- Fallback: tetap pakai remote event meskipun tidak ada Blade (bypass cooldown dengan multiple fire)
+-- Fallback: fire multiple times untuk bypass cooldown
 local function fallbackParry()
     local remote = findParryRemoteEvent()
-    if remote then
-        -- Fire multiple times to bypass cooldown (beberapa game memiliki cooldown berdasarkan frekuensi)
-        for i = 1, 3 do
-            pcall(function()
-                remote:FireServer("Blade", nil)
-            end)
-            task.wait(0.01)
-        end
-        return true
+    if not remote then return false end
+    
+    for i = 1, 3 do
+        pcall(function()
+            remote:FireServer()
+            remote:FireServer("Parrying Dagger")
+            remote:FireServer("parry")
+        end)
+        task.wait(0.01)
     end
-    return false
+    return true
 end
 
 -- ============================================================================
--- AUTO PARRY MAIN LOOP (menggunakan ParryDagger remote event)
+-- AUTO PARRY MAIN LOOP
 -- ============================================================================
 local lastParryTime = 0
-local PARRY_COOLDOWN = 0.15  -- interval minimal (0.15 detik)
+local PARRY_COOLDOWN = 0.15
 
--- Fungsi untuk mendapatkan jarak killer terdekat (harus sudah ada di script)
--- Jika belum ada, kita buat lokal
 local function getKillerDistance()
     if not localRootPart then return math.huge end
     local localPos = localRootPart.Position
@@ -1787,19 +1833,17 @@ local function getKillerDistance()
 end
 
 local function autoParryLoop()
-    if not config.infiniteAmmoEnabled then return end  -- menggunakan toggle INF AMMO
+    if not config.infiniteAmmoEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    -- Deteksi jarak killer terdekat
     local killerDist = getKillerDistance()
-    if killerDist > 15 then return end  -- radius 15 studs
+    if killerDist > 15 then return end
 
-    -- Cegah terlalu sering
     local now = tick()
     if now - lastParryTime < PARRY_COOLDOWN then return end
     lastParryTime = now
 
-    -- Cari target killer terdekat (untuk argument remote)
+    -- Cari target killer terdekat
     local targetPlayer = nil
     local minDist = math.huge
     local localPos = localRootPart.Position
@@ -1831,7 +1875,6 @@ local function autoParryLoop()
         end
     end
 
-    -- Kirim remote event ParryDagger dengan item Blade
     if targetPlayer then
         fireParryRemote(targetPlayer)
     else
@@ -1847,7 +1890,7 @@ local infiniteAmmoConnection = nil
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
     infiniteAmmoConnection = RunService.Heartbeat:Connect(autoParryLoop)
-    print("[AutoParry] Started (ParryDagger remote event + Blade item, bypass cooldown)")
+    print("[AutoParry] Started (using remote 'parry' at correct path)")
 end
 
 local function stopInfiniteAmmo()
@@ -1857,13 +1900,6 @@ local function stopInfiniteAmmo()
     end
     print("[AutoParry] Stopped")
 end
-
--- ============================================================================
--- CATATAN: 
--- - Fungsi getKillerDistance() sudah didefinisikan ulang di sini (jika belum ada di script utama)
--- - Pastikan tidak ada konflik dengan fungsi getKillerDistance yang sudah ada.
--- - Toggle tetap menggunakan config.infiniteAmmoEnabled (tombol INF AMMO di GUI).
--- ============================================================================
 -- ============================================================================
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================

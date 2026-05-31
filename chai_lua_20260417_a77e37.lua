@@ -1837,7 +1837,7 @@ local function autoParryLoop()
     if not getLocalCharacter() or not localRootPart then return end
 
     local killerDist = getKillerDistance()
-    if killerDist > 13 then return end
+    if killerDist > 10 then return end
 
     local now = tick()
     if now - lastParryTime < PARRY_COOLDOWN then return end

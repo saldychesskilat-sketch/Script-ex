@@ -1666,7 +1666,8 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (OPTIMIZED - SINGLE FIRE, LONGER COOLDOWN)
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - NO CLIENT COOLDOWN)
+-- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
 -- ============================================================================
 
 -- Cache remote event parry
@@ -1728,32 +1729,73 @@ local function getParryingDaggerTool()
     return nil
 end
 
--- Kirim remote event parry dengan argumen yang paling mungkin (hanya sekali)
+-- Kirim remote event parry dengan argumen yang benar
 local function fireParryRemote(targetPlayer)
     local remote = findParryRemoteEvent()
     if not remote then
+        print("[AutoParry] Parry remote not found!")
         return false
     end
     
     local dagger = getParryingDaggerTool()
     
-    -- Hanya satu percobaan dengan argumen terbaik
-    if dagger then
-        pcall(function() remote:FireServer(dagger) end)
-    else
-        pcall(function() remote:FireServer("Parrying Dagger") end)
-    end
-    -- Juga coba tanpa argumen sebagai fallback
-    pcall(function() remote:FireServer() end)
+    -- Variasi argumen yang mungkin diterima (urutan prioritas)
+    local argsVariants = {
+        {dagger},                     -- objek tool (jika ada)
+        {"Parrying Dagger"},          -- string nama item
+        {"parry"},
+        {"block"},
+        {dagger, targetPlayer},       -- tool + target
+        {"Parrying Dagger", targetPlayer},
+        {}                            -- tanpa argumen
+    }
     
+    -- Jika tidak punya dagger, hapus varian yang menggunakan objek tool
+    if not dagger then
+        for i = #argsVariants, 1, -1 do
+            local args = argsVariants[i]
+            if #args > 0 and type(args[1]) == "userdata" then
+                table.remove(argsVariants, i)
+            end
+        end
+    end
+    
+    local success = false
+    for _, args in ipairs(argsVariants) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            elseif #args == 1 then
+                remote:FireServer(args[1])
+            elseif #args == 2 then
+                remote:FireServer(args[1], args[2])
+            end
+        end)
+        success = true
+    end
+    
+    return success
+end
+
+-- Fallback: fire multiple times untuk bypass cooldown
+local function fallbackParry()
+    local remote = findParryRemoteEvent()
+    if not remote then return false end
+    
+    for i = 1, 3 do
+        pcall(function()
+            remote:FireServer()
+            remote:FireServer("Parrying Dagger")
+            remote:FireServer("parry")
+        end)
+        task.wait(0.01)
+    end
     return true
 end
 
 -- ============================================================================
--- AUTO PARRY MAIN LOOP
+-- AUTO PARRY MAIN LOOP (tanpa client cooldown, kirim terus saat killer dekat)
 -- ============================================================================
-local lastParryTime = 0
-local PARRY_COOLDOWN = 1.5  -- dinaikkan untuk menghindari cooldown server
 
 local function getKillerDistance()
     if not localRootPart then return math.huge end
@@ -1795,11 +1837,43 @@ local function autoParryLoop()
     local killerDist = getKillerDistance()
     if killerDist > 15 then return end
 
-    local now = tick()
-    if now - lastParryTime < PARRY_COOLDOWN then return end
-    lastParryTime = now
+    -- Cari target killer terdekat
+    local targetPlayer = nil
+    local minDist = math.huge
+    local localPos = localRootPart.Position
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local isKiller = false
+                if player.Team then
+                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
+                end
+                if not isKiller then
+                    local tool = char:FindFirstChildWhichIsA("Tool")
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                        isKiller = true
+                    end
+                end
+                if isKiller then
+                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    if root then
+                        local dist = (localPos - root.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            targetPlayer = player
+                        end
+                    end
+                end
+            end
+        end
+    end
 
-    fireParryRemote()
+    if targetPlayer then
+        fireParryRemote(targetPlayer)
+    else
+        fallbackParry()
+    end
 end
 
 -- ============================================================================
@@ -1810,7 +1884,7 @@ local infiniteAmmoConnection = nil
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
     infiniteAmmoConnection = RunService.Heartbeat:Connect(autoParryLoop)
-    print("[AutoParry] Started (single fire, cooldown 1.5s)")
+    print("[AutoParry] Started (no client cooldown, continuous firing)")
 end
 
 local function stopInfiniteAmmo()

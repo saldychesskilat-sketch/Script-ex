@@ -1666,7 +1666,7 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - NO CLIENT COOLDOWN)
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (BY CLIENT - NO CLIENT COOLDOWN)
 -- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
 -- ============================================================================
 
@@ -1729,7 +1729,7 @@ local function getParryingDaggerTool()
     return nil
 end
 
--- Kirim remote event parry dengan argumen yang benar
+-- Kirim remote event parry dengan argumen yang benar (tanpa cooldown client)
 local function fireParryRemote(targetPlayer)
     local remote = findParryRemoteEvent()
     if not remote then
@@ -1760,7 +1760,7 @@ local function fireParryRemote(targetPlayer)
         end
     end
     
-    local success = false
+    -- Kirim semua variasi argumen dalam satu loop (tanpa jeda cooldown client)
     for _, args in ipairs(argsVariants) do
         pcall(function()
             if #args == 0 then
@@ -1771,30 +1771,13 @@ local function fireParryRemote(targetPlayer)
                 remote:FireServer(args[1], args[2])
             end
         end)
-        success = true
     end
     
-    return success
-end
-
--- Fallback: fire multiple times untuk bypass cooldown
-local function fallbackParry()
-    local remote = findParryRemoteEvent()
-    if not remote then return false end
-    
-    for i = 1, 3 do
-        pcall(function()
-            remote:FireServer()
-            remote:FireServer("Parrying Dagger")
-            remote:FireServer("parry")
-        end)
-        task.wait(0.01)
-    end
     return true
 end
 
 -- ============================================================================
--- AUTO PARRY MAIN LOOP (tanpa client cooldown, kirim terus saat killer dekat)
+-- AUTO PARRY MAIN LOOP (tanpa client cooldown)
 -- ============================================================================
 
 local function getKillerDistance()
@@ -1869,10 +1852,9 @@ local function autoParryLoop()
         end
     end
 
+    -- Kirim remote event tanpa cooldown client (akan dieksekusi setiap frame)
     if targetPlayer then
         fireParryRemote(targetPlayer)
-    else
-        fallbackParry()
     end
 end
 
@@ -1884,7 +1866,7 @@ local infiniteAmmoConnection = nil
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
     infiniteAmmoConnection = RunService.Heartbeat:Connect(autoParryLoop)
-    print("[AutoParry] Started (no client cooldown, continuous firing)")
+    print("[AutoParry] Started (no client cooldown, firing every frame)")
 end
 
 local function stopInfiniteAmmo()

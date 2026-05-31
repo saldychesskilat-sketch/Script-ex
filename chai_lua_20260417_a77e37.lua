@@ -1797,7 +1797,7 @@ end
 -- AUTO PARRY MAIN LOOP
 -- ============================================================================
 local lastParryTime = 0
-local PARRY_COOLDOWN = 2
+local PARRY_COOLDOWN = 0.15
 
 local function getKillerDistance()
     if not localRootPart then return math.huge end

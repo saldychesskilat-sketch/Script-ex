@@ -3561,7 +3561,7 @@ end
         {name="speedBoostEnabled", text="SPEED BOOST"},  
         {name="stealthEnabled", text="STEALTH"},  
         {name="godModeEnabled", text="GOD MODE"},  
-        {name="infiniteAmmoEnabled", text="INF AMMO"},  
+        {name="infiniteAmmoEnabled", text="Dagger"},  
         {name="shieldEnabled", text="SHIELD"},  
         {name="tpwalkEnabled", text="TPWALK"},  
         {name="noCollideEnabled", text="NO COLLIDE"},  

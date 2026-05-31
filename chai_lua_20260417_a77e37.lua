@@ -1665,86 +1665,51 @@ end
 -- - Semua variabel internal menggunakan prefix "god_" untuk menghindari konflik.
 -- ============================================================================
 
+
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (ENHANCED - ARGUMENT BRUTEFORCE)
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - USING CORRECT REMOTE EVENT)
+-- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
 -- ============================================================================
 
 -- Cache remote event parry
 local cachedParryRemote = nil
-local cachedKillerTarget = nil
 
--- Cari remote event "parry" dengan prioritas path yang benar
+-- Cari remote event "parry" di path yang benar
 local function findParryRemoteEvent()
     if cachedParryRemote and cachedParryRemote.Parent then
         return cachedParryRemote
     end
     
-    -- Priority 1: Path yang paling mungkin (dari referensi script lain)
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        local items = remotes:FindFirstChild("Items")
-        if items then
-            local dagger = items:FindFirstChild("Parrying Dagger")
-            if dagger then
-                local parry = dagger:FindFirstChild("parry")
-                if parry and parry:IsA("RemoteEvent") then
-                    cachedParryRemote = parry
-                    print("[AutoParry] Found parry remote at: Remotes.Items.Parrying Dagger.parry")
-                    return parry
+    -- Coba akses langsung melalui path yang diketahui
+    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")
+    if parryRemote then
+        parryRemote = parryRemote:FindFirstChild("Items")
+        if parryRemote then
+            parryRemote = parryRemote:FindFirstChild("Parrying Dagger")
+            if parryRemote then
+                parryRemote = parryRemote:FindFirstChild("parry")
+                if parryRemote and parryRemote:IsA("RemoteEvent") then
+                    cachedParryRemote = parryRemote
+                    print("[AutoParry] Found parry remote event at correct path")
+                    return parryRemote
                 end
             end
         end
     end
     
-    -- Priority 2: Cari semua kemungkinan path di ReplicatedStorage
-    local searchPaths = {
-        "Remotes.Items.Parrying Dagger.parry",
-        "Remotes.Items.ParryDagger.parry",
-        "Items.Parrying Dagger.parry",
-        "Parrying Dagger.parry",
-        "Remotes.Combat.parry",
-        "Combat.parry",
-        "parry"
-    }
-    
-    for _, path in ipairs(searchPaths) do
-        local parts = {}
-        for part in path:gmatch("[^%.]+") do
-            table.insert(parts, part)
-        end
-        
-        local current = ReplicatedStorage
-        local found = true
-        for _, part in ipairs(parts) do
-            current = current:FindFirstChild(part)
-            if not current then
-                found = false
-                break
-            end
-        end
-        if found and current:IsA("RemoteEvent") then
-            cachedParryRemote = current
-            print("[AutoParry] Found parry remote at:", path)
-            return current
-        end
-    end
-    
-    -- Priority 3: Scan semua RemoteEvent di ReplicatedStorage (fallback)
+    -- Fallback: scan semua RemoteEvent di ReplicatedStorage
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local name = obj.Name:lower()
-            if name == "parry" or name == "block" or name == "deflect" or name == "counter" then
-                cachedParryRemote = obj
-                print("[AutoParry] Found parry remote via scan:", obj.Name)
-                return obj
-            end
+        if obj:IsA("RemoteEvent") and obj.Name == "parry" then
+            cachedParryRemote = obj
+            print("[AutoParry] Found parry remote event via scan:", obj.Name)
+            return obj
         end
     end
     
     return nil
 end
 
--- Cari item Parrying Dagger (sama)
+-- Cari item Parrying Dagger di inventory player (Backpack atau Character)
 local function getParryingDaggerTool()
     local backpack = localPlayer:FindFirstChild("Backpack")
     local character = localPlayer.Character
@@ -1765,23 +1730,87 @@ local function getParryingDaggerTool()
     return nil
 end
 
--- Cari killer terdekat sebagai target untuk argumen
-local function getNearestKiller()
-    if not localRootPart then return nil end
-    local localPos = localRootPart.Position
-    local nearest = nil
-    local minDist = math.huge
+-- Kirim remote event parry dengan argumen yang benar
+local function fireParryRemote(targetPlayer)
+    local remote = findParryRemoteEvent()
+    if not remote then
+        print("[AutoParry] Parry remote not found!")
+        return false
+    end
     
+    local dagger = getParryingDaggerTool()
+    
+    -- Variasi argumen yang mungkin diterima (urutan prioritas)
+    local argsVariants = {
+        {dagger},                     -- objek tool (jika ada)
+        {"Parrying Dagger"},          -- string nama item
+        {"parry"},
+        {"block"},
+        {dagger, targetPlayer},       -- tool + target
+        {"Parrying Dagger", targetPlayer},
+        {}                            -- tanpa argumen
+    }
+    
+    -- Jika tidak punya dagger, hapus varian yang menggunakan objek tool
+    if not dagger then
+        for i = #argsVariants, 1, -1 do
+            local args = argsVariants[i]
+            if #args > 0 and type(args[1]) == "userdata" then
+                table.remove(argsVariants, i)
+            end
+        end
+    end
+    
+    local success = false
+    for _, args in ipairs(argsVariants) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            elseif #args == 1 then
+                remote:FireServer(args[1])
+            elseif #args == 2 then
+                remote:FireServer(args[1], args[2])
+            end
+        end)
+        success = true
+    end
+    
+    return success
+end
+
+-- Fallback: fire multiple times untuk bypass cooldown
+local function fallbackParry()
+    local remote = findParryRemoteEvent()
+    if not remote then return false end
+    
+    for i = 1, 3 do
+        pcall(function()
+            remote:FireServer()
+            remote:FireServer("Parrying Dagger")
+            remote:FireServer("parry")
+        end)
+        task.wait(0.01)
+    end
+    return true
+end
+
+-- ============================================================================
+-- AUTO PARRY MAIN LOOP
+-- ============================================================================
+local lastParryTime = 0
+local PARRY_COOLDOWN = 0.15
+
+local function getKillerDistance()
+    if not localRootPart then return math.huge end
+    local localPos = localRootPart.Position
+    local minDist = math.huge
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             local char = player.Character
             if char then
                 local isKiller = false
                 if player.Team then
-                    local teamName = player.Team.Name:lower()
-                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                        isKiller = true
-                    end
+                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
                 end
                 if not isKiller then
                     local tool = char:FindFirstChildWhichIsA("Tool")
@@ -1795,303 +1824,74 @@ local function getNearestKiller()
                         local dist = (localPos - root.Position).Magnitude
                         if dist < minDist then
                             minDist = dist
-                            nearest = player
                         end
                     end
                 end
             end
         end
     end
-    return nearest
+    return minDist
 end
-
--- ============================================================================
--- INTELLIGENT ARGUMENT BRUTEFORCE (mencari kombinasi argumen yang tidak diblokir)
--- ============================================================================
-
--- Daftar semua kemungkinan argumen yang akan diuji (urutan prioritas)
-local argumentCandidates = {
-    -- String-based arguments (most common)
-    {type = "string", value = "Parrying Dagger"},
-    {type = "string", value = "parry"},
-    {type = "string", value = "block"},
-    {type = "string", value = "deflect"},
-    {type = "string", value = "counter"},
-    {type = "string", value = "success"},
-    {type = "string", value = "fail"},
-    {type = "string", value = "parry_success"},
-    {type = "string", value = "parry_fail"},
-    {type = "string", value = "Parry"},
-    {type = "string", value = "Block"},
-    {type = "string", value = "true"},
-    {type = "string", value = "false"},
-    {type = "string", value = "1"},
-    {type = "string", value = "0"},
-    {type = "string", value = "start"},
-    {type = "string", value = "end"},
-    {type = "string", value = "activate"},
-    {type = "string", value = "deactivate"},
-    {type = "string", value = "ready"},
-    {type = "string", value = "commit"},
-    {type = "string", value = "execute"},
-    {type = "string", value = "perform"},
-    {type = "string", value = "use"},
-    {type = "string", value = "cast"},
-    {type = "string", value = "trigger"},
-    
-    -- Boolean-based
-    {type = "boolean", value = true},
-    {type = "boolean", value = false},
-    
-    -- Number-based
-    {type = "number", value = 1},
-    {type = "number", value = 0},
-    {type = "number", value = 0.5},
-    {type = "number", value = 1.0},
-    {type = "number", value = 100},
-    {type = "number", value = -1},
-    {type = "number", value = math.random()},
-    {type = "number", value = tick()},
-    
-    -- Nil-based
-    {type = "nil", value = nil},
-    
-    -- Table-based (untuk kasus tertentu)
-    {type = "table", value = {}},
-    {type = "table", value = {success = true}},
-    {type = "table", value = {type = "parry"}},
-}
-
--- Cache argumen yang berhasil (untuk digunakan selanjutnya)
-local lastSuccessfulArgs = nil
-local lastSuccessfulTarget = nil
-local lastSuccessTime = 0
-local bruteForceIndex = 1
-local bruteForceCooldown = 0.5  -- hindari spam saat mencoba
-local lastBruteForceTime = 0
-
--- Fire remote dengan argumen spesifik
-local function fireRemoteWithArgs(remote, args)
-    pcall(function()
-        if #args == 0 then
-            remote:FireServer()
-        elseif #args == 1 then
-            remote:FireServer(args[1])
-        elseif #args == 2 then
-            remote:FireServer(args[1], args[2])
-        elseif #args == 3 then
-            remote:FireServer(args[1], args[2], args[3])
-        else
-            remote:FireServer(unpack(args))
-        end
-    end)
-end
-
--- Uji coba semua kemungkinan argumen untuk menemukan yang tidak memiliki cooldown
-local function tryNextArgumentCombination(remote, targetPlayer)
-    local now = tick()
-    if now - lastBruteForceTime < bruteForceCooldown then
-        return false  -- masih dalam cooldown percobaan
-    end
-    lastBruteForceTime = now
-    
-    local dagger = getParryingDaggerTool()
-    
-    -- Konversi candidate ke nilai sebenarnya
-    local function getCandidateValue(candidate)
-        if candidate.type == "string" then
-            return candidate.value
-        elseif candidate.type == "boolean" then
-            return candidate.value
-        elseif candidate.type == "number" then
-            return candidate.value
-        elseif candidate.type == "nil" then
-            return nil
-        elseif candidate.type == "table" then
-            return candidate.value
-        end
-        return nil
-    end
-    
-    -- Buat kombinasi argumen yang mungkin (single, double, triple)
-    local testCombinations = {}
-    
-    -- Single argument
-    for _, cand in ipairs(argumentCandidates) do
-        local val = getCandidateValue(cand)
-        if cand.type == "string" or cand.type == "number" or cand.type == "boolean" then
-            table.insert(testCombinations, {val})
-            -- Jika ada dagger, tambahkan juga kombinasi dengan dagger
-            if dagger then
-                table.insert(testCombinations, {dagger, val})
-            end
-        elseif cand.type == "nil" then
-            table.insert(testCombinations, {})
-            if dagger then
-                table.insert(testCombinations, {dagger})
-            end
-        end
-    end
-    
-    -- Tambahan: kombinasi dengan targetPlayer sebagai argumen pertama
-    if targetPlayer then
-        table.insert(testCombinations, {targetPlayer})
-        table.insert(testCombinations, {targetPlayer, "parry"})
-        table.insert(testCombinations, {targetPlayer, "block"})
-        if dagger then
-            table.insert(testCombinations, {dagger, targetPlayer})
-        end
-    end
-    
-    -- Pilih kombinasi berdasarkan indeks bruteForce
-    if bruteForceIndex > #testCombinations then
-        bruteForceIndex = 1
-        print("[AutoParry] Completed full argument scan, restarting from beginning")
-        return false
-    end
-    
-    local currentArgs = testCombinations[bruteForceIndex]
-    bruteForceIndex = bruteForceIndex + 1
-    
-    -- Format args untuk logging
-    local argsStr = {}
-    for _, arg in ipairs(currentArgs) do
-        if type(arg) == "string" then
-            table.insert(argsStr, '"' .. arg .. '"')
-        elseif type(arg) == "userdata" then
-            table.insert(argsStr, "[tool:" .. (arg.Name or "unknown") .. "]")
-        elseif type(arg) == "table" then
-            table.insert(argsStr, "{...}")
-        else
-            table.insert(argsStr, tostring(arg))
-        end
-    end
-    print("[AutoParry] Testing args:", table.concat(argsStr, ", "))
-    
-    fireRemoteWithArgs(remote, currentArgs)
-    return true
-end
-
--- Fire parry remote dengan berbagai strategi
-local function fireParryRemote(targetPlayer)
-    local remote = findParryRemoteEvent()
-    if not remote then
-        print("[AutoParry] Parry remote not found!")
-        return false
-    end
-    
-    local dagger = getParryingDaggerTool()
-    local success = false
-    
-    -- FIRST PRIORITY: Jika sudah pernah sukses, langsung gunakan argumen itu (cache hit)
-    if lastSuccessfulArgs and lastSuccessfulTarget == targetPlayer and (tick() - lastSuccessTime) < 30 then
-        print("[AutoParry] Using cached successful args")
-        fireRemoteWithArgs(remote, lastSuccessfulArgs)
-        return true
-    end
-    
-    -- SECOND PRIORITY: Coba kombinasi argumen yang paling umum
-    local highPriorityCombos = {}
-    
-    -- Tanpa argumen
-    table.insert(highPriorityCombos, {})
-    
-    -- Dengan string "parry"
-    table.insert(highPriorityCombos, {"parry"})
-    table.insert(highPriorityCombos, {"block"})
-    table.insert(highPriorityCombos, {"Parrying Dagger"})
-    
-    -- Dengan dagger sebagai argumen
-    if dagger then
-        table.insert(highPriorityCombos, {dagger})
-        table.insert(highPriorityCombos, {dagger, "parry"})
-    end
-    
-    -- Dengan target player
-    if targetPlayer then
-        table.insert(highPriorityCombos, {targetPlayer})
-        table.insert(highPriorityCombos, {targetPlayer, "parry"})
-        if dagger then
-            table.insert(highPriorityCombos, {dagger, targetPlayer})
-        end
-    end
-    
-    -- Coba high priority combos
-    for _, args in ipairs(highPriorityCombos) do
-        local argsStr = {}
-        for _, arg in ipairs(args) do
-            if type(arg) == "string" then
-                table.insert(argsStr, '"' .. arg .. '"')
-            elseif type(arg) == "userdata" then
-                table.insert(argsStr, "[tool]")
-            else
-                table.insert(argsStr, tostring(arg))
-            end
-        end
-        print("[AutoParry] Trying high-priority combo:", table.concat(argsStr, ", "))
-        fireRemoteWithArgs(remote, args)
-        success = true
-    end
-    
-    -- THIRD PRIORITY: Gunakan brute force untuk mencari argumen yang tidak terdeteksi cooldown
-    -- Ini akan berjalan di background, tidak menghambat eksekusi utama
-    task.spawn(function()
-        tryNextArgumentCombination(remote, targetPlayer)
-    end)
-    
-    return success
-end
-
--- ============================================================================
--- AUTO PARRY MAIN LOOP
--- ============================================================================
-local lastParryTime = 0
-local PARRY_COOLDOWN = 0.15
 
 local function autoParryLoop()
     if not config.infiniteAmmoEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    -- Deteksi jarak killer terdekat
-    local nearestKiller = getNearestKiller()
-    if not nearestKiller then return end
-    
-    local killerChar = nearestKiller.Character
-    if not killerChar then return end
-    
-    local killerRoot = killerChar:FindFirstChild("HumanoidRootPart") or killerChar:FindFirstChild("Torso")
-    if not killerRoot then return end
-    
-    local dist = (localRootPart.Position - killerRoot.Position).Magnitude
-    if dist > 15 then return end  -- di luar radius
+    local killerDist = getKillerDistance()
+    if killerDist > 15 then return end
 
     local now = tick()
     if now - lastParryTime < PARRY_COOLDOWN then return end
     lastParryTime = now
 
-    fireParryRemote(nearestKiller)
-end
+    -- Cari target killer terdekat
+    local targetPlayer = nil
+    local minDist = math.huge
+    local localPos = localRootPart.Position
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local isKiller = false
+                if player.Team then
+                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
+                end
+                if not isKiller then
+                    local tool = char:FindFirstChildWhichIsA("Tool")
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                        isKiller = true
+                    end
+                end
+                if isKiller then
+                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    if root then
+                        local dist = (localPos - root.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            targetPlayer = player
+                        end
+                    end
+                end
+            end
+        end
+    end
 
--- Fungsi untuk mengatur ulang cache argumen sukses (dipanggil saat menemukan argumen yang work)
-local function setSuccessfulArgs(args, target)
-    lastSuccessfulArgs = args
-    lastSuccessfulTarget = target
-    lastSuccessTime = tick()
-    print("[AutoParry] Cached successful arguments!")
+    if targetPlayer then
+        fireParryRemote(targetPlayer)
+    else
+        fallbackParry()
+    end
 end
 
 -- ============================================================================
--- START / STOP AUTO PARRY
+-- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)
 -- ============================================================================
 local infiniteAmmoConnection = nil
 
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
     infiniteAmmoConnection = RunService.Heartbeat:Connect(autoParryLoop)
-    print("[AutoParry] Started (argument bruteforce mode - will try 80+ argument combinations to bypass cooldown)")
-    
-    -- Inisialisasi: scan remote sekali di awal
-    findParryRemoteEvent()
+    print("[AutoParry] Started (using remote 'parry' at correct path)")
 end
 
 local function stopInfiniteAmmo()
@@ -2100,32 +1900,7 @@ local function stopInfiniteAmmo()
         infiniteAmmoConnection = nil
     end
     print("[AutoParry] Stopped")
-end
-
--- ============================================================================
--- MANUAL OVERRIDE: Panggil fungsi ini saat player berhasil parry secara manual
--- untuk mempelajari argumen yang benar
--- ============================================================================
-local function recordSuccessfulParry(args)
-    setSuccessfulArgs(args, getNearestKiller())
-end
-
--- ============================================================================
--- INTEGRATION WITH TELEPORT BUTTON (optional)
--- ============================================================================
--- Jika user ingin mencatat parry manual, bisa dipanggil via command di chat
--- Contoh: _G.CyberHeroes.recordParry({"Parrying Dagger", "parry"})
-_G.CyberHeroes = _G.CyberHeroes or {}
-_G.CyberHeroes.recordParry = recordSuccessfulParry
-_G.CyberHeroes.testParryArgs = function(...)
-    local remote = findParryRemoteEvent()
-    if remote then
-        fireRemoteWithArgs(remote, {...})
-        print("[AutoParry] Manual test with args:", ...)
-    end
-end
-
-
+end 
 -- ============================================================================
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================

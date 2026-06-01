@@ -1666,7 +1666,8 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- UPGRADE FITUR AUTO PARRY (REALISTIC + RADIUS ESP)
+-- ============================================================================
+-- UPGRADE FITUR AUTO PARRY (REALISTIC + RADIUS ESP + HILT DETECTION)
 -- ============================================================================
 
 -- ==================== RADIUS ESP (visual area deteksi) ====================
@@ -1675,8 +1676,8 @@ local radiusPulseConnection = nil
 
 local function createParryRadius()
     if parryRadiusPart then parryRadiusPart:Destroy() end
-    if not config.infiniteAmmoEnabled then return end  -- hanya dibuat saat auto parry aktif
-    
+    if not config.infiniteAmmoEnabled then return end
+
     local radiusSize = 7  -- jarak deteksi serangan (studs)
     local part = Instance.new("Part")
     part.Name = "AutoParryRadius"
@@ -1690,7 +1691,7 @@ local function createParryRadius()
     part.TopSurface = Enum.SurfaceType.Smooth
     part.BottomSurface = Enum.SurfaceType.Smooth
     part.Parent = workspace
-    
+
     -- Efek pulse (transparency naik turun)
     if radiusPulseConnection then radiusPulseConnection:Disconnect() end
     radiusPulseConnection = RunService.RenderStepped:Connect(function()
@@ -1711,7 +1712,7 @@ local function createParryRadius()
             part.CFrame = CFrame.new(localCharacter.HumanoidRootPart.Position)
         end
     end)
-    
+
     parryRadiusPart = part
 end
 
@@ -1720,22 +1721,64 @@ local function destroyParryRadius()
     if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end
 end
 
--- ==================== SISTEM DETEKSI SERANGAN (TOUCH DETECTION) ====================
+-- ==================== SISTEM DETEKSI SERANGAN (HILT DETECTION) ====================
 local hitboxPart = nil
 local hitboxConnection = nil
 local pendingParry = false
 local lastAttackTime = 0
 local ATTACK_COOLDOWN = 0.5  -- batas minimal antar parry
 
--- Buat part hitbox pada local player untuk mendeteksi sentuhan senjata killer
+-- Fungsi untuk mengecek apakah suatu objek adalah bagian dari "Hilt" killer
+local function isHiltPart(hit)
+    -- Cari ancestor yang merupakan Tool
+    local tool = hit:FindFirstAncestorWhichIsA("Tool")
+    if not tool then return false end
+
+    -- Pastikan tool dimiliki oleh killer (bukan kita)
+    local owner = tool.Parent
+    if not owner or owner == localCharacter then return false end
+    local player = Players:GetPlayerFromCharacter(owner)
+    if not player or player == localPlayer then return false end
+
+    -- Cek apakah pemilik adalah killer
+    local isKiller = false
+    if player.Team then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            isKiller = true
+        end
+    end
+    if not isKiller then
+        local wep = player.Character and player.Character:FindFirstChildWhichIsA("Tool")
+        if wep and (wep.Name:lower():find("knife") or wep.Name:lower():find("weapon") or wep.Name:lower():find("blade")) then
+            isKiller = true
+        end
+    end
+    if not isKiller then return false end
+
+    -- Cek apakah bagian yang terkena bernama "Hilt" atau mengandung kata hilt
+    local partName = hit.Name:lower()
+    if partName:find("hilt") then
+        return true
+    end
+
+    -- Alternatif: cek apakah tool memiliki anak bernama Hilt (mungkin hit adalah Hilt itu sendiri)
+    if tool:FindFirstChild("Hilt") and (hit == tool:FindFirstChild("Hilt") or hit.Parent == tool:FindFirstChild("Hilt")) then
+        return true
+    end
+
+    return false
+end
+
+-- Buat part hitbox pada local player untuk mendeteksi sentuhan Hilt
 local function createHitbox()
     if hitboxPart then hitboxPart:Destroy() end
     if hitboxConnection then hitboxConnection:Disconnect() end
-    
+
     if not localCharacter then return end
     local root = localCharacter:FindFirstChild("HumanoidRootPart") or localCharacter:FindFirstChild("Torso")
     if not root then return end
-    
+
     local box = Instance.new("Part")
     box.Name = "AutoParryHitbox"
     box.Size = Vector3.new(3, 3, 3)
@@ -1744,92 +1787,51 @@ local function createHitbox()
     box.CanCollide = false
     box.Transparency = 1
     box.Parent = localCharacter
-    
+
     -- Weld ke root agar mengikuti karakter
     local weld = Instance.new("Weld")
     weld.Part0 = root
     weld.Part1 = box
     weld.C0 = CFrame.new(0, 0, 0)
     weld.Parent = box
-    
+
     hitboxPart = box
-    
+
     hitboxConnection = box.Touched:Connect(function(hit)
-        -- Hanya proses jika auto parry aktif
         if not config.infiniteAmmoEnabled then return end
-        
-        -- Cek apakah yang menyentuh adalah senjata killer (tool atau bagian dari tool)
-        local weapon = hit:FindFirstAncestorWhichIsA("Tool")
-        if not weapon then
-            -- Bisa juga bagian dari karakter killer (misal tangan) tapi kita batasi ke tool
-            return
-        end
-        
-        -- Pastikan pemilik tool adalah killer (bukan diri sendiri)
-        local owner = weapon.Parent
-        if not owner or owner == localCharacter then return end
-        local player = Players:GetPlayerFromCharacter(owner)
-        if not player or player == localPlayer then return end
-        
-        -- Cek apakah player tersebut benar-benar killer (memiliki knife/weapon di tangan)
-        local isKiller = false
-        if player.Team then
-            isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
-        end
-        if not isKiller then
-            local tool = player.Character and player.Character:FindFirstChildWhichIsA("Tool")
-            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon") or tool.Name:lower():find("blade")) then
-                isKiller = true
-            end
-        end
-        if not isKiller then return end
-        
-        -- Cegah spam terlalu cepat
+
+        -- Deteksi apakah yang menyentuh adalah Hilt milik killer
+        if not isHiltPart(hit) then return end
+
         local now = tick()
         if now - lastAttackTime < ATTACK_COOLDOWN then return end
         lastAttackTime = now
-        
-        -- Trigger parry dengan delay manusiawi (0.07 - 0.15 detik)
+
         if pendingParry then return end
         pendingParry = true
-        
-        local delayTime = 0.07 + math.random() * 0.08  -- random delay
-        task.wait(delayTime)
-        
+
+        -- Delay 0.1 detik sebelum menekan tombol parry (sesuai permintaan)
+        task.wait(0.1)
+
         if config.infiniteAmmoEnabled then
-            triggerParryAction()
+            -- Simulasi klik kanan mouse (parry)
+            pcall(function()
+                VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 1, false, game, 0)
+                task.wait(0.02)
+                VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 0, false, game, 0)
+            end)
+            -- Fallback tekan E jika diperlukan (opsional)
+            pcall(function()
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                task.wait(0.02)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            end)
         end
         pendingParry = false
     end)
 end
 
--- ==================== SIMULASI INPUT PARRY YANG REALISTIS ====================
-local function triggerParryAction()
-    -- Mencari remote event parry (sama seperti sebelumnya)
-    local remote = findParryRemoteEvent()
-    if remote then
-        -- Kirim remote event dengan argumen yang sesuai (opsional, tetap menggunakan metode lama agar kompatibel)
-        fireParryRemote(nil)  -- argumen target tidak diperlukan untuk parry
-    else
-        -- Fallback: simulasi klik kanan mouse jika game menggunakan tombol right click untuk parry
-        pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 1, false, game, 0)
-            task.wait(0.02)
-            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 0, false, game, 0)
-        end)
-        -- Alternatif simulasi tekan tombol E jika diperlukan
-        pcall(function()
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            task.wait(0.02)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        end)
-    end
-    -- Debug (opsional)
-    -- print("[AutoParry] Parry triggered with human delay")
-end
-
 -- ==================== START / STOP AUTO PARRY ====================
--- Ganti fungsi startInfiniteAmmo dan stopInfiniteAmmo yang lama
 local infiniteAmmoConnection = nil
 
 local function startInfiniteAmmo()
@@ -1837,23 +1839,29 @@ local function startInfiniteAmmo()
     -- Hapus koneksi lama jika ada
     if hitboxConnection then hitboxConnection:Disconnect(); hitboxConnection = nil end
     destroyParryRadius()
-    
+
     -- Buat radius ESP dan hitbox
     createParryRadius()
     createHitbox()
-    
-    -- Tidak perlu Heartbeat loop, cukup event Touched
-    print("[AutoParry] Started (realistic touch detection + human delay)")
+
+    print("[AutoParry] Started (Hilt detection + right-click parry with 0.1s delay)")
 end
 
 local function stopInfiniteAmmo()
     if hitboxConnection then hitboxConnection:Disconnect(); hitboxConnection = nil end
     if hitboxPart then hitboxPart:Destroy(); hitboxPart = nil end
     destroyParryRadius()
-    print("[AutoParry] Stopped (touch detection removed)")
+    print("[AutoParry] Stopped")
 end
 
-
+-- ============================================================================
+-- CATATAN: 
+-- - Fungsi ini menggantikan seluruh bagian upgrade auto parry.
+-- - Radius ESP visual berbentuk lingkaran (cylinder) dengan efek pulse.
+-- - Deteksi serangan berdasarkan sentuhan pada bagian "Hilt" dari senjata killer.
+-- - Setelah terdeteksi, delay 0.1 detik lalu klik kanan mouse untuk parry.
+-- - Tidak ada konflik dengan fungsi lain karena tetap menggunakan config.infiniteAmmoEnabled.
+-- ============================================================================
 
 -- ============================================================================
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT

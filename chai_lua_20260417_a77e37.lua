@@ -1665,12 +1665,12 @@ end
 -- - Semua variabel internal menggunakan prefix "god_" untuk menghindari konflik.
 -- ============================================================================
 
+
 -- ============================================================================
--- ============================================================================
--- UPGRADE FITUR AUTO PARRY (REALISTIC + RADIUS ESP + HILT DETECTION)
+-- UPGRADE FITUR AUTO PARRY (REALISTIC + RADIUS ESP + REMOTE EVENT DETECTION)
 -- ============================================================================
 
--- ==================== RADIUS ESP (visual area deteksi) ====================
+-- ==================== RADIUS ESP (CIRCLE) ====================
 local parryRadiusPart = nil
 local radiusPulseConnection = nil
 
@@ -1678,7 +1678,7 @@ local function createParryRadius()
     if parryRadiusPart then parryRadiusPart:Destroy() end
     if not config.infiniteAmmoEnabled then return end
 
-    local radiusSize = 7  -- jarak deteksi serangan (studs)
+    local radiusSize = 7  -- jarak deteksi visual (studs)
     local part = Instance.new("Part")
     part.Name = "AutoParryRadius"
     part.Size = Vector3.new(radiusSize * 2, 0.2, radiusSize * 2)
@@ -1692,7 +1692,6 @@ local function createParryRadius()
     part.BottomSurface = Enum.SurfaceType.Smooth
     part.Parent = workspace
 
-    -- Efek pulse (transparency naik turun)
     if radiusPulseConnection then radiusPulseConnection:Disconnect() end
     radiusPulseConnection = RunService.RenderStepped:Connect(function()
         if not config.infiniteAmmoEnabled then
@@ -1701,11 +1700,10 @@ local function createParryRadius()
             return
         end
         if part and part.Parent then
-            local alpha = (math.sin(tick() * 3) + 1) / 2  -- 0-1
+            local alpha = (math.sin(tick() * 3) + 1) / 2
             part.Transparency = 0.5 + alpha * 0.3
             part.Color = Color3.fromRGB(255, 50, 50)
         end
-        -- Ikuti local player
         if localRootPart and localRootPart.Parent then
             part.CFrame = CFrame.new(localRootPart.Position)
         elseif localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then
@@ -1721,114 +1719,96 @@ local function destroyParryRadius()
     if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end
 end
 
--- ==================== SISTEM DETEKSI SERANGAN (HILT DETECTION) ====================
-local hitboxPart = nil
-local hitboxConnection = nil
-local pendingParry = false
+-- ==================== DETEKSI REMOTE EVENT SERANGAN KILLER ====================
+local attackRemoteEvents = {
+    "hit", "AttackEvent", "BasicAttack", "Lunge", "LungeDetect",
+    "AfterAttack", "TrailEvent", "SlowAttack", "alexattack", "M2",
+    "m2HitVM", "Spearthrow", "FrenzyHitEvent", "grab", "GrabHitResult"
+}
+local monitoredRemotes = {}
+local remoteConnections = {}
 local lastAttackTime = 0
-local ATTACK_COOLDOWN = 0.5  -- batas minimal antar parry
+local ATTACK_COOLDOWN = 0.15  -- cooldown antar parry
 
--- Fungsi untuk mengecek apakah suatu objek adalah bagian dari "Hilt" killer
-local function isHiltPart(hit)
-    -- Cari ancestor yang merupakan Tool
-    local tool = hit:FindFirstAncestorWhichIsA("Tool")
-    if not tool then return false end
-
-    -- Pastikan tool dimiliki oleh killer (bukan kita)
-    local owner = tool.Parent
-    if not owner or owner == localCharacter then return false end
-    local player = Players:GetPlayerFromCharacter(owner)
-    if not player or player == localPlayer then return false end
-
-    -- Cek apakah pemilik adalah killer
-    local isKiller = false
-    if player.Team then
-        local teamName = player.Team.Name:lower()
-        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-            isKiller = true
+-- Fungsi untuk memicu parry (simulasi input)
+local function triggerParryAction()
+    -- Metode 1: temukan remote event parry (misalnya dari game)
+    local parryRemote = nil
+    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+        if remote:IsA("RemoteEvent") then
+            local name = remote.Name:lower()
+            if name:find("parry") or name:find("block") or name:find("deflect") then
+                parryRemote = remote
+                break
+            end
         end
     end
-    if not isKiller then
-        local wep = player.Character and player.Character:FindFirstChildWhichIsA("Tool")
-        if wep and (wep.Name:lower():find("knife") or wep.Name:lower():find("weapon") or wep.Name:lower():find("blade")) then
-            isKiller = true
-        end
+    if parryRemote then
+        pcall(function() parryRemote:FireServer() end)
+    else
+        -- Fallback: simulasi klik kanan (biasanya parry)
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 1, false, game, 0)
+            task.wait(0.02)
+            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 0, false, game, 0)
+        end)
+        -- Alternatif: tekan E
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.02)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
     end
-    if not isKiller then return false end
-
-    -- Cek apakah bagian yang terkena bernama "Hilt" atau mengandung kata hilt
-    local partName = hit.Name:lower()
-    if partName:find("hilt") then
-        return true
-    end
-
-    -- Alternatif: cek apakah tool memiliki anak bernama Hilt (mungkin hit adalah Hilt itu sendiri)
-    if tool:FindFirstChild("Hilt") and (hit == tool:FindFirstChild("Hilt") or hit.Parent == tool:FindFirstChild("Hilt")) then
-        return true
-    end
-
-    return false
 end
 
--- Buat part hitbox pada local player untuk mendeteksi sentuhan Hilt
-local function createHitbox()
-    if hitboxPart then hitboxPart:Destroy() end
-    if hitboxConnection then hitboxConnection:Disconnect() end
+-- Handler ketika remote event serangan terdeteksi
+local function onAttackDetected(...)
+    if not config.infiniteAmmoEnabled then return end
+    local now = tick()
+    if now - lastAttackTime < ATTACK_COOLDOWN then return end
+    lastAttackTime = now
 
-    if not localCharacter then return end
-    local root = localCharacter:FindFirstChild("HumanoidRootPart") or localCharacter:FindFirstChild("Torso")
-    if not root then return end
+    -- Delay 0.15 detik sebelum parry (akurasi)
+    task.wait(0.15)
+    if config.infiniteAmmoEnabled then
+        triggerParryAction()
+        -- Debug (opsional)
+        -- print("[AutoParry] Parry triggered after attack remote event")
+    end
+end
 
-    local box = Instance.new("Part")
-    box.Name = "AutoParryHitbox"
-    box.Size = Vector3.new(3, 3, 3)
-    box.CFrame = root.CFrame
-    box.Anchored = false
-    box.CanCollide = false
-    box.Transparency = 1
-    box.Parent = localCharacter
+-- Setup monitoring untuk remote event serangan
+local function setupAttackRemoteMonitoring()
+    -- Hapus koneksi lama
+    for _, conn in ipairs(remoteConnections) do
+        conn:Disconnect()
+    end
+    remoteConnections = {}
+    monitoredRemotes = {}
 
-    -- Weld ke root agar mengikuti karakter
-    local weld = Instance.new("Weld")
-    weld.Part0 = root
-    weld.Part1 = box
-    weld.C0 = CFrame.new(0, 0, 0)
-    weld.Parent = box
-
-    hitboxPart = box
-
-    hitboxConnection = box.Touched:Connect(function(hit)
-        if not config.infiniteAmmoEnabled then return end
-
-        -- Deteksi apakah yang menyentuh adalah Hilt milik killer
-        if not isHiltPart(hit) then return end
-
-        local now = tick()
-        if now - lastAttackTime < ATTACK_COOLDOWN then return end
-        lastAttackTime = now
-
-        if pendingParry then return end
-        pendingParry = true
-
-        -- Delay 0.1 detik sebelum menekan tombol parry (sesuai permintaan)
-        task.wait(0.1)
-
-        if config.infiniteAmmoEnabled then
-            -- Simulasi klik kanan mouse (parry)
-            pcall(function()
-                VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 1, false, game, 0)
-                task.wait(0.02)
-                VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 0, false, game, 0)
-            end)
-            -- Fallback tekan E jika diperlukan (opsional)
-            pcall(function()
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                task.wait(0.02)
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-            end)
+    -- Cari semua remote event yang namanya mengandung keyword serangan
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") then
+            local name = obj.Name:lower()
+            for _, keyword in ipairs(attackRemoteEvents) do
+                if name:find(keyword:lower()) then
+                    if not monitoredRemotes[obj] then
+                        monitoredRemotes[obj] = true
+                        local conn = obj.OnClientEvent:Connect(onAttackDetected)
+                        table.insert(remoteConnections, conn)
+                        -- Juga coba OnServerEvent (jika ada)
+                        local serverConn = nil
+                        pcall(function()
+                            serverConn = obj.OnServerEvent:Connect(onAttackDetected)
+                            if serverConn then table.insert(remoteConnections, serverConn) end
+                        end)
+                        break
+                    end
+                end
+            end
         end
-        pendingParry = false
-    end)
+    end
+    print("[AutoParry] Monitoring " .. #remoteConnections .. " attack remote events")
 end
 
 -- ==================== START / STOP AUTO PARRY ====================
@@ -1836,31 +1816,30 @@ local infiniteAmmoConnection = nil
 
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
-    -- Hapus koneksi lama jika ada
-    if hitboxConnection then hitboxConnection:Disconnect(); hitboxConnection = nil end
     destroyParryRadius()
-
-    -- Buat radius ESP dan hitbox
     createParryRadius()
-    createHitbox()
-
-    print("[AutoParry] Started (Hilt detection + right-click parry with 0.1s delay)")
+    setupAttackRemoteMonitoring()
+    print("[AutoParry] Started (remote event detection + 0.15s delay + circle ESP)")
 end
 
 local function stopInfiniteAmmo()
-    if hitboxConnection then hitboxConnection:Disconnect(); hitboxConnection = nil end
-    if hitboxPart then hitboxPart:Destroy(); hitboxPart = nil end
     destroyParryRadius()
-    print("[AutoParry] Stopped")
+    for _, conn in ipairs(remoteConnections) do
+        conn:Disconnect()
+    end
+    remoteConnections = {}
+    monitoredRemotes = {}
+    print("[AutoParry] Stopped (remote monitoring removed)")
 end
 
 -- ============================================================================
 -- CATATAN: 
--- - Fungsi ini menggantikan seluruh bagian upgrade auto parry.
--- - Radius ESP visual berbentuk lingkaran (cylinder) dengan efek pulse.
--- - Deteksi serangan berdasarkan sentuhan pada bagian "Hilt" dari senjata killer.
--- - Setelah terdeteksi, delay 0.1 detik lalu klik kanan mouse untuk parry.
--- - Tidak ada konflik dengan fungsi lain karena tetap menggunakan config.infiniteAmmoEnabled.
+-- - Fungsi startInfiniteAmmo() dan stopInfiniteAmmo() menggantikan versi sebelumnya.
+-- - Konfigurasi toggle tetap menggunakan config.infiniteAmmoEnabled.
+-- - ESP berbentuk lingkaran (cylinder) dengan radius 7 studs, berwarna merah neon.
+-- - Deteksi serangan berdasarkan remote event yang umum digunakan di Violence District.
+-- - Delay parry 0.15 detik setelah remote event terdeteksi (akurasi).
+-- - Tidak mengubah fitur lain (auto win, auto task, esp objek, dll).
 -- ============================================================================
 
 -- ============================================================================

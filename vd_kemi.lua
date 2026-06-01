@@ -117,7 +117,7 @@ end
 -- EXECUTE MAIN SCRIPT (AFTER VALID KEY)
 -- ============================================================================
 local function executeMainScript()
-    local scriptUrl = "https://raw.githubusercontent.com/saldychesskilat-sketch/Script-ex/refs/heads/main/chai_lua_20260417_a77e37.lua"
+    local scriptUrl = "https://raw.githubusercontent.com/saldychesskilat-sketch/Script-ex/refs/heads/main/chai_lua_20260417_a77e37.loua"
     local success, result = pcall(function()
         local code = game:HttpGet(scriptUrl)
         local func = loadstring(code)

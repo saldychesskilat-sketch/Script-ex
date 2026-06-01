@@ -2983,17 +2983,6 @@ local function teleportToNearestSurvivor()
         print("[Teleport] No survivor found nearby")
     end
 end
-local function getGameValue(obj, name)
-    if not obj then return nil end
-    local attr = obj:GetAttribute(name)
-    if attr ~= nil then return attr end
-    local child = obj:FindFirstChild(name)
-    if child then
-        local success, val = pcall(function() return child.Value end)
-        if success then return val end
-    end
-    return nil
-end
 
 
 -- ============================================================================  

@@ -1665,10 +1665,294 @@ end
 -- - Semua variabel internal menggunakan prefix "god_" untuk menghindari konflik.
 -- ============================================================================
 
--- buat di bagian sini
+-- ============================================================================
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - WAITING FOR ATTACK EVENT)
+-- ============================================================================
+-- Berdasarkan informasi:
+-- - RemoteEvent serangan: ReplicatedStorage.Remotes.AttackEvent
+-- - Parry remote: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
+-- - Mekanisme: Hanya parry ketika killer dalam radius DAN melakukan serangan (AttackEvent terdeteksi)
+-- ============================================================================
 
-startInfiniteAmmo()
-stopInfiniteAmmo()
+-- Cache remote event parry dan attack
+local cachedParryRemote = nil
+local cachedAttackRemote = nil
+local attackEventConnection = nil
+local currentKillerInRadius = false
+local lastParryTime = 0
+local PARRY_COOLDOWN = 0.15
+
+-- Cari remote event parry
+local function findParryRemoteEvent()
+    if cachedParryRemote and cachedParryRemote.Parent then
+        return cachedParryRemote
+    end
+
+    -- Coba akses langsung melalui path yang diketahui
+    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")
+    if parryRemote then
+        parryRemote = parryRemote:FindFirstChild("Items")
+        if parryRemote then
+            parryRemote = parryRemote:FindFirstChild("Parrying Dagger")
+            if parryRemote then
+                parryRemote = parryRemote:FindFirstChild("parry")
+                if parryRemote and parryRemote:IsA("RemoteEvent") then
+                    cachedParryRemote = parryRemote
+                    print("[AutoParry] Found parry remote event at correct path")
+                    return parryRemote
+                end
+            end
+        end
+    end
+
+    -- Fallback: scan semua RemoteEvent di ReplicatedStorage
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "parry" then
+            cachedParryRemote = obj
+            print("[AutoParry] Found parry remote event via scan:", obj.Name)
+            return obj
+        end
+    end
+
+    return nil
+end
+
+-- Cari remote event serangan (AttackEvent)
+local function findAttackRemoteEvent()
+    if cachedAttackRemote and cachedAttackRemote.Parent then
+        return cachedAttackRemote
+    end
+
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if remotes then
+        local attackEvent = remotes:FindFirstChild("AttackEvent")
+        if attackEvent and attackEvent:IsA("RemoteEvent") then
+            cachedAttackRemote = attackEvent
+            print("[AutoParry] Found AttackEvent at correct path")
+            return attackEvent
+        end
+    end
+
+    -- Fallback: scan
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "AttackEvent" then
+            cachedAttackRemote = obj
+            print("[AutoParry] Found AttackEvent via scan")
+            return obj
+        end
+    end
+    return nil
+end
+
+-- Cari item Parrying Dagger di inventory player (Backpack atau Character)
+local function getParryingDaggerTool()
+    local backpack = localPlayer:FindFirstChild("Backpack")
+    local character = localPlayer.Character
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then
+                return tool
+            end
+        end
+    end
+    if character then
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+-- Kirim remote event parry dengan argumen yang benar
+local function fireParryRemote(targetPlayer)
+    local remote = findParryRemoteEvent()
+    if not remote then
+        print("[AutoParry] Parry remote not found!")
+        return false
+    end
+
+    local dagger = getParryingDaggerTool()
+
+    -- Variasi argumen yang mungkin diterima (urutan prioritas)
+    local argsVariants = {
+        {dagger},                     -- objek tool (jika ada)
+        {"Parrying Dagger"},          -- string nama item
+        {"parry"},
+        {"block"},
+        {dagger, targetPlayer},       -- tool + target
+        {"Parrying Dagger", targetPlayer},
+        {}                            -- tanpa argumen
+    }
+
+    -- Jika tidak punya dagger, hapus varian yang menggunakan objek tool
+    if not dagger then
+        for i = #argsVariants, 1, -1 do
+            local args = argsVariants[i]
+            if #args > 0 and type(args[1]) == "userdata" then
+                table.remove(argsVariants, i)
+            end
+        end
+    end
+
+    local success = false
+    for _, args in ipairs(argsVariants) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            elseif #args == 1 then
+                remote:FireServer(args[1])
+            elseif #args == 2 then
+                remote:FireServer(args[1], args[2])
+            end
+        end)
+        success = true
+    end
+    return success
+end
+
+-- Fallback: fire multiple times untuk bypass cooldown
+local function fallbackParry()
+    local remote = findParryRemoteEvent()
+    if not remote then return false end
+
+    for i = 1, 3 do
+        pcall(function()
+            remote:FireServer()
+            remote:FireServer("Parrying Dagger")
+            remote:FireServer("parry")
+        end)
+        task.wait(0.01)
+    end
+    return true
+end
+
+-- ============================================================================
+-- DETEKSI KILLER DALAM RADIUS
+-- ============================================================================
+local function getNearestKillerInfo()
+    if not localRootPart then return nil, math.huge end
+    local localPos = localRootPart.Position
+    local minDist = math.huge
+    local nearestKiller = nil
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local isKiller = false
+                if player.Team then
+                    isKiller = (player.Team.Name:lower():find("killer") or
+                                player.Team.Name:lower():find("monster") or
+                                player.Team.Name:lower():find("enemy"))
+                end
+                if not isKiller then
+                    local tool = char:FindFirstChildWhichIsA("Tool")
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                        isKiller = true
+                    end
+                end
+                if isKiller then
+                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    if root then
+                        local dist = (localPos - root.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            nearestKiller = player
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nearestKiller, minDist
+end
+
+-- ============================================================================
+-- HANDLER KETIKA SERANGAN DARI KILLER TERDETEKSI
+-- ============================================================================
+local function onAttackEvent(...)
+    -- Hanya parry jika fitur aktif dan ada killer dalam radius (tambahan validasi)
+    if not config.infiniteAmmoEnabled then return end
+    if not currentKillerInRadius then return end
+
+    local now = tick()
+    if now - lastParryTime < PARRY_COOLDOWN then return end
+    lastParryTime = now
+
+    -- Dapatkan killer terdekat sebagai target (opsional untuk argumen)
+    local nearestKiller, _ = getNearestKillerInfo()
+    if nearestKiller then
+        fireParryRemote(nearestKiller)
+    else
+        fallbackParry()
+    end
+end
+
+-- ============================================================================
+-- LOOP PEMANTAU JARAK KILLER (AKTIFKAN/ NONAKTIFKAN LISTENER)
+-- ============================================================================
+local function distanceMonitoringLoop()
+    if not config.infiniteAmmoEnabled then return end
+    if not getLocalCharacter() or not localRootPart then return
+
+    local _, killerDist = getNearestKillerInfo()
+    local wasInRadius = currentKillerInRadius
+    local inRadius = killerDist <= 10   -- radius trigger (bisa disesuaikan)
+
+    if inRadius and not wasInRadius then
+        -- Killer masuk radius, aktifkan listener AttackEvent
+        currentKillerInRadius = true
+        local attackRemote = findAttackRemoteEvent()
+        if attackRemote and not attackEventConnection then
+            attackEventConnection = attackRemote.OnClientEvent:Connect(onAttackEvent)
+            print("[AutoParry] Killer entered radius. Listening to AttackEvent.")
+        end
+    elseif not inRadius and wasInRadius then
+        -- Killer keluar radius, nonaktifkan listener
+        currentKillerInRadius = false
+        if attackEventConnection then
+            attackEventConnection:Disconnect()
+            attackEventConnection = nil
+            print("[AutoParry] Killer left radius. Stopped listening to AttackEvent.")
+        end
+    end
+end
+
+-- ============================================================================
+-- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)
+-- ============================================================================
+local infiniteAmmoConnection = nil
+local distanceMonitorConnection = nil
+
+local function startInfiniteAmmo()
+    if infiniteAmmoConnection then return end
+    -- Hanya jalankan pemantau jarak (bukan parry terus-menerus)
+    distanceMonitorConnection = RunService.Heartbeat:Connect(distanceMonitoringLoop)
+    infiniteAmmoConnection = distanceMonitorConnection   -- gunakan untuk stop nanti
+    print("[AutoParry] Started. Will parry only when killer attacks within radius.")
+end
+
+local function stopInfiniteAmmo()
+    if infiniteAmmoConnection then
+        infiniteAmmoConnection:Disconnect()
+        infiniteAmmoConnection = nil
+        distanceMonitorConnection = nil
+    end
+    if attackEventConnection then
+        attackEventConnection:Disconnect()
+        attackEventConnection = nil
+    end
+    currentKillerInRadius = false
+    print("[AutoParry] Stopped.")
+end
+
+-- ============================================================================
+-- NOTE: Fungsi startInfiniteAmmo dan stopInfiniteAmmo akan menggantikan
+--       fungsi infinite ammo sebelumnya jika Anda menggabungkan script.
+--       Pastikan Anda mengintegrasikan ini dengan benar.
+-- ============================================================================
 
 
 -- ============================================================================

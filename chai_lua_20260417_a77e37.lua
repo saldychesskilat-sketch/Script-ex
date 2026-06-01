@@ -1668,10 +1668,199 @@ end
 
 
 -- ============================================================================
--- script auto parry
+-- AUTO PARRY (DAGGER) dengan visual radius + deteksi remote event serangan
+-- Toggle menggunakan config.infiniteAmmoEnabled (tombol Dagger di GUI)
 -- ============================================================================
--- startInfiniteAmmo()
--- stopInfiniteAmmo()
+
+-- Variabel untuk auto parry
+local parryRadiusPart = nil
+local radiusPulseConnection = nil
+local attackRemoteConnections = {}
+local lastAttackTime = 0
+local PARRY_COOLDOWN = 0.3   -- cooldown antar parry
+local parryDelay = 0.1        -- delay setelah deteksi serangan (respons cepat)
+
+-- Daftar keyword remote event serangan (berdasarkan informasi dari VD)
+local attackKeywords = {
+    "hilt", "AttackEvent", "BasicAttack", "Lunge", "LungeDetect",
+    "AfterAttack", "TrailEvent", "SlowAttack", "alexattack", "M2",
+    "m2HitVM", "Spearthrow", "FrenzyHitEvent", "grab", "GrabHitResult"
+}
+
+-- ==================== VISUAL RADIUS (LINGKARAN MERAH) ====================
+local function createParryRadius()
+    if parryRadiusPart then parryRadiusPart:Destroy() end
+    if not config.infiniteAmmoEnabled then return end
+
+    local radius = 7  -- jarak visual (studs)
+    local part = Instance.new("Part")
+    part.Name = "AutoParryRadius"
+    part.Size = Vector3.new(radius * 2, 0.2, radius * 2)
+    part.Shape = Enum.PartType.Cylinder
+    part.Anchored = true
+    part.CanCollide = false
+    part.BrickColor = BrickColor.new("Bright red")
+    part.Material = Enum.Material.Neon
+    part.Transparency = 0.7
+    part.Parent = workspace
+
+    if radiusPulseConnection then radiusPulseConnection:Disconnect() end
+    radiusPulseConnection = RunService.RenderStepped:Connect(function()
+        if not config.infiniteAmmoEnabled then
+            if parryRadiusPart then parryRadiusPart:Destroy() end
+            if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end
+            return
+        end
+        if part and part.Parent then
+            local alpha = (math.sin(tick() * 3) + 1) / 2
+            part.Transparency = 0.5 + alpha * 0.3
+            part.Color = Color3.fromRGB(255, 50, 50)
+        end
+        if localRootPart and localRootPart.Parent then
+            part.CFrame = CFrame.new(localRootPart.Position)
+        elseif localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then
+            part.CFrame = CFrame.new(localCharacter.HumanoidRootPart.Position)
+        end
+    end)
+    parryRadiusPart = part
+end
+
+local function destroyParryRadius()
+    if parryRadiusPart then parryRadiusPart:Destroy(); parryRadiusPart = nil end
+    if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end
+end
+
+-- ==================== DETEKSI JARAK KILLER ====================
+local function getNearestKillerDistance()
+    if not localRootPart then return math.huge end
+    local localPos = localRootPart.Position
+    local minDist = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local isKiller = false
+                if player.Team then
+                    local teamName = player.Team.Name:lower()
+                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                        isKiller = true
+                    end
+                end
+                if not isKiller then
+                    local tool = char:FindFirstChildWhichIsA("Tool")
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                        isKiller = true
+                    end
+                end
+                if isKiller then
+                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    if root then
+                        local dist = (localPos - root.Position).Magnitude
+                        if dist < minDist then minDist = dist end
+                    end
+                end
+            end
+        end
+    end
+    return minDist
+end
+
+-- ==================== PENDETEKSI REMOTE EVENT SERANGAN ====================
+local function findAllAttackRemotes()
+    local attackRemotes = {}
+    local containers = {ReplicatedStorage, Workspace, game:GetService("ReplicatedFirst")}
+    for _, container in ipairs(containers) do
+        if container then
+            for _, obj in ipairs(container:GetDescendants()) do
+                if obj:IsA("RemoteEvent") then
+                    local name = obj.Name:lower()
+                    for _, kw in ipairs(attackKeywords) do
+                        if name:find(kw) then
+                            table.insert(attackRemotes, obj)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return attackRemotes
+end
+
+local function setupAttackRemoteListeners()
+    -- Hapus listener lama
+    for _, conn in ipairs(attackRemoteConnections) do
+        conn:Disconnect()
+    end
+    attackRemoteConnections = {}
+
+    local attackRemotes = findAllAttackRemotes()
+    for _, remote in ipairs(attackRemotes) do
+        local conn = remote.OnServerEvent:Connect(function(player, ...)
+            -- Hanya proses jika auto parry aktif dan jarak killer <= 8 studs
+            if not config.infiniteAmmoEnabled then return end
+            if player == localPlayer then return end
+            local dist = getNearestKillerDistance()
+            if dist > 8 then return end
+
+            local now = tick()
+            if now - lastAttackTime < PARRY_COOLDOWN then return end
+            lastAttackTime = now
+
+            -- Trigger parry dengan delay kecil (respons cepat)
+            task.spawn(function()
+                task.wait(parryDelay)
+                if config.infiniteAmmoEnabled then
+                    -- Simulasi klik kanan mouse (parry di VD biasanya tombol kanan)
+                    pcall(function()
+                        VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 1, false, game, 0)
+                        task.wait(0.02)
+                        VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 0, false, game, 0)
+                    end)
+                end
+            end)
+        end)
+        table.insert(attackRemoteConnections, conn)
+    end
+    print("[AutoParry] Listening to " .. #attackRemotes .. " attack remote events")
+end
+
+-- ==================== START / STOP AUTO PARRY ====================
+-- Ganti fungsi startInfiniteAmmo dan stopInfiniteAmmo yang kosong
+local infiniteAmmoConnection = nil
+
+local function startInfiniteAmmo()
+    if infiniteAmmoConnection then return end
+    destroyParryRadius()
+    createParryRadius()
+    setupAttackRemoteListeners()
+    -- Simpan koneksi dummy agar stop bisa mendeteksi
+    infiniteAmmoConnection = RunService.Heartbeat:Connect(function() end)
+    print("[AutoParry] Started (visual radius 7 studs, remote event detection, right-click parry)")
+end
+
+local function stopInfiniteAmmo()
+    if infiniteAmmoConnection then
+        infiniteAmmoConnection:Disconnect()
+        infiniteAmmoConnection = nil
+    end
+    for _, conn in ipairs(attackRemoteConnections) do
+        conn:Disconnect()
+    end
+    attackRemoteConnections = {}
+    destroyParryRadius()
+    print("[AutoParry] Stopped")
+end
+
+-- ============================================================================
+-- CATATAN:
+-- - Visual radius: lingkaran merah dengan radius 7 studs.
+-- - Deteksi serangan berdasarkan remote event dengan keyword di atas.
+-- - Parry dilakukan dengan simulasi klik kanan mouse (tombol kanan).
+-- - Hanya aktif jika jarak killer ≤ 8 studs.
+-- - Cooldown antar parry 0.3 detik, delay respons 0.1 detik.
+-- - Tidak mengganggu fitur lain, toggle menggunakan config.infiniteAmmoEnabled.
+-- ============================================================================
 
 -- ============================================================================
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT

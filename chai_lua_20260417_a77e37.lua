@@ -1666,14 +1666,16 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (UPGRADED - REACTIVE COMBAT BROADCAST + FALLBACK)
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (UPGRADED – HYBRID COMBAT DETECTION)
 -- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
--- Upgrade: Scanning dinamis terhadap ReplicatedStorage.Remotes.Attacks & .Killers
--- Mendeteksi OnClientEvent dari remote combat, analisis argumen realtime, trigger parry
--- Heartbeat loop lama tetap sebagai fallback jika tidak ada broadcast.
+-- Mekanisme:
+--   1. Deteksi utama: scan dinamis RemoteEvent di ReplicatedStorage.Remotes.Attacks & .Killers
+--      → Pasang listener OnClientEvent, analisis argumen untuk deteksi serangan realtime.
+--   2. Deteksi fallback: heartbeat loop (jarak killer > 10) seperti semula.
+--   3. Semua fungsi original (findParryRemoteEvent, fireParryRemote, fallbackParry, cooldown) tetap utuh.
 -- ============================================================================
 
--- ===== EXISTING FUNCTIONS (TIDAK DIUBAH) =====
+-- ===== BAGIAN YANG SUDAH ADA (TIDAK DIUBAH) =====
 local cachedParryRemote = nil
 
 local function findParryRemoteEvent()
@@ -1751,12 +1753,9 @@ local function fireParryRemote(targetPlayer)
     end
     for _, args in ipairs(argsVariants) do
         pcall(function()
-            if #args == 0 then
-                remote:FireServer()
-            elseif #args == 1 then
-                remote:FireServer(args[1])
-            elseif #args == 2 then
-                remote:FireServer(args[1], args[2])
+            if #args == 0 then remote:FireServer()
+            elseif #args == 1 then remote:FireServer(args[1])
+            elseif #args == 2 then remote:FireServer(args[1], args[2])
             end
         end)
     end
@@ -1777,7 +1776,193 @@ local function fallbackParry()
     return true
 end
 
--- ===== KILLER DETECTION & RADIUS (SAMA) =====
+-- ===== BAGIAN BARU: SCANNING DINAMIS REMOTE COMBAT =====
+local combatRemoteConnections = {}  -- tabel { [remote] = connection }
+local combatScanConnection = nil
+local combatDescendantConnection = nil
+
+-- Helper: cek apakah suatu player adalah killer
+local function isPlayerKiller(player)
+    if not player or player == localPlayer then return false end
+    if player.Team then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            return true
+        end
+    end
+    local char = player.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Helper: cari player dari karakter atau objek
+local function findPlayerFromObject(obj)
+    if not obj then return nil end
+    if obj:IsA("Player") then return obj end
+    if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Character == obj then return p end
+        end
+    end
+    return nil
+end
+
+-- Fungsi yang dipanggil setiap kali remote combat mengirim event
+local function onCombatRemoteTriggered(remote, ...)
+    if not config.infiniteAmmoEnabled then return end
+    if not getLocalCharacter() or not localRootPart then return end
+
+    local args = {...}
+    local targetPlayer = nil
+
+    -- Analisis argumen untuk mencari player killer
+    for _, arg in ipairs(args) do
+        local player = findPlayerFromObject(arg)
+        if player and isPlayerKiller(player) then
+            targetPlayer = player
+            break
+        end
+        -- Jika argumen adalah string nama player, coba cocokkan
+        if type(arg) == "string" then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Name == arg and isPlayerKiller(p) then
+                    targetPlayer = p
+                    break
+                end
+            end
+        end
+    end
+
+    -- Jika tidak ditemukan, coba lihat nama remote sebagai petunjuk
+    if not targetPlayer and remote and remote.Name:lower():find("hit") or remote.Name:lower():find("damage") then
+        -- Fallback: cari killer terdekat
+        local minDist = math.huge
+        local nearestKiller = nil
+        local localPos = localRootPart.Position
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= localPlayer and isPlayerKiller(p) and p.Character then
+                local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Torso")
+                if root then
+                    local dist = (localPos - root.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        nearestKiller = p
+                    end
+                end
+            end
+        end
+        targetPlayer = nearestKiller
+    end
+
+    if not targetPlayer then return end
+
+    -- Validasi jarak
+    local killerChar = targetPlayer.Character
+    if not killerChar then return end
+    local killerRoot = killerChar:FindFirstChild("HumanoidRootPart") or killerChar:FindFirstChild("Torso")
+    if not killerRoot then return end
+    local dist = (localRootPart.Position - killerRoot.Position).Magnitude
+    if dist > 10 then return end  -- radius maksimum 10 studs
+
+    -- Cooldown global
+    local now = tick()
+    if now - lastParryTime < PARRY_COOLDOWN then return end
+    lastParryTime = now
+
+    -- Trigger parry
+    fireParryRemote(targetPlayer)
+    -- Debug ringan (bisa dihapus)
+    -- print("[AutoParry] Combat-triggered parry vs", targetPlayer.Name, "remote:", remote and remote.Name)
+end
+
+-- Pasang listener untuk satu remote event
+local function hookCombatRemote(remote)
+    if combatRemoteConnections[remote] then return end  -- sudah terpasang
+    local conn = remote.OnClientEvent:Connect(function(...)
+        onCombatRemoteTriggered(remote, ...)
+    end)
+    combatRemoteConnections[remote] = conn
+end
+
+-- Scan folder Attacks dan Killers, serta semua descendant-nya
+local function scanAndHookCombatRemotes()
+    local remotesContainer = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotesContainer then return end
+
+    local attacks = remotesContainer:FindFirstChild("Attacks")
+    local killers = remotesContainer:FindFirstChild("Killers")
+
+    local function scanFolder(folder)
+        if not folder then return end
+        for _, obj in ipairs(folder:GetDescendants()) do
+            if obj:IsA("RemoteEvent") then
+                hookCombatRemote(obj)
+            end
+        end
+    end
+
+    scanFolder(attacks)
+    scanFolder(killers)
+
+    -- Juga scan seluruh ReplicatedStorage untuk remote yang mengandung kata kunci
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and not combatRemoteConnections[obj] then
+            local nameLow = obj.Name:lower()
+            if nameLow:find("hit") or nameLow:find("damage") or nameLow:find("attack") or nameLow:find("swing") then
+                hookCombatRemote(obj)
+            end
+        end
+    end
+end
+
+-- Memulai pemindaian dinamis (dipanggil saat startInfiniteAmmo)
+local function startCombatScanning()
+    if combatScanConnection then return end
+    scanAndHookCombatRemotes()
+    -- Periodic scan ulang setiap 10 detik untuk remote baru
+    combatScanConnection = RunService.Stepped:Connect(function()
+        if not config.infiniteAmmoEnabled then
+            if combatScanConnection then combatScanConnection:Disconnect() end
+            combatScanConnection = nil
+            return
+        end
+        scanAndHookCombatRemotes()
+    end)
+    -- Pantau DescendantAdded di ReplicatedStorage untuk remote baru
+    combatDescendantConnection = ReplicatedStorage.DescendantAdded:Connect(function(desc)
+        if config.infiniteAmmoEnabled and desc:IsA("RemoteEvent") then
+            local nameLow = desc.Name:lower()
+            if nameLow:find("hit") or nameLow:find("damage") or nameLow:find("attack") or nameLow:find("swing") then
+                hookCombatRemote(desc)
+            end
+        end
+    end)
+end
+
+local function stopCombatScanning()
+    if combatScanConnection then
+        combatScanConnection:Disconnect()
+        combatScanConnection = nil
+    end
+    if combatDescendantConnection then
+        combatDescendantConnection:Disconnect()
+        combatDescendantConnection = nil
+    end
+    for remote, conn in pairs(combatRemoteConnections) do
+        conn:Disconnect()
+    end
+    combatRemoteConnections = {}
+end
+
+-- ===== HEARTBEAT LOOP (FALLBACK) – TETAP SAMA =====
+local lastParryTime = 0
+local PARRY_COOLDOWN = 0.15
+
 local function getKillerDistance()
     if not localRootPart then return math.huge end
     local localPos = localRootPart.Position
@@ -1788,10 +1973,7 @@ local function getKillerDistance()
             if char then
                 local isKiller = false
                 if player.Team then
-                    local teamName = player.Team.Name:lower()
-                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                        isKiller = true
-                    end
+                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
                 end
                 if not isKiller then
                     local tool = char:FindFirstChildWhichIsA("Tool")
@@ -1814,158 +1996,7 @@ local function getKillerDistance()
     return minDist
 end
 
--- ===== NEW: REAKTIF COMBAT BROADCAST DETECTION =====
-local combatRemoteListeners = {}   -- cache koneksi untuk setiap remote (path -> connection)
-local combatScanConnection = nil
-local combatAddedConnection = nil
-local remoteScanInterval = 5        -- scan ulang setiap 5 detik untuk remote baru
-
--- Analisis argumen broadcast untuk menentukan apakah ini serangan killer
-local function analyzeAttackBroadcast(...)
-    local args = {...}
-    local killerPlayer = nil
-    local targetPlayer = nil
-    local isAttack = false
-
-    -- Cek apakah ada argumen yang merupakan Player atau karakter
-    for _, arg in ipairs(args) do
-        if typeof(arg) == "Instance" then
-            if arg:IsA("Player") then
-                if arg ~= localPlayer and (arg.Team and arg.Team.Name:lower():find("killer")) then
-                    killerPlayer = arg
-                    isAttack = true
-                end
-            elseif arg:IsA("Model") and arg:FindFirstChild("Humanoid") then
-                -- Cari player dari karakter
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p.Character == arg then
-                        if p ~= localPlayer and (p.Team and p.Team.Name:lower():find("killer")) then
-                            killerPlayer = p
-                            isAttack = true
-                        end
-                        break
-                    end
-                end
-            end
-        elseif type(arg) == "string" then
-            local lower = arg:lower()
-            if lower:find("hit") or lower:find("attack") or lower:find("damage") or lower:find("melee") then
-                isAttack = true
-            end
-        elseif type(arg) == "number" and arg > 0 then
-            -- bisa damage value, tidak bisa disimpulkan sendiri, tetap pertahankan flag
-            isAttack = true
-        end
-    end
-
-    return isAttack, killerPlayer
-end
-
--- Callback saat remote combat terpanggil
-local function onCombatRemoteFired(remotePath, ...)
-    if not config.infiniteAmmoEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-
-    local isAttack, attacker = analyzeAttackBroadcast(...)
-    if not isAttack or not attacker then return end
-
-    -- Validasi jarak
-    local dist = getKillerDistance()
-    if dist > 12 then return end   -- radius 12 studs (bisa disesuaikan)
-
-    -- Cooldown global
-    local now = tick()
-    if now - (lastParryTime or 0) < (PARRY_COOLDOWN or 0.15) then return end
-    lastParryTime = now
-
-    -- Trigger parry
-    fireParryRemote(attacker)
-    -- Logging ringan untuk debugging (hanya tampilkan 1x setiap 10 detik per remote)
-    if not combatRemoteListeners[remotePath] or combatRemoteListeners[remotePath].lastLog or tick() - (combatRemoteListeners[remotePath].lastLog or 0) > 10 then
-        print("[AutoParry] Combat broadcast detected from", remotePath, "attacker:", attacker.Name, "dist:", dist)
-        if combatRemoteListeners[remotePath] then
-            combatRemoteListeners[remotePath].lastLog = tick()
-        end
-    end
-end
-
--- Pasang listener untuk satu remote event
-local function setupCombatListener(remote, remotePath)
-    if combatRemoteListeners[remotePath] and combatRemoteListeners[remotePath].conn then
-        return  -- sudah terpasang
-    end
-    local conn = remote.OnClientEvent:Connect(function(...)
-        onCombatRemoteFired(remotePath, ...)
-    end)
-    combatRemoteListeners[remotePath] = {
-        conn = conn,
-        lastLog = 0
-    }
-end
-
--- Scanning dinamis: cari semua RemoteEvent di folder Attacks dan Killers
-local function scanCombatRemotes()
-    local attacksFolder = ReplicatedStorage:FindFirstChild("Remotes")
-    if attacksFolder then
-        local killersFolder = attacksFolder:FindFirstChild("Killers")
-        if killersFolder then
-            for _, remote in ipairs(killersFolder:GetDescendants()) do
-                if remote:IsA("RemoteEvent") then
-                    local path = "Remotes.Killers." .. remote.Name
-                    setupCombatListener(remote, path)
-                end
-            end
-        end
-        local attacksSub = attacksFolder:FindFirstChild("Attacks")
-        if attacksSub then
-            for _, remote in ipairs(attacksSub:GetDescendants()) do
-                if remote:IsA("RemoteEvent") then
-                    local path = "Remotes.Attacks." .. remote.Name
-                    setupCombatListener(remote, path)
-                end
-            end
-        end
-        -- Juga scan langsung di bawah Remotes (misal: Hit, Damage, etc)
-        for _, remote in ipairs(attacksFolder:GetDescendants()) do
-            if remote:IsA("RemoteEvent") then
-                local path = "Remotes." .. remote.Name
-                if not combatRemoteListeners[path] then
-                    setupCombatListener(remote, path)
-                end
-            end
-        end
-    end
-    -- Fallback: scan seluruh ReplicatedStorage untuk remote dengan nama mengandung kata kunci
-    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
-        if remote:IsA("RemoteEvent") then
-            local name = remote.Name:lower()
-            if name:find("hit") or name:find("attack") or name:find("damage") or name:find("melee") then
-                local path = "ReplicatedStorage." .. remote.Name
-                if not combatRemoteListeners[path] then
-                    setupCombatListener(remote, path)
-                end
-            end
-        end
-    end
-end
-
--- Handler untuk remote event baru yang ditambahkan saat runtime
-local function onCombatRemoteAdded(instance)
-    if instance:IsA("RemoteEvent") then
-        local name = instance.Name:lower()
-        local parentName = instance.Parent and instance.Parent.Name or ""
-        if parentName == "Attacks" or parentName == "Killers" or name:find("hit") or name:find("attack") or name:find("damage") then
-            local path = (instance.Parent and instance.Parent.Name .. "." or "") .. instance.Name
-            setupCombatListener(instance, path)
-        end
-    end
-end
-
--- ===== HEARTBEAT FALLBACK LOOP (SAMA SEPERTI LAMA, DIPERTAHANKAN) =====
-local lastParryTime = 0
-local PARRY_COOLDOWN = 0.15
-
-local function autoParryFallbackLoop()
+local function autoParryLoop()
     if not config.infiniteAmmoEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
@@ -1976,7 +2007,6 @@ local function autoParryFallbackLoop()
     if now - lastParryTime < PARRY_COOLDOWN then return end
     lastParryTime = now
 
-    -- Cari target killer terdekat
     local targetPlayer = nil
     local minDist = math.huge
     local localPos = localRootPart.Position
@@ -2015,48 +2045,19 @@ local function autoParryFallbackLoop()
     end
 end
 
--- ============================================================================
--- START / STOP (MENGGABUNGKAN SEMUA SISTEM)
--- ============================================================================
+-- ===== START / STOP =====
 local infiniteAmmoConnection = nil
-local fallbackLoopConnection = nil
 
 local function startInfiniteAmmo()
     if infiniteAmmoConnection then return end
 
-    -- Bersihkan listener lama
-    for path, data in pairs(combatRemoteListeners) do
-        if data.conn then data.conn:Disconnect() end
-    end
-    combatRemoteListeners = {}
-    if combatScanConnection then combatScanConnection:Disconnect() end
-    if combatAddedConnection then combatAddedConnection:Disconnect() end
+    -- Mulai pemindaian combat remote (deteksi serangan realtime)
+    startCombatScanning()
 
-    -- Pasang scanning awal
-    scanCombatRemotes()
+    -- Jalankan heartbeat loop sebagai fallback
+    infiniteAmmoConnection = RunService.Heartbeat:Connect(autoParryLoop)
 
-    -- Periodic scan (setiap 5 detik) untuk remote baru
-    combatScanConnection = RunService.Heartbeat:Connect(function()
-        if not config.infiniteAmmoEnabled then return end
-        if tick() % remoteScanInterval < 0.1 then  -- kurang presisi, tapi cukup
-            scanCombatRemotes()
-        end
-    end)
-
-    -- Listener untuk remote yang ditambahkan saat runtime
-    combatAddedConnection = ReplicatedStorage.DescendantAdded:Connect(onCombatRemoteAdded)
-
-    -- Heartbeat fallback loop (sama seperti loop lama, tetap berjalan)
-    fallbackLoopConnection = RunService.Heartbeat:Connect(autoParryFallbackLoop)
-
-    -- Koneksi dummy untuk menjaga agar stopInfiniteAmmo bisa membedakan status (opsional)
-    infiniteAmmoConnection = RunService.Heartbeat:Connect(function()
-        if not config.infiniteAmmoEnabled then
-            stopInfiniteAmmo()
-        end
-    end)
-
-    print("[AutoParry] Started (Reactive combat broadcast detection + fallback heartbeat)")
+    print("[AutoParry] Started (hybrid mode: combat remote scanning + heartbeat fallback)")
 end
 
 local function stopInfiniteAmmo()
@@ -2064,36 +2065,12 @@ local function stopInfiniteAmmo()
         infiniteAmmoConnection:Disconnect()
         infiniteAmmoConnection = nil
     end
-    if fallbackLoopConnection then
-        fallbackLoopConnection:Disconnect()
-        fallbackLoopConnection = nil
-    end
-    if combatScanConnection then
-        combatScanConnection:Disconnect()
-        combatScanConnection = nil
-    end
-    if combatAddedConnection then
-        combatAddedConnection:Disconnect()
-        combatAddedConnection = nil
-    end
-    for path, data in pairs(combatRemoteListeners) do
-        if data.conn then data.conn:Disconnect() end
-    end
-    combatRemoteListeners = {}
+    stopCombatScanning()
     print("[AutoParry] Stopped")
 end
 
--- ============================================================================
--- CATATAN:
--- - Semua fungsi existing (findParryRemoteEvent, fireParryRemote, fallbackParry, getKillerDistance) TIDAK DIUBAH.
--- - Ditambahkan scanning dinamis terhadap ReplicatedStorage.Remotes.Attacks & .Killers,
---   serta DescendantAdded untuk remote baru.
- -- - Setiap remote combat dipasang listener OnClientEvent, analisis argumen realtime.
--- - Parry hanya dipicu jika terdeteksi serangan dari killer dalam radius ≤ 12 studs.
--- - Heartbeat loop lama tetap berjalan sebagai fallback (menggunakan getKillerDistance + fireParryRemote).
--- - Cooldown global (PARRY_COOLDOWN = 0.15) tetap digunakan.
--- - Sistem bekerja adaptif terhadap perubahan struktur remote game tanpa perlu hardcode.
--- ============================================================================
+
+
 -- ============================================================================
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================

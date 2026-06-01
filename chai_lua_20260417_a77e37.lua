@@ -1666,220 +1666,202 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- UPGRADE FITUR AUTO PARRY (REALISTIC + RADIUS ESP)
--- ============================================================================
-
--- ==================== RADIUS ESP (LINGKARAN SEMPURNA) ====================
-local parryRadiusPart = nil
-local radiusPulseConnection = nil
-
-local function createParryRadius()
-    if parryRadiusPart then parryRadiusPart:Destroy() end
-    if not config.infiniteAmmoEnabled then return end
-
-    local radiusSize = 7  -- jarak deteksi serangan (studs)
-    local part = Instance.new("Part")
-    part.Name = "AutoParryRadius"
-    part.Size = Vector3.new(radiusSize * 2, 0.2, radiusSize * 2)
-    part.Shape = Enum.PartType.Cylinder
-    part.Anchored = true
-    part.CanCollide = false
-    part.BrickColor = BrickColor.new("Bright red")
-    part.Material = Enum.Material.Neon
-    part.Transparency = 0.7
-    -- Rotasi agar lingkaran rata di tanah (tidak miring)
-    part.CFrame = CFrame.new(localRootPart and localRootPart.Position or Vector3.zero) * CFrame.Angles(math.rad(90), 0, 0)
-    part.TopSurface = Enum.SurfaceType.Smooth
-    part.BottomSurface = Enum.SurfaceType.Smooth
-    part.Parent = workspace
-
-    -- Efek pulse (transparency naik turun)
-    if radiusPulseConnection then radiusPulseConnection:Disconnect() end
-    radiusPulseConnection = RunService.RenderStepped:Connect(function()
-        if not config.infiniteAmmoEnabled then
-            if parryRadiusPart then parryRadiusPart:Destroy() end
-            if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end
-            return
-        end
-        if part and part.Parent then
-            local alpha = (math.sin(tick() * 3) + 1) / 2  -- 0-1
-            part.Transparency = 0.5 + alpha * 0.3
-            part.Color = Color3.fromRGB(255, 50, 50)
-        end
-        -- Ikuti local player
-        if localRootPart and localRootPart.Parent then
-            part.CFrame = CFrame.new(localRootPart.Position) * CFrame.Angles(math.rad(90), 0, 0)
-        elseif localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then
-            local root = localCharacter.HumanoidRootPart
-            part.CFrame = CFrame.new(root.Position) * CFrame.Angles(math.rad(90), 0, 0)
-        end
-    end)
-
-    parryRadiusPart = part
-end
-
-local function destroyParryRadius()
-    if parryRadiusPart then parryRadiusPart:Destroy(); parryRadiusPart = nil end
-    if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end
-end
-
--- ==================== SISTEM DETEKSI SERANGAN (REMOTE EVENT) ====================
-local attackRemoteEvents = {}
-local attackConnection = nil
-local lastAttackTime = 0
-local ATTACK_COOLDOWN = 0.5  -- batas minimal antar parry
-
--- Daftar nama remote event yang menandakan serangan killer
-local attackRemoteNames = {
-    "hilt", "AttackEvent", "BasicAttack", "Lunge", "LungeDetect", "AfterAttack",
-    "TrailEvent", "SlowAttack", "alexattack", "M2", "m2HitVM", "Spearthrow",
-    "FrenzyHitEvent", "grab", "GrabHitResult"
-}
-
--- Fungsi untuk mendeteksi apakah suatu remote event adalah serangan killer
-local function isAttackRemote(remote)
-    if not remote or not remote:IsA("RemoteEvent") then return false end
-    local name = remote.Name:lower()
-    for _, pattern in ipairs(attackRemoteNames) do
-        if name:find(pattern:lower()) then
-            return true
-        end
-    end
-    return false
-end
-
--- Scan semua remote event di ReplicatedStorage (dan folder di dalamnya)
-local function scanAttackRemoteEvents()
-    local events = {}
-    local containers = {ReplicatedStorage, workspace:FindFirstChild("Remotes")}
-    for _, container in ipairs(containers) do
-        if container then
-            for _, obj in ipairs(container:GetDescendants()) do
-                if obj:IsA("RemoteEvent") and isAttackRemote(obj) then
-                    table.insert(events, obj)
-                end
-            end
-        end
-    end
-    return events
-end
-
--- Simulasi input parry (klik kanan / E)
-local function triggerParryAction()
-    -- Method 1: Remote Event parry jika ada (kompatibilitas dengan kode lama)
-    local parryRemote = findParryRemoteEvent()
-    if parryRemote then
-        fireParryRemote(nil)
-    else
-        -- Fallback: simulasi klik kanan mouse (default parry di banyak game)
-        pcall(function()
-            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 1, false, game, 0)
-            task.wait(0.02)
-            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 0, false, game, 0)
-        end)
-        -- Alternatif tekan tombol E jika diperlukan
-        pcall(function()
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            task.wait(0.02)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        end)
-    end
-end
-
--- Event handler ketika serangan terdeteksi
-local function onAttackDetected(remote, ...)
-    if not config.infiniteAmmoEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-
-    -- Cek apakah killer yang menyerang ada di radius sekitar
-    local nearestKiller, killerDist = getNearestKiller()
-    if not nearestKiller or killerDist > 7 then return end  -- radius 7 studs
-
-    -- Cegah spam terlalu cepat
-    local now = tick()
-    if now - lastAttackTime < ATTACK_COOLDOWN then return end
-    lastAttackTime = now
-
-    -- Humanized delay (0.13 - 0.15 detik)
-    local delay = 0.13 + math.random() * 0.02
-    task.wait(delay)
-
-    if config.infiniteAmmoEnabled then
-        triggerParryAction()
-    end
-end
-
--- Pasang listener ke semua remote event serangan
-local function setupAttackListeners()
-    if attackConnection then attackConnection:Disconnect(); attackConnection = nil end
-
-    attackRemoteEvents = scanAttackRemoteEvents()
-    for _, remote in ipairs(attackRemoteEvents) do
-        -- Coba pasang ke FireServer (jika remote bisa dipanggil client)
-        pcall(function()
-            local oldFire = remote.FireServer
-            remote.FireServer = function(self, ...)
-                oldFire(self, ...)
-                onAttackDetected(self, ...)
-            end
-        end)
-        -- Pasang ke OnClientEvent sebagai listener pasif
-        pcall(function()
-            remote.OnClientEvent:Connect(function(...)
-                onAttackDetected(remote, ...)
-            end)
-        end)
-    end
-    print("[AutoParry] Attack remote listeners installed for " .. #attackRemoteEvents .. " events")
-end
-
--- ==================== START / STOP AUTO PARRY ====================
-local infiniteAmmoConnection = nil
-
-local function startInfiniteAmmo()
-    if infiniteAmmoConnection then return end
-    -- Hapus koneksi lama jika ada
-    if attackConnection then attackConnection:Disconnect(); attackConnection = nil end
-    destroyParryRadius()
-
-    -- Buat radius ESP dan pasang listener remote event
-    createParryRadius()
-    setupAttackListeners()
-
-    -- Periodic scan untuk mendeteksi remote event baru (ringan, interval 10 detik)
-    infiniteAmmoConnection = RunService.Heartbeat:Connect(function()
-        if not config.infiniteAmmoEnabled then return end
-        if tick() - (infiniteAmmoConnection.lastScan or 0) > 10 then
-            infiniteAmmoConnection.lastScan = tick()
-            setupAttackListeners()  -- refresh remote events
-        end
-    end)
-    infiniteAmmoConnection.lastScan = tick()
-
-    print("[AutoParry] Started (attack remote detection + human delay)")
-end
-
-local function stopInfiniteAmmo()
-    if infiniteAmmoConnection then
-        infiniteAmmoConnection:Disconnect()
-        infiniteAmmoConnection = nil
-    end
-    if attackConnection then attackConnection:Disconnect(); attackConnection = nil end
-    destroyParryRadius()
-    print("[AutoParry] Stopped (remote detection removed)")
-end
-
--- ============================================================================
--- CATATAN:
--- - Fungsi findParryRemoteEvent(), fireParryRemote(), fallbackParry() tetap
---   menggunakan kode yang sudah ada (tidak diubah), cukup pastikan tidak bentrok.
--- - Konfigurasi toggle tetap menggunakan config.infiniteAmmoEnabled.
--- - Radius ESP visual berbentuk lingkaran sempurna (Cylinder dengan rotasi 90 derajat).
--- - Deteksi serangan menggunakan remote event yang dikirim killer, bukan jarak atau touch.
--- - Humanized delay (0.13-0.15 detik) untuk trigger parry agar natural.
--- - Tidak ada loop Heartbeat berat untuk pengecekan jarak (hanya scan remote periodik ringan).
--- ============================================================================
-
+-- ============================================================================    
+-- UPGRADE FITUR AUTO PARRY (REALISTIC + RADIUS ESP)    
+-- ============================================================================    
+    
+-- ==================== RADIUS ESP (visual area deteksi) ====================    
+local parryRadiusPart = nil    
+local radiusPulseConnection = nil    
+    
+local function createParryRadius()    
+    if parryRadiusPart then parryRadiusPart:Destroy() end    
+    if not config.infiniteAmmoEnabled then return end  -- hanya dibuat saat auto parry aktif    
+        
+    local radiusSize = 7  -- jarak deteksi serangan (studs)    
+    local part = Instance.new("Part")    
+    part.Name = "AutoParryRadius"    
+    part.Size = Vector3.new(radiusSize * 2, 0.2, radiusSize * 2)    
+    part.Shape = Enum.PartType.Cylinder    
+    part.Anchored = true    
+    part.CanCollide = false    
+    part.BrickColor = BrickColor.new("Bright red")    
+    part.Material = Enum.Material.Neon    
+    part.Transparency = 0.7    
+    part.TopSurface = Enum.SurfaceType.Smooth    
+    part.BottomSurface = Enum.SurfaceType.Smooth    
+    part.Parent = workspace    
+        
+    -- Efek pulse (transparency naik turun)    
+    if radiusPulseConnection then radiusPulseConnection:Disconnect() end    
+    radiusPulseConnection = RunService.RenderStepped:Connect(function()    
+        if not config.infiniteAmmoEnabled then    
+            if parryRadiusPart then parryRadiusPart:Destroy() end    
+            if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end    
+            return    
+        end    
+        if part and part.Parent then    
+            local alpha = (math.sin(tick() * 3) + 1) / 2  -- 0-1    
+            part.Transparency = 0.5 + alpha * 0.3    
+            part.Color = Color3.fromRGB(255, 50, 50)    
+        end    
+        -- Ikuti local player    
+        if localRootPart and localRootPart.Parent then    
+            part.CFrame = CFrame.new(localRootPart.Position)    
+        elseif localCharacter and localCharacter:FindFirstChild("HumanoidRootPart") then    
+            part.CFrame = CFrame.new(localCharacter.HumanoidRootPart.Position)    
+        end    
+    end)    
+        
+    parryRadiusPart = part    
+end    
+    
+local function destroyParryRadius()    
+    if parryRadiusPart then parryRadiusPart:Destroy(); parryRadiusPart = nil end    
+    if radiusPulseConnection then radiusPulseConnection:Disconnect(); radiusPulseConnection = nil end    
+end    
+    
+-- ==================== SISTEM DETEKSI SERANGAN (TOUCH DETECTION) ====================    
+local hitboxPart = nil    
+local hitboxConnection = nil    
+local pendingParry = false    
+local lastAttackTime = 0    
+local ATTACK_COOLDOWN = 0.5  -- batas minimal antar parry    
+    
+-- Buat part hitbox pada local player untuk mendeteksi sentuhan senjata killer    
+local function createHitbox()    
+    if hitboxPart then hitboxPart:Destroy() end    
+    if hitboxConnection then hitboxConnection:Disconnect() end    
+        
+    if not localCharacter then return end    
+    local root = localCharacter:FindFirstChild("HumanoidRootPart") or localCharacter:FindFirstChild("Torso")    
+    if not root then return end    
+        
+    local box = Instance.new("Part")    
+    box.Name = "AutoParryHitbox"    
+    box.Size = Vector3.new(3, 3, 3)    
+    box.CFrame = root.CFrame    
+    box.Anchored = false    
+    box.CanCollide = false    
+    box.Transparency = 1    
+    box.Parent = localCharacter    
+        
+    -- Weld ke root agar mengikuti karakter    
+    local weld = Instance.new("Weld")    
+    weld.Part0 = root    
+    weld.Part1 = box    
+    weld.C0 = CFrame.new(0, 0, 0)    
+    weld.Parent = box    
+        
+    hitboxPart = box    
+        
+    hitboxConnection = box.Touched:Connect(function(hit)    
+        -- Hanya proses jika auto parry aktif    
+        if not config.infiniteAmmoEnabled then return end    
+            
+        -- Cek apakah yang menyentuh adalah senjata killer (tool atau bagian dari tool)    
+        local weapon = hit:FindFirstAncestorWhichIsA("Tool")    
+        if not weapon then    
+            -- Bisa juga bagian dari karakter killer (misal tangan) tapi kita batasi ke tool    
+            return    
+        end    
+            
+        -- Pastikan pemilik tool adalah killer (bukan diri sendiri)    
+        local owner = weapon.Parent    
+        if not owner or owner == localCharacter then return end    
+        local player = Players:GetPlayerFromCharacter(owner)    
+        if not player or player == localPlayer then return end    
+            
+        -- Cek apakah player tersebut benar-benar killer (memiliki knife/weapon di tangan)    
+        local isKiller = false    
+        if player.Team then    
+            isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))    
+        end    
+        if not isKiller then    
+            local tool = player.Character and player.Character:FindFirstChildWhichIsA("Tool")    
+            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon") or tool.Name:lower():find("blade")) then    
+                isKiller = true    
+            end    
+        end    
+        if not isKiller then return end    
+            
+        -- Cegah spam terlalu cepat    
+        local now = tick()    
+        if now - lastAttackTime < ATTACK_COOLDOWN then return end    
+        lastAttackTime = now    
+            
+        -- Trigger parry dengan delay manusiawi (0.07 - 0.15 detik)    
+        if pendingParry then return end    
+        pendingParry = true    
+            
+        local delayTime = 0.07 + math.random() * 0.08  -- random delay    
+        task.wait(delayTime)    
+            
+        if config.infiniteAmmoEnabled then    
+            triggerParryAction()    
+        end    
+        pendingParry = false    
+    end)    
+end    
+    
+-- ==================== SIMULASI INPUT PARRY YANG REALISTIS ====================    
+local function triggerParryAction()    
+    -- Mencari remote event parry (sama seperti sebelumnya)    
+    local remote = findParryRemoteEvent()    
+    if remote then    
+        -- Kirim remote event dengan argumen yang sesuai (opsional, tetap menggunakan metode lama agar kompatibel)    
+        fireParryRemote(nil)  -- argumen target tidak diperlukan untuk parry    
+    else    
+        -- Fallback: simulasi klik kanan mouse jika game menggunakan tombol right click untuk parry    
+        pcall(function()    
+            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 1, false, game, 0)    
+            task.wait(0.02)    
+            VirtualInputManager:SendMouseButtonEvent(Enum.UserInputType.MouseButton2, 0, false, game, 0)    
+        end)    
+        -- Alternatif simulasi tekan tombol E jika diperlukan    
+        pcall(function()    
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)    
+            task.wait(0.02)    
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)    
+        end)    
+    end    
+    -- Debug (opsional)    
+    -- print("[AutoParry] Parry triggered with human delay")    
+end    
+    
+-- ==================== START / STOP AUTO PARRY ====================    
+-- Ganti fungsi startInfiniteAmmo dan stopInfiniteAmmo yang lama    
+local infiniteAmmoConnection = nil    
+    
+local function startInfiniteAmmo()    
+    if infiniteAmmoConnection then return end    
+    -- Hapus koneksi lama jika ada    
+    if hitboxConnection then hitboxConnection:Disconnect(); hitboxConnection = nil end    
+    destroyParryRadius()    
+        
+    -- Buat radius ESP dan hitbox    
+    createParryRadius()    
+    createHitbox()    
+        
+    -- Tidak perlu Heartbeat loop, cukup event Touched    
+    print("[AutoParry] Started (realistic touch detection + human delay)")    
+end    
+    
+local function stopInfiniteAmmo()    
+    if hitboxConnection then hitboxConnection:Disconnect(); hitboxConnection = nil end    
+    if hitboxPart then hitboxPart:Destroy(); hitboxPart = nil end    
+    destroyParryRadius()    
+    print("[AutoParry] Stopped (touch detection removed)")    
+end    
+    
+-- ============================================================================    
+-- CATATAN:     
+-- - Fungsi findParryRemoteEvent(), fireParryRemote(), fallbackParry() tetap     
+--   menggunakan kode yang sudah ada (tidak diubah), cukup pastikan tidak bentrok.    
+-- - Konfigurasi toggle tetap menggunakan config.infiniteAmmoEnabled.    
+-- - Radius ESP visual berwarna merah dengan efek pulse, radius deteksi serangan     
+--   sebesar 7 studs (hardcoded, bisa disesuaikan).    
+-- - Tidak ada lagi loop Heartbeat untuk mengecek jarak, sehingga performa lebih baik.    
 -- ============================================================================
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================

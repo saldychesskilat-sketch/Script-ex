@@ -1668,323 +1668,315 @@ end
 
 
 -- ============================================================================
--- ============================================================================  
--- FEATURE 7: AUTO PARRY / AUTO BLOCK (UPGRADED - REACTIVE ATTACK ANIMATION DETECTION)  
--- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry  
--- Mekanisme: Mendeteksi animasi serangan dari killer (priority Action/Action2/Action3/Action4)  
--- dan melakukan parry hanya saat jarak ≤ radius tertentu (default 15 studs).  
--- ============================================================================  
-
--- Cache remote event parry (tetap sama)  
-local cachedParryRemote = nil  
-
--- Cari remote event "parry" di path yang benar (tidak diubah)  
-local function findParryRemoteEvent()  
-    if cachedParryRemote and cachedParryRemote.Parent then  
-        return cachedParryRemote  
-    end  
-    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")  
-    if parryRemote then  
-        parryRemote = parryRemote:FindFirstChild("Items")  
-        if parryRemote then  
-            parryRemote = parryRemote:FindFirstChild("Parrying Dagger")  
-            if parryRemote then  
-                parryRemote = parryRemote:FindFirstChild("parry")  
-                if parryRemote and parryRemote:IsA("RemoteEvent") then  
-                    cachedParryRemote = parryRemote  
-                    print("[AutoParry] Found parry remote event at correct path")  
-                    return parryRemote  
-                end  
-            end  
-        end  
-    end  
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do  
-        if obj:IsA("RemoteEvent") and obj.Name == "parry" then  
-            cachedParryRemote = obj  
-            print("[AutoParry] Found parry remote event via scan:", obj.Name)  
-            return obj  
-        end  
-    end  
-    return nil  
-end  
-
--- Cari item Parrying Dagger di inventory player (tidak diubah)  
-local function getParryingDaggerTool()  
-    local backpack = localPlayer:FindFirstChild("Backpack")  
-    local character = localPlayer.Character  
-    if backpack then  
-        for _, tool in ipairs(backpack:GetChildren()) do  
-            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then  
-                return tool  
-            end  
-        end  
-    end  
-    if character then  
-        for _, tool in ipairs(character:GetChildren()) do  
-            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then  
-                return tool  
-            end  
-        end  
-    end  
-    return nil  
-end  
-
--- Kirim remote event parry dengan argumen yang benar (tidak diubah)  
-local function fireParryRemote(targetPlayer)  
-    local remote = findParryRemoteEvent()  
-    if not remote then  
-        print("[AutoParry] Parry remote not found!")  
-        return false  
-    end  
-    local dagger = getParryingDaggerTool()  
-    local argsVariants = {  
-        {dagger},  
-        {"Parrying Dagger"},  
-        {"parry"},  
-        {"block"},  
-        {dagger, targetPlayer},  
-        {"Parrying Dagger", targetPlayer},  
-        {}  
-    }  
-    if not dagger then  
-        for i = #argsVariants, 1, -1 do  
-            local args = argsVariants[i]  
-            if #args > 0 and type(args[1]) == "userdata" then  
-                table.remove(argsVariants, i)  
-            end  
-        end  
-    end  
-    for _, args in ipairs(argsVariants) do  
-        pcall(function()  
-            if #args == 0 then remote:FireServer()  
-            elseif #args == 1 then remote:FireServer(args[1])  
-            elseif #args == 2 then remote:FireServer(args[1], args[2])  
-            end  
-        end)  
-    end  
-    return true  
-end  
-
--- Fallback (dipertahankan, tapi jarang digunakan)  
-local function fallbackParry()  
-    local remote = findParryRemoteEvent()  
-    if not remote then return false end  
-    for i = 1, 3 do  
-        pcall(function()  
-            remote:FireServer()  
-            remote:FireServer("Parrying Dagger")  
-            remote:FireServer("parry")  
-        end)  
-        task.wait(0.01)  
-    end  
-    return true  
-end  
-
--- ============================================================================  
--- DETEKSI KILLER & ANIMASI SERANGAN  
--- ============================================================================  
-
-local parryActiveKillers = {}      -- menyimpan koneksi AnimationPlayed per killer  
-local parryLastParryTime = 0  
-local PARRY_COOLDOWN = 0.15  
-local PARRY_MAX_RADIUS = 15        -- jarak maksimum untuk melakukan parry  
-
--- Helper: cek apakah suatu player adalah killer  
-local function isPlayerKiller(player)  
-    if not player then return false end  
-    if player.Team then  
-        local teamName = player.Team.Name:lower()  
-        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then  
-            return true  
-        end  
-    end  
-    -- Fallback: cek tool  
-    local char = player.Character  
-    if char then  
-        local tool = char:FindFirstChildWhichIsA("Tool")  
-        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then  
-            return true  
-        end  
-    end  
-    return false  
-end  
-
--- Helper: dapatkan jarak antara local player dan karakter killer  
-local function getDistanceToKiller(killerChar)  
-    if not localRootPart or not killerChar then return math.huge end  
-    local killerRoot = killerChar:FindFirstChild("HumanoidRootPart") or killerChar:FindFirstChild("Torso")  
-    if not killerRoot then return math.huge end  
-    return (localRootPart.Position - killerRoot.Position).Magnitude  
-end  
-
--- Fungsi yang akan dipanggil saat killer memainkan animasi  
-local function onKillerAnimationPlayed(killerPlayer, animationTrack)  
-    if not config.infiniteAmmoEnabled then return end  
-    if not getLocalCharacter() or not localRootPart then return end  
-
-    -- Filter priority: hanya Action, Action2, Action3, Action4  
-    local priority = animationTrack.Priority  
-    if priority ~= Enum.AnimationPriority.Action and  
-       priority ~= Enum.AnimationPriority.Action2 and  
-       priority ~= Enum.AnimationPriority.Action3 and  
-       priority ~= Enum.AnimationPriority.Action4 then  
-        return  
-    end  
-
-    -- Cek jarak  
-    local killerChar = killerPlayer.Character  
-    if not killerChar then return end  
-    local dist = getDistanceToKiller(killerChar)  
-    if dist > PARRY_MAX_RADIUS then return end  
-
-    -- Cooldown  
-    local now = tick()  
-    if now - parryLastParryTime < PARRY_COOLDOWN then return end  
-    parryLastParryTime = now  
-
-    -- Lakukan parry  
-    fireParryRemote(killerPlayer)  
-    print("[AutoParry] Parry triggered by attack animation from", killerPlayer.Name, "dist:", dist)  
-end  
-
--- Pasang listener untuk satu killer (panggil saat karakter spawn)  
-local function setupKillerAnimationListener(killerPlayer)  
-    if not killerPlayer or not killerPlayer.Character then return end  
-    local humanoid = killerPlayer.Character:FindFirstChildWhichIsA("Humanoid")  
-    if not humanoid then return end  
-
-    -- Hapus koneksi lama jika ada  
-    if parryActiveKillers[killerPlayer] then  
-        parryActiveKillers[killerPlayer]:Disconnect()  
-        parryActiveKillers[killerPlayer] = nil  
-    end  
-
-    local conn = humanoid.AnimationPlayed:Connect(function(animationTrack)  
-        onKillerAnimationPlayed(killerPlayer, animationTrack)  
-    end)  
-    parryActiveKillers[killerPlayer] = conn  
-end  
-
--- Bersihkan semua listener  
-local function cleanupAllKillerListeners()  
-    for player, conn in pairs(parryActiveKillers) do  
-        if conn then conn:Disconnect() end  
-    end  
-    parryActiveKillers = {}  
-end  
-
--- ============================================================================  
--- EVENT HANDLER UNTUK PLAYER MASUK/KELUAR DAN CHARACTER SPAWN  
--- ============================================================================  
-
-local function onPlayerAdded(player)  
-    if not isPlayerKiller(player) then return end  
-    -- Jika karakter sudah ada, pasang listener  
-    if player.Character then  
-        setupKillerAnimationListener(player)  
-    end  
-    -- Pasang listener untuk CharacterAdded  
-    player.CharacterAdded:Connect(function()  
-        if config.infiniteAmmoEnabled and isPlayerKiller(player) then  
-            task.wait(0.5) -- tunggu humanoid terbentuk  
-            setupKillerAnimationListener(player)  
-        end  
-    end)  
-end  
-
-local function onPlayerRemoving(player)  
-    if parryActiveKillers[player] then  
-        parryActiveKillers[player]:Disconnect()  
-        parryActiveKillers[player] = nil  
-    end  
-end  
-
--- ============================================================================  
--- START / STOP AUTO PARRY (menggantikan loop heartbeat)  
--- ============================================================================  
-local infiniteAmmoConnection = nil  
-local playerAddedConn = nil  
-local playerRemovingConn = nil  
-
-local function startInfiniteAmmo()  
-    if infiniteAmmoConnection then return end  
-
-    -- Bersihkan listener lama  
-    cleanupAllKillerListeners()  
-
-    -- Pasang event untuk player yang sudah ada  
-    for _, player in ipairs(Players:GetPlayers()) do  
-        if player ~= localPlayer and isPlayerKiller(player) then  
-            setupKillerAnimationListener(player)  
-        end  
-    end  
-
-    -- Pasang event untuk player baru  
-    playerAddedConn = Players.PlayerAdded:Connect(onPlayerAdded)  
-    playerRemovingConn = Players.PlayerRemoving:Connect(onPlayerRemoving)  
-
-    -- Loop dummy untuk menjaga agar fungsi tetap berjalan (hanya untuk memenuhi struktur, tidak ada spam)  
-    infiniteAmmoConnection = RunService.Heartbeat:Connect(function()  
-        -- Tidak perlu loop, karena semua trigger dari animasi.  
-        -- Tapi kita biarkan koneksi ini hidup agar fitur "aktif".  
-        -- Jika ingin matikan saat config.infiniteAmmoEnabled false, cek di sini:  
-        if not config.infiniteAmmoEnabled then  
-            stopInfiniteAmmo()  
-        end  
-    end)  
-
-    print("[AutoParry] Started (reactive mode - listens to killer attack animations)")  
-end  
-
-local function stopInfiniteAmmo()  
-    if infiniteAmmoConnection then  
-        infiniteAmmoConnection:Disconnect()  
-        infiniteAmmoConnection = nil  
-    end  
-    if playerAddedConn then  
-        playerAddedConn:Disconnect()  
-        playerAddedConn = nil  
-    end  
-    if playerRemovingConn then  
-        playerRemovingConn:Disconnect()  
-        playerRemovingConn = nil  
-    end  
-    cleanupAllKillerListeners()  
-    print("[AutoParry] Stopped")  
-end  
-
--- ============================================================================  
--- CATATAN:  
--- - Sistem tidak lagi menggunakan loop jarak berbasis Heartbeat.  
--- - Parry hanya terjadi ketika killer benar-benar memainkan animasi serangan (priority Action s/d Action4)  
---   dan jarak ≤ PARRY_MAX_RADIUS (default 15 studs).  
--- - Semua fungsi pendukung (findParryRemoteEvent, fireParryRemote, fallbackParry) tetap utuh.  
--- - Toggle tetap menggunakan config.infiniteAmmoEnabled (tombol Dagger di GUI).  
+-- ============================================================================
+-- FEATURE 7: AUTO PARRY / AUTO BLOCK (UPGRADED - REACTIVE ATTACK ANIMATION DETECTION)
+-- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry
+-- Mekanisme: Mendeteksi animasi serangan dari killer (priority Action/Action2/Action3/Action4)
+-- dan melakukan parry hanya saat jarak ≤ radius tertentu (default 12 studs).
 -- ============================================================================
 
--- ============================================================================
--- OVERRIDE FUNGSI START/STOP INFINITE AMMO (DAGGER) YANG SUDAH ADA
--- ============================================================================
--- Hapus atau komentari fungsi startInfiniteAmmo dan stopInfiniteAmmo yang lama,
--- lalu gunakan yang baru ini.
+-- Cache remote event parry
+local cachedParryRemote = nil
 
--- Mulai auto parry (dipanggil saat toggle Dagger ON)
-function startInfiniteAmmo()
-    if not config.infiniteAmmoEnabled then return end
-    startAutoParry()
+-- Cari remote event "parry" di path yang benar
+local function findParryRemoteEvent()
+    if cachedParryRemote and cachedParryRemote.Parent then
+        return cachedParryRemote
+    end
+    
+    -- Coba akses langsung melalui path yang diketahui
+    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")
+    if parryRemote then
+        parryRemote = parryRemote:FindFirstChild("Items")
+        if parryRemote then
+            parryRemote = parryRemote:FindFirstChild("Parrying Dagger")
+            if parryRemote then
+                parryRemote = parryRemote:FindFirstChild("parry")
+                if parryRemote and parryRemote:IsA("RemoteEvent") then
+                    cachedParryRemote = parryRemote
+                    print("[AutoParry] Found parry remote event at correct path")
+                    return parryRemote
+                end
+            end
+        end
+    end
+    
+    -- Fallback: scan semua RemoteEvent di ReplicatedStorage
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "parry" then
+            cachedParryRemote = obj
+            print("[AutoParry] Found parry remote event via scan:", obj.Name)
+            return obj
+        end
+    end
+    
+    return nil
 end
 
--- Hentikan auto parry (dipanggil saat toggle Dagger OFF)
-function stopInfiniteAmmo()
-    if config.infiniteAmmoEnabled then
-        -- Jika toggle masih ON, jangan matikan
+-- Cari item Parrying Dagger di inventory player (Backpack atau Character)
+local function getParryingDaggerTool()
+    local backpack = localPlayer:FindFirstChild("Backpack")
+    local character = localPlayer.Character
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then
+                return tool
+            end
+        end
+    end
+    if character then
+        for _, tool in ipairs(character:GetChildren()) do
+            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+-- Kirim remote event parry dengan argumen yang benar
+local function fireParryRemote(targetPlayer)
+    local remote = findParryRemoteEvent()
+    if not remote then
+        print("[AutoParry] Parry remote not found!")
+        return false
+    end
+    
+    local dagger = getParryingDaggerTool()
+    
+    -- Variasi argumen yang mungkin diterima (urutan prioritas)
+    local argsVariants = {
+        {dagger},                     -- objek tool (jika ada)
+        {"Parrying Dagger"},          -- string nama item
+        {"parry"},
+        {"block"},
+        {dagger, targetPlayer},       -- tool + target
+        {"Parrying Dagger", targetPlayer},
+        {}                            -- tanpa argumen
+    }
+    
+    -- Jika tidak punya dagger, hapus varian yang menggunakan objek tool
+    if not dagger then
+        for i = #argsVariants, 1, -1 do
+            local args = argsVariants[i]
+            if #args > 0 and type(args[1]) == "userdata" then
+                table.remove(argsVariants, i)
+            end
+        end
+    end
+    
+    for _, args in ipairs(argsVariants) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            elseif #args == 1 then
+                remote:FireServer(args[1])
+            elseif #args == 2 then
+                remote:FireServer(args[1], args[2])
+            end
+        end)
+    end
+    
+    return true
+end
+
+-- Fallback: fire multiple times untuk bypass cooldown (tetap dipertahankan)
+local function fallbackParry()
+    local remote = findParryRemoteEvent()
+    if not remote then return false end
+    
+    for i = 1, 3 do
+        pcall(function()
+            remote:FireServer()
+            remote:FireServer("Parrying Dagger")
+            remote:FireServer("parry")
+        end)
+        task.wait(0.01)
+    end
+    return true
+end
+
+-- ============================================================================
+-- DETEKSI KILLER & ANIMASI SERANGAN (REAKTIF)
+-- ============================================================================
+
+local parryActiveKillers = {}      -- menyimpan koneksi AnimationPlayed per killer
+local parryLastParryTime = 0
+local PARRY_COOLDOWN = 0.15
+local PARRY_MAX_RADIUS = 12         -- jarak maksimum untuk melakukan parry (studs)
+
+-- Helper: cek apakah suatu player adalah killer
+local function isPlayerKiller(player)
+    if not player then return false end
+    if player == localPlayer then return false end
+    if player.Team then
+        local teamName = player.Team.Name:lower()
+        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            return true
+        end
+    end
+    -- Fallback: cek tool
+    local char = player.Character
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
+        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Helper: dapatkan jarak antara local player dan karakter killer
+local function getDistanceToKiller(killerChar)
+    if not localRootPart or not killerChar then return math.huge end
+    local killerRoot = killerChar:FindFirstChild("HumanoidRootPart") or killerChar:FindFirstChild("Torso")
+    if not killerRoot then return math.huge end
+    return (localRootPart.Position - killerRoot.Position).Magnitude
+end
+
+-- Fungsi yang akan dipanggil saat killer memainkan animasi
+local function onKillerAnimationPlayed(killerPlayer, animationTrack)
+    if not config.infiniteAmmoEnabled then return end
+    if not getLocalCharacter() or not localRootPart then return end
+
+    -- Filter priority: hanya Action, Action2, Action3, Action4 (animasi serangan)
+    local priority = animationTrack.Priority
+    if priority ~= Enum.AnimationPriority.Action and
+       priority ~= Enum.AnimationPriority.Action2 and
+       priority ~= Enum.AnimationPriority.Action3 and
+       priority ~= Enum.AnimationPriority.Action4 then
         return
     end
-    stopAutoParry()
+
+    -- Cek jarak
+    local killerChar = killerPlayer.Character
+    if not killerChar then return end
+    local dist = getDistanceToKiller(killerChar)
+    if dist > PARRY_MAX_RADIUS then return end
+
+    -- Cooldown global untuk menghindari spam berlebihan
+    local now = tick()
+    if now - parryLastParryTime < PARRY_COOLDOWN then return end
+    parryLastParryTime = now
+
+    -- Lakukan parry
+    fireParryRemote(killerPlayer)
+    -- Optional: print untuk debugging (bisa dihapus)
+    -- print("[AutoParry] Parry triggered by attack animation from", killerPlayer.Name, "dist:", dist)
 end
 
--- Pastikan saat script restart, auto parry menyesuaikan dengan config
--- Tambahkan panggilan di restoreFeatureStates jika diperlukan (sudah ada di bagian akhir)
+-- Pasang listener untuk satu killer (panggil saat karakter spawn)
+local function setupKillerAnimationListener(killerPlayer)
+    if not killerPlayer or not killerPlayer.Character then return end
+    local humanoid = killerPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+    if not humanoid then return end
+
+    -- Hapus koneksi lama jika ada
+    if parryActiveKillers[killerPlayer] then
+        parryActiveKillers[killerPlayer]:Disconnect()
+        parryActiveKillers[killerPlayer] = nil
+    end
+
+    local conn = humanoid.AnimationPlayed:Connect(function(animationTrack)
+        onKillerAnimationPlayed(killerPlayer, animationTrack)
+    end)
+    parryActiveKillers[killerPlayer] = conn
+end
+
+-- Bersihkan semua listener
+local function cleanupAllKillerListeners()
+    for player, conn in pairs(parryActiveKillers) do
+        if conn then conn:Disconnect() end
+    end
+    parryActiveKillers = {}
+end
+
+-- ============================================================================
+-- EVENT HANDLER UNTUK PLAYER MASUK/KELUAR DAN CHARACTER SPAWN
+-- ============================================================================
+
+local function onPlayerAdded(player)
+    if not isPlayerKiller(player) then return end
+    -- Jika karakter sudah ada, pasang listener
+    if player.Character then
+        setupKillerAnimationListener(player)
+    end
+    -- Pasang listener untuk CharacterAdded
+    player.CharacterAdded:Connect(function()
+        if config.infiniteAmmoEnabled and isPlayerKiller(player) then
+            task.wait(0.5) -- tunggu humanoid terbentuk
+            setupKillerAnimationListener(player)
+        end
+    end)
+end
+
+local function onPlayerRemoving(player)
+    if parryActiveKillers[player] then
+        parryActiveKillers[player]:Disconnect()
+        parryActiveKillers[player] = nil
+    end
+end
+
+-- ============================================================================
+-- START / STOP AUTO PARRY (menggantikan loop heartbeat)
+-- ============================================================================
+local infiniteAmmoConnection = nil
+local playerAddedConn = nil
+local playerRemovingConn = nil
+
+local function startInfiniteAmmo()
+    if infiniteAmmoConnection then return end
+
+    -- Bersihkan listener lama
+    cleanupAllKillerListeners()
+
+    -- Pasang event untuk player yang sudah ada
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and isPlayerKiller(player) then
+            setupKillerAnimationListener(player)
+        end
+    end
+
+    -- Pasang event untuk player baru
+    playerAddedConn = Players.PlayerAdded:Connect(onPlayerAdded)
+    playerRemovingConn = Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+    -- Loop dummy untuk menjaga agar fungsi tetap berjalan (hanya untuk memenuhi struktur)
+    -- Tidak ada spam remote, hanya mengecek status toggle.
+    infiniteAmmoConnection = RunService.Heartbeat:Connect(function()
+        if not config.infiniteAmmoEnabled then
+            stopInfiniteAmmo()
+        end
+    end)
+
+    print("[AutoParry] Started (reactive mode - listens to killer attack animations, radius " .. PARRY_MAX_RADIUS .. " studs)")
+end
+
+local function stopInfiniteAmmo()
+    if infiniteAmmoConnection then
+        infiniteAmmoConnection:Disconnect()
+        infiniteAmmoConnection = nil
+    end
+    if playerAddedConn then
+        playerAddedConn:Disconnect()
+        playerAddedConn = nil
+    end
+    if playerRemovingConn then
+        playerRemovingConn:Disconnect()
+        playerRemovingConn = nil
+    end
+    cleanupAllKillerListeners()
+    print("[AutoParry] Stopped")
+end
+
+-- ============================================================================
+-- CATATAN:
+-- - Sistem tidak lagi menggunakan loop jarak berbasis Heartbeat.
+-- - Parry hanya terjadi ketika killer benar-benar memainkan animasi serangan (priority Action s/d Action4)
+--   dan jarak ≤ PARRY_MAX_RADIUS (default 12 studs).
+-- - Semua fungsi pendukung (findParryRemoteEvent, fireParryRemote, fallbackParry) tetap utuh.
+-- - Toggle tetap menggunakan config.infiniteAmmoEnabled (tombol Dagger di GUI).
+-- ============================================================================
 
 -- ============================================================================
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT

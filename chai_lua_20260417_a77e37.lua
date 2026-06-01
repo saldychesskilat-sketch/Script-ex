@@ -1959,7 +1959,6 @@ end
 -- Jika fungsi startInfiniteAmmo sudah didefinisikan sebelumnya, 
 -- Anda bisa menggantinya dengan kode di bawah ini.
 
-local infiniteAmmoConnection = nil
 local parryScanConnection = nil
 
 local function startInfiniteAmmo()

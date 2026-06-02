@@ -1658,12 +1658,6 @@ local function stopGodMode()
 end
 
 -- ============================================================================
--- PENJELASAN:
--- - Stealth akan mati secara otomatis ketika jarak killer > config.stealthTriggerDistance
---   karena fungsi `god_checkKillerDistanceAndToggleStealth` memanggil `god_makeVisible()`.
--- - Tidak ada perubahan pada mekanisme seat dan pre-teleport.
--- - Semua variabel internal menggunakan prefix "god_" untuk menghindari konflik.
--- ============================================================================
 
 -- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - USING CORRECT REMOTE EVENT)        
 -- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry        

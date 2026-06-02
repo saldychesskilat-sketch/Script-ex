@@ -1825,90 +1825,83 @@ local function getKillerDistance()
     return minDist        
 end        
         
-local attackEventsConnected = false
+local deactivateEventConnected = false
 
 local function autoParryLoop()
     if not config.infiniteAmmoEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    -- Daftarkan listener ke berbagai remote event serangan hanya sekali
-    if not attackEventsConnected then
-        attackEventsConnected = true
-        
-        -- Daftar path remote event yang perlu didengarkan
-        local remotePaths = {
-            "Remotes.AttackEvent",
-            "Remotes.Attacks.BasicAttack",
-            "Remotes.Attacks.AfterAttack",
-            "Remotes.Attacks.hit",
-            "Remotes.Attacks.Lunge",
-            "Remotes.Attacks.LungeDetect",
-            "Remotes.Killers.Masked.alexattack",
-            "Remotes.Killers.SlowAttack",
-            "Remotes.Killers.Killer.FrenzyHitEvent",
-            "Remotes.Killers.Stalker.StartGrabHitbox",
-            "Remotes.Killers.Stalker.GrabHitResult"
-        }
-        
-        local function getRemoteByPath(path)
-            local parts = {}
-            for part in string.gmatch(path, "[^%.]+") do
-                table.insert(parts, part)
+    if not deactivateEventConnected then
+        -- Cari remote event Deactivatefromclient
+        local remote = nil
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            local killers = remotes:FindFirstChild("Killers")
+            if killers then
+                local killer = killers:FindFirstChild("Killer")
+                if killer then
+                    remote = killer:FindFirstChild("Deactivatefromclient")
+                end
             end
-            local current = ReplicatedStorage
-            for _, part in ipairs(parts) do
-                if current then
-                    current = current:FindFirstChild(part)
-                else
+        end
+        if not remote then
+            -- fallback scan
+            for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+                if obj:IsA("RemoteEvent") and obj.Name == "Deactivatefromclient" then
+                    remote = obj
                     break
                 end
             end
-            return current
         end
-        
-        local function onAttack(attacker, ...)
-            if not attacker then return end
-            -- Cek apakah attacker adalah killer
-            local isKiller = false
-            if attacker.Team then
-                local teamName = attacker.Team.Name:lower()
-                if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                    isKiller = true
-                end
-            end
-            if not isKiller then
-                local char = attacker.Character
-                if char then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                        isKiller = true
-                    end
-                end
-            end
-            if isKiller then
+        if remote and remote:IsA("RemoteEvent") then
+            remote.OnClientEvent:Connect(function(...)
                 local dist = getKillerDistance()
                 if dist <= 10 then
-                    fireParryRemote(attacker)
-                end
-            end
-        end
-        
-        -- Pasang listener untuk setiap remote yang ditemukan
-        for _, path in ipairs(remotePaths) do
-            local remote = getRemoteByPath(path)
-            if remote and remote:IsA("RemoteEvent") then
-                remote.OnClientEvent:Connect(onAttack)
-                print("[AutoParry] Listening to:", path)
-            else
-                -- Fallback: scan jika tidak ditemukan via path
-                for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-                    if obj:IsA("RemoteEvent") and obj.Name == path:match("[^%.]+$") then
-                        obj.OnClientEvent:Connect(onAttack)
-                        print("[AutoParry] Listening to (scanned):", obj.Name)
-                        break
+                    -- Cari killer terdekat untuk argumen
+                    local targetKiller = nil
+                    local minDist = math.huge
+                    local localPos = localRootPart.Position
+                    for _, player in ipairs(Players:GetPlayers()) do
+                        if player ~= localPlayer then
+                            local char = player.Character
+                            if char then
+                                local isKiller = false
+                                if player.Team then
+                                    local teamName = player.Team.Name:lower()
+                                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                                        isKiller = true
+                                    end
+                                end
+                                if not isKiller then
+                                    local tool = char:FindFirstChildWhichIsA("Tool")
+                                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                                        isKiller = true
+                                    end
+                                end
+                                if isKiller then
+                                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                                    if root then
+                                        local dist = (localPos - root.Position).Magnitude
+                                        if dist < minDist then
+                                            minDist = dist
+                                            targetKiller = player
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    if targetKiller then
+                        fireParryRemote(targetKiller)
+                    else
+                        fireParryRemote()  -- fallback tanpa argumen
                     end
                 end
-            end
+            end)
+            deactivateEventConnected = true
+            print("[AutoParry] Deactivatefromclient event listener registered")
+        else
+            print("[AutoParry] Deactivatefromclient remote not found")
         end
     end
 end

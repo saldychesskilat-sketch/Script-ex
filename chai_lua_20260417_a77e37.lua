@@ -2142,7 +2142,7 @@ local function autoParryLoop()
                 end
             end
         end
-    end)
+    end
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

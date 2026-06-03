@@ -1618,27 +1618,20 @@ local function findParryRemoteEvent()
     end        
             
     -- Coba akses langsung melalui path yang diketahui        
-    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")
-if parryRemote then
-    parryRemote = parryRemote:FindFirstChild("Items")
-    if parryRemote then
-        parryRemote = parryRemote:FindFirstChild("Parrying Dagger")
-        if parryRemote then
-            -- Remote untuk mengirim perintah parry
-            local parryEvent = parryRemote:FindFirstChild("parry")
-            if parryEvent and parryEvent:IsA("RemoteEvent") then
-                cachedParryRemote = parryEvent
-                print("[AutoParry] Found parry remote event at correct path")
-            end
-            
-            -- Remote untuk menerima hasil parry dari server
-            local parryResultEvent = parryRemote:FindFirstChild("parryResult")
-            if parryResultEvent and parryResultEvent:IsA("RemoteEvent") then
-                cachedParryResultRemote = parryResultEvent
-                print("[AutoParry] Found parryResult remote event at correct path")
-            end
-        end
-    end
+    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")        
+    if parryRemote then        
+        parryRemote = parryRemote:FindFirstChild("Items")        
+        if parryRemote then        
+            parryRemote = parryRemote:FindFirstChild("Parrying Dagger")        
+            if parryRemote then        
+                parryRemote = parryRemote:FindFirstChild("parry")        
+                if parryRemote and parryRemote:IsA("RemoteEvent") then        
+                    cachedParryRemote = parryRemote        
+                    print("[AutoParry] Found parry remote event at correct path")        
+                    return parryRemote        
+                end        
+            end        
+        end        
     end
             
     -- Fallback: scan semua RemoteEvent di ReplicatedStorage        
@@ -1689,7 +1682,7 @@ local function fireParryRemote(targetPlayer)
         {dagger},                     -- objek tool (jika ada)        
         {"Parrying Dagger"},          -- string nama item        
         {"parry"},        
-        {"block"},        
+        {"parryResult"},        
         {dagger, targetPlayer},       -- tool + target        
         {"Parrying Dagger", targetPlayer},        
         {}                            -- tanpa argumen        

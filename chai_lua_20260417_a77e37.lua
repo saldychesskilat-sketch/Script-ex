@@ -3671,11 +3671,11 @@ end
     sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
     sidebarLayout.Parent = sidebarList  
   
-    local homeItem = createSidebarItem(sidebarList, "HOME", "🏠", true)  
-    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "⚡", false)  
-    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "⚙️", false)  
-    local infoItem = createSidebarItem(sidebarList, "INFO", "📄", false)  
-    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "ℹ️", false)  
+    local homeItem = createSidebarItem(sidebarList, "HOME", true)  
+    local featuresItem = createSidebarItem(sidebarList, "FEATURES", false)  
+    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", false)  
+    local infoItem = createSidebarItem(sidebarList, "INFO", false)  
+    local aboutItem = createSidebarItem(sidebarList, "ABOUT", false)  
     local sep = Instance.new("Frame")  
     sep.Size = UDim2.new(0.8, 0, 0, 1)  
     sep.BackgroundColor3 = Color3.fromRGB(0, 200, 255)  

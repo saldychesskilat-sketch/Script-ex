@@ -1782,7 +1782,7 @@ local function autoParryLoop()
                 
     combatStateConnected = true                
                 
-    local DETECTION_RADIUS = 15                
+    local DETECTION_RADIUS = 8                
     local PARRY_COOLDOWN = 0.08                
     local lastParry = 0                
                 

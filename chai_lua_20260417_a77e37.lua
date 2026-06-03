@@ -2054,7 +2054,7 @@ local function autoParryLoop()
                         break
                     end
 
-                    grow += DETECTION_RADIUS / 12
+                    grow += DETECTION_RADIUS / 2
 
                     pulse.CFrame =
                         CFrame.new(

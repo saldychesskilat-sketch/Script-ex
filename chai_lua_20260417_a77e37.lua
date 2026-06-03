@@ -1769,7 +1769,6 @@ local function getKillerDistance()
     end        
     return minDist        
 end        
-        
 local combatStateConnected = false
 local combatHeartbeat = nil
 local radiusFolder = nil
@@ -1830,6 +1829,41 @@ local function autoParryLoop()
         end
 
         return false
+    end
+
+    -- Fungsi untuk mendapatkan survivor terdekat ke killer
+    local function getClosestSurvivorToKiller(killer)
+        local killerChar = killer.Character
+        if not killerChar then
+            return nil, math.huge
+        end
+
+        local killerRoot = getRoot(killerChar)
+        if not killerRoot then
+            return nil, math.huge
+        end
+
+        local nearestPlayer = nil
+        local nearestDistance = math.huge
+
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= killer then
+                local char = plr.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    local root = getRoot(char)
+                    if hum and hum.Health > 0 and root then
+                        local dist = (killerRoot.Position - root.Position).Magnitude
+                        if dist < nearestDistance then
+                            nearestDistance = dist
+                            nearestPlayer = plr
+                        end
+                    end
+                end
+            end
+        end
+
+        return nearestPlayer, nearestDistance
     end
 
     local function triggerParry(reason, player)
@@ -1919,8 +1953,9 @@ local function autoParryLoop()
             return
         end
 
-        pulseTick += dt * 2
+        pulseTick = pulseTick + dt * 2
 
+        -- Update posisi main circle setiap frame (agar tidak tertinggal)
         mainCircle.CFrame =
             CFrame.new(
                 localRootPart.Position - Vector3.new(0,2,0)
@@ -1934,28 +1969,19 @@ local function autoParryLoop()
         mainCircle.Transparency =
             0.72 + math.sin(pulseTick) * 0.08
 
-        if math.floor(pulseTick * 8) % 8 == 0 then
+        -- Pulse effect (diperbaiki agar mengikuti player)
+        if math.floor(pulseTick * 7) % 7 == 0 then
 
             local pulse = Instance.new("Part")
 
             pulse.Shape = Enum.PartType.Cylinder
             pulse.Material = Enum.Material.Neon
             pulse.Color = Color3.fromRGB(255,170,0)
-            pulse.Transparency = 0.6
+            pulse.Transparency = 0.55
             pulse.Anchored = true
             pulse.CanCollide = false
 
             pulse.Size = Vector3.new(0.1,1,1)
-
-            pulse.CFrame =
-                CFrame.new(
-                    localRootPart.Position - Vector3.new(0,2,0)
-                )
-                * CFrame.Angles(
-                    0,
-                    0,
-                    math.rad(90)
-                )
 
             pulse.Parent = radiusFolder
 
@@ -1963,9 +1989,13 @@ local function autoParryLoop()
 
                 local size = 1
 
-                for i = 1,20 do
+                for i = 1,22 do
 
-                    size += DETECTION_RADIUS / 10
+                    if not pulse.Parent then
+                        break
+                    end
+
+                    size = size + DETECTION_RADIUS / 11
 
                     pulse.Size = Vector3.new(
                         0.1,
@@ -1973,15 +2003,30 @@ local function autoParryLoop()
                         size
                     )
 
-                    pulse.Transparency += 0.02
+                    pulse.Transparency = pulse.Transparency + 0.018
 
-                    task.wait(0.015)
+                    -- Update posisi pulse setiap langkah
+                    if localRootPart then
+                        pulse.CFrame =
+                            CFrame.new(
+                                localRootPart.Position
+                                - Vector3.new(0,2,0)
+                            )
+                            * CFrame.Angles(
+                                0,
+                                0,
+                                math.rad(90)
+                            )
+                    end
+
+                    RunService.Heartbeat:Wait()
                 end
 
                 pulse:Destroy()
             end)
         end
 
+        -- Loop deteksi killer
         for _, player in ipairs(Players:GetPlayers()) do
 
             if isKiller(player) then
@@ -1999,6 +2044,21 @@ local function autoParryLoop()
 
                         if dist <= DETECTION_RADIUS then
 
+                            -- Validasi target prioritas
+                            local nearestTarget, nearestDist =
+                                getClosestSurvivorToKiller(player)
+
+                            if nearestTarget and nearestTarget ~= localPlayer then
+                                local myDist =
+                                    (localRootPart.Position - root.Position).Magnitude
+                                local diff = math.abs(myDist - nearestDist)
+                                if diff > 2 then
+                                    -- Ada survivor lain yang secara signifikan lebih dekat ke killer
+                                    goto continue
+                                end
+                            end
+
+                            -- Velocity spike detection
                             local velocity =
                                 root.AssemblyLinearVelocity.Magnitude
 
@@ -2010,6 +2070,7 @@ local function autoParryLoop()
                                 )
                             end
 
+                            -- Facing direction detection
                             local look =
                                 root.CFrame.LookVector
 
@@ -2030,6 +2091,7 @@ local function autoParryLoop()
                                 )
                             end
 
+                            -- Combat sound detection (swing, attack, etc)
                             for _, obj in ipairs(char:GetDescendants()) do
 
                                 if obj:IsA("Sound") then
@@ -2058,10 +2120,11 @@ local function autoParryLoop()
                     end
                 end
             end
+            --::continue::
         end
     end)
 
-    print("[AutoParry] Real-time adaptive scanner initialized")
+    print("[AutoParry] Real-time adaptive scanner initialized (priority-target + ESP fixed)")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

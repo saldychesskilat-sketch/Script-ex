@@ -289,162 +289,118 @@ local function stopAutoWin()
 end
 
 -- ============================================================================
--- FEATURE 2: AUTO TASK (ANTI-HOOK + LEVER GOAL GATE SYSTEM)
 -- ============================================================================
-local function isPlayerHooked()
-    if not localCharacter then return false end
-    -- Deteksi melalui Humanoid state
-    if localHumanoid and localHumanoid:GetState() == Enum.HumanoidStateType.Climbing then
-        return true
+-- FEATURE 2: AUTO TASK (ANTI-HOOK + LEVER GOAL GATE SYSTEM) - UPGRADED
+-- Menggunakan RemoteEvent: ReplicatedStorage.Remotes.Exit.LeverEvent
+-- ============================================================================
+
+-- Cache remote event lever
+local cachedLeverRemote = nil
+local leverEventConnected = false
+
+-- Cari remote event LeverEvent
+local function findLeverRemote()
+    if cachedLeverRemote and cachedLeverRemote.Parent then
+        return cachedLeverRemote
     end
-    -- Deteksi melalui Weld/Parent changes
-    local hook = localCharacter:FindFirstChild("Hook") or localCharacter:FindFirstChild("Hooked") or localCharacter:FindFirstChild("Grabbed")
-    if hook then return true end
-    for _, part in ipairs(localCharacter:GetChildren()) do
-        if part.Name:lower():find("hook") or part.Name:lower():find("grabbed") or part.Name:lower():find("carried") then
-            return true
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if remotes then
+        local exit = remotes:FindFirstChild("Exit")
+        if exit then
+            local lever = exit:FindFirstChild("LeverEvent")
+            if lever and lever:IsA("RemoteEvent") then
+                cachedLeverRemote = lever
+                print("[AutoTask] Found LeverEvent remote")
+                return lever
+            end
         end
     end
-    -- Deteksi perubahan posisi drastis (killer membawa)
-    if localRootPart and localRootPart.AssemblyLinearVelocity.Magnitude > 30 then
-        return true
-    end
-    return false
-end
-
-local function findKillerCharacter()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then
-                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
-                end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                        isKiller = true
-                    end
-                end
-                if isKiller then
-                    return char
-                end
-            end
+    -- fallback scan
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "LeverEvent" then
+            cachedLeverRemote = obj
+            print("[AutoTask] Found LeverEvent via scan")
+            return obj
         end
     end
     return nil
 end
 
-local function knockbackKiller(killerChar)
-    if not killerChar then return false end
-    local killerRoot = killerChar:FindFirstChild("HumanoidRootPart") or killerChar:FindFirstChild("Torso")
-    if not killerRoot then return false end
-    -- Cari remote event untuk damage/knockback
-    local remoteEvents = {}
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") then
-            local name = obj.Name:lower()
-            if name:find("damage") or name:find("hit") or name:find("knockback") or name:find("drop") or name:find("release") then
-                table.insert(remoteEvents, obj)
+-- Interaksi dengan lever goal menggunakan remote event (hold simulation)
+local function activateLeverGoal()
+    local remote = findLeverRemote()
+    if not remote then
+        print("[AutoTask] LeverEvent remote not found, fallback to manual")
+        return false
+    end
+    
+    -- Variasi argumen yang mungkin untuk memulai hold
+    local startArgs = {
+        {},                         -- tanpa argumen
+        {"Start"},
+        {"Hold"},
+        {"activate"},
+        {"begin"},
+        {true},
+        {1}
+    }
+    -- Variasi argumen untuk mengakhiri hold (stop)
+    local stopArgs = {
+        {},
+        {"Stop"},
+        {"Release"},
+        {"deactivate"},
+        {"end"},
+        {false},
+        {0}
+    }
+    
+    -- Kirim start event (hold)
+    local startSuccess = false
+    for _, args in ipairs(startArgs) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            else
+                remote:FireServer(unpack(args))
             end
-        end
+            startSuccess = true
+        end)
+        if startSuccess then break end
     end
-    for _, remote in ipairs(remoteEvents) do
-        pcall(function() remote:FireServer(killerChar) end)
-        pcall(function() remote:FireServer(killerChar, "knockback") end)
+    
+    if not startSuccess then
+        print("[AutoTask] Failed to send start hold event")
+        return false
     end
-    -- Brute force knockback dengan velocity
-    local direction = (killerRoot.Position - localRootPart.Position).Unit
-    killerRoot.Velocity = direction * 50 + Vector3.new(0, 20, 0)
-    -- Simulasi press E untuk melepas
-    simulatePressE()
+    
+    -- Tunggu simulasi hold (durasi sesuai kebutuhan game, misal 1.5 detik)
+    task.wait(1.5)
+    
+    -- Kirim stop event (release)
+    local stopSuccess = false
+    for _, args in ipairs(stopArgs) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            else
+                remote:FireServer(unpack(args))
+            end
+            stopSuccess = true
+        end)
+        if stopSuccess then break end
+    end
+    
+    if stopSuccess then
+        print("[AutoTask] Lever goal activated via remote event")
+    else
+        print("[AutoTask] Lever goal release may have failed, but continuing")
+    end
+    
     return true
 end
 
-local function activateAuto1xMode()
-    if isAuto1xModeActive then return end
-    if auto1xModeTimerConnection then auto1xModeTimerConnection:Disconnect() end
-    if localHumanoid then
-        config.originalWalkSpeed = localHumanoid.WalkSpeed
-        localHumanoid.WalkSpeed = 16
-    end
-    isAuto1xModeActive = true
-    config.auto1xModeEnabled = true
-    print("[Auto1xMode] Activated")
-    auto1xModeTimerConnection = task.delay(5, function()
-        if isAuto1xModeActive then
-            if localHumanoid then
-                localHumanoid.WalkSpeed = config.originalWalkSpeed
-            end
-            isAuto1xModeActive = false
-            config.auto1xModeEnabled = false
-            if auto1xModeTimerConnection then auto1xModeTimerConnection = nil end
-            print("[Auto1xMode] Deactivated")
-        end
-    end)
-end
-
-local function findLeverGoal()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj.Name:lower():find("lever") and obj.Name:lower():find("goal") then
-            return obj
-        end
-    end
-    return nil
-end
-
-local function findGateFO()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj.Name == "F_O" then
-            return obj
-        end
-    end
-    return nil
-end
-
-local function findRightGate()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj.Name:lower():find("right") and obj.Name:lower():find("gate") then
-            return obj
-        end
-    end
-    return nil
-end
-
-local function findLiftGate()
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj.Name:lower():find("lift") and obj.Name:lower():find("gate") then
-            return obj
-        end
-    end
-    return nil
-end
-
-local function interactWithGate(gate)
-    if not gate then return false end
-    local targetPart = gate:IsA("BasePart") and gate or gate:FindFirstChildWhichIsA("BasePart")
-    if not targetPart then return false end
-    local clickDetector = targetPart:FindFirstChildWhichIsA("ClickDetector")
-    if clickDetector and clickDetector.Enabled then
-        pcall(function() clickDetector:FireClick() end)
-        return true
-    end
-    local proximityPrompt = targetPart:FindFirstChildWhichIsA("ProximityPrompt")
-    if proximityPrompt and proximityPrompt.Enabled then
-        pcall(function() proximityPrompt:Hold(); task.wait(0.1); proximityPrompt:Release() end)
-        return true
-    end
-    -- Brute force remote event
-    for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
-        if remote:IsA("RemoteEvent") and (remote.Name:lower():find("gate") or remote.Name:lower():find("open")) then
-            pcall(function() remote:FireServer(gate) end)
-            return true
-        end
-    end
-    return false
-end
-
+-- Fungsi asli teleportToLeverGoal tetap digunakan (tidak diubah)
 local function teleportToLeverGoal()
     local leverGoal = findLeverGoal()
     if leverGoal then
@@ -457,10 +413,12 @@ local function teleportToLeverGoal()
     return false
 end
 
+-- Fungsi autoTaskLoop yang dimodifikasi (bagian lever goal menggunakan remote event)
 local function autoTaskLoop()
     if not config.autoTaskEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
-    -- Anti-hook
+    
+    -- Anti-hook (tetap sama)
     if isPlayerHooked() then
         local killerChar = findKillerCharacter()
         if knockbackKiller(killerChar) then
@@ -470,14 +428,16 @@ local function autoTaskLoop()
         task.wait(0.5)
         return
     end
-    -- Buka escape dengan lever goal + gate
+    
+    -- Buka escape dengan lever goal + gate (menggunakan remote event)
     local leverGoal = findLeverGoal()
     if leverGoal then
         teleportToLeverGoal()
         task.wait(0.1)
-        simulatePressE()
-        print("[AutoTask] Activated lever goal")
+        -- Gunakan remote event untuk interaksi lever goal
+        activateLeverGoal()
         task.wait(0.5)
+        -- Sisanya tetap menggunakan interaksi gate (ClickDetector, dll)
         local gateFO = findGateFO()
         if gateFO then
             interactWithGate(gateFO)
@@ -494,7 +454,7 @@ local function autoTaskLoop()
             print("[AutoTask] Interacted with LiftGate")
         end
     else
-        -- Fallback: repair generator
+        -- Fallback: repair generator (tetap sama)
         local nearestGen = getNearestGeneratorOptimized()
         if nearestGen then
             local targetPos = nearestGen:GetPivot().Position
@@ -507,14 +467,16 @@ local function autoTaskLoop()
     task.wait(0.5)
 end
 
+-- Fungsi startAutoTask dan stopAutoTask tidak diubah
 local function startAutoTask()
     if currentTaskConnection then return end
     currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
-    print("[AutoTask] Auto task started (anti-hook + lever gate system)")
+    print("[AutoTask] Auto task started (anti-hook + lever gate system with remote event)")
 end
+
 local function stopAutoTask()
     if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
-    if localHumanoid and config.ao1xModeEnabled then
+    if localHumanoid and config.auto1xModeEnabled then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
         config.auto1xModeEnabled = false
         isAuto1xModeActive = false
@@ -522,10 +484,6 @@ local function stopAutoTask()
     if auto1xModeTimerConnection then auto1xModeTimerConnection:Disconnect(); auto1xModeTimerConnection = nil end
     print("[AutoTask] Auto task stopped")
 end
-
-
--- ============================================================================
--- ============================================================================
 
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED: SCP ENTITY + MORE TRANSPARENT

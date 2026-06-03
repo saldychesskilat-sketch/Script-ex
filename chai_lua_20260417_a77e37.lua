@@ -1772,311 +1772,315 @@ end
 local combatStateConnected = false
 
 local function autoParryLoop()
-    if not config.infiniteAmmoEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
+    if not config.infiniteAmmoEnabled then
+        return
+    end
 
-    if not combatStateConnected then
-        combatStateConnected = true
+    if not getLocalCharacter() or not localRootPart then
+        return
+    end
 
-        local DETECTION_RADIUS = 15
-        local lastParry = 0
-        local parryCooldown = 0.08
+    if combatStateConnected then
+        return
+    end
 
-        local trackedObjects = {}
-        local trackedCharacters = {}
+    combatStateConnected = true
 
-        local radiusPart = Instance.new("Part")
-        radiusPart.Name = "ParryRadiusESP"
-        radiusPart.Shape = Enum.PartType.Cylinder
-        radiusPart.Material = Enum.Material.Neon
-        radiusPart.Color = Color3.fromRGB(255,0,0)
-        radiusPart.Transparency = 0.88
-        radiusPart.CanCollide = false
-        radiusPart.Anchored = true
-        radiusPart.Size = Vector3.new(0.08, DETECTION_RADIUS * 2, DETECTION_RADIUS * 2)
-        radiusPart.Parent = workspace
+    local DETECTION_RADIUS = 15
+    local lastParry = 0
+    local cooldown = 0.08
 
-        task.spawn(function()
-            while radiusPart and radiusPart.Parent do
-                task.wait()
+    local radiusESP = Instance.new("Part")
+    radiusESP.Name = "ParryRadiusESP"
+    radiusESP.Shape = Enum.PartType.Cylinder
+    radiusESP.Material = Enum.Material.Neon
+    radiusESP.Color = Color3.fromRGB(255,0,0)
+    radiusESP.Transparency = 0.82
+    radiusESP.CanCollide = false
+    radiusESP.Anchored = true
+    radiusESP.Size = Vector3.new(0.15, DETECTION_RADIUS * 2, DETECTION_RADIUS * 2)
+    radiusESP.Parent = workspace
 
-                if localRootPart then
-                    radiusPart.CFrame =
-                        CFrame.new(localRootPart.Position - Vector3.new(0,2.85,0))
-                        * CFrame.Angles(0,0,math.rad(90))
-                end
+    task.spawn(function()
+        while radiusESP and radiusESP.Parent do
+            task.wait()
+
+            if localRootPart then
+                radiusESP.CFrame =
+                    CFrame.new(
+                        localRootPart.Position - Vector3.new(0,0.8,0)
+                    ) * CFrame.Angles(
+                        0,
+                        0,
+                        math.rad(90)
+                    )
             end
-        end)
+        end
+    end)
 
-        local combatKeywords = {
-            "attack",
-            "hit",
-            "damage",
-            "swing",
-            "weapon",
-            "knife",
-            "killer",
-            "combat",
-            "slash",
-            "state",
-            "action",
-            "grab",
-            "dash",
-            "lunge",
-            "frenzy",
-            "power",
-            "rage",
-            "execute",
-            "target",
-            "stalk",
-            "injure",
-            "hurt",
-            "down",
-            "mori",
-            "break",
-            "stun",
-            "skill",
-            "charge"
-        }
+    local combatKeywords = {
+        "attack",
+        "hit",
+        "damage",
+        "swing",
+        "slash",
+        "knife",
+        "weapon",
+        "grab",
+        "lunge",
+        "stun",
+        "frenzy",
+        "combat",
+        "rage",
+        "execute",
+        "injure",
+        "hurt",
+        "dash",
+        "kill",
+        "power"
+    }
 
-        local function suspicious(name)
-            local lower = string.lower(name)
+    local tracked = {}
 
-            for _, key in ipairs(combatKeywords) do
-                if string.find(lower, key) then
-                    return true
-                end
+    local function validCombatName(name)
+        local n = string.lower(tostring(name))
+
+        for _, key in ipairs(combatKeywords) do
+            if string.find(n, key) then
+                return true
             end
+        end
 
+        return false
+    end
+
+    local function isKiller(player)
+        if not player or player == localPlayer then
             return false
         end
 
-        local function isKiller(player)
-            if not player or player == localPlayer then
-                return false
+        if player.Team then
+            local t = player.Team.Name:lower()
+
+            if t:find("killer")
+            or t:find("monster")
+            or t:find("enemy") then
+                return true
             end
+        end
 
-            if player.Team then
-                local t = player.Team.Name:lower()
+        local char = player.Character
 
-                if t:find("killer")
-                or t:find("monster")
-                or t:find("enemy") then
+        if char then
+            local tool = char:FindFirstChildWhichIsA("Tool")
+
+            if tool then
+                local n = tool.Name:lower()
+
+                if n:find("knife")
+                or n:find("weapon")
+                or n:find("blade")
+                or n:find("staff") then
                     return true
                 end
             end
-
-            local char = player.Character
-
-            if char then
-                local tool = char:FindFirstChildWhichIsA("Tool")
-
-                if tool then
-                    local n = tool.Name:lower()
-
-                    if n:find("knife")
-                    or n:find("blade")
-                    or n:find("weapon") then
-                        return true
-                    end
-                end
-            end
-
-            return false
         end
 
-        local function getDistanceFromKiller(player)
-            local char = player.Character
-            if not char then return math.huge end
+        return false
+    end
 
-            local root =
-                char:FindFirstChild("HumanoidRootPart")
-                or char:FindFirstChild("Torso")
+    local function getRoot(character)
+        return
+            character:FindFirstChild("HumanoidRootPart")
+            or character:FindFirstChild("Torso")
+    end
 
-            if not root then
-                return math.huge
-            end
-
-            return (localRootPart.Position - root.Position).Magnitude
+    local function triggerParry(reason, source, player)
+        if tick() - lastParry < cooldown then
+            return
         end
 
-        local function triggerParry(reason, source, player)
-            if not player then return end
+        if not player then
+            return
+        end
 
-            local dist = getDistanceFromKiller(player)
+        local char = player.Character
+        if not char then
+            return
+        end
 
-            if dist > DETECTION_RADIUS then
-                return
-            end
+        local root = getRoot(char)
+        if not root then
+            return
+        end
 
-            local now = tick()
+        local dist =
+            (localRootPart.Position - root.Position).Magnitude
 
-            if now - lastParry < parryCooldown then
-                return
-            end
+        if dist > DETECTION_RADIUS then
+            return
+        end
 
-            lastParry = now
+        lastParry = tick()
 
-            print("========== AUTO PARRY ==========")
-            print("Reason :", reason)
-            print("Source :", source)
-            print("Killer :", player.Name)
-            print("Distance :", math.floor(dist))
-            print("================================")
+        print("==========================")
+        print("[AUTO PARRY]")
+        print("Reason :", reason)
+        print("Source :", source)
+        print("Killer :", player.Name)
+        print("Distance :", math.floor(dist))
+        print("==========================")
 
+        pcall(function()
             fireParryRemote(player)
+        end)
+    end
+
+    local function watchObject(player, obj)
+        if tracked[obj] then
+            return
         end
 
-        local function monitorObject(player, obj)
-            if trackedObjects[obj] then
-                return
-            end
+        tracked[obj] = true
 
-            trackedObjects[obj] = true
+        if validCombatName(obj.Name) then
+            triggerParry(
+                "CombatObject",
+                obj:GetFullName(),
+                player
+            )
+        end
 
-            if suspicious(obj.Name) then
+        if obj:IsA("Sound") then
+            obj.Played:Connect(function()
+
+                local soundName =
+                    tostring(obj.Name):lower()
+
+                local soundId =
+                    tostring(obj.SoundId):lower()
+
+                if validCombatName(soundName)
+                or validCombatName(soundId) then
+
+                    triggerParry(
+                        "CombatSound",
+                        obj:GetFullName(),
+                        player
+                    )
+                end
+            end)
+        end
+
+        if obj:IsA("ParticleEmitter")
+        or obj:IsA("Trail")
+        or obj:IsA("Beam") then
+
+            if validCombatName(obj.Name) then
                 triggerParry(
-                    "CombatObject",
+                    "CombatEffect",
                     obj:GetFullName(),
                     player
                 )
             end
-
-            if obj:IsA("Sound") then
-                obj.Played:Connect(function()
-
-                    if suspicious(obj.Name) then
-                        triggerParry(
-                            "CombatSound",
-                            obj:GetFullName(),
-                            player
-                        )
-                    end
-                end)
-            end
-
-            if obj:IsA("ParticleEmitter")
-            or obj:IsA("Trail")
-            or obj:IsA("Beam") then
-
-                obj:GetPropertyChangedSignal("Enabled"):Connect(function()
-
-                    if obj.Enabled then
-                        triggerParry(
-                            "EffectEnabled",
-                            obj:GetFullName(),
-                            player
-                        )
-                    end
-                end)
-            end
-
-            if obj:IsA("ValueBase") then
-                obj.Changed:Connect(function()
-
-                    triggerParry(
-                        "ValueChanged",
-                        obj:GetFullName(),
-                        player
-                    )
-                end)
-            end
-
-            for attr,_ in pairs(obj:GetAttributes()) do
-                obj:GetAttributeChangedSignal(attr):Connect(function()
-
-                    triggerParry(
-                        "AttributeChanged",
-                        obj:GetFullName() .. " -> " .. attr,
-                        player
-                    )
-                end)
-            end
         end
 
-        local function monitorCharacter(player, character)
-            if trackedCharacters[character] then
-                return
-            end
+        if obj:IsA("ValueBase") then
+            obj.Changed:Connect(function()
 
-            trackedCharacters[character] = true
-
-            for _, obj in ipairs(character:GetDescendants()) do
-                monitorObject(player, obj)
-            end
-
-            character.DescendantAdded:Connect(function(obj)
-                monitorObject(player, obj)
-
-                if suspicious(obj.Name) then
-                    triggerParry(
-                        "DescendantAdded",
-                        obj:GetFullName(),
-                        player
-                    )
-                end
+                triggerParry(
+                    "ValueChanged",
+                    obj:GetFullName(),
+                    player
+                )
             end)
-
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-
-            if humanoid then
-                humanoid.AnimationPlayed:Connect(function(track)
-
-                    local anim = track.Animation
-
-                    if anim then
-                        triggerParry(
-                            "AnimationPlayed",
-                            tostring(anim.AnimationId),
-                            player
-                        )
-                    else
-                        triggerParry(
-                            "AnimationPlayed",
-                            "UnknownAnimation",
-                            player
-                        )
-                    end
-                end)
-            end
         end
 
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer then
+        for attr,_ in pairs(obj:GetAttributes()) do
 
-                if player.Character and isKiller(player) then
-                    monitorCharacter(player, player.Character)
-                end
+            obj:GetAttributeChangedSignal(attr):Connect(function()
 
-                player.CharacterAdded:Connect(function(char)
-                    task.wait(1)
-
-                    if isKiller(player) then
-                        monitorCharacter(player, char)
-                    end
-                end)
-            end
-        end
-
-        Players.PlayerAdded:Connect(function(player)
-
-            player.CharacterAdded:Connect(function(char)
-                task.wait(1)
-
-                if isKiller(player) then
-                    monitorCharacter(player, char)
-                end
+                triggerParry(
+                    "AttributeChanged",
+                    obj:GetFullName() .. " : " .. attr,
+                    player
+                )
             end)
+        end
+    end
+
+    local function hookCharacter(player, character)
+        if not isKiller(player) then
+            return
+        end
+
+        print("[AutoParry] Hooked killer :", player.Name)
+
+        for _, obj in ipairs(character:GetDescendants()) do
+            watchObject(player, obj)
+        end
+
+        character.DescendantAdded:Connect(function(obj)
+            watchObject(player, obj)
         end)
 
-        RunService.Heartbeat:Connect(function()
+        local humanoid =
+            character:FindFirstChildOfClass("Humanoid")
 
-            for _, player in ipairs(Players:GetPlayers()) do
+        if humanoid then
+            humanoid.AnimationPlayed:Connect(function(track)
 
-                if isKiller(player) and player.Character then
+                local anim = track.Animation
 
-                    local root =
-                        player.Character:FindFirstChild("HumanoidRootPart")
+                if anim then
+                    triggerParry(
+                        "Animation",
+                        tostring(anim.AnimationId),
+                        player
+                    )
+                end
+            end)
+        end
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+
+        if player ~= localPlayer then
+
+            if player.Character then
+                hookCharacter(player, player.Character)
+            end
+
+            player.CharacterAdded:Connect(function(char)
+
+                task.wait(1)
+
+                hookCharacter(player, char)
+            end)
+        end
+    end
+
+    Players.PlayerAdded:Connect(function(player)
+
+        player.CharacterAdded:Connect(function(char)
+
+            task.wait(1)
+
+            hookCharacter(player, char)
+        end)
+    end)
+
+    RunService.Heartbeat:Connect(function()
+
+        for _, player in ipairs(Players:GetPlayers()) do
+
+            if isKiller(player) then
+
+                local char = player.Character
+
+                if char then
+
+                    local root = getRoot(char)
 
                     if root then
 
@@ -2084,6 +2088,7 @@ local function autoParryLoop()
                             root.AssemblyLinearVelocity.Magnitude
 
                         if velocity > 32 then
+
                             triggerParry(
                                 "VelocitySpike",
                                 tostring(math.floor(velocity)),
@@ -2093,11 +2098,12 @@ local function autoParryLoop()
                     end
                 end
             end
-        end)
+        end
+    end)
 
-        print("[CombatState] Adaptive realtime scanner initialized")
-    end
+    print("[AutoParry] Adaptive real-time scanner initialized")
 end
+
         
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

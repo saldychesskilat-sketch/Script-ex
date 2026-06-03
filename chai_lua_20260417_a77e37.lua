@@ -2025,87 +2025,125 @@ local function autoParryLoop()
             end)                
         end                
                 
-        for _, player in ipairs(Players:GetPlayers()) do                
-                
-            if isKiller(player) then                
-                
-                local char = player.Character                
-                
-                if char then                
-                
-                    local root = getRoot(char)                
-                
-                    if root then                
-                
-                        local dist =                
-                            (localRootPart.Position - root.Position).Magnitude                
-                
-                        if dist <= DETECTION_RADIUS then                
-                
-                            local velocity =                
-                                root.AssemblyLinearVelocity.Magnitude                
-                
-                            if velocity > 24 then                
-                
-                                triggerParry(                
-                                    "VelocitySpike",                
-                                    player                
-                                )                
-                            end                
-                
-                            local look =                
-                                root.CFrame.LookVector                
-                
-                            local toPlayer =                
-                                (                
-                                    localRootPart.Position                
-                                    - root.Position                
-                                ).Unit                
-                
-                            local dot =                
-                                look:Dot(toPlayer)                
-                
-                            if dot > 0.72 then                
-                
-                                triggerParry(                
-                                    "FacingLocalPlayer",                
-                                    player                
-                                )                
-                            end                
-                
-                            for _, obj in ipairs(char:GetDescendants()) do                
-                
-                                if obj:IsA("Sound") then                
-                
-                                    if obj.IsPlaying then                
-                
-                                        local n =                
-                                            obj.Name:lower()                
-                
-                                        if n:find("swing")                
-                                        or n:find("attack")                
-                                        or n:find("slash")                
-                                        or n:find("hit") then                
-                
-                                            triggerParry(                
-                                                "CombatSound",                
-                                                player                
-                                            )                
-                
-                                            break                
-                                        end                
-                                    end                
-                                end                
-                            end                
-                        end                
-                    end                
-                end                
-            end                
-        end                
-    end)                
-                
-    print("[AutoParry] Real-time adaptive scanner initialized (with nearest survivor check)")                
-end                
+        for _, player in ipairs(Players:GetPlayers()) do
+
+    if isKiller(player) then
+
+        local char = player.Character
+
+        if char then
+
+            local root = getRoot(char)
+
+            if root then
+
+                local dist =
+                    (localRootPart.Position - root.Position).Magnitude
+
+                if dist <= DETECTION_RADIUS then
+
+                    -- =====================================================
+                    -- VALIDASI TAMBAHAN: CEK JARAK SURVIVOR LAIN KE KILLER
+                    -- =====================================================
+                    local function getNearestSurvivorDistanceToKiller(killerRootPos)
+                        local minDist = math.huge
+                        for _, other in ipairs(Players:GetPlayers()) do
+                            if other ~= localPlayer and other ~= player then
+                                -- Cek apakah other adalah survivor (bukan killer)
+                                local isOtherKiller = false
+                                if other.Team then
+                                    local t = other.Team.Name:lower()
+                                    if t:find("killer") or t:find("monster") or t:find("enemy") then
+                                        isOtherKiller = true
+                                    end
+                                end
+                                if not isOtherKiller then
+                                    local otherChar = other.Character
+                                    if otherChar then
+                                        local otherRoot = getRoot(otherChar)
+                                        if otherRoot then
+                                            local d = (killerRootPos - otherRoot.Position).Magnitude
+                                            if d < minDist then
+                                                minDist = d
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        return minDist
+                    end
+
+                    local killerRootPos = root.Position
+                    local nearestSurvivorDist = getNearestSurvivorDistanceToKiller(killerRootPos)
+
+                    -- Toleransi 2 studs: jika ada survivor lain yang lebih dekat >= 2 studs, skip parry
+                    if nearestSurvivorDist < dist - 2 then
+                        -- Ada survivor lain yang lebih dekat, abaikan killer ini
+                        goto continue
+                    end
+                    -- =====================================================
+
+                    local velocity =
+                        root.AssemblyLinearVelocity.Magnitude
+
+                    if velocity > 24 then
+
+                        triggerParry(
+                            "VelocitySpike",
+                            player
+                        )
+                    end
+
+                    local look =
+                        root.CFrame.LookVector
+
+                    local toPlayer =
+                        (
+                            localRootPart.Position
+                            - root.Position
+                        ).Unit
+
+                    local dot =
+                        look:Dot(toPlayer)
+
+                    if dot > 0.72 then
+
+                        triggerParry(
+                            "FacingLocalPlayer",
+                            player
+                        )
+                    end
+
+                    for _, obj in ipairs(char:GetDescendants()) do
+
+                        if obj:IsA("Sound") then
+
+                            if obj.IsPlaying then
+
+                                local n =
+                                    obj.Name:lower()
+
+                                if n:find("swing")
+                                or n:find("attack")
+                                or n:find("slash")
+                                or n:find("hit") then
+
+                                    triggerParry(
+                                        "CombatSound",
+                                        player
+                                    )
+
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

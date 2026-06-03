@@ -288,8 +288,7 @@ local function stopAutoWin()
     print("[AutoWin] Auto win stopped")
 end
 
--- ============================================================================
--- ============================================================================
+    -- ============================================================================
 -- FEATURE 2: AUTO TASK (ANTI-HOOK + LEVER GOAL GATE SYSTEM) - UPGRADED
 -- Menggunakan RemoteEvent: ReplicatedStorage.Remotes.Exit.LeverEvent
 -- ============================================================================
@@ -310,7 +309,7 @@ local function findLeverRemote()
             local lever = exit:FindFirstChild("LeverEvent")
             if lever and lever:IsA("RemoteEvent") then
                 cachedLeverRemote = lever
-                print("[AutoTask] Found LeverEvent remote")
+                print("[AutoTask] Found LeverEvent remote at correct path")
                 return lever
             end
         end
@@ -326,17 +325,18 @@ local function findLeverRemote()
     return nil
 end
 
--- Interaksi dengan lever goal menggunakan remote event (hold simulation)
-local function activateLeverGoal()
+-- Aktifkan lever goal menggunakan remote event (hold simulation)
+local function activateLeverGoalViaRemote()
     local remote = findLeverRemote()
     if not remote then
-        print("[AutoTask] LeverEvent remote not found, fallback to manual")
+        print("[AutoTask] LeverEvent remote not found, fallback to manual press")
+        simulatePressE()
         return false
     end
-    
-    -- Variasi argumen yang mungkin untuk memulai hold
-    local startArgs = {
-        {},                         -- tanpa argumen
+
+    -- Variasi argumen untuk memulai hold (start)
+    local startArgsList = {
+        {},             -- tanpa argumen
         {"Start"},
         {"Hold"},
         {"activate"},
@@ -345,7 +345,7 @@ local function activateLeverGoal()
         {1}
     }
     -- Variasi argumen untuk mengakhiri hold (stop)
-    local stopArgs = {
+    local stopArgsList = {
         {},
         {"Stop"},
         {"Release"},
@@ -354,10 +354,9 @@ local function activateLeverGoal()
         {false},
         {0}
     }
-    
-    -- Kirim start event (hold)
+
     local startSuccess = false
-    for _, args in ipairs(startArgs) do
+    for _, args in ipairs(startArgsList) do
         pcall(function()
             if #args == 0 then
                 remote:FireServer()
@@ -368,18 +367,18 @@ local function activateLeverGoal()
         end)
         if startSuccess then break end
     end
-    
+
     if not startSuccess then
-        print("[AutoTask] Failed to send start hold event")
+        print("[AutoTask] Failed to send start hold event, fallback to manual press")
+        simulatePressE()
         return false
     end
-    
-    -- Tunggu simulasi hold (durasi sesuai kebutuhan game, misal 1.5 detik)
+
+    -- Tunggu simulasi hold (durasi sesuai kebutuhan, misal 1.5 detik)
     task.wait(1.5)
-    
-    -- Kirim stop event (release)
+
     local stopSuccess = false
-    for _, args in ipairs(stopArgs) do
+    for _, args in ipairs(stopArgsList) do
         pcall(function()
             if #args == 0 then
                 remote:FireServer()
@@ -390,35 +389,22 @@ local function activateLeverGoal()
         end)
         if stopSuccess then break end
     end
-    
+
     if stopSuccess then
-        print("[AutoTask] Lever goal activated via remote event")
+        print("[AutoTask] Lever goal activated via remote event (hold simulated)")
     else
         print("[AutoTask] Lever goal release may have failed, but continuing")
     end
-    
+
     return true
 end
 
--- Fungsi asli teleportToLeverGoal tetap digunakan (tidak diubah)
-local function teleportToLeverGoal()
-    local leverGoal = findLeverGoal()
-    if leverGoal then
-        local targetPart = leverGoal:IsA("BasePart") and leverGoal or leverGoal:FindFirstChildWhichIsA("BasePart")
-        if targetPart then
-            teleportTo(targetPart.Position)
-            return true
-        end
-    end
-    return false
-end
-
--- Fungsi autoTaskLoop yang dimodifikasi (bagian lever goal menggunakan remote event)
+-- MODIFIKASI autoTaskLoop: ganti simulatePressE() dengan activateLeverGoalViaRemote()
 local function autoTaskLoop()
     if not config.autoTaskEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
-    
-    -- Anti-hook (tetap sama)
+
+    -- Anti-hook (tidak diubah)
     if isPlayerHooked() then
         local killerChar = findKillerCharacter()
         if knockbackKiller(killerChar) then
@@ -428,15 +414,16 @@ local function autoTaskLoop()
         task.wait(0.5)
         return
     end
-    
-    -- Buka escape dengan lever goal + gate (menggunakan remote event)
+
+    -- Buka escape dengan lever goal + gate
     local leverGoal = findLeverGoal()
     if leverGoal then
         teleportToLeverGoal()
         task.wait(0.1)
         -- Gunakan remote event untuk interaksi lever goal
-        activateLeverGoal()
+        activateLeverGoalViaRemote()
         task.wait(0.5)
+
         -- Sisanya tetap menggunakan interaksi gate (ClickDetector, dll)
         local gateFO = findGateFO()
         if gateFO then
@@ -467,7 +454,7 @@ local function autoTaskLoop()
     task.wait(0.5)
 end
 
--- Fungsi startAutoTask dan stopAutoTask tidak diubah
+-- Fungsi startAutoTask dan stopAutoTask tidak diubah (tetap sama)
 local function startAutoTask()
     if currentTaskConnection then return end
     currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
@@ -3629,11 +3616,11 @@ end
     sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
     sidebarLayout.Parent = sidebarList  
   
-    local homeItem = createSidebarItem(sidebarList, "HOME","", true)  
-    local featuresItem = createSidebarItem(sidebarList, "FEATURES","", false)  
-    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", false)  
-    local infoItem = createSidebarItem(sidebarList, "INFO","", false)  
-    local aboutItem = createSidebarItem(sidebarList, "ABOUT","", false)  
+    local homeItem = createSidebarItem(sidebarList, "HOME", "", true)  
+    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)  
+    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)  
+    local infoItem = createSidebarItem(sidebarList, "INFO", "", false)  
+    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)  
     local sep = Instance.new("Frame")  
     sep.Size = UDim2.new(0.8, 0, 0, 1)  
     sep.BackgroundColor3 = Color3.fromRGB(0, 200, 255)  

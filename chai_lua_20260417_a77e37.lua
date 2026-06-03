@@ -1769,6 +1769,7 @@ local function getKillerDistance()
     end        
     return minDist        
 end        
+
 local combatStateConnected = false
 local combatHeartbeat = nil
 local radiusFolder = nil
@@ -1781,11 +1782,12 @@ local function autoParryLoop()
 
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 8
+    local DETECTION_RADIUS = 15
     local PARRY_COOLDOWN = 0.08
-    local lastParry = 0
 
+    local lastParry = 0
     local pulseTick = 0
+    local lastPulse = 0
 
     local function getRoot(char)
         return char:FindFirstChild("HumanoidRootPart")
@@ -1831,6 +1833,82 @@ local function autoParryLoop()
         return false
     end
 
+    local function getClosestSurvivorDistance(killer)
+
+        local killerChar = killer.Character
+
+        if not killerChar then
+            return math.huge
+        end
+
+        local killerRoot = getRoot(killerChar)
+
+        if not killerRoot then
+            return math.huge
+        end
+
+        local closest = math.huge
+
+        for _, plr in ipairs(Players:GetPlayers()) do
+
+            if plr ~= killer and plr.Character then
+
+                if plr.Team then
+
+                    local tn = plr.Team.Name:lower()
+
+                    if not tn:find("killer")
+                    and not tn:find("monster")
+                    and not tn:find("enemy") then
+
+                        local root = getRoot(plr.Character)
+
+                        if root then
+
+                            local dist =
+                                (
+                                    killerRoot.Position
+                                    - root.Position
+                                ).Magnitude
+
+                            if dist < closest then
+                                closest = dist
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        return closest
+    end
+
+    local function isLocalClosestTarget(killer)
+
+        local killerChar = killer.Character
+
+        if not killerChar then
+            return false
+        end
+
+        local killerRoot = getRoot(killerChar)
+
+        if not killerRoot then
+            return false
+        end
+
+        local localDist =
+            (
+                killerRoot.Position
+                - localRootPart.Position
+            ).Magnitude
+
+        local nearest =
+            getClosestSurvivorDistance(killer)
+
+        return localDist <= nearest + 0.4
+    end
+
     local function triggerParry(reason, player)
 
         if tick() - lastParry < PARRY_COOLDOWN then
@@ -1854,9 +1932,16 @@ local function autoParryLoop()
         end
 
         local dist =
-            (localRootPart.Position - root.Position).Magnitude
+            (
+                localRootPart.Position
+                - root.Position
+            ).Magnitude
 
         if dist > DETECTION_RADIUS then
+            return
+        end
+
+        if not isLocalClosestTarget(player) then
             return
         end
 
@@ -1885,17 +1970,17 @@ local function autoParryLoop()
     mainCircle.Shape = Enum.PartType.Cylinder
     mainCircle.Material = Enum.Material.Neon
     mainCircle.Color = Color3.fromRGB(255,140,0)
-    mainCircle.Transparency = 0.75
+    mainCircle.Transparency = 0.72
     mainCircle.Anchored = true
     mainCircle.CanCollide = false
     mainCircle.Size = Vector3.new(
-        0.15,
+        0.12,
         DETECTION_RADIUS * 2,
         DETECTION_RADIUS * 2
     )
     mainCircle.Parent = radiusFolder
 
-    combatHeartbeat = RunService.Heartbeat:Connect(function(dt)
+    combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
 
         if not config.infiniteAmmoEnabled then
 
@@ -1918,12 +2003,13 @@ local function autoParryLoop()
             return
         end
 
-        pulseTick += dt * 2
+        pulseTick += dt * 3
+
+        local basePosition =
+            localRootPart.Position - Vector3.new(0,2,0)
 
         mainCircle.CFrame =
-            CFrame.new(
-                localRootPart.Position - Vector3.new(0,2,0)
-            )
+            CFrame.new(basePosition)
             * CFrame.Angles(
                 0,
                 0,
@@ -1931,25 +2017,25 @@ local function autoParryLoop()
             )
 
         mainCircle.Transparency =
-            0.72 + math.sin(pulseTick) * 0.08
+            0.70 + math.sin(pulseTick) * 0.05
 
-        if math.floor(pulseTick * 8) % 8 == 0 then
+        if tick() - lastPulse >= 0.18 then
+
+            lastPulse = tick()
 
             local pulse = Instance.new("Part")
 
             pulse.Shape = Enum.PartType.Cylinder
             pulse.Material = Enum.Material.Neon
             pulse.Color = Color3.fromRGB(255,170,0)
-            pulse.Transparency = 0.6
+            pulse.Transparency = 0.45
             pulse.Anchored = true
             pulse.CanCollide = false
 
-            pulse.Size = Vector3.new(0.1,1,1)
+            pulse.Size = Vector3.new(0.08,2,2)
 
             pulse.CFrame =
-                CFrame.new(
-                    localRootPart.Position - Vector3.new(0,2,0)
-                )
+                CFrame.new(basePosition)
                 * CFrame.Angles(
                     0,
                     0,
@@ -1960,21 +2046,36 @@ local function autoParryLoop()
 
             task.spawn(function()
 
-                local size = 1
+                local grow = 2
 
-                for i = 1,20 do
+                for i = 1,25 do
 
-                    size += DETECTION_RADIUS / 10
+                    if not pulse.Parent then
+                        break
+                    end
+
+                    grow += DETECTION_RADIUS / 12
+
+                    pulse.CFrame =
+                        CFrame.new(
+                            localRootPart.Position
+                            - Vector3.new(0,2,0)
+                        )
+                        * CFrame.Angles(
+                            0,
+                            0,
+                            math.rad(90)
+                        )
 
                     pulse.Size = Vector3.new(
-                        0.1,
-                        size,
-                        size
+                        0.08,
+                        grow,
+                        grow
                     )
 
                     pulse.Transparency += 0.02
 
-                    task.wait(0.015)
+                    RunService.RenderStepped:Wait()
                 end
 
                 pulse:Destroy()
@@ -1994,7 +2095,10 @@ local function autoParryLoop()
                     if root then
 
                         local dist =
-                            (localRootPart.Position - root.Position).Magnitude
+                            (
+                                localRootPart.Position
+                                - root.Position
+                            ).Magnitude
 
                         if dist <= DETECTION_RADIUS then
 
@@ -2012,14 +2116,14 @@ local function autoParryLoop()
                             local look =
                                 root.CFrame.LookVector
 
-                            local toPlayer =
+                            local toLocal =
                                 (
                                     localRootPart.Position
                                     - root.Position
                                 ).Unit
 
                             local dot =
-                                look:Dot(toPlayer)
+                                look:Dot(toLocal)
 
                             if dot > 0.72 then
 
@@ -2045,6 +2149,29 @@ local function autoParryLoop()
 
                                             triggerParry(
                                                 "CombatSound",
+                                                player
+                                            )
+
+                                            break
+                                        end
+                                    end
+                                end
+
+                                if obj:IsA("Trail")
+                                or obj:IsA("ParticleEmitter") then
+
+                                    if obj.Enabled then
+
+                                        local n =
+                                            obj.Name:lower()
+
+                                        if n:find("slash")
+                                        or n:find("attack")
+                                        or n:find("weapon")
+                                        or n:find("hit") then
+
+                                            triggerParry(
+                                                "CombatEffect",
                                                 player
                                             )
 

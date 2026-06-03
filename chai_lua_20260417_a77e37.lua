@@ -1624,7 +1624,7 @@ local function findParryRemoteEvent()
         if parryRemote then        
             parryRemote = parryRemote:FindFirstChild("Parrying Dagger")        
             if parryRemote then        
-                parryRemote = parryRemote:FindFirstChild("parry")        
+                parryRemote = parryRemote:FindFirstChild("parry" ,"parryResult")        
                 if parryRemote and parryRemote:IsA("RemoteEvent") then        
                     cachedParryRemote = parryRemote        
                     print("[AutoParry] Found parry remote event at correct path")        
@@ -1782,7 +1782,7 @@ local function autoParryLoop()
 
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 15
+    local DETECTION_RADIUS = 8
     local PARRY_COOLDOWN = 0.08
     local lastParry = 0
 

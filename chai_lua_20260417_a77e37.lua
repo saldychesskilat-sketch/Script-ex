@@ -1771,26 +1771,21 @@ local function getKillerDistance()
 end        
 
 local combatStateConnected = false
+local combatHeartbeat = nil
+local radiusESP = nil
 
 local function autoParryLoop()
-    if not config.infiniteAmmoEnabled then
-        combatStateConnected = false
-        local oldESP = workspace:FindFirstChild("ParryRadiusESP")
-        if oldESP then
-            oldESP:Destroy()
-        end
-        return
-    end
-    if not getLocalCharacter() or not localRootPart then
-        return
-    end
+
     if combatStateConnected then
         return
     end
+
     combatStateConnected = true
+
     local DETECTION_RADIUS = 9
     local lastParry = 0
-    local cooldown = 0.08
+    local PARRY_COOLDOWN = 0.08
+
     local combatKeywords = {
         "attack",
         "hit",
@@ -1803,7 +1798,6 @@ local function autoParryLoop()
         "lunge",
         "stun",
         "frenzy",
-        "combat",
         "rage",
         "execute",
         "injure",
@@ -1811,85 +1805,28 @@ local function autoParryLoop()
         "dash",
         "kill",
         "power",
-        "spear",
-        "staff",
-        "m1",
-        "m2"
+        "hitbox",
+        "attackline",
+        "swingsound"
     }
-    local tracked = {}
-    local connections = {}
-
-    local radiusESP = workspace:FindFirstChild("ParryRadiusESP")
-
-    if radiusESP then
-        radiusESP:Destroy()
-    end
-
-    radiusESP = Instance.new("Part")
-    radiusESP.Name = "ParryRadiusESP"
-    radiusESP.Shape = Enum.PartType.Cylinder
-    radiusESP.Material = Enum.Material.Neon
-    radiusESP.Color = Color3.fromRGB(255,0,0)
-    radiusESP.Transparency = 0.84
-    radiusESP.CanCollide = false
-    radiusESP.Anchored = true
-    radiusESP.Size = Vector3.new(
-        0.15,
-        DETECTION_RADIUS * 2,
-        DETECTION_RADIUS * 2
-    )
-    radiusESP.Parent = workspace
-
-    table.insert(connections,
-        RunService.Heartbeat:Connect(function()
-
-            if not config.infiniteAmmoEnabled then
-
-                combatStateConnected = false
-
-                if radiusESP then
-                    radiusESP:Destroy()
-                end
-
-                for _, c in ipairs(connections) do
-                    pcall(function()
-                        c:Disconnect()
-                    end)
-                end
-
-                table.clear(connections)
-                table.clear(tracked)
-
-                return
-            end
-
-            if localRootPart and radiusESP then
-
-                radiusESP.CFrame =
-                    CFrame.new(
-                        localRootPart.Position + Vector3.new(0,1.2,0)
-                    )
-                    * CFrame.Angles(
-                        0,
-                        0,
-                        math.rad(90)
-                    )
-            end
-        end)
-    )
 
     local function validCombatName(name)
 
-        local n = string.lower(tostring(name))
+        local lower = tostring(name):lower()
 
         for _, key in ipairs(combatKeywords) do
-
-            if string.find(n, key) then
+            if string.find(lower, key) then
                 return true
             end
         end
 
         return false
+    end
+
+    local function getRoot(character)
+
+        return character:FindFirstChild("HumanoidRootPart")
+            or character:FindFirstChild("Torso")
     end
 
     local function isKiller(player)
@@ -1920,8 +1857,8 @@ local function autoParryLoop()
                 local n = tool.Name:lower()
 
                 if n:find("knife")
-                or n:find("weapon")
                 or n:find("blade")
+                or n:find("weapon")
                 or n:find("staff") then
                     return true
                 end
@@ -1931,20 +1868,9 @@ local function autoParryLoop()
         return false
     end
 
-    local function getRoot(character)
-
-        return
-            character:FindFirstChild("HumanoidRootPart")
-            or character:FindFirstChild("Torso")
-    end
-
     local function triggerParry(reason, source, player)
 
-        if not config.infiniteAmmoEnabled then
-            return
-        end
-
-        if tick() - lastParry < cooldown then
+        if tick() - lastParry < PARRY_COOLDOWN then
             return
         end
 
@@ -1985,184 +1911,79 @@ local function autoParryLoop()
         end)
     end
 
-    local function watchObject(player, obj)
-
-        if tracked[obj] then
-            return
-        end
-
-        tracked[obj] = true
-
-        if validCombatName(obj.Name) then
-
-            triggerParry(
-                "ObjectDetected",
-                obj:GetFullName(),
-                player
-            )
-        end
-
-        if obj:IsA("Sound") then
-
-            table.insert(connections,
-                obj.Played:Connect(function()
-
-                    triggerParry(
-                        "SoundPlayed",
-                        obj:GetFullName(),
-                        player
-                    )
-                end)
-            )
-        end
-
-        if obj:IsA("Animation") then
-
-            triggerParry(
-                "AnimationObject",
-                obj.AnimationId,
-                player
-            )
-        end
-
-        if obj:IsA("Trail")
-        or obj:IsA("Beam")
-        or obj:IsA("ParticleEmitter") then
-
-            triggerParry(
-                "CombatEffect",
-                obj:GetFullName(),
-                player
-            )
-        end
-
-        if obj:IsA("ValueBase") then
-
-            table.insert(connections,
-                obj.Changed:Connect(function()
-
-                    triggerParry(
-                        "ValueChanged",
-                        obj:GetFullName(),
-                        player
-                    )
-                end)
-            )
-        end
-
-        for attr,_ in pairs(obj:GetAttributes()) do
-
-            table.insert(connections,
-                obj:GetAttributeChangedSignal(attr):Connect(function()
-
-                    triggerParry(
-                        "AttributeChanged",
-                        obj:GetFullName() .. " : " .. attr,
-                        player
-                    )
-                end)
-            )
-        end
+    if radiusESP then
+        radiusESP:Destroy()
     end
 
-    local function hookCharacter(player, character)
+    radiusESP = Instance.new("Part")
+    radiusESP.Name = "ParryRadiusESP"
+    radiusESP.Shape = Enum.PartType.Cylinder
+    radiusESP.Material = Enum.Material.Neon
+    radiusESP.Color = Color3.fromRGB(255,0,0)
+    radiusESP.Transparency = 0.89
+    radiusESP.CanCollide = false
+    radiusESP.Anchored = true
+    radiusESP.Size = Vector3.new(
+        0.2,
+        DETECTION_RADIUS * 2,
+        DETECTION_RADIUS * 2
+    )
+    radiusESP.Parent = workspace
 
-        if not isKiller(player) then
-            return
-        end
+    combatHeartbeat = RunService.Heartbeat:Connect(function()
 
-        print("[AutoParry] Killer Hooked :", player.Name)
+        if not config.infiniteAmmoEnabled then
 
-        for _, obj in ipairs(character:GetDescendants()) do
-            watchObject(player, obj)
-        end
+            combatStateConnected = false
 
-        table.insert(connections,
-            character.DescendantAdded:Connect(function(obj)
-
-                watchObject(player, obj)
-
-                triggerParry(
-                    "DescendantAdded",
-                    obj:GetFullName(),
-                    player
-                )
-            end)
-        )
-
-        local humanoid =
-            character:FindFirstChildOfClass("Humanoid")
-
-        if humanoid then
-
-            table.insert(connections,
-                humanoid.AnimationPlayed:Connect(function(track)
-
-                    local anim = track.Animation
-
-                    if anim then
-
-                        triggerParry(
-                            "AnimationPlayed",
-                            tostring(anim.AnimationId),
-                            player
-                        )
-                    end
-                end)
-            )
-        end
-    end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-
-        if player ~= localPlayer then
-
-            if player.Character then
-                hookCharacter(player, player.Character)
+            if combatHeartbeat then
+                combatHeartbeat:Disconnect()
+                combatHeartbeat = nil
             end
 
-            table.insert(connections,
-                player.CharacterAdded:Connect(function(char)
+            if radiusESP then
+                radiusESP:Destroy()
+                radiusESP = nil
+            end
 
-                    task.wait(1)
-
-                    hookCharacter(player, char)
-                end)
-            )
+            return
         end
-    end
 
-    table.insert(connections,
-        Players.PlayerAdded:Connect(function(player)
+        if not localRootPart then
+            return
+        end
 
-            player.CharacterAdded:Connect(function(char)
+        radiusESP.CFrame =
+            CFrame.new(
+                localRootPart.Position + Vector3.new(0,1.2,0)
+            )
+            * CFrame.Angles(
+                0,
+                0,
+                math.rad(90)
+            )
 
-                task.wait(1)
+        for _, player in ipairs(Players:GetPlayers()) do
 
-                hookCharacter(player, char)
-            end)
-        end)
-    )
+            if isKiller(player) then
 
-    table.insert(connections,
-        RunService.Heartbeat:Connect(function()
+                local char = player.Character
 
-            for _, player in ipairs(Players:GetPlayers()) do
+                if char then
 
-                if isKiller(player) then
+                    local root = getRoot(char)
 
-                    local char = player.Character
+                    if root then
 
-                    if char then
+                        local dist =
+                            (localRootPart.Position - root.Position).Magnitude
 
-                        local root = getRoot(char)
-
-                        if root then
+                        if dist <= DETECTION_RADIUS then
 
                             local velocity =
                                 root.AssemblyLinearVelocity.Magnitude
 
-                            if velocity > 24 then
+                            if velocity > 26 then
 
                                 triggerParry(
                                     "VelocitySpike",
@@ -2170,16 +1991,57 @@ local function autoParryLoop()
                                     player
                                 )
                             end
+
+                            for _, obj in ipairs(char:GetDescendants()) do
+
+                                if validCombatName(obj.Name) then
+
+                                    triggerParry(
+                                        "CombatState",
+                                        obj:GetFullName(),
+                                        player
+                                    )
+
+                                    break
+                                end
+
+                                if obj:IsA("Sound") then
+
+                                    if obj.IsPlaying then
+
+                                        triggerParry(
+                                            "CombatSound",
+                                            obj:GetFullName(),
+                                            player
+                                        )
+
+                                        break
+                                    end
+                                end
+
+                                if obj:IsA("Animation") then
+
+                                    if validCombatName(obj.Name) then
+
+                                        triggerParry(
+                                            "Animation",
+                                            obj.AnimationId,
+                                            player
+                                        )
+
+                                        break
+                                    end
+                                end
+                            end
                         end
                     end
                 end
             end
-        end)
-    )
+        end
+    end)
 
-    print("[AutoParry] Real-time adaptive scanner loaded")
+    print("[AutoParry] Real-time scanner initialized")
 end
-        
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

@@ -1955,7 +1955,7 @@ local function autoParryLoop()
 
         radiusESP.CFrame =
             CFrame.new(
-                localRootPart.Position + Vector3.new(0,1.2,0)
+                localRootPart.Position + Vector3.new(0,0.5,0)
             )
             * CFrame.Angles(
                 0,

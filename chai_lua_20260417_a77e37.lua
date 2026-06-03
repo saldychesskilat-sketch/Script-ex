@@ -1825,207 +1825,227 @@ local function getKillerDistance()
     return minDist        
 end        
         
-local attackEventsConnected = false
+local combatStateConnected = false
 
 local function autoParryLoop()
     if not config.infiniteAmmoEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    if not attackEventsConnected then
-        attackEventsConnected = true
-        
-        -- Daftar lengkap remote event berdasarkan hasil scan
-        local remotePaths = {
-            -- Serangan Umum
-            "Remotes.AttackEvent",
-            "Remotes.Attacks.BasicAttack",
-            "Remotes.Attacks.AfterAttack",
-            "Remotes.Attacks.hit",
-            "Remotes.Attacks.Lunge",
-            "Remotes.Attacks.LungeDetect",
-            "Remotes.Attacks.TrailEvent",
-            -- Killer Umum
-            "Remotes.Killers.SetAction",
-            "Remotes.Killers.Instinct",
-            "Remotes.Killers.Highlightremote",
-            "Remotes.Killers.Startmori",
-            "Remotes.Killers.SlowAttack",
-            "Remotes.Killers.Damageviz",
-            "Remotes.Killers.Killer.ActivatePower",
-            "Remotes.Killers.Killer.IdleRefreshEvent",
-            "Remotes.Killers.Killer.Deactivate",
-            "Remotes.Killers.Killer.Deactivatefromclient",
-            "Remotes.Killers.Killer.ShowPlayers",
-            "Remotes.Killers.Killer.CooldownEvent",
-            "Remotes.Killers.Killer.PowerDoneDeactivating",
-            "Remotes.Killers.Killer.FrenzyHitEvent",
-            -- Stalker
-            "Remotes.Killers.Stalker.StopStalking",
-            "Remotes.Killers.Stalker.StartStalking",
-            "Remotes.Killers.Stalker.UpdateStalking",
-            "Remotes.Killers.Stalker.EvolveStage",
-            "Remotes.Killers.Stalker.ConsumeReady",
-            "Remotes.Killers.Stalker.grab",
-            "Remotes.Killers.Stalker.StartGrabHitbox",
-            "Remotes.Killers.Stalker.GrabHitResult",
-            "Remotes.Killers.Stalker.CancelGrabHitbox",
-            "Remotes.Killers.Stalker.GrabResult",
-            -- Masked
-            "Remotes.Killers.Masked.Activatepower",
-            "Remotes.Killers.Masked.Deactivatepower",
-            "Remotes.Killers.Masked.alexattack",
-            "Remotes.Killers.Masked.StopDash",
-            "Remotes.Killers.Masked.playsound",
-            -- Hidden
-            "Remotes.Killers.Hidden.M2",
-            "Remotes.Killers.Hidden.highlight",
-            "Remotes.Killers.Hidden.Leap",
-            "Remotes.Killers.Hidden.m2HitVM",
-            -- Veil
-            "Remotes.Killers.Veil.Spearthrow",
-            "Remotes.Killers.Veil.visualize",
-            "Remotes.Killers.Veil.vfx",
-            "Remotes.Killers.Veil.updatewep",
-            "Remotes.Killers.Veil.Echo.EchoVoid_Check",
-            "Remotes.Killers.Veil.Echo.EchoVoid_Trigger",
-            -- Cure
-            "Remotes.Killers.Cure.inject",
-            "Remotes.Killers.Cure.corpse",
-            "Remotes.Killers.Cure.ThrowFlask",
-            "Remotes.Killers.Cure.VisualizeFlask",
-            "Remotes.Killers.Cure.CancelFlask",
-            "Remotes.Killers.Cure.PrepareFlask",
-            -- Abysswalker
-            "Remotes.Killers.Abysswalker.corrupt",
-            "Remotes.Killers.Abysswalker.visualize",
-            -- Jason
-            "Remotes.Killers.Jason.LakeMist",
-            "Remotes.Killers.Jason.Pursuit",
-            "Remotes.Pallet.Jason.Stun",
-            "Remotes.Pallet.Jason.Destroy",
-            "Remotes.Pallet.Jason.Destroy-Global",
-            "Remotes.Pallet.Jason.Stunover",
-            "Remotes.Pallet.Jason.PalletBreakCommit",
-            "Remotes.Pallet.Jason.PalletBreakReject",
-            -- Carry / Hook
-            "Remotes.Carry.CarrySurvivorEvent",
-            "Remotes.Carry.HookEvent",
-            "Remotes.Carry.UnHookEvent",
-            "Remotes.Carry.SelfUnHookEvent",
-            "Remotes.Carry.DropSurvivorEvent",
-            "Remotes.Carry.HookReject",
-            "Remotes.Carry.HookCommit",
-            -- Chase
-            "Remotes.Chase.ChaseMusicEvent",
-            "Remotes.Chase.Runevent"
-        }
-        
-        -- Helper untuk mendapatkan remote dari path (mengatasi nested folder)
-        local function getRemoteByPath(path)
-            local parts = {}
-            for part in string.gmatch(path, "[^%.]+") do
-                table.insert(parts, part)
+    if not combatStateConnected then
+        combatStateConnected = true
+
+        local trackedStates = {}
+        local trackedConnections = {}
+
+        local function isKiller(player)
+            if not player or player == localPlayer then
+                return false
             end
-            local current = ReplicatedStorage
-            for _, part in ipairs(parts) do
-                if current then
-                    current = current:FindFirstChild(part)
-                else
-                    break
+
+            if player.Team then
+                local t = player.Team.Name:lower()
+
+                if t:find("killer")
+                or t:find("monster")
+                or t:find("enemy") then
+                    return true
                 end
             end
-            return current
+
+            local char = player.Character
+
+            if char then
+                local tool = char:FindFirstChildWhichIsA("Tool")
+
+                if tool then
+                    local n = tool.Name:lower()
+
+                    if n:find("knife")
+                    or n:find("blade")
+                    or n:find("weapon") then
+                        return true
+                    end
+                end
+            end
+
+            return false
         end
-        
-        -- Handler untuk event serangan (dipanggil saat remote di-fire)
-        local function onAttackDetected(attacker, ...)
-            -- Validasi attacker
-            if not attacker or type(attacker) ~= "userdata" then return end
-            
-            -- Cek jarak ke killer terdekat
-            local dist = getKillerDistance()
-            if dist <= 10 then
-                -- Tentukan target killer (bisa dari attacker atau cari sendiri)
-                local targetKiller = attacker
-                local isKiller = false
-                
-                -- Cek apakah attacker adalah killer
-                if targetKiller.Team then
-                    local teamName = targetKiller.Team.Name:lower()
-                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                        isKiller = true
-                    end
-                end
-                if not isKiller then
-                    -- Cek dari tool
-                    local char = targetKiller.Character
+
+        local function getClosestKiller()
+            local nearest = nil
+            local nearestDist = math.huge
+            local localPos = localRootPart.Position
+
+            for _, player in ipairs(Players:GetPlayers()) do
+                if isKiller(player) then
+                    local char = player.Character
+
                     if char then
-                        local tool = char:FindFirstChildWhichIsA("Tool")
-                        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                            isKiller = true
-                        end
-                    end
-                end
-                
-                -- Jika attacker bukan killer, cari killer terdekat
-                if not isKiller then
-                    local localPos = localRootPart.Position
-                    local minDist = math.huge
-                    targetKiller = nil
-                    for _, player in ipairs(Players:GetPlayers()) do
-                        if player ~= localPlayer then
-                            local char = player.Character
-                            if char then
-                                local killerCheck = false
-                                if player.Team then
-                                    local tn = player.Team.Name:lower()
-                                    if tn:find("killer") or tn:find("monster") or tn:find("enemy") then
-                                        killerCheck = true
-                                    end
-                                end
-                                if not killerCheck then
-                                    local tool = char:FindFirstChildWhichIsA("Tool")
-                                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                                        killerCheck = true
-                                    end
-                                end
-                                if killerCheck then
-                                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                                    if root then
-                                        local d = (localPos - root.Position).Magnitude
-                                        if d < minDist then
-                                            minDist = d
-                                            targetKiller = player
-                                        end
-                                    end
-                                end
+                        local root =
+                            char:FindFirstChild("HumanoidRootPart")
+                            or char:FindFirstChild("Torso")
+
+                        if root then
+                            local dist = (localPos - root.Position).Magnitude
+
+                            if dist < nearestDist then
+                                nearestDist = dist
+                                nearest = player
                             end
                         end
                     end
                 end
-                
-                -- Eksekusi parry jika ada target killer
-                if targetKiller then
-                    fireParryRemote(targetKiller)
-                else
-                    -- Fallback: parry tanpa argumen
-                    fireParryRemote()
+            end
+
+            return nearest, nearestDist
+        end
+
+        local function triggerParry(reason, source)
+            local killer, dist = getClosestKiller()
+
+            if not killer then
+                return
+            end
+
+            if dist > 15 then
+                return
+            end
+
+            print("[CombatState]")
+            print("Reason :", reason)
+            print("Source :", source)
+            print("Killer :", killer.Name)
+            print("Distance :", math.floor(dist))
+
+            fireParryRemote(killer)
+        end
+
+        local function hookCharacter(player, character)
+            if not isKiller(player) then
+                return
+            end
+
+            if trackedStates[character] then
+                return
+            end
+
+            trackedStates[character] = true
+
+            character.DescendantAdded:Connect(function(obj)
+
+                local n = obj.Name:lower()
+
+                if obj:IsA("WeldConstraint") then
+                    triggerParry("WeldConstraint", obj:GetFullName())
+                end
+
+                if n:find("hitbox")
+                or n:find("grab")
+                or n:find("attack")
+                or n:find("slash")
+                or n:find("hit")
+                or n:find("swing")
+                or n:find("lunge")
+                or n:find("stun") then
+
+                    triggerParry("CombatObject", obj:GetFullName())
+                end
+
+                if obj:IsA("Sound") then
+                    obj.Played:Connect(function()
+
+                        local sn = obj.Name:lower()
+
+                        if sn:find("swing")
+                        or sn:find("attack")
+                        or sn:find("slash")
+                        or sn:find("hit")
+                        or sn:find("knife") then
+
+                            triggerParry("CombatSound", obj:GetFullName())
+                        end
+                    end)
+                end
+            end)
+
+            for _, obj in ipairs(character:GetDescendants()) do
+
+                if obj:IsA("Instance") then
+
+                    obj.AttributeChanged:Connect(function(attr)
+
+                        local value = obj:GetAttribute(attr)
+
+                        local a = tostring(attr):lower()
+
+                        if a:find("attack")
+                        or a:find("action")
+                        or a:find("combat")
+                        or a:find("hit")
+                        or a:find("state")
+                        or a:find("grab") then
+
+                            print("[STATE]")
+                            print("Object :", obj.Name)
+                            print("Attribute :", attr)
+                            print("Value :", tostring(value))
+
+                            if value == true
+                            or value == 1
+                            or tostring(value):lower() == "attack"
+                            or tostring(value):lower() == "active" then
+
+                                triggerParry("AttributeState", obj:GetFullName())
+                            end
+                        end
+                    end)
                 end
             end
-        end
-        
-        -- Pasang listener ke setiap remote yang ditemukan
-        local registeredCount = 0
-        for _, path in ipairs(remotePaths) do
-            local remote = getRemoteByPath(path)
-            if remote and remote:IsA("RemoteEvent") then
-                remote.OnClientEvent:Connect(onAttackDetected)
-                registeredCount = registeredCount + 1
-                print("[AutoParry] Listening to:", path)
+
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+            if humanoid then
+                humanoid.AnimationPlayed:Connect(function(track)
+
+                    local anim = track.Animation
+
+                    if anim then
+                        local id = tostring(anim.AnimationId)
+
+                        print("[ANIMATION]")
+                        print("Player :", player.Name)
+                        print("Anim :", id)
+
+                        triggerParry("Animation", id)
+                    end
+                end)
             end
         end
-        
-        print("[AutoParry] Registered " .. registeredCount .. " attack/killer events")
+
+        for _, player in ipairs(Players:GetPlayers()) do
+
+            if player ~= localPlayer then
+
+                if player.Character then
+                    hookCharacter(player, player.Character)
+                end
+
+                player.CharacterAdded:Connect(function(char)
+                    task.wait(1)
+                    hookCharacter(player, char)
+                end)
+            end
+        end
+
+        Players.PlayerAdded:Connect(function(player)
+
+            player.CharacterAdded:Connect(function(char)
+                task.wait(1)
+                hookCharacter(player, char)
+            end)
+        end)
+
+        print("[CombatState] Adaptive scanner initialized")
     end
 end
         

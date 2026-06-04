@@ -1973,7 +1973,7 @@ local function autoParryLoop()
     mainCircle.CanCollide = false
 
     mainCircle.Size = Vector3.new(
-        0.12,
+        0.05,
         DETECTION_RADIUS * 2,
         DETECTION_RADIUS * 2
     )
@@ -2017,7 +2017,7 @@ local function autoParryLoop()
     innerHole.CanCollide = false
 
     innerHole.Size = Vector3.new(
-        0.13,
+        0.05,
         (DETECTION_RADIUS * 2) - 0.45,
         (DETECTION_RADIUS * 2) - 0.45
     )
@@ -2271,7 +2271,7 @@ local function autoParryLoop()
 
         -- posisi esp dinaikkan 2 studs
         local targetPos =
-            localRootPart.Position + Vector3.new(0,0.8,0)
+            localRootPart.Position + Vector3.new(0,0,0)
 
         local espCF =
             CFrame.new(targetPos)

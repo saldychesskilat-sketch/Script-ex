@@ -1782,7 +1782,7 @@ local function autoParryLoop()
 
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 15
+    local DETECTION_RADIUS = 8
     local PARRY_COOLDOWN = 0.08
 
     local lastParry = 0
@@ -2106,7 +2106,7 @@ local function autoParryLoop()
 
             local current = 2
 
-            for i = 1,2 do
+            for i = 1,36 do
 
                 if not pulse.Parent then
                     break

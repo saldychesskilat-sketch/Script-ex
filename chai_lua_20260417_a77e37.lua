@@ -1798,7 +1798,7 @@ local function autoParryLoop()
         "attack",
         "swing",
         "slash",
-        "TrailEvent,
+        "TrailEvent",
         "hit",
         "damage",
         "lunge",

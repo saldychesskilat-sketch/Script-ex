@@ -2048,7 +2048,7 @@ local function autoParryLoop()
 
         pulse.CFrame =
             CFrame.new(
-                localRootPart.Position - Vector3.new(0,0,0)
+                localRootPart.Position - Vector3.new(0,0.4,0)
             )
             * CFrame.Angles(
                 0,
@@ -2271,7 +2271,7 @@ local function autoParryLoop()
 
         -- posisi esp dinaikkan 2 studs
         local targetPos =
-            localRootPart.Position + Vector3.new(0,0.4,0)
+            localRootPart.Position + Vector3.new(0,0.04,0)
 
         local espCF =
             CFrame.new(targetPos)

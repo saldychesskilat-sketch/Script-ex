@@ -1782,26 +1782,30 @@ local function autoParryLoop()
 
     combatStateConnected = true
 
-    -- RADIUS DIKECILKAN
+    -- ESP radius diperkecil
     local DETECTION_RADIUS = 8
     local PARRY_COOLDOWN = 0.08
 
     local lastParry = 0
     local pulseTick = 0
     local lastPulse = 0
+    local outlineHue = 0
 
+    -- replicated combat states
     local COMBAT_STATES = {
 
         "basicattack",
         "attack",
         "swing",
         "slash",
+        "TrailEvent,
         "hit",
         "damage",
         "lunge",
         "frenzy",
         "frenzyend",
         "grab",
+        "StartGrabHitbox",
         "stun",
         "wallhitstun",
         "wallhitstun2",
@@ -1809,19 +1813,31 @@ local function autoParryLoop()
         "weapon",
         "knife",
         "machete",
+        "trigger",
+        "Startmori",
+        "ThrowFlask",
+        "StatusUpdateEvent",
         "bat",
+        "Deactivatefromclient",
         "powers",
+        "KingScourgeStart",
+        "FrenzyHitEvent",
+        "corrupt",
         "killerost",
+        "Damageviz",
+        "m2HitVM",
         "lookscriptkiller",
-        "swingsound",
+        "LungeDetect",
         "attackline",
-        "execute",
+        "hit",
+        "alexattack",
+        "Activatepower",
         "rage",
         "hurt",
         "injure",
         "dash",
         "power",
-        "combat",
+        "SetAction",
         "kill"
     }
 
@@ -1933,6 +1949,7 @@ local function autoParryLoop()
         end)
     end
 
+    -- destroy old esp
     if radiusFolder then
         radiusFolder:Destroy()
     end
@@ -1947,11 +1964,10 @@ local function autoParryLoop()
     mainCircle.Name = "MainRadius"
     mainCircle.Shape = Enum.PartType.Cylinder
     mainCircle.Material = Enum.Material.Neon
-
-    -- LEBIH TRANSPARAN
-    mainCircle.Transparency = 0.88
-
     mainCircle.Color = Color3.fromRGB(255,140,0)
+
+    -- lebih transparan
+    mainCircle.Transparency = 0.88
 
     mainCircle.Anchored = true
     mainCircle.CanCollide = false
@@ -1964,29 +1980,49 @@ local function autoParryLoop()
 
     mainCircle.Parent = radiusFolder
 
-    -- OUTLINE RAINBOW
-    local outline = Instance.new("Part")
+    -- OUTLINE ESP
+    local outlineCircle = Instance.new("Part")
 
-    outline.Name = "OutlineRadius"
-    outline.Shape = Enum.PartType.Cylinder
-    outline.Material = Enum.Material.Neon
+    outlineCircle.Name = "OutlineRadius"
+    outlineCircle.Shape = Enum.PartType.Cylinder
+    outlineCircle.Material = Enum.Material.Neon
 
-    outline.Transparency = 0.22
+    outlineCircle.Color = Color3.fromRGB(255,255,255)
 
-    outline.Color = Color3.fromRGB(255,0,0)
+    outlineCircle.Transparency = 0.18
 
-    outline.Anchored = true
-    outline.CanCollide = false
+    outlineCircle.Anchored = true
+    outlineCircle.CanCollide = false
 
-    outline.Size = Vector3.new(
-        0.16,
-        (DETECTION_RADIUS * 2) + 0.4,
-        (DETECTION_RADIUS * 2) + 0.4
+    outlineCircle.Size = Vector3.new(
+        0.05,
+        (DETECTION_RADIUS * 2) + 0.7,
+        (DETECTION_RADIUS * 2) + 0.7
     )
 
-    outline.Parent = radiusFolder
+    outlineCircle.Parent = radiusFolder
 
-    local rainbowTick = 0
+    -- INNER HOLE
+    local innerHole = Instance.new("Part")
+
+    innerHole.Name = "InnerHole"
+    innerHole.Shape = Enum.PartType.Cylinder
+    innerHole.Material = Enum.Material.SmoothPlastic
+
+    innerHole.Color = Color3.fromRGB(0,0,0)
+
+    innerHole.Transparency = 1
+
+    innerHole.Anchored = true
+    innerHole.CanCollide = false
+
+    innerHole.Size = Vector3.new(
+        0.13,
+        (DETECTION_RADIUS * 2) - 0.45,
+        (DETECTION_RADIUS * 2) - 0.45
+    )
+
+    innerHole.Parent = radiusFolder
 
     -- ESP PULSE
     local function createPulse()
@@ -2000,19 +2036,19 @@ local function autoParryLoop()
         pulse.Shape = Enum.PartType.Cylinder
         pulse.Material = Enum.Material.Neon
 
-        pulse.Color = Color3.fromRGB(255,170,0)
+        pulse.Color =
+            Color3.fromHSV(outlineHue,1,1)
 
-        pulse.Transparency = 0.75
+        pulse.Transparency = 0.55
 
         pulse.Anchored = true
         pulse.CanCollide = false
 
-        pulse.Size = Vector3.new(0.1,1.5,1.5)
+        pulse.Size = Vector3.new(0.08,1,1)
 
         pulse.CFrame =
             CFrame.new(
-                -- NAIK 2 STUD
-                localRootPart.Position - Vector3.new(0,0.8,0)
+                localRootPart.Position - Vector3.new(0,0,0)
             )
             * CFrame.Angles(
                 0,
@@ -2024,9 +2060,9 @@ local function autoParryLoop()
 
         task.spawn(function()
 
-            local current = 1.5
+            local current = 1
 
-            for i = 1,45 do
+            for i = 1,32 do
 
                 if not pulse.Parent then
                     break
@@ -2036,19 +2072,19 @@ local function autoParryLoop()
                     break
                 end
 
-                current += 0.35
+                current += 0.45
 
                 pulse.Size = Vector3.new(
-                    0.1,
+                    0.08,
                     current,
                     current
                 )
 
-                pulse.Transparency += 0.005
+                pulse.Transparency += 0.012
 
                 pulse.CFrame =
                     CFrame.new(
-                        localRootPart.Position - Vector3.new(0,0.8,0)
+                        localRootPart.Position - Vector3.new(0,0,0)
                     )
                     * CFrame.Angles(
                         0,
@@ -2063,7 +2099,7 @@ local function autoParryLoop()
         end)
     end
 
-    -- COMBAT SCANNER
+    -- COMBAT OBJECT SCAN
     local function scanCombatObject(player, obj)
 
         if scannedObjects[obj] then
@@ -2166,36 +2202,9 @@ local function autoParryLoop()
             end)
 
         table.insert(stateConnections, descConn)
-
-        local humanoid =
-            char:FindFirstChildOfClass("Humanoid")
-
-        if humanoid then
-
-            local animConn =
-                humanoid.AnimationPlayed:Connect(function(track)
-
-                    local anim = track.Animation
-
-                    if anim then
-
-                        local animId =
-                            tostring(anim.AnimationId):lower()
-
-                        if validCombatState(animId) then
-
-                            triggerParry(
-                                "AnimationPlayed",
-                                player
-                            )
-                        end
-                    end
-                end)
-
-            table.insert(stateConnections, animConn)
-        end
     end
 
+    -- PLAYER HOOK
     for _, player in ipairs(Players:GetPlayers()) do
 
         if player ~= localPlayer then
@@ -2210,27 +2219,16 @@ local function autoParryLoop()
                     task.wait(1)
 
                     hookCharacter(player, char)
+
+                    -- reload esp setelah reset
+                    if radiusFolder and not radiusFolder.Parent then
+                        radiusFolder.Parent = workspace
+                    end
                 end)
 
             table.insert(stateConnections, charConn)
         end
     end
-
-    local playerConn =
-        Players.PlayerAdded:Connect(function(player)
-
-            local charConn =
-                player.CharacterAdded:Connect(function(char)
-
-                    task.wait(1)
-
-                    hookCharacter(player, char)
-                end)
-
-            table.insert(stateConnections, charConn)
-        end)
-
-    table.insert(stateConnections, playerConn)
 
     -- MAIN LOOP
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
@@ -2265,21 +2263,17 @@ local function autoParryLoop()
         end
 
         pulseTick += dt * 2
-        rainbowTick += dt * 0.35
+        outlineHue += dt * 0.25
 
-        -- RAINBOW OUTLINE
-        outline.Color = Color3.fromHSV(
-            rainbowTick % 1,
-            1,
-            1
-        )
+        if outlineHue > 1 then
+            outlineHue = 0
+        end
 
-        -- POSISI ESP
+        -- posisi esp dinaikkan 2 studs
         local targetPos =
-            -- NAIK 2 STUD
-            localRootPart.Position - Vector3.new(0,0.8,0)
+            localRootPart.Position + Vector3.new(0,2,0)
 
-        mainCircle.CFrame =
+        local espCF =
             CFrame.new(targetPos)
             * CFrame.Angles(
                 0,
@@ -2287,12 +2281,33 @@ local function autoParryLoop()
                 math.rad(90)
             )
 
-        outline.CFrame =
-            mainCircle.CFrame
+        -- permanent reload esp
+        if not mainCircle.Parent then
+            mainCircle.Parent = radiusFolder
+        end
+
+        if not outlineCircle.Parent then
+            outlineCircle.Parent = radiusFolder
+        end
+
+        if not innerHole.Parent then
+            innerHole.Parent = radiusFolder
+        end
+
+        mainCircle.CFrame = espCF
+        outlineCircle.CFrame = espCF
+        innerHole.CFrame = espCF
 
         mainCircle.Transparency =
             0.87 + math.sin(pulseTick) * 0.025
 
+        outlineCircle.Color =
+            Color3.fromHSV(outlineHue,1,1)
+
+        outlineCircle.Transparency =
+            0.12 + math.sin(pulseTick * 2) * 0.03
+
+        -- pulse 2 detik
         if tick() - lastPulse >= 2 then
 
             lastPulse = tick()
@@ -2300,6 +2315,7 @@ local function autoParryLoop()
             createPulse()
         end
 
+        -- velocity scan
         for _, player in ipairs(Players:GetPlayers()) do
 
             if isKiller(player) then

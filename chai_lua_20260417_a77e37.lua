@@ -1781,65 +1781,96 @@ local function autoParryLoop()
 
     combatStateConnected = true
 
-    ----------------------------------------------------
-    -- SETTINGS
-    ----------------------------------------------------
-
     local DETECTION_RADIUS = 15
     local PARRY_COOLDOWN = 0.05
 
     local lastParry = 0
     local lastPulse = 0
-    local espReloadTick = 0
+    local espTick = 0
 
     local scannedObjects = {}
     local hookedCharacters = {}
-    local objectStates = {}
 
-    ----------------------------------------------------
+    -- VALID COMBAT CLASS
+    local VALID_CLASSES = {
+
+        Script = true,
+        LocalScript = true,
+        ModuleScript = true,
+        WeldConstraint = true,
+        BoolValue = true,
+        IntValue = true,
+        StringValue = true,
+        NumberValue = true,
+        ObjectValue = true
+    }
+
     -- BLOCKED CLASS
-    ----------------------------------------------------
-
     local BLOCKED_CLASSES = {
 
         Sound = true,
         Animation = true,
         MeshPart = true,
         Part = true,
-        UnionOperation = true,
         Model = true,
         Accessory = true,
         Attachment = true,
         Decal = true,
-        Texture = true,
-        Highlight = true,
-        Trail = true,
-        Beam = true,
-        Smoke = true,
-        Fire = true,
-        Sparkles = true
+        Texture = true
     }
 
-    ----------------------------------------------------
     -- BLOCKED NAMES
-    ----------------------------------------------------
-
     local BLOCKED_NAMES = {
 
         ["movement spike"] = true,
         ["possible dash/lunge"] = true,
-
+        ["action"] = true,
         ["idle"] = true,
         ["walk"] = true,
         ["run"] = true,
-        ["jump"] = true,
+        ["jump"] = true
+    }
 
-        ["animation"] = true,
-        ["sound"] = true,
-        ["mesh"] = true,
+    -- VALID STATES
+    local COMBAT_STATES = {
 
-        ["thumbnailcameratarget"] = true,
-        ["pcube4_knife_0"] = true
+        -- attack
+        "attack",
+        "basicattack",
+        "combat",
+        "damage",
+        "hit",
+        "slash",
+        "swing",
+        "lunge",
+
+        -- frenzy
+        "frenzy",
+        "frenzyend",
+        "rage",
+
+        -- stun
+        "stun",
+        "wallhitstun",
+        "wallhitstun2",
+        "wallhitstunalex",
+
+        -- systems
+        "powers",
+        "killerost",
+        "lookscriptkiller",
+        "frenzyanims",
+
+        -- extra
+        "grab",
+        "hook",
+        "execute",
+        "kill",
+        "weapon",
+        "knife",
+        "machete",
+        "bat",
+        "blade"
     }
 
     ----------------------------------------------------
@@ -1854,42 +1885,25 @@ local function autoParryLoop()
     end
 
     ----------------------------------------------------
-    -- VALID OBJECT FILTER
+    -- VALID STATE
     ----------------------------------------------------
 
-    local function isValidCombatObject(obj)
+    local function validCombatState(name)
 
-        if not obj then
+        local n = tostring(name):lower()
+
+        if BLOCKED_NAMES[n] then
             return false
         end
 
-        local className =
-            tostring(obj.ClassName)
+        for _, state in ipairs(COMBAT_STATES) do
 
-        local objName =
-            tostring(obj.Name):lower()
-
-        ------------------------------------------------
-        -- BLOCKED CLASS
-        ------------------------------------------------
-
-        if BLOCKED_CLASSES[className] then
-            return false
+            if n:find(state) then
+                return true
+            end
         end
 
-        ------------------------------------------------
-        -- BLOCKED NAME
-        ------------------------------------------------
-
-        if BLOCKED_NAMES[objName] then
-            return false
-        end
-
-        ------------------------------------------------
-        -- ACCEPT
-        ------------------------------------------------
-
-        return true
+        return false
     end
 
     ----------------------------------------------------
@@ -1903,14 +1917,9 @@ local function autoParryLoop()
             return false
         end
 
-        ------------------------------------------------
-        -- TEAM CHECK
-        ------------------------------------------------
-
         if player.Team then
 
-            local t =
-                tostring(player.Team.Name):lower()
+            local t = player.Team.Name:lower()
 
             if t:find("killer")
             or t:find("monster")
@@ -1919,10 +1928,6 @@ local function autoParryLoop()
                 return true
             end
         end
-
-        ------------------------------------------------
-        -- CHARACTER CHECK
-        ------------------------------------------------
 
         local char = player.Character
 
@@ -1938,14 +1943,13 @@ local function autoParryLoop()
             if tool then
 
                 local n =
-                    tostring(tool.Name):lower()
+                    tool.Name:lower()
 
                 if n:find("knife")
                 or n:find("blade")
                 or n:find("weapon")
                 or n:find("bat")
-                or n:find("machete")
-                or n:find("staff") then
+                or n:find("machete") then
 
                     return true
                 end
@@ -1979,10 +1983,6 @@ local function autoParryLoop()
             return
         end
 
-        ------------------------------------------------
-        -- ONLY RADIUS VALIDATION
-        ------------------------------------------------
-
         local dist =
             (
                 localRootPart.Position
@@ -2008,23 +2008,16 @@ local function autoParryLoop()
     end
 
     ----------------------------------------------------
-    -- ESP CLEAN
+    -- ESP
     ----------------------------------------------------
 
     if radiusFolder then
-
-        pcall(function()
-            radiusFolder:Destroy()
-        end)
+        radiusFolder:Destroy()
     end
 
     radiusFolder = Instance.new("Folder")
     radiusFolder.Name = "ParryESP"
     radiusFolder.Parent = workspace
-
-    ----------------------------------------------------
-    -- CREATE MAIN ESP
-    ----------------------------------------------------
 
     local function createMainESP()
 
@@ -2038,14 +2031,14 @@ local function autoParryLoop()
         circle.Color =
             Color3.fromRGB(255,140,0)
 
-        circle.Transparency = 0.90
+        circle.Transparency = 0.84
 
         circle.Anchored = true
         circle.CanCollide = false
         circle.CastShadow = false
 
         circle.Size = Vector3.new(
-            0.04,
+            0.08,
             DETECTION_RADIUS * 2,
             DETECTION_RADIUS * 2
         )
@@ -2075,14 +2068,14 @@ local function autoParryLoop()
         pulse.Color =
             Color3.fromRGB(255,170,0)
 
-        pulse.Transparency = 0.86
+        pulse.Transparency = 0.75
 
         pulse.Anchored = true
         pulse.CanCollide = false
         pulse.CastShadow = false
 
         pulse.Size = Vector3.new(
-            0.02,
+            0.05,
             2,
             2
         )
@@ -2104,22 +2097,22 @@ local function autoParryLoop()
 
             local size = 2
 
-            for i = 1,20 do
+            for i = 1,22 do
 
                 if not pulse.Parent
                 or not localRootPart then
                     break
                 end
 
-                size += DETECTION_RADIUS / 10
+                size += DETECTION_RADIUS / 11
 
                 pulse.Size = Vector3.new(
-                    0.02,
+                    0.05,
                     size,
                     size
                 )
 
-                pulse.Transparency += 0.005
+                pulse.Transparency += 0.01
 
                 pulse.CFrame =
                     CFrame.new(
@@ -2135,42 +2128,8 @@ local function autoParryLoop()
                 RunService.Heartbeat:Wait()
             end
 
-            pcall(function()
-                pulse:Destroy()
-            end)
+            pulse:Destroy()
         end)
-    end
-
-    ----------------------------------------------------
-    -- STATE UPDATE DETECTION
-    ----------------------------------------------------
-
-    local function registerStateUpdate(player, obj, reason)
-
-        if not isValidCombatObject(obj) then
-            return
-        end
-
-        local previous =
-            objectStates[obj]
-
-        local current =
-            tostring(obj:GetFullName())
-            .. "|"
-            .. tostring(obj.Parent)
-            .. "|"
-            .. tostring(obj.Name)
-
-        ------------------------------------------------
-        -- ONLY UPDATE TRIGGER
-        ------------------------------------------------
-
-        if previous ~= current then
-
-            objectStates[obj] = current
-
-            triggerParry(reason, player)
-        end
     end
 
     ----------------------------------------------------
@@ -2185,70 +2144,78 @@ local function autoParryLoop()
 
         scannedObjects[obj] = true
 
+        local className = obj.ClassName
+        local objName =
+            tostring(obj.Name):lower()
+
         ------------------------------------------------
-        -- FILTER
+        -- BLOCKED CLASS
         ------------------------------------------------
 
-        if not isValidCombatObject(obj) then
+        if BLOCKED_CLASSES[className] then
             return
         end
 
         ------------------------------------------------
-        -- INITIAL STATE
+        -- VALID CLASS
         ------------------------------------------------
 
-        objectStates[obj] =
-            tostring(obj:GetFullName())
+        if VALID_CLASSES[className] then
+
+            if validCombatState(objName) then
+
+                triggerParry(
+                    "CombatState : "..obj.Name,
+                    player
+                )
+            end
+        end
 
         ------------------------------------------------
-        -- ATTRIBUTE UPDATE
+        -- ATTRIBUTE
         ------------------------------------------------
 
         pcall(function()
 
-            obj.AttributeChanged:Connect(function(attr)
+            for attr,_ in pairs(obj:GetAttributes()) do
 
-                registerStateUpdate(
-                    player,
-                    obj,
-                    "AttributeUpdate : "..tostring(attr)
-                )
-            end)
+                obj:GetAttributeChangedSignal(attr):Connect(function()
+
+                    local attrName =
+                        tostring(attr):lower()
+
+                    if validCombatState(attrName) then
+
+                        triggerParry(
+                            "Attribute : "..attr,
+                            player
+                        )
+                    end
+                end)
+            end
         end)
 
         ------------------------------------------------
-        -- PROPERTY UPDATE
-        ------------------------------------------------
-
-        pcall(function()
-
-            obj.Changed:Connect(function()
-
-                registerStateUpdate(
-                    player,
-                    obj,
-                    "Changed : "..obj.ClassName
-                )
-            end)
-        end)
-
-        ------------------------------------------------
-        -- VALUE OBJECT UPDATE
+        -- VALUE OBJECT
         ------------------------------------------------
 
         if obj:IsA("BoolValue")
         or obj:IsA("IntValue")
         or obj:IsA("StringValue")
-        or obj:IsA("NumberValue")
-        or obj:IsA("ObjectValue") then
+        or obj:IsA("NumberValue") then
 
             obj.Changed:Connect(function()
 
-                registerStateUpdate(
-                    player,
-                    obj,
-                    "ValueUpdate : "..obj.Name
-                )
+                local n =
+                    tostring(obj.Name):lower()
+
+                if validCombatState(n) then
+
+                    triggerParry(
+                        "ValueChanged : "..obj.Name,
+                        player
+                    )
+                end
             end)
         end
     end
@@ -2286,20 +2253,7 @@ local function autoParryLoop()
 
         char.DescendantAdded:Connect(function(obj)
 
-            if not isValidCombatObject(obj) then
-                return
-            end
-
             scanObject(player, obj)
-
-            ------------------------------------------------
-            -- DIRECT UPDATE EVENT
-            ------------------------------------------------
-
-            triggerParry(
-                "NewCombatUpdate : "..obj.ClassName,
-                player
-            )
         end)
     end
 
@@ -2331,10 +2285,6 @@ local function autoParryLoop()
         end
     end
 
-    ----------------------------------------------------
-    -- NEW PLAYER
-    ----------------------------------------------------
-
     Players.PlayerAdded:Connect(function(player)
 
         player.CharacterAdded:Connect(function(char)
@@ -2355,10 +2305,6 @@ local function autoParryLoop()
     combatHeartbeat =
         RunService.Heartbeat:Connect(function(dt)
 
-        ------------------------------------------------
-        -- DISABLE
-        ------------------------------------------------
-
         if not config.infiniteAmmoEnabled then
 
             combatStateConnected = false
@@ -2371,10 +2317,7 @@ local function autoParryLoop()
 
             if radiusFolder then
 
-                pcall(function()
-                    radiusFolder:Destroy()
-                end)
-
+                radiusFolder:Destroy()
                 radiusFolder = nil
             end
 
@@ -2389,20 +2332,19 @@ local function autoParryLoop()
         -- ESP RELOAD
         ------------------------------------------------
 
-        espReloadTick += dt
+        espTick += dt
 
         if not mainCircle
         or not mainCircle.Parent
-        or espReloadTick >= 1 then
+        or espTick >= 1 then
 
-            espReloadTick = 0
+            espTick = 0
 
-            pcall(function()
-
-                if mainCircle then
+            if mainCircle then
+                pcall(function()
                     mainCircle:Destroy()
-                end
-            end)
+                end)
+            end
 
             mainCircle = createMainESP()
         end
@@ -2424,10 +2366,10 @@ local function autoParryLoop()
             )
 
         ------------------------------------------------
-        -- PULSE
+        -- PULSE EFFECT
         ------------------------------------------------
 
-        if tick() - lastPulse >= 0.16 then
+        if tick() - lastPulse >= 0.18 then
 
             lastPulse = tick()
 
@@ -2435,7 +2377,7 @@ local function autoParryLoop()
         end
 
         ------------------------------------------------
-        -- RUNTIME UPDATE SCAN
+        -- RUNTIME SCAN
         ------------------------------------------------
 
         for _, player in ipairs(Players:GetPlayers()) do
@@ -2459,40 +2401,33 @@ local function autoParryLoop()
                             ).Magnitude
 
                         ------------------------------------------------
-                        -- ONLY INSIDE RADIUS
+                        -- ONLY RADIUS VALIDATION
                         ------------------------------------------------
 
                         if dist <= DETECTION_RADIUS then
+
+                            ------------------------------------------------
+                            -- OBJECT SCAN
+                            ------------------------------------------------
 
                             for _, obj in ipairs(
                                 char:GetDescendants()
                             ) do
 
-                                if isValidCombatObject(obj) then
+                                local className =
+                                    obj.ClassName
 
-                                    ------------------------------------------------
-                                    -- ONLY UPDATE / CHANGE
-                                    ------------------------------------------------
+                                local objName =
+                                    tostring(obj.Name):lower()
 
-                                    local current =
-                                        tostring(obj:GetFullName())
-                                        .. "|"
-                                        .. tostring(obj.Parent)
-                                        .. "|"
-                                        .. tostring(obj.Name)
+                                if not BLOCKED_CLASSES[className]
+                                and VALID_CLASSES[className]
+                                and validCombatState(objName) then
 
-                                    local previous =
-                                        objectStates[obj]
-
-                                    if previous ~= current then
-
-                                        objectStates[obj] = current
-
-                                        triggerParry(
-                                            "RuntimeUpdate : "..obj.ClassName,
-                                            player
-                                        )
-                                    end
+                                    triggerParry(
+                                        "RuntimeState : "..obj.Name,
+                                        player
+                                    )
                                 end
                             end
                         end
@@ -2502,7 +2437,7 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Adaptive update combat scanner initialized")
+    print("[AutoParry] Adaptive filtered combat scanner initialized")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

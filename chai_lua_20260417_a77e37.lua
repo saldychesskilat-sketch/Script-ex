@@ -1967,7 +1967,7 @@ local function autoParryLoop()
     mainCircle.Color = Color3.fromRGB(255,140,0)
 
     -- lebih transparan
-    mainCircle.Transparency = 0.18
+    mainCircle.Transparency = 0.48
 
     mainCircle.Anchored = true
     mainCircle.CanCollide = false
@@ -1989,7 +1989,7 @@ local function autoParryLoop()
 
     outlineCircle.Color = Color3.fromRGB(255,255,255)
 
-    outlineCircle.Transparency = 0.89
+    outlineCircle.Transparency = 0.19
 
     outlineCircle.Anchored = true
     outlineCircle.CanCollide = false
@@ -2271,7 +2271,7 @@ local function autoParryLoop()
 
         -- posisi esp dinaikkan 2 studs
         local targetPos =
-            localRootPart.Position + Vector3.new(0,1.2,0)
+            localRootPart.Position + Vector3.new(0,0.8,0)
 
         local espCF =
             CFrame.new(targetPos)

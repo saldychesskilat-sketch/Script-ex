@@ -1769,6 +1769,7 @@ local function getKillerDistance()
     end        
     return minDist        
 end        
+
 local combatStateConnected = false
 local combatHeartbeat = nil
 local radiusFolder = nil
@@ -1781,6 +1782,7 @@ local function autoParryLoop()
 
     combatStateConnected = true
 
+    -- RADIUS DIKECILKAN
     local DETECTION_RADIUS = 8
     local PARRY_COOLDOWN = 0.08
 
@@ -1788,7 +1790,6 @@ local function autoParryLoop()
     local pulseTick = 0
     local lastPulse = 0
 
-    -- replicated combat states
     local COMBAT_STATES = {
 
         "basicattack",
@@ -1932,7 +1933,6 @@ local function autoParryLoop()
         end)
     end
 
-    -- remove old esp
     if radiusFolder then
         radiusFolder:Destroy()
     end
@@ -1941,24 +1941,52 @@ local function autoParryLoop()
     radiusFolder.Name = "ParryESP"
     radiusFolder.Parent = workspace
 
-    -- MAIN RADIUS
+    -- MAIN ESP
     local mainCircle = Instance.new("Part")
 
     mainCircle.Name = "MainRadius"
     mainCircle.Shape = Enum.PartType.Cylinder
     mainCircle.Material = Enum.Material.Neon
+
+    -- LEBIH TRANSPARAN
+    mainCircle.Transparency = 0.88
+
     mainCircle.Color = Color3.fromRGB(255,140,0)
-    mainCircle.Transparency = 0.74
+
     mainCircle.Anchored = true
     mainCircle.CanCollide = false
 
     mainCircle.Size = Vector3.new(
-        0.14,
+        0.12,
         DETECTION_RADIUS * 2,
         DETECTION_RADIUS * 2
     )
 
     mainCircle.Parent = radiusFolder
+
+    -- OUTLINE RAINBOW
+    local outline = Instance.new("Part")
+
+    outline.Name = "OutlineRadius"
+    outline.Shape = Enum.PartType.Cylinder
+    outline.Material = Enum.Material.Neon
+
+    outline.Transparency = 0.22
+
+    outline.Color = Color3.fromRGB(255,0,0)
+
+    outline.Anchored = true
+    outline.CanCollide = false
+
+    outline.Size = Vector3.new(
+        0.16,
+        (DETECTION_RADIUS * 2) + 0.4,
+        (DETECTION_RADIUS * 2) + 0.4
+    )
+
+    outline.Parent = radiusFolder
+
+    local rainbowTick = 0
 
     -- ESP PULSE
     local function createPulse()
@@ -1971,17 +1999,20 @@ local function autoParryLoop()
 
         pulse.Shape = Enum.PartType.Cylinder
         pulse.Material = Enum.Material.Neon
+
         pulse.Color = Color3.fromRGB(255,170,0)
 
-        pulse.Transparency = 0.5
+        pulse.Transparency = 0.75
+
         pulse.Anchored = true
         pulse.CanCollide = false
 
-        pulse.Size = Vector3.new(0.1,2,2)
+        pulse.Size = Vector3.new(0.1,1.5,1.5)
 
         pulse.CFrame =
             CFrame.new(
-                localRootPart.Position - Vector3.new(0,2.8,0)
+                -- NAIK 2 STUD
+                localRootPart.Position - Vector3.new(0,0.8,0)
             )
             * CFrame.Angles(
                 0,
@@ -1993,9 +2024,9 @@ local function autoParryLoop()
 
         task.spawn(function()
 
-            local current = 2
+            local current = 1.5
 
-            for i = 1,40 do
+            for i = 1,45 do
 
                 if not pulse.Parent then
                     break
@@ -2005,7 +2036,7 @@ local function autoParryLoop()
                     break
                 end
 
-                current += 0.65
+                current += 0.35
 
                 pulse.Size = Vector3.new(
                     0.1,
@@ -2013,11 +2044,11 @@ local function autoParryLoop()
                     current
                 )
 
-                pulse.Transparency += 0.012
+                pulse.Transparency += 0.005
 
                 pulse.CFrame =
                     CFrame.new(
-                        localRootPart.Position - Vector3.new(0,2.8,0)
+                        localRootPart.Position - Vector3.new(0,0.8,0)
                     )
                     * CFrame.Angles(
                         0,
@@ -2032,7 +2063,7 @@ local function autoParryLoop()
         end)
     end
 
-    -- COMBAT OBJECT SCAN
+    -- COMBAT SCANNER
     local function scanCombatObject(player, obj)
 
         if scannedObjects[obj] then
@@ -2043,7 +2074,6 @@ local function autoParryLoop()
 
         local objName = tostring(obj.Name):lower()
 
-        -- direct combat object
         if validCombatState(objName) then
 
             triggerParry(
@@ -2052,7 +2082,6 @@ local function autoParryLoop()
             )
         end
 
-        -- sound state
         if obj:IsA("Sound") then
 
             local conn =
@@ -2076,7 +2105,6 @@ local function autoParryLoop()
             table.insert(stateConnections, conn)
         end
 
-        -- attributes
         for attr,_ in pairs(obj:GetAttributes()) do
 
             local conn =
@@ -2105,27 +2133,6 @@ local function autoParryLoop()
 
             table.insert(stateConnections, conn)
         end
-
-        -- value objects
-        if obj:IsA("BoolValue")
-        or obj:IsA("IntValue")
-        or obj:IsA("NumberValue")
-        or obj:IsA("StringValue") then
-
-            local conn =
-                obj.Changed:Connect(function()
-
-                    if validCombatState(obj.Name) then
-
-                        triggerParry(
-                            "ValueObject : "..obj.Name,
-                            player
-                        )
-                    end
-                end)
-
-            table.insert(stateConnections, conn)
-        end
     end
 
     -- HOOK KILLER
@@ -2137,12 +2144,10 @@ local function autoParryLoop()
 
         print("[AutoParry] Hooked :", player.Name)
 
-        -- initial scan
         for _, obj in ipairs(char:GetDescendants()) do
             scanCombatObject(player, obj)
         end
 
-        -- real-time scan
         local descConn =
             char.DescendantAdded:Connect(function(obj)
 
@@ -2162,7 +2167,6 @@ local function autoParryLoop()
 
         table.insert(stateConnections, descConn)
 
-        -- animation scan
         local humanoid =
             char:FindFirstChildOfClass("Humanoid")
 
@@ -2192,7 +2196,6 @@ local function autoParryLoop()
         end
     end
 
-    -- existing players
     for _, player in ipairs(Players:GetPlayers()) do
 
         if player ~= localPlayer then
@@ -2213,7 +2216,6 @@ local function autoParryLoop()
         end
     end
 
-    -- new players
     local playerConn =
         Players.PlayerAdded:Connect(function(player)
 
@@ -2263,10 +2265,19 @@ local function autoParryLoop()
         end
 
         pulseTick += dt * 2
+        rainbowTick += dt * 0.35
 
-        -- ALWAYS CENTER ESP
+        -- RAINBOW OUTLINE
+        outline.Color = Color3.fromHSV(
+            rainbowTick % 1,
+            1,
+            1
+        )
+
+        -- POSISI ESP
         local targetPos =
-            localRootPart.Position - Vector3.new(0,2.8,0)
+            -- NAIK 2 STUD
+            localRootPart.Position - Vector3.new(0,0.8,0)
 
         mainCircle.CFrame =
             CFrame.new(targetPos)
@@ -2276,10 +2287,12 @@ local function autoParryLoop()
                 math.rad(90)
             )
 
-        mainCircle.Transparency =
-            0.73 + math.sin(pulseTick) * 0.04
+        outline.CFrame =
+            mainCircle.CFrame
 
-        -- pulse every 2 sec
+        mainCircle.Transparency =
+            0.87 + math.sin(pulseTick) * 0.025
+
         if tick() - lastPulse >= 2 then
 
             lastPulse = tick()
@@ -2287,7 +2300,6 @@ local function autoParryLoop()
             createPulse()
         end
 
-        -- velocity + facing scan
         for _, player in ipairs(Players:GetPlayers()) do
 
             if isKiller(player) then
@@ -2308,7 +2320,6 @@ local function autoParryLoop()
 
                         if dist <= DETECTION_RADIUS then
 
-                            -- velocity spike
                             local velocity =
                                 root.AssemblyLinearVelocity.Magnitude
 
@@ -2320,7 +2331,6 @@ local function autoParryLoop()
                                 )
                             end
 
-                            -- facing local player
                             local look =
                                 root.CFrame.LookVector
 

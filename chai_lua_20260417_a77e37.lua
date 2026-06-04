@@ -1769,10 +1769,9 @@ local function getKillerDistance()
     end        
     return minDist        
 end        
-
 local combatHeartbeat = nil
-local radiusFolder = nil
 local combatStateConnected = false
+local radiusFolder = nil
 
 local function autoParryLoop()
 
@@ -1782,69 +1781,70 @@ local function autoParryLoop()
 
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 15
-    local PARRY_COOLDOWN = 0.07
+    ----------------------------------------------------
+    -- SETTINGS
+    ----------------------------------------------------
+
+    local DETECTION_RADIUS = 8
+    local PARRY_COOLDOWN = 0.05
 
     local lastParry = 0
-    local pulseTick = 0
     local lastPulse = 0
+    local espReloadTick = 0
 
     local scannedObjects = {}
     local hookedCharacters = {}
-    local permanentESP = {}
 
-    -- COMBAT STATES
-    local COMBAT_STATES = {
+    ----------------------------------------------------
+    -- BLOCKED CLASS
+    -- SEMUA CLASS DITERIMA KECUALI INI
+    ----------------------------------------------------
 
-        -- basic attack
-        "basicattack",
-        "attack",
-        "swing",
-        "slash",
-        "hit",
-        "damage",
-        "lunge",
+    local BLOCKED_CLASSES = {
 
-        -- frenzy
-        "frenzy",
-        "frenzyend",
-        "rage",
-
-        -- stun
-        "stun",
-        "wallhitstun",
-        "wallhitstun2",
-        "wallhitstunalex",
-
-        -- weapon
-        "weapon",
-        "knife",
-        "machete",
-        "bat",
-        "blade",
-        "staff",
-
-        -- systems
-        "powers",
-        "killerost",
-        "lookscriptkiller",
-        "frenzyanims",
-
-        -- sounds
-        "swingsound",
-        "attackline",
-
-        -- extra
-        "execute",
-        "hurt",
-        "injure",
-        "dash",
-        "power",
-        "combat",
-        "kill",
-        "grab",
-        "hook"
+        Sound = true,
+        Animation = true,
+        MeshPart = true,
+        Part = true,
+        UnionOperation = true,
+        Model = true,
+        Accessory = true,
+        Attachment = true,
+        Decal = true,
+        Texture = true,
+        Highlight = true,
+        Trail = true,
+        Beam = true,
+        Smoke = true,
+        Fire = true,
+        Sparkles = true
     }
+
+    ----------------------------------------------------
+    -- BLOCKED NAMES
+    ----------------------------------------------------
+
+    local BLOCKED_NAMES = {
+
+        ["movement spike"] = true,
+        ["possible dash/lunge"] = true,
+
+        ["idle"] = true,
+        ["walk"] = true,
+        ["run"] = true,
+        ["jump"] = true,
+
+        ["animation"] = true,
+        ["sound"] = true,
+        ["mesh"] = true,
+
+        ["thumbnailcameratarget"] = true,
+        ["pCube4_knife_0"] = true
+    }
+
+    ----------------------------------------------------
+    -- ROOT
+    ----------------------------------------------------
 
     local function getRoot(char)
 
@@ -1853,120 +1853,108 @@ local function autoParryLoop()
             or char:FindFirstChild("Torso")
     end
 
-    local function validCombatState(name)
+    ----------------------------------------------------
+    -- FILTER VALIDATION
+    ----------------------------------------------------
 
-        local n = tostring(name):lower()
+    local function isValidCombatObject(obj)
 
-        for _, state in ipairs(COMBAT_STATES) do
-
-            if n:find(state) then
-                return true
-            end
-        end
-
-        return false
-    end
-
-    local function isKiller(player)
-
-        if not player or player == localPlayer then
+        if not obj then
             return false
         end
 
+        local className = tostring(obj.ClassName)
+        local objName = tostring(obj.Name):lower()
+
+        ------------------------------------------------
+        -- BLOCKED CLASS
+        ------------------------------------------------
+
+        if BLOCKED_CLASSES[className] then
+            return false
+        end
+
+        ------------------------------------------------
+        -- BLOCKED NAME
+        ------------------------------------------------
+
+        if BLOCKED_NAMES[objName] then
+            return false
+        end
+
+        ------------------------------------------------
+        -- CLASS VALID
+        ------------------------------------------------
+
+        return true
+    end
+
+    ----------------------------------------------------
+    -- KILLER CHECK
+    ----------------------------------------------------
+
+    local function isKiller(player)
+
+        if not player
+        or player == localPlayer then
+            return false
+        end
+
+        ------------------------------------------------
+        -- TEAM CHECK
+        ------------------------------------------------
+
         if player.Team then
 
-            local t = player.Team.Name:lower()
+            local t =
+                tostring(player.Team.Name):lower()
 
             if t:find("killer")
             or t:find("monster")
             or t:find("enemy") then
+
                 return true
             end
         end
+
+        ------------------------------------------------
+        -- CHARACTER CHECK
+        ------------------------------------------------
 
         local char = player.Character
 
         if char then
 
-            local tool = char:FindFirstChildWhichIsA("Tool")
+            if char:FindFirstChild("Weapon") then
+                return true
+            end
+
+            local tool =
+                char:FindFirstChildWhichIsA("Tool")
 
             if tool then
 
-                local n = tool.Name:lower()
+                local n =
+                    tostring(tool.Name):lower()
 
                 if n:find("knife")
                 or n:find("blade")
                 or n:find("weapon")
-                or n:find("staff")
                 or n:find("bat")
-                or n:find("machete") then
+                or n:find("machete")
+                or n:find("staff") then
 
                     return true
                 end
-            end
-
-            if char:FindFirstChild("Weapon") then
-                return true
             end
         end
 
         return false
     end
 
-    local function isClosestTarget(killer)
-
-        local killerChar = killer.Character
-        if not killerChar then
-            return false
-        end
-
-        local killerRoot = getRoot(killerChar)
-        if not killerRoot then
-            return false
-        end
-
-        local localDistance =
-            (
-                localRootPart.Position
-                - killerRoot.Position
-            ).Magnitude
-
-        local closestDistance = math.huge
-
-        for _, player in ipairs(Players:GetPlayers()) do
-
-            if player ~= killer
-            and player ~= localPlayer then
-
-                local char = player.Character
-
-                if char then
-
-                    local hum =
-                        char:FindFirstChildOfClass("Humanoid")
-
-                    local root = getRoot(char)
-
-                    if hum
-                    and hum.Health > 0
-                    and root then
-
-                        local dist =
-                            (
-                                root.Position
-                                - killerRoot.Position
-                            ).Magnitude
-
-                        if dist < closestDistance then
-                            closestDistance = dist
-                        end
-                    end
-                end
-            end
-        end
-
-        return localDistance <= closestDistance + 0.45
-    end
+    ----------------------------------------------------
+    -- DIRECT PARRY
+    ----------------------------------------------------
 
     local function triggerParry(reason, player)
 
@@ -1988,6 +1976,10 @@ local function autoParryLoop()
             return
         end
 
+        ------------------------------------------------
+        -- ONLY RADIUS VALIDATION
+        ------------------------------------------------
+
         local dist =
             (
                 localRootPart.Position
@@ -1995,10 +1987,6 @@ local function autoParryLoop()
             ).Magnitude
 
         if dist > DETECTION_RADIUS then
-            return
-        end
-
-        if not isClosestTarget(player) then
             return
         end
 
@@ -2011,39 +1999,65 @@ local function autoParryLoop()
         print("================================")
 
         pcall(function()
+
             fireParryRemote(player)
         end)
     end
 
+    ----------------------------------------------------
     -- ESP CLEAN
+    ----------------------------------------------------
+
     if radiusFolder then
-        radiusFolder:Destroy()
+
+        pcall(function()
+            radiusFolder:Destroy()
+        end)
     end
 
     radiusFolder = Instance.new("Folder")
     radiusFolder.Name = "ParryESP"
     radiusFolder.Parent = workspace
 
-    -- MAIN ESP
-    local mainCircle = Instance.new("Part")
-    mainCircle.Name = "MainRadius"
-    mainCircle.Shape = Enum.PartType.Cylinder
-    mainCircle.Material = Enum.Material.Neon
-    mainCircle.Color = Color3.fromRGB(255,140,0)
-    mainCircle.Transparency = 0.72
-    mainCircle.Anchored = true
-    mainCircle.CanCollide = false
-    mainCircle.CastShadow = false
-    mainCircle.Size = Vector3.new(
-        0.12,
-        DETECTION_RADIUS * 2,
-        DETECTION_RADIUS * 2
-    )
-    mainCircle.Parent = radiusFolder
+    ----------------------------------------------------
+    -- CREATE MAIN ESP
+    ----------------------------------------------------
 
-    permanentESP.main = mainCircle
+    local function createMainESP()
 
-    -- CREATE PULSE
+        local circle = Instance.new("Part")
+
+        circle.Name = "MainRadius"
+
+        circle.Shape = Enum.PartType.Cylinder
+        circle.Material = Enum.Material.Neon
+
+        circle.Color =
+            Color3.fromRGB(255,140,0)
+
+        circle.Transparency = 0.88
+
+        circle.Anchored = true
+        circle.CanCollide = false
+        circle.CastShadow = false
+
+        circle.Size = Vector3.new(
+            0.06,
+            DETECTION_RADIUS * 2,
+            DETECTION_RADIUS * 2
+        )
+
+        circle.Parent = radiusFolder
+
+        return circle
+    end
+
+    local mainCircle = createMainESP()
+
+    ----------------------------------------------------
+    -- PULSE EFFECT
+    ----------------------------------------------------
+
     local function createPulse()
 
         if not localRootPart then
@@ -2054,17 +2068,26 @@ local function autoParryLoop()
 
         pulse.Shape = Enum.PartType.Cylinder
         pulse.Material = Enum.Material.Neon
-        pulse.Color = Color3.fromRGB(255,170,0)
-        pulse.Transparency = 0.5
+
+        pulse.Color =
+            Color3.fromRGB(255,170,0)
+
+        pulse.Transparency = 0.82
+
         pulse.Anchored = true
         pulse.CanCollide = false
         pulse.CastShadow = false
 
-        pulse.Size = Vector3.new(0.08,2,2)
+        pulse.Size = Vector3.new(
+            0.03,
+            2,
+            2
+        )
 
         pulse.CFrame =
             CFrame.new(
-                localRootPart.Position - Vector3.new(0,2,0)
+                localRootPart.Position
+                - Vector3.new(0,2,0)
             )
             * CFrame.Angles(
                 0,
@@ -2078,26 +2101,27 @@ local function autoParryLoop()
 
             local size = 2
 
-            for i = 1,26 do
+            for i = 1,20 do
 
                 if not pulse.Parent
                 or not localRootPart then
                     break
                 end
 
-                size += DETECTION_RADIUS / 13
+                size += DETECTION_RADIUS / 10
 
                 pulse.Size = Vector3.new(
-                    0.08,
+                    0.03,
                     size,
                     size
                 )
 
-                pulse.Transparency += 0.018
+                pulse.Transparency += 0.008
 
                 pulse.CFrame =
                     CFrame.new(
-                        localRootPart.Position - Vector3.new(0,2,0)
+                        localRootPart.Position
+                        - Vector3.new(0,2,0)
                     )
                     * CFrame.Angles(
                         0,
@@ -2108,11 +2132,16 @@ local function autoParryLoop()
                 RunService.Heartbeat:Wait()
             end
 
-            pulse:Destroy()
+            pcall(function()
+                pulse:Destroy()
+            end)
         end)
     end
 
-    -- SCAN OBJECT
+    ----------------------------------------------------
+    -- OBJECT SCAN
+    ----------------------------------------------------
+
     local function scanObject(player, obj)
 
         if scannedObjects[obj] then
@@ -2121,95 +2150,70 @@ local function autoParryLoop()
 
         scannedObjects[obj] = true
 
-        local objName =
-            tostring(obj.Name):lower()
+        ------------------------------------------------
+        -- FILTER CLASS
+        ------------------------------------------------
 
-        -- DIRECT STATE
-        if validCombatState(objName) then
-
-            triggerParry(
-                "CombatState : "..obj.Name,
-                player
-            )
+        if not isValidCombatObject(obj) then
+            return
         end
 
-        -- SOUND
-        if obj:IsA("Sound") then
+        ------------------------------------------------
+        -- DIRECT PARRY
+        ------------------------------------------------
 
-            local function soundCheck()
+        triggerParry(
+            "CombatState : "..obj.ClassName,
+            player
+        )
 
-                if obj.Playing then
+        ------------------------------------------------
+        -- ATTRIBUTE SCAN
+        ------------------------------------------------
 
-                    local soundName =
-                        tostring(obj.Name):lower()
+        pcall(function()
 
-                    if validCombatState(soundName) then
+            obj.AttributeChanged:Connect(function(attr)
 
-                        triggerParry(
-                            "CombatSound : "..obj.Name,
-                            player
-                        )
-                    end
+                if not isValidCombatObject(obj) then
+                    return
                 end
-            end
 
-            obj:GetPropertyChangedSignal("Playing"):Connect(soundCheck)
-
-            if obj.Playing then
-                soundCheck()
-            end
-        end
-
-        -- ATTRIBUTE
-        for attr,_ in pairs(obj:GetAttributes()) do
-
-            obj:GetAttributeChangedSignal(attr):Connect(function()
-
-                local attrName =
-                    tostring(attr):lower()
-
-                local value =
-                    obj:GetAttribute(attr)
-
-                if validCombatState(attrName) then
-
-                    if value == true
-                    or value == 1
-                    or tostring(value):lower() == "attack"
-                    or tostring(value):lower() == "active"
-                    or tostring(value):lower() == "hit" then
-
-                        triggerParry(
-                            "Attribute : "..attr,
-                            player
-                        )
-                    end
-                end
+                triggerParry(
+                    "Attribute : "..tostring(attr),
+                    player
+                )
             end)
-        end
+        end)
 
-        -- VALUE OBJECT
+        ------------------------------------------------
+        -- VALUE OBJECT SCAN
+        ------------------------------------------------
+
         if obj:IsA("BoolValue")
         or obj:IsA("IntValue")
-        or obj:IsA("StringValue") then
+        or obj:IsA("StringValue")
+        or obj:IsA("NumberValue")
+        or obj:IsA("ObjectValue") then
 
-            obj.Changed:Connect(function(v)
+            obj.Changed:Connect(function()
 
-                local n =
-                    tostring(obj.Name):lower()
-
-                if validCombatState(n) then
-
-                    triggerParry(
-                        "ValueChanged : "..obj.Name,
-                        player
-                    )
+                if not isValidCombatObject(obj) then
+                    return
                 end
+
+                triggerParry(
+                    "ValueChanged : "..obj.Name,
+                    player
+                )
             end)
         end
     end
 
+    ----------------------------------------------------
     -- HOOK CHARACTER
+    ----------------------------------------------------
+
     local function hookCharacter(player, char)
 
         if hookedCharacters[char] then
@@ -2224,76 +2228,56 @@ local function autoParryLoop()
 
         print("[AutoParry] Hooked :", player.Name)
 
-        -- EXISTING
+        ------------------------------------------------
+        -- EXISTING OBJECTS
+        ------------------------------------------------
+
         for _, obj in ipairs(char:GetDescendants()) do
+
             scanObject(player, obj)
         end
 
-        -- NEW OBJECT
+        ------------------------------------------------
+        -- DESCENDANT ADDED
+        ------------------------------------------------
+
         char.DescendantAdded:Connect(function(obj)
 
             scanObject(player, obj)
-
-            local n =
-                tostring(obj.Name):lower()
-
-            if validCombatState(n) then
-
-                triggerParry(
-                    "NewObject : "..obj.Name,
-                    player
-                )
-            end
         end)
-
-        -- ANIMATION
-        local humanoid =
-            char:FindFirstChildOfClass("Humanoid")
-
-        if humanoid then
-
-            humanoid.AnimationPlayed:Connect(function(track)
-
-                local anim = track.Animation
-
-                if anim then
-
-                    local animId =
-                        tostring(anim.AnimationId):lower()
-
-                    local animName =
-                        tostring(track.Name):lower()
-
-                    if validCombatState(animId)
-                    or validCombatState(animName) then
-
-                        triggerParry(
-                            "AnimationPlayed",
-                            player
-                        )
-                    end
-                end
-            end)
-        end
     end
 
+    ----------------------------------------------------
     -- PLAYER HOOK
+    ----------------------------------------------------
+
     for _, player in ipairs(Players:GetPlayers()) do
 
         if player ~= localPlayer then
 
             if player.Character then
-                hookCharacter(player, player.Character)
+
+                hookCharacter(
+                    player,
+                    player.Character
+                )
             end
 
             player.CharacterAdded:Connect(function(char)
 
                 task.wait(1)
 
-                hookCharacter(player, char)
+                hookCharacter(
+                    player,
+                    char
+                )
             end)
         end
     end
+
+    ----------------------------------------------------
+    -- NEW PLAYER
+    ----------------------------------------------------
 
     Players.PlayerAdded:Connect(function(player)
 
@@ -2301,24 +2285,40 @@ local function autoParryLoop()
 
             task.wait(1)
 
-            hookCharacter(player, char)
+            hookCharacter(
+                player,
+                char
+            )
         end)
     end)
 
-    -- MAIN HEARTBEAT
-    combatHeartbeat = RunService.Heartbeat:Connect(function(dt)
+    ----------------------------------------------------
+    -- HEARTBEAT
+    ----------------------------------------------------
+
+    combatHeartbeat =
+        RunService.Heartbeat:Connect(function(dt)
+
+        ------------------------------------------------
+        -- DISABLE
+        ------------------------------------------------
 
         if not config.infiniteAmmoEnabled then
 
             combatStateConnected = false
 
             if combatHeartbeat then
+
                 combatHeartbeat:Disconnect()
                 combatHeartbeat = nil
             end
 
             if radiusFolder then
-                radiusFolder:Destroy()
+
+                pcall(function()
+                    radiusFolder:Destroy()
+                end)
+
                 radiusFolder = nil
             end
 
@@ -2329,42 +2329,35 @@ local function autoParryLoop()
             return
         end
 
-        -- FORCE ESP PERMANENT
+        ------------------------------------------------
+        -- ESP RELOAD
+        ------------------------------------------------
+
+        espReloadTick += dt
+
         if not mainCircle
-        or not mainCircle.Parent then
+        or not mainCircle.Parent
+        or espReloadTick >= 1 then
 
-            mainCircle = permanentESP.main
+            espReloadTick = 0
 
-            if not mainCircle
-            or not mainCircle.Parent then
+            pcall(function()
 
-                mainCircle = Instance.new("Part")
+                if mainCircle then
+                    mainCircle:Destroy()
+                end
+            end)
 
-                mainCircle.Name = "MainRadius"
-                mainCircle.Shape = Enum.PartType.Cylinder
-                mainCircle.Material = Enum.Material.Neon
-                mainCircle.Color = Color3.fromRGB(255,140,0)
-                mainCircle.Transparency = 0.72
-                mainCircle.Anchored = true
-                mainCircle.CanCollide = false
-                mainCircle.CastShadow = false
-
-                mainCircle.Size = Vector3.new(
-                    0.12,
-                    DETECTION_RADIUS * 2,
-                    DETECTION_RADIUS * 2
-                )
-
-                mainCircle.Parent = radiusFolder
-
-                permanentESP.main = mainCircle
-            end
+            mainCircle = createMainESP()
         end
 
-        pulseTick += dt * 3
+        ------------------------------------------------
+        -- ESP POSITION
+        ------------------------------------------------
 
         local espPos =
-            localRootPart.Position - Vector3.new(0,2,0)
+            localRootPart.Position
+            - Vector3.new(0,2,0)
 
         mainCircle.CFrame =
             CFrame.new(espPos)
@@ -2374,27 +2367,32 @@ local function autoParryLoop()
                 math.rad(90)
             )
 
-        mainCircle.Transparency =
-            0.72 + math.sin(pulseTick) * 0.03
-
+        ------------------------------------------------
         -- PULSE
-        if tick() - lastPulse > 0.16 then
+        ------------------------------------------------
+
+        if tick() - lastPulse >= 0.16 then
 
             lastPulse = tick()
 
             createPulse()
         end
 
+        ------------------------------------------------
         -- REALTIME SCAN
+        ------------------------------------------------
+
         for _, player in ipairs(Players:GetPlayers()) do
 
             if isKiller(player) then
 
-                local char = player.Character
+                local char =
+                    player.Character
 
                 if char then
 
-                    local root = getRoot(char)
+                    local root =
+                        getRoot(char)
 
                     if root then
 
@@ -2404,67 +2402,26 @@ local function autoParryLoop()
                                 - root.Position
                             ).Magnitude
 
+                        ------------------------------------------------
+                        -- ONLY RADIUS VALIDATION
+                        ------------------------------------------------
+
                         if dist <= DETECTION_RADIUS then
 
-                            -- VELOCITY
-                            local velocity =
-                                root.AssemblyLinearVelocity.Magnitude
+                            ------------------------------------------------
+                            -- DIRECT OBJECT FILTER
+                            ------------------------------------------------
 
-                            if velocity > 22 then
+                            for _, obj in ipairs(
+                                char:GetDescendants()
+                            ) do
 
-                                triggerParry(
-                                    "VelocitySpike",
-                                    player
-                                )
-                            end
+                                if isValidCombatObject(obj) then
 
-                            -- LOOK VECTOR
-                            local look =
-                                root.CFrame.LookVector
-
-                            local toLocal =
-                                (
-                                    localRootPart.Position
-                                    - root.Position
-                                ).Unit
-
-                            local dot =
-                                look:Dot(toLocal)
-
-                            if dot > 0.82 then
-
-                                triggerParry(
-                                    "FacingLocalPlayer",
-                                    player
-                                )
-                            end
-
-                            -- REALTIME DESCENDANT CHECK
-                            for _, obj in ipairs(char:GetDescendants()) do
-
-                                local n =
-                                    tostring(obj.Name):lower()
-
-                                if validCombatState(n) then
-
-                                    if obj:IsA("Sound") then
-
-                                        if obj.Playing then
-
-                                            triggerParry(
-                                                "PlayingSound : "..obj.Name,
-                                                player
-                                            )
-
-                                            break
-                                        end
-                                    else
-
-                                        triggerParry(
-                                            "DetectedState : "..obj.Name,
-                                            player
-                                        )
-                                    end
+                                    triggerParry(
+                                        "RuntimeState : "..obj.ClassName,
+                                        player
+                                    )
                                 end
                             end
                         end
@@ -2474,7 +2431,7 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Real-time adaptive scanner initialized")
+    print("[AutoParry] Adaptive filtered combat scanner initialized")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

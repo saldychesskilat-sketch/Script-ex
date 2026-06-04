@@ -2106,7 +2106,7 @@ local function autoParryLoop()
 
             local current = 2
 
-            for i = 1,36 do
+            for i = 1,18 do
 
                 if not pulse.Parent then
                     break

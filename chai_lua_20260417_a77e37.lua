@@ -3573,7 +3573,7 @@ logo.BackgroundTransparency=1
 logo.ScaleType=Enum.ScaleType.Fit
 
 -- pastikan format asset benar
-logo.Image="rbxassetid://127173186832760"
+logo.Image="rbxassetid://76051161792347"
 
 -- tambahan penting
 logo.Visible=true

@@ -3504,15 +3504,11 @@ local function createHomeContent()
         homeContent:Destroy()
     end
 
-    --// MAIN CONTENT
-
     homeContent=Instance.new("Frame")
     homeContent.Size=UDim2.new(1,0,1,0)
     homeContent.BackgroundTransparency=1
     homeContent.ClipsDescendants=true
     homeContent.Parent=contentPanel
-
-    --// SCROLL
 
     local scroll=Instance.new("ScrollingFrame")
     scroll.Size=UDim2.new(1,-8,1,-8)
@@ -3520,8 +3516,8 @@ local function createHomeContent()
     scroll.BackgroundTransparency=1
     scroll.BorderSizePixel=0
     scroll.ScrollBarThickness=2
-    scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
     scroll.CanvasSize=UDim2.new(0,0,0,0)
+    scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
     scroll.Parent=homeContent
 
     local layout=Instance.new("UIListLayout")
@@ -3537,12 +3533,10 @@ local function createHomeContent()
     padding.PaddingRight=UDim.new(0,2)
     padding.Parent=scroll
 
-    --========================================================
-    -- HEADER CARD
-    --========================================================
+    --// HEADER CARD
 
     local header=Instance.new("Frame")
-    header.Size=UDim2.new(1,-6,0,108)
+    header.Size=UDim2.new(1,-6,0,110)
     header.BackgroundColor3=Color3.fromRGB(8,18,34)
     header.BorderSizePixel=0
     header.Parent=scroll
@@ -3554,22 +3548,12 @@ local function createHomeContent()
     headerStroke.Transparency=0.35
     headerStroke.Parent=header
 
-    --// LIGHT EFFECT
-
-    local glow=Instance.new("Frame")
-    glow.Size=UDim2.new(1,0,0,2)
-    glow.BackgroundColor3=Color3.fromRGB(0,200,255)
-    glow.BorderSizePixel=0
-    glow.Parent=header
-
-    --========================================================
-    -- LOGO HOLDER
-    --========================================================
+    --// LOGO HOLDER (SEGI EMPAT)
 
     local logoHolder=Instance.new("Frame")
-    logoHolder.Size=UDim2.new(0,62,0,62)
+    logoHolder.Size=UDim2.new(0,56,0,56)
     logoHolder.Position=UDim2.new(0,12,0,12)
-    logoHolder.BackgroundColor3=Color3.fromRGB(10,24,42)
+    logoHolder.BackgroundColor3=Color3.fromRGB(10,28,48)
     logoHolder.BorderSizePixel=0
     logoHolder.Parent=header
 
@@ -3577,65 +3561,47 @@ local function createHomeContent()
 
     local logoStroke=Instance.new("UIStroke")
     logoStroke.Color=Color3.fromRGB(0,200,255)
-    logoStroke.Transparency=0.35
-    logoStroke.Thickness=1.2
+    logoStroke.Transparency=0.45
     logoStroke.Parent=logoHolder
 
-    --// IMAGE
-
     local logo=Instance.new("ImageLabel")
-    logo.Name="Logo"
     logo.Size=UDim2.new(1,-8,1,-8)
     logo.Position=UDim2.new(0,4,0,4)
     logo.BackgroundTransparency=1
-
-    -- IMPORTANT
-    -- pakai format ini agar asset private / baru lebih mudah muncul
-    logo.Image="rbxassetid://76051161792347"
-
+    logo.Image="rbxassetid://6031071053"
     logo.ScaleType=Enum.ScaleType.Fit
-    logo.ClipsDescendants=true
     logo.Parent=logoHolder
 
-    -- fallback jika asset gagal load
-    logo.Loaded:Connect(function()
-        logo.ImageTransparency=0
-    end)
-
-    --========================================================
-    -- TITLE
-    --========================================================
+    --// TITLE
 
     local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-92,0,26)
-    title.Position=UDim2.new(0,84,0,14)
+    title.Size=UDim2.new(1,-90,0,26)
+    title.Position=UDim2.new(0,80,0,14)
     title.BackgroundTransparency=1
     title.Text="KEMI HUB"
     title.TextColor3=Color3.fromRGB(0,225,255)
     title.Font=Enum.Font.GothamBold
-    title.TextSize=17
+    title.TextSize=18
     title.TextWrapped=true
-    title.TextXAlignment=Enum.TextXAlignment.Left
     title.TextTruncate=Enum.TextTruncate.AtEnd
+    title.TextXAlignment=Enum.TextXAlignment.Left
     title.Parent=header
 
-    local subtitle=Instance.new("TextLabel")
-    subtitle.Size=UDim2.new(1,-94,0,42)
-    subtitle.Position=UDim2.new(0,84,0,42)
-    subtitle.BackgroundTransparency=1
-    subtitle.Text="Modern cyber interface with optimized layout and responsive controls."
-    subtitle.TextColor3=Color3.fromRGB(205,205,205)
-    subtitle.Font=Enum.Font.Gotham
-    subtitle.TextSize=10
-    subtitle.TextWrapped=true
-    subtitle.TextXAlignment=Enum.TextXAlignment.Left
-    subtitle.TextYAlignment=Enum.TextYAlignment.Top
-    subtitle.ClipsDescendants=true
-    subtitle.Parent=header
+    local desc=Instance.new("TextLabel")
+    desc.Size=UDim2.new(1,-92,0,46)
+    desc.Position=UDim2.new(0,80,0,42)
+    desc.BackgroundTransparency=1
+    desc.Text="script by kemi"
+    desc.TextColor3=Color3.fromRGB(210,210,210)
+    desc.Font=Enum.Font.Gotham
+    desc.TextSize=11
+    desc.TextWrapped=true
+    desc.TextXAlignment=Enum.TextXAlignment.Left
+    desc.TextYAlignment=Enum.TextYAlignment.Top
+    desc.ClipsDescendants=true
+    desc.Parent=header
 
-    --========================================================
-    -- INFO CARD
-    --========================================================
+    --// INFORMATION CARD
 
     local infoCard=Instance.new("Frame")
     infoCard.Size=UDim2.new(1,-6,0,150)
@@ -3662,13 +3628,14 @@ local function createHomeContent()
     infoTitle.Parent=infoCard
 
     local infoText=Instance.new("TextLabel")
-    infoText.Size=UDim2.new(1,-20,1,-42)
-    infoText.Position=UDim2.new(0,10,0,34)
+    infoText.Size=UDim2.new(1,-20,1,-44)
+    infoText.Position=UDim2.new(0,10,0,36)
     infoText.BackgroundTransparency=1
     infoText.RichText=true
     infoText.TextWrapped=true
     infoText.TextXAlignment=Enum.TextXAlignment.Left
     infoText.TextYAlignment=Enum.TextYAlignment.Top
+    infoText.ClipsDescendants=true
     infoText.Font=Enum.Font.Gotham
     infoText.TextSize=11
     infoText.TextColor3=Color3.fromRGB(225,225,225)
@@ -3682,13 +3649,11 @@ local function createHomeContent()
 
 <b>DEVELOPER</b>
 Kemi Studio
-    ]]
+]]
 
     infoText.Parent=infoCard
 
-    --========================================================
-    -- CROSSHAIR SETTINGS
-    --========================================================
+    --// CROSSHAIR SETTINGS
 
     local crosshairCard=Instance.new("Frame")
     crosshairCard.Size=UDim2.new(1,-6,0,165)
@@ -3700,11 +3665,11 @@ Kemi Studio
 
     local crossStroke=Instance.new("UIStroke")
     crossStroke.Color=Color3.fromRGB(0,180,255)
-    crossStroke.Transparency=0.42
+    crossStroke.Transparency=0.4
     crossStroke.Parent=crosshairCard
 
     local crossTitle=Instance.new("TextLabel")
-    crossTitle.Size=UDim2.new(1,-20,0,22)
+    crossTitle.Size=UDim2.new(1,-20,0,24)
     crossTitle.Position=UDim2.new(0,10,0,10)
     crossTitle.BackgroundTransparency=1
     crossTitle.Text="🎯 CROSSHAIR SETTINGS"
@@ -3715,20 +3680,19 @@ Kemi Studio
     crossTitle.Parent=crosshairCard
 
     local crossDesc=Instance.new("TextLabel")
-    crossDesc.Size=UDim2.new(1,-20,0,28)
-    crossDesc.Position=UDim2.new(0,10,0,36)
+    crossDesc.Size=UDim2.new(1,-20,0,30)
+    crossDesc.Position=UDim2.new(0,10,0,34)
     crossDesc.BackgroundTransparency=1
-    crossDesc.Text="Enable overlay and customize crosshair style."
-    crossDesc.TextColor3=Color3.fromRGB(200,200,200)
+    crossDesc.Text="make a shot right in the middle of the screen"
+    crossDesc.TextColor3=Color3.fromRGB(180,180,180)
     crossDesc.Font=Enum.Font.Gotham
     crossDesc.TextSize=10
     crossDesc.TextWrapped=true
     crossDesc.TextXAlignment=Enum.TextXAlignment.Left
+    crossDesc.TextYAlignment=Enum.TextYAlignment.Top
     crossDesc.Parent=crosshairCard
 
-    --========================================================
-    -- CROSSHAIR GUI
-    --========================================================
+    --// CROSSHAIR GUI
 
     local crossGui=game.CoreGui:FindFirstChild("CyberCrosshair")
 
@@ -3809,13 +3773,11 @@ Kemi Studio
     circleStroke.Thickness=2
     circleStroke.Parent=circle
 
-    --========================================================
-    -- TOGGLE BUTTON
-    --========================================================
+    --// TOGGLE BUTTON
 
     local toggleButton=Instance.new("TextButton")
     toggleButton.Size=UDim2.new(1,-20,0,36)
-    toggleButton.Position=UDim2.new(0,10,0,74)
+    toggleButton.Position=UDim2.new(0,10,0,72)
     toggleButton.BackgroundColor3=Color3.fromRGB(14,24,40)
     toggleButton.Text="CROSSHAIR DISABLED"
     toggleButton.TextColor3=Color3.fromRGB(220,220,220)
@@ -3827,9 +3789,7 @@ Kemi Studio
 
     Instance.new("UICorner",toggleButton).CornerRadius=UDim.new(0,8)
 
-    --========================================================
-    -- SHAPE BUTTONS
-    --========================================================
+    --// SHAPE BUTTONS
 
     local buttonHolder=Instance.new("Frame")
     buttonHolder.Size=UDim2.new(1,-20,0,34)
@@ -3864,10 +3824,6 @@ Kemi Studio
     local xBtn=createShapeButton("X",false)
     local oBtn=createShapeButton("O",false)
 
-    --========================================================
-    -- LOGIC
-    --========================================================
-
     local enabled=false
 
     toggleButton.MouseButton1Click:Connect(function()
@@ -3878,9 +3834,11 @@ Kemi Studio
         if enabled then
             toggleButton.Text="CROSSHAIR ENABLED"
             toggleButton.BackgroundColor3=Color3.fromRGB(0,140,255)
+            toggleButton.TextColor3=Color3.fromRGB(255,255,255)
         else
             toggleButton.Text="CROSSHAIR DISABLED"
             toggleButton.BackgroundColor3=Color3.fromRGB(14,24,40)
+            toggleButton.TextColor3=Color3.fromRGB(220,220,220)
         end
     end)
 
@@ -4155,7 +4113,7 @@ local function createInfoContent()
 • Auto Aim
 • dagger
 • Optimized Layout
-]]
+    ]]
     body.Parent=infoCard
 
     local noteCard=Instance.new("Frame")

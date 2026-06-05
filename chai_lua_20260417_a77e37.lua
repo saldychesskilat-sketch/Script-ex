@@ -3501,6 +3501,65 @@ end
 -- HOME CONTENT
 -- ============================================================================
 local homeContent=nil
+local crosshairGui=nil
+local crosshairSize=12
+local crosshairShape="PLUS"
+
+local function updateCrosshair()
+    if crosshairGui then
+        crosshairGui:Destroy()
+    end
+
+    crosshairGui=Instance.new("ScreenGui")
+    crosshairGui.Name="CyberCrosshair"
+    crosshairGui.ResetOnSpawn=false
+    crosshairGui.IgnoreGuiInset=true
+    crosshairGui.Parent=CoreGui
+
+    local holder=Instance.new("Frame")
+    holder.Size=UDim2.new(0,0,0,0)
+    holder.Position=UDim2.new(0.5,0,0.5,0)
+    holder.BackgroundTransparency=1
+    holder.Parent=crosshairGui
+
+    local function createLine(size,pos,rot)
+        local line=Instance.new("Frame")
+        line.AnchorPoint=Vector2.new(0.5,0.5)
+        line.Size=UDim2.new(0,size,0,2)
+        line.Position=pos
+        line.Rotation=rot
+        line.BackgroundColor3=Color3.fromRGB(0,220,255)
+        line.BorderSizePixel=0
+        line.Parent=holder
+        Instance.new("UICorner",line).CornerRadius=UDim.new(1,0)
+    end
+
+    if crosshairShape=="PLUS" then
+        createLine(crosshairSize,UDim2.new(0,0,0,0),0)
+        createLine(crosshairSize,UDim2.new(0,0,0,0),90)
+
+    elseif crosshairShape=="X" then
+        createLine(crosshairSize,UDim2.new(0,0,0,0),45)
+        createLine(crosshairSize,UDim2.new(0,0,0,0),-45)
+
+    elseif crosshairShape=="O" then
+        local circle=Instance.new("Frame")
+        circle.AnchorPoint=Vector2.new(0.5,0.5)
+        circle.Size=UDim2.new(0,crosshairSize,0,crosshairSize)
+        circle.Position=UDim2.new(0,0,0,0)
+        circle.BackgroundTransparency=1
+        circle.BorderSizePixel=0
+        circle.Parent=holder
+
+        local stroke=Instance.new("UIStroke")
+        stroke.Color=Color3.fromRGB(0,220,255)
+        stroke.Thickness=2
+        stroke.Parent=circle
+
+        Instance.new("UICorner",circle).CornerRadius=UDim.new(1,0)
+    end
+end
+
 local function createHomeContent()
     if homeContent then homeContent:Destroy() end
 
@@ -3509,12 +3568,30 @@ local function createHomeContent()
     homeContent.BackgroundTransparency=1
     homeContent.Parent=contentPanel
 
+    local scroll=Instance.new("ScrollingFrame")
+    scroll.Size=UDim2.new(1,-6,1,-6)
+    scroll.Position=UDim2.new(0,3,0,3)
+    scroll.CanvasSize=UDim2.new(0,0,0,540)
+    scroll.ScrollBarThickness=3
+    scroll.BackgroundTransparency=1
+    scroll.BorderSizePixel=0
+    scroll.Parent=homeContent
+
+    local layout=Instance.new("UIListLayout")
+    layout.Padding=UDim.new(0,8)
+    layout.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    layout.Parent=scroll
+
+    local padding=Instance.new("UIPadding")
+    padding.PaddingTop=UDim.new(0,4)
+    padding.PaddingBottom=UDim.new(0,8)
+    padding.Parent=scroll
+
     local topCard=Instance.new("Frame")
     topCard.Size=UDim2.new(1,-10,0,90)
-    topCard.Position=UDim2.new(0,5,0,5)
     topCard.BackgroundColor3=Color3.fromRGB(10,25,40)
     topCard.BorderSizePixel=0
-    topCard.Parent=homeContent
+    topCard.Parent=scroll
 
     Instance.new("UICorner",topCard).CornerRadius=UDim.new(0,8)
 
@@ -3549,10 +3626,9 @@ local function createHomeContent()
 
     local statsCard=Instance.new("Frame")
     statsCard.Size=UDim2.new(1,-10,0,120)
-    statsCard.Position=UDim2.new(0,5,0,105)
     statsCard.BackgroundColor3=Color3.fromRGB(8,18,32)
     statsCard.BorderSizePixel=0
-    statsCard.Parent=homeContent
+    statsCard.Parent=scroll
 
     Instance.new("UICorner",statsCard).CornerRadius=UDim.new(0,8)
 
@@ -3586,6 +3662,162 @@ Blue Cyber Theme
 Kemi Studio
 ]]
     info.Parent=statsCard
+
+    local crosshairCard=Instance.new("Frame")
+    crosshairCard.Size=UDim2.new(1,-10,0,240)
+    crosshairCard.BackgroundColor3=Color3.fromRGB(8,18,32)
+    crosshairCard.BorderSizePixel=0
+    crosshairCard.Parent=scroll
+
+    Instance.new("UICorner",crosshairCard).CornerRadius=UDim.new(0,8)
+
+    local crossStroke=Instance.new("UIStroke")
+    crossStroke.Color=Color3.fromRGB(0,180,255)
+    crossStroke.Transparency=0.55
+    crossStroke.Parent=crosshairCard
+
+    local crossTitle=Instance.new("TextLabel")
+    crossTitle.Size=UDim2.new(1,-20,0,25)
+    crossTitle.Position=UDim2.new(0,10,0,10)
+    crossTitle.BackgroundTransparency=1
+    crossTitle.Text="🎯 CROSSHAIR SETTINGS"
+    crossTitle.TextColor3=Color3.fromRGB(0,220,255)
+    crossTitle.Font=Enum.Font.GothamBold
+    crossTitle.TextSize=13
+    crossTitle.TextXAlignment=Enum.TextXAlignment.Left
+    crossTitle.Parent=crosshairCard
+
+    local sizeText=Instance.new("TextLabel")
+    sizeText.Size=UDim2.new(1,-20,0,20)
+    sizeText.Position=UDim2.new(0,10,0,42)
+    sizeText.BackgroundTransparency=1
+    sizeText.Text="SIZE : "..crosshairSize
+    sizeText.TextColor3=Color3.fromRGB(220,220,220)
+    sizeText.Font=Enum.Font.Gotham
+    sizeText.TextSize=11
+    sizeText.TextXAlignment=Enum.TextXAlignment.Left
+    sizeText.Parent=crosshairCard
+
+    local sliderBg=Instance.new("Frame")
+    sliderBg.Size=UDim2.new(1,-20,0,6)
+    sliderBg.Position=UDim2.new(0,10,0,72)
+    sliderBg.BackgroundColor3=Color3.fromRGB(20,40,60)
+    sliderBg.BorderSizePixel=0
+    sliderBg.Parent=crosshairCard
+
+    Instance.new("UICorner",sliderBg).CornerRadius=UDim.new(1,0)
+
+    local sliderFill=Instance.new("Frame")
+    sliderFill.Size=UDim2.new(crosshairSize/40,0,1,0)
+    sliderFill.BackgroundColor3=Color3.fromRGB(0,220,255)
+    sliderFill.BorderSizePixel=0
+    sliderFill.Parent=sliderBg
+
+    Instance.new("UICorner",sliderFill).CornerRadius=UDim.new(1,0)
+
+    local sliderBtn=Instance.new("TextButton")
+    sliderBtn.Size=UDim2.new(1,0,0,18)
+    sliderBtn.Position=UDim2.new(0,0,-0.6,0)
+    sliderBtn.Text=""
+    sliderBtn.BackgroundTransparency=1
+    sliderBtn.Parent=sliderBg
+
+    local dragging=false
+
+    sliderBtn.InputBegan:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseButton1 then
+            dragging=true
+        end
+    end)
+
+    sliderBtn.InputEnded:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.MouseButton1 then
+            dragging=false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
+            local percent=math.clamp((input.Position.X-sliderBg.AbsolutePosition.X)/sliderBg.AbsoluteSize.X,0,1)
+            crosshairSize=math.floor(6+(34*percent))
+            sliderFill.Size=UDim2.new(percent,0,1,0)
+            sizeText.Text="SIZE : "..crosshairSize
+            updateCrosshair()
+        end
+    end)
+
+    local shapeTitle=Instance.new("TextLabel")
+    shapeTitle.Size=UDim2.new(1,-20,0,20)
+    shapeTitle.Position=UDim2.new(0,10,0,95)
+    shapeTitle.BackgroundTransparency=1
+    shapeTitle.Text="SHAPE"
+    shapeTitle.TextColor3=Color3.fromRGB(220,220,220)
+    shapeTitle.Font=Enum.Font.GothamBold
+    shapeTitle.TextSize=11
+    shapeTitle.TextXAlignment=Enum.TextXAlignment.Left
+    shapeTitle.Parent=crosshairCard
+
+    local function createShapeButton(txt,pos,mode)
+        local btn=Instance.new("TextButton")
+        btn.Size=UDim2.new(0,70,0,28)
+        btn.Position=pos
+        btn.Text=txt
+        btn.BackgroundColor3=Color3.fromRGB(15,35,55)
+        btn.TextColor3=Color3.fromRGB(220,220,220)
+        btn.Font=Enum.Font.GothamBold
+        btn.TextSize=11
+        btn.BorderSizePixel=0
+        btn.Parent=crosshairCard
+
+        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
+
+        local stroke=Instance.new("UIStroke")
+        stroke.Color=Color3.fromRGB(0,180,255)
+        stroke.Transparency=0.5
+        stroke.Parent=btn
+
+        btn.MouseButton1Click:Connect(function()
+            crosshairShape=mode
+            updateCrosshair()
+        end)
+    end
+
+    createShapeButton("+",UDim2.new(0,10,0,125),"PLUS")
+    createShapeButton("X",UDim2.new(0,90,0,125),"X")
+    createShapeButton("O",UDim2.new(0,170,0,125),"O")
+
+    local toggleBtn=Instance.new("TextButton")
+    toggleBtn.Size=UDim2.new(1,-20,0,32)
+    toggleBtn.Position=UDim2.new(0,10,0,175)
+    toggleBtn.Text="ENABLE CROSSHAIR"
+    toggleBtn.BackgroundColor3=Color3.fromRGB(0,140,220)
+    toggleBtn.TextColor3=Color3.fromRGB(255,255,255)
+    toggleBtn.Font=Enum.Font.GothamBold
+    toggleBtn.TextSize=11
+    toggleBtn.BorderSizePixel=0
+    toggleBtn.Parent=crosshairCard
+
+    Instance.new("UICorner",toggleBtn).CornerRadius=UDim.new(0,6)
+
+    local enabled=false
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        enabled=not enabled
+
+        if enabled then
+            toggleBtn.Text="DISABLE CROSSHAIR"
+            toggleBtn.BackgroundColor3=Color3.fromRGB(0,180,255)
+            updateCrosshair()
+        else
+            toggleBtn.Text="ENABLE CROSSHAIR"
+            toggleBtn.BackgroundColor3=Color3.fromRGB(0,140,220)
+
+            if crosshairGui then
+                crosshairGui:Destroy()
+                crosshairGui=nil
+            end
+        end
+    end)
 end
 
 -- ============================================================================

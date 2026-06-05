@@ -3497,14 +3497,12 @@ local function updateTheme()
 end  
   
 -- ============================================================================
+-- ============================================================================
 -- HOME CONTENT
 -- ============================================================================
 local homeContent=nil
 local function createHomeContent()
     if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
 
     homeContent=Instance.new("Frame")
     homeContent.Size=UDim2.new(1,0,1,0)
@@ -3512,7 +3510,7 @@ local function createHomeContent()
     homeContent.Parent=contentPanel
 
     local topCard=Instance.new("Frame")
-    topCard.Size=UDim2.new(1,-10,0,85)
+    topCard.Size=UDim2.new(1,-10,0,90)
     topCard.Position=UDim2.new(0,5,0,5)
     topCard.BackgroundColor3=Color3.fromRGB(10,25,40)
     topCard.BorderSizePixel=0
@@ -3521,29 +3519,29 @@ local function createHomeContent()
     Instance.new("UICorner",topCard).CornerRadius=UDim.new(0,8)
 
     local topStroke=Instance.new("UIStroke")
-    topStroke.Color=Color3.fromRGB(0,170,255)
+    topStroke.Color=Color3.fromRGB(0,180,255)
     topStroke.Transparency=0.4
     topStroke.Parent=topCard
 
     local welcome=Instance.new("TextLabel")
     welcome.Size=UDim2.new(1,-20,0,30)
-    welcome.Position=UDim2.new(0,12,0,10)
+    welcome.Position=UDim2.new(0,10,0,10)
     welcome.BackgroundTransparency=1
-    welcome.Text="⚡ WELCOME TO CYBERHEROES"
+    welcome.Text="⚡ CYBERHEROES HUB"
     welcome.TextColor3=Color3.fromRGB(0,220,255)
     welcome.Font=Enum.Font.GothamBold
-    welcome.TextSize=15
+    welcome.TextSize=16
     welcome.TextXAlignment=Enum.TextXAlignment.Left
     welcome.Parent=topCard
 
     local desc=Instance.new("TextLabel")
-    desc.Size=UDim2.new(1,-20,0,35)
-    desc.Position=UDim2.new(0,12,0,40)
+    desc.Size=UDim2.new(1,-20,0,40)
+    desc.Position=UDim2.new(0,10,0,42)
     desc.BackgroundTransparency=1
-    desc.Text="Modern utility hub with premium cyber interface and optimized feature systems."
-    desc.TextColor3=Color3.fromRGB(190,190,190)
+    desc.Text="Modern utility interface with premium blue cyber style.\nUse sidebar navigation to access features and settings."
+    desc.TextColor3=Color3.fromRGB(210,210,210)
     desc.Font=Enum.Font.Gotham
-    desc.TextSize=10
+    desc.TextSize=11
     desc.TextWrapped=true
     desc.TextXAlignment=Enum.TextXAlignment.Left
     desc.TextYAlignment=Enum.TextYAlignment.Top
@@ -3551,40 +3549,43 @@ local function createHomeContent()
 
     local statsCard=Instance.new("Frame")
     statsCard.Size=UDim2.new(1,-10,0,120)
-    statsCard.Position=UDim2.new(0,5,0,100)
-    statsCard.BackgroundColor3=Color3.fromRGB(8,18,30)
+    statsCard.Position=UDim2.new(0,5,0,105)
+    statsCard.BackgroundColor3=Color3.fromRGB(8,18,32)
     statsCard.BorderSizePixel=0
     statsCard.Parent=homeContent
 
     Instance.new("UICorner",statsCard).CornerRadius=UDim.new(0,8)
 
     local statsStroke=Instance.new("UIStroke")
-    statsStroke.Color=Color3.fromRGB(0,160,255)
+    statsStroke.Color=Color3.fromRGB(0,180,255)
     statsStroke.Transparency=0.55
     statsStroke.Parent=statsCard
 
-    local statsTitle=Instance.new("TextLabel")
-    statsTitle.Size=UDim2.new(1,-20,0,20)
-    statsTitle.Position=UDim2.new(0,10,0,10)
-    statsTitle.BackgroundTransparency=1
-    statsTitle.Text="📊 SYSTEM STATUS"
-    statsTitle.TextColor3=Color3.fromRGB(255,255,255)
-    statsTitle.Font=Enum.Font.GothamBold
-    statsTitle.TextSize=12
-    statsTitle.TextXAlignment=Enum.TextXAlignment.Left
-    statsTitle.Parent=statsCard
+    local info=Instance.new("TextLabel")
+    info.Size=UDim2.new(1,-20,1,-20)
+    info.Position=UDim2.new(0,10,0,10)
+    info.BackgroundTransparency=1
+    info.RichText=true
+    info.TextXAlignment=Enum.TextXAlignment.Left
+    info.TextYAlignment=Enum.TextYAlignment.Top
+    info.TextWrapped=true
+    info.Font=Enum.Font.Gotham
+    info.TextSize=11
+    info.TextColor3=Color3.fromRGB(220,220,220)
+    info.Text=[[
+<b>STATUS</b>
+🟢 System Online
 
-    local statusText=Instance.new("TextLabel")
-    statusText.Size=UDim2.new(1,-20,1,-35)
-    statusText.Position=UDim2.new(0,10,0,30)
-    statusText.BackgroundTransparency=1
-    statusText.Text="• GUI STATUS : ACTIVE\n• THEME : CYBER BLUE\n• VERSION : 10.1\n• PERFORMANCE : STABLE\n• SECURITY : ENABLED"
-    statusText.TextColor3=Color3.fromRGB(190,190,190)
-    statusText.Font=Enum.Font.Gotham
-    statusText.TextSize=10
-    statusText.TextXAlignment=Enum.TextXAlignment.Left
-    statusText.TextYAlignment=Enum.TextYAlignment.Top
-    statusText.Parent=statsCard
+<b>VERSION</b>
+10.1 Experimental
+
+<b>INTERFACE</b>
+Blue Cyber Theme
+
+<b>DEVELOPER</b>
+Kemi Studio
+]]
+    info.Parent=statsCard
 end
 
 -- ============================================================================
@@ -3593,9 +3594,6 @@ end
 local infoContent=nil
 local function createInfoContent()
     if infoContent then infoContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if homeContent then homeContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
 
     infoContent=Instance.new("Frame")
     infoContent.Size=UDim2.new(1,0,1,0)
@@ -3605,8 +3603,7 @@ local function createInfoContent()
     local scroll=Instance.new("ScrollingFrame")
     scroll.Size=UDim2.new(1,-10,1,-10)
     scroll.Position=UDim2.new(0,5,0,5)
-    scroll.BackgroundColor3=Color3.fromRGB(8,18,30)
-    scroll.BackgroundTransparency=0.15
+    scroll.BackgroundColor3=Color3.fromRGB(8,16,28)
     scroll.BorderSizePixel=0
     scroll.ScrollBarThickness=3
     scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
@@ -3616,66 +3613,96 @@ local function createInfoContent()
     Instance.new("UICorner",scroll).CornerRadius=UDim.new(0,8)
 
     local scrollStroke=Instance.new("UIStroke")
-    scrollStroke.Color=Color3.fromRGB(0,170,255)
+    scrollStroke.Color=Color3.fromRGB(0,180,255)
     scrollStroke.Transparency=0.5
     scrollStroke.Parent=scroll
 
     local layout=Instance.new("UIListLayout")
     layout.Padding=UDim.new(0,8)
-    layout.HorizontalAlignment=Enum.HorizontalAlignment.Center
     layout.Parent=scroll
 
     local padding=Instance.new("UIPadding")
     padding.PaddingTop=UDim.new(0,10)
-    padding.PaddingBottom=UDim.new(0,10)
     padding.PaddingLeft=UDim.new(0,10)
     padding.PaddingRight=UDim.new(0,10)
+    padding.PaddingBottom=UDim.new(0,10)
     padding.Parent=scroll
 
     local function createCard(title,text,height)
         local card=Instance.new("Frame")
-        card.Size=UDim2.new(1,-5,0,height)
-        card.BackgroundColor3=Color3.fromRGB(10,25,40)
+        card.Size=UDim2.new(1,-2,0,height)
+        card.BackgroundColor3=Color3.fromRGB(10,22,38)
         card.BorderSizePixel=0
         card.Parent=scroll
 
         Instance.new("UICorner",card).CornerRadius=UDim.new(0,8)
 
         local stroke=Instance.new("UIStroke")
-        stroke.Color=Color3.fromRGB(0,170,255)
-        stroke.Transparency=0.6
+        stroke.Color=Color3.fromRGB(0,180,255)
+        stroke.Transparency=0.65
         stroke.Parent=card
 
-        local cardTitle=Instance.new("TextLabel")
-        cardTitle.Size=UDim2.new(1,-20,0,20)
-        cardTitle.Position=UDim2.new(0,10,0,10)
-        cardTitle.BackgroundTransparency=1
-        cardTitle.Text=title
-        cardTitle.TextColor3=Color3.fromRGB(255,255,255)
-        cardTitle.Font=Enum.Font.GothamBold
-        cardTitle.TextSize=12
-        cardTitle.TextXAlignment=Enum.TextXAlignment.Left
-        cardTitle.Parent=card
+        local titleLabel=Instance.new("TextLabel")
+        titleLabel.Size=UDim2.new(1,-20,0,24)
+        titleLabel.Position=UDim2.new(0,10,0,8)
+        titleLabel.BackgroundTransparency=1
+        titleLabel.Text=title
+        titleLabel.TextColor3=Color3.fromRGB(0,220,255)
+        titleLabel.Font=Enum.Font.GothamBold
+        titleLabel.TextSize=12
+        titleLabel.TextXAlignment=Enum.TextXAlignment.Left
+        titleLabel.Parent=card
 
-        local cardText=Instance.new("TextLabel")
-        cardText.Size=UDim2.new(1,-20,1,-35)
-        cardText.Position=UDim2.new(0,10,0,30)
-        cardText.BackgroundTransparency=1
-        cardText.Text=text
-        cardText.TextWrapped=true
-        cardText.TextYAlignment=Enum.TextYAlignment.Top
-        cardText.TextXAlignment=Enum.TextXAlignment.Left
-        cardText.TextColor3=Color3.fromRGB(190,190,190)
-        cardText.Font=Enum.Font.Gotham
-        cardText.TextSize=10
-        cardText.Parent=card
+        local body=Instance.new("TextLabel")
+        body.Size=UDim2.new(1,-20,1,-40)
+        body.Position=UDim2.new(0,10,0,32)
+        body.BackgroundTransparency=1
+        body.RichText=true
+        body.TextWrapped=true
+        body.TextYAlignment=Enum.TextYAlignment.Top
+        body.TextXAlignment=Enum.TextXAlignment.Left
+        body.Text=text
+        body.TextColor3=Color3.fromRGB(220,220,220)
+        body.Font=Enum.Font.Gotham
+        body.TextSize=10
+        body.Parent=card
     end
 
-    createCard("🌐 COMMUNITY","Discord : discord.gg/cyberheroes\nTelegram : @cyberheroes\nYouTube : Kemi Studio",85)
+    createCard(
+        "🌐 COMMUNITY",
+[[
+💬 Discord Server
+📢 Telegram Channel
+▶ YouTube Updates
+🛠 Developer News
+]],
+90)
 
-    createCard("📜 INFORMATION","CYBERHEROES is a modern utility GUI with responsive design, smooth animations, optimized systems, floating interface and advanced automation tools.",110)
+    createCard(
+        "📜 SCRIPT INFORMATION",
+[[
+<b>CYBERHEROES v10.1</b>
 
-    createCard("⚡ UPDATE LOG","• New cyber blue redesign\n• Better floating bar\n• Optimized feature buttons\n• Improved navigation system\n• Better scrolling layout",110)
+⚡ Modern blue cyber interface
+⚡ Smooth animation system
+⚡ Floating draggable UI
+⚡ Optimized performance
+
+<b>FEATURES</b>
+• ESP
+• Auto Win
+• Auto Skill Check
+• TP Walk
+• Auto Aim
+]],
+140)
+
+    createCard(
+        "⚠ NOTES",
+[[
+This interface was redesigned using a modern responsive layout with blue cyber styling and optimized visual effects.
+]],
+80)
 end
 
 -- ============================================================================
@@ -3684,9 +3711,6 @@ end
 local aboutContent=nil
 local function createAboutContent()
     if aboutContent then aboutContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if homeContent then homeContent:Destroy() end
 
     aboutContent=Instance.new("Frame")
     aboutContent.Size=UDim2.new(1,0,1,0)
@@ -3703,15 +3727,15 @@ local function createAboutContent()
     Instance.new("UICorner",card).CornerRadius=UDim.new(0,8)
 
     local stroke=Instance.new("UIStroke")
-    stroke.Color=Color3.fromRGB(0,170,255)
-    stroke.Transparency=0.5
+    stroke.Color=Color3.fromRGB(0,180,255)
+    stroke.Transparency=0.45
     stroke.Parent=card
 
     local title=Instance.new("TextLabel")
     title.Size=UDim2.new(1,-20,0,30)
     title.Position=UDim2.new(0,10,0,10)
     title.BackgroundTransparency=1
-    title.Text="📘 ABOUT CYBERHEROES"
+    title.Text="ℹ ABOUT CYBERHEROES"
     title.TextColor3=Color3.fromRGB(0,220,255)
     title.Font=Enum.Font.GothamBold
     title.TextSize=15
@@ -3719,142 +3743,36 @@ local function createAboutContent()
     title.Parent=card
 
     local text=Instance.new("TextLabel")
-    text.Size=UDim2.new(1,-20,1,-50)
-    text.Position=UDim2.new(0,10,0,40)
+    text.Size=UDim2.new(1,-20,1,-55)
+    text.Position=UDim2.new(0,10,0,45)
     text.BackgroundTransparency=1
+    text.RichText=true
     text.TextWrapped=true
     text.TextYAlignment=Enum.TextYAlignment.Top
     text.TextXAlignment=Enum.TextXAlignment.Left
-    text.TextColor3=Color3.fromRGB(190,190,190)
     text.Font=Enum.Font.Gotham
-    text.TextSize=10
-    text.Text="CYBERHEROES SCRIPT\n\nVersion : 10.1\nDeveloper : Kemi Studio\nTheme : Cyber Blue\n\nThis interface was designed with modern UI concepts, responsive layout, smooth transitions and optimized performance.\n\nThank you for using CYBERHEROES."
+    text.TextSize=11
+    text.TextColor3=Color3.fromRGB(220,220,220)
+    text.Text=[[
+<b>CYBERHEROES SCRIPT</b>
+
+Version : 10.1 Experimental
+
+Developer :
+Kemi Studio
+
+Interface :
+Blue Cyber Modern UI
+
+Special Thanks :
+Community & Supporters
+
+This GUI focuses on responsive layout, modern visuals, smooth interaction, and optimized performance.
+]]
     text.Parent=card
 end
 
 
--- ============================================================================
--- SETTINGS CONTENT
--- ============================================================================
-local function createSettingsContent()
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if homeContent then homeContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
-
-    settingsContent=Instance.new("Frame")
-    settingsContent.Size=UDim2.new(1,0,1,0)
-    settingsContent.BackgroundTransparency=1
-    settingsContent.Parent=contentPanel
-
-    local mainCard=Instance.new("Frame")
-    mainCard.Size=UDim2.new(1,-10,1,-10)
-    mainCard.Position=UDim2.new(0,5,0,5)
-    mainCard.BackgroundColor3=Color3.fromRGB(10,20,35)
-    mainCard.BorderSizePixel=0
-    mainCard.Parent=settingsContent
-
-    Instance.new("UICorner",mainCard).CornerRadius=UDim.new(0,8)
-
-    local stroke=Instance.new("UIStroke")
-    stroke.Color=Color3.fromRGB(0,170,255)
-    stroke.Transparency=0.45
-    stroke.Parent=mainCard
-
-    local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-20,0,25)
-    title.Position=UDim2.new(0,10,0,10)
-    title.BackgroundTransparency=1
-    title.Text="⚙ SETTINGS PANEL"
-    title.TextColor3=Color3.fromRGB(0,220,255)
-    title.Font=Enum.Font.GothamBold
-    title.TextSize=14
-    title.TextXAlignment=Enum.TextXAlignment.Left
-    title.Parent=mainCard
-
-    local function createThemeButton(text,color,pos)
-        local btn=Instance.new("TextButton")
-        btn.Size=UDim2.new(0,70,0,28)
-        btn.Position=pos
-        btn.Text=text
-        btn.BackgroundColor3=color
-        btn.TextColor3=Color3.fromRGB(255,255,255)
-        btn.Font=Enum.Font.GothamBold
-        btn.TextSize=10
-        btn.BorderSizePixel=0
-        btn.Parent=mainCard
-
-        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
-
-        btn.MouseButton1Click:Connect(function()
-            config.guiThemeColor=color
-            updateTheme()
-        end)
-    end
-
-    createThemeButton("BLUE",Color3.fromRGB(0,170,255),UDim2.new(0,10,0,45))
-    createThemeButton("CYAN",Color3.fromRGB(0,255,255),UDim2.new(0,90,0,45))
-    createThemeButton("PURPLE",Color3.fromRGB(140,80,255),UDim2.new(0,170,0,45))
-end
-
--- ============================================================================
--- NAVIGATION HANDLER
--- ============================================================================
-local function resetTabs()
-    local normal=Color3.fromRGB(200,200,200)
-
-    homeItem.TextColor3=normal
-    featuresItem.TextColor3=normal
-    settingsItem.TextColor3=normal
-    infoItem.TextColor3=normal
-    aboutItem.TextColor3=normal
-end
-
-local function clearContents()
-    if homeContent then homeContent:Destroy() homeContent=nil end
-    if settingsContent then settingsContent:Destroy() settingsContent=nil end
-    if infoContent then infoContent:Destroy() infoContent=nil end
-    if aboutContent then aboutContent:Destroy() aboutContent=nil end
-end
-
-homeItem.MouseButton1Click:Connect(function()
-    resetTabs()
-    clearContents()
-    gridLayout.Parent=nil
-    homeItem.TextColor3=Color3.fromRGB(0,220,255)
-    createHomeContent()
-end)
-
-featuresItem.MouseButton1Click:Connect(function()
-    resetTabs()
-    clearContents()
-    featuresItem.TextColor3=Color3.fromRGB(0,220,255)
-    gridLayout.Parent=contentPanel
-end)
-
-settingsItem.MouseButton1Click:Connect(function()
-    resetTabs()
-    clearContents()
-    gridLayout.Parent=nil
-    settingsItem.TextColor3=Color3.fromRGB(0,220,255)
-    createSettingsContent()
-end)
-
-infoItem.MouseButton1Click:Connect(function()
-    resetTabs()
-    clearContents()
-    gridLayout.Parent=nil
-    infoItem.TextColor3=Color3.fromRGB(0,220,255)
-    createInfoContent()
-end)
-
-aboutItem.MouseButton1Click:Connect(function()
-    resetTabs()
-    clearContents()
-    gridLayout.Parent=nil
-    aboutItem.TextColor3=Color3.fromRGB(0,220,255)
-    createAboutContent()
-end)
 -- ============================================================================  
 -- FLOATING BAR (MINI GUI) - VERSI DIPERBAIKI  
 -- ============================================================================  
@@ -4294,55 +4212,80 @@ end
     end 
 
 -- Navigation handlers  
-    homeItem.MouseButton1Click:Connect(function()  
-        homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
-    end)  
-    featuresItem.MouseButton1Click:Connect(function()  
-        featuresItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
-    end)  
-    settingsItem.MouseButton1Click:Connect(function()  
-        settingsItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        gridLayout.Parent = nil  
-        if infoContent then infoContent:Destroy() end  
-        createSettingsContent()  
-    end)  
-    infoItem.MouseButton1Click:Connect(function()  
-        infoItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        gridLayout.Parent = nil  
-        if settingsContent then settingsContent:Destroy() end  
-        createInfoContent()  
-    end)  
-    aboutItem.MouseButton1Click:Connect(function()  
-        aboutItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
+    homeItem.MouseButton1Click:Connect(function()
+    homeItem.TextColor3=Color3.fromRGB(0,230,255)
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+
+    if settingsContent then settingsContent:Destroy() end
+    if infoContent then infoContent:Destroy() end
+    if aboutContent then aboutContent:Destroy() end
+
+    gridLayout.Parent=nil
+    createHomeContent()
+end)
+
+featuresItem.MouseButton1Click:Connect(function()
+    featuresItem.TextColor3=Color3.fromRGB(0,230,255)
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+
+    if homeContent then homeContent:Destroy() end
+    if settingsContent then settingsContent:Destroy() end
+    if infoContent then infoContent:Destroy() end
+    if aboutContent then aboutContent:Destroy() end
+
+    gridLayout.Parent=contentPanel
+end)
+
+settingsItem.MouseButton1Click:Connect(function()
+    settingsItem.TextColor3=Color3.fromRGB(0,230,255)
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+
+    if homeContent then homeContent:Destroy() end
+    if infoContent then infoContent:Destroy() end
+    if aboutContent then aboutContent:Destroy() end
+
+    gridLayout.Parent=nil
+    createSettingsContent()
+end)
+
+infoItem.MouseButton1Click:Connect(function()
+    infoItem.TextColor3=Color3.fromRGB(0,230,255)
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+
+    if homeContent then homeContent:Destroy() end
+    if settingsContent then settingsContent:Destroy() end
+    if aboutContent then aboutContent:Destroy() end
+
+    gridLayout.Parent=nil
+    createInfoContent()
+end)
+
+aboutItem.MouseButton1Click:Connect(function()
+    aboutItem.TextColor3=Color3.fromRGB(0,230,255)
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)
+
+    if homeContent then homeContent:Destroy() end
+    if settingsContent then settingsContent:Destroy() end
+    if infoContent then infoContent:Destroy() end
+
+    gridLayout.Parent=nil
+    createAboutContent()
+end)
   
     makeDraggable(mainFrame)  
   

@@ -3548,31 +3548,14 @@ local function createHomeContent()
     headerStroke.Transparency=0.35
     headerStroke.Parent=header
 
-    -- 1. BUAT SCREEN GUI UTAMA (Wajib ada agar GUI muncul di layar)
-local playerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "MenuGuiUtama"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
-
--- 2. BUAT CONTAINER HEADER (Tempat menaruh logo Anda)
-local header = Instance.new("Frame")
-header.Name = "HeaderMenu"
-header.Size = UDim2.new(0, 300, 0, 56) -- Sesuaikan ukuran header Anda
-header.Position = UDim2.new(0.5, -150, 0.4, -28) -- Posisi di tengah layar
-header.BackgroundColor3 = Color3.fromRGB(35, 35, 35) -- Warna latar belakang menu
-header.Parent = screenGui -- Dimasukkan ke ScreenGui
-
--- 3. LOGO ANDA (Langsung menempel di Header)
-local logo = Instance.new("ImageLabel")
-logo.Name = "LogoMenu"
-logo.Size = UDim2.new(0, 28, 0, 28)
-logo.Position = UDim2.new(0, 12, 0, 14)
-logo.BackgroundTransparency = 1
-logo.Image = "rbxassetid://127173186832760"
-logo.ScaleType = Enum.ScaleType.Fit
-logo.Parent = header -- Dimasukkan ke Header
+    --// LOGO (DIRECT IN HEADER, NO CONTAINER)
+    local logo=Instance.new("ImageLabel")
+    logo.Size=UDim2.new(0,28,0,28)
+    logo.Position=UDim2.new(0,12,0,14)
+    logo.BackgroundTransparency=1
+    logo.Image="rbxassetid://127173117498427" -- SUDAH DIUBAH KE IMAGE ID ASLI YANG VALID UNTUK SCRIPT GUI
+    logo.ScaleType=Enum.ScaleType.Fit
+    logo.Parent=header
 
     --// TITLE
 

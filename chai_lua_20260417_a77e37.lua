@@ -4175,6 +4175,7 @@ end
 -- ABOUT CONTENT
 -- ============================================================================
 local aboutContent=nil
+
 local function createAboutContent()
     if aboutContent then aboutContent:Destroy() end
 
@@ -4183,52 +4184,193 @@ local function createAboutContent()
     aboutContent.BackgroundTransparency=1
     aboutContent.Parent=contentPanel
 
+    -- MAIN CARD
     local card=Instance.new("Frame")
     card.Size=UDim2.new(1,-10,1,-10)
     card.Position=UDim2.new(0,5,0,5)
-    card.BackgroundColor3=Color3.fromRGB(10,20,35)
+    card.BackgroundColor3=Color3.fromRGB(10,18,32)
     card.BorderSizePixel=0
     card.Parent=aboutContent
 
-    Instance.new("UICorner",card).CornerRadius=UDim.new(0,8)
+    Instance.new("UICorner",card).CornerRadius=UDim.new(0,10)
 
     local stroke=Instance.new("UIStroke")
     stroke.Color=Color3.fromRGB(0,180,255)
-    stroke.Transparency=0.45
+    stroke.Transparency=0.4
     stroke.Parent=card
 
+    -- TITLE
     local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-20,0,30)
-    title.Position=UDim2.new(0,10,0,10)
+    title.Size=UDim2.new(1,-20,0,28)
+    title.Position=UDim2.new(0,10,0,8)
     title.BackgroundTransparency=1
-    title.Text="ℹ ABOUT CYBERHEROES"
+    title.Text="ℹ CYBERHEROES PANEL"
     title.TextColor3=Color3.fromRGB(0,220,255)
     title.Font=Enum.Font.GothamBold
     title.TextSize=15
     title.TextXAlignment=Enum.TextXAlignment.Left
     title.Parent=card
 
-    local text=Instance.new("TextLabel")
-    text.Size=UDim2.new(1,-20,1,-55)
-    text.Position=UDim2.new(0,10,0,45)
-    text.BackgroundTransparency=1
-    text.RichText=true
-    text.TextWrapped=true
-    text.TextYAlignment=Enum.TextYAlignment.Top
-    text.TextXAlignment=Enum.TextXAlignment.Left
-    text.Font=Enum.Font.Gotham
-    text.TextSize=11
-    text.TextColor3=Color3.fromRGB(220,220,220)
-    text.Text=[[
-<b>CYBERHEROES SCRIPT</b>
-Version : 10.1 Experimental
-Developer :
-Kemi Studio
-Special Thanks :
-Community & Supporters
-This GUI focuses on responsive layout, modern visuals, smooth interaction, and optimized performance.
-]]
-    text.Parent=card
+    -- SIDEBAR
+    local sidebar=Instance.new("Frame")
+    sidebar.Size=UDim2.new(0,120,1,-50)
+    sidebar.Position=UDim2.new(0,10,0,40)
+    sidebar.BackgroundColor3=Color3.fromRGB(8,14,25)
+    sidebar.BorderSizePixel=0
+    sidebar.Parent=card
+
+    Instance.new("UICorner",sidebar).CornerRadius=UDim.new(0,8)
+
+    local sideStroke=Instance.new("UIStroke")
+    sideStroke.Color=Color3.fromRGB(0,180,255)
+    sideStroke.Transparency=0.6
+    sideStroke.Parent=sidebar
+
+    local sideLayout=Instance.new("UIListLayout")
+    sideLayout.Padding=UDim.new(0,8)
+    sideLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    sideLayout.Parent=sidebar
+
+    -- CONTENT AREA
+    local pageHolder=Instance.new("Frame")
+    pageHolder.Size=UDim2.new(1,-140,1,-50)
+    pageHolder.Position=UDim2.new(0,130,0,40)
+    pageHolder.BackgroundTransparency=1
+    pageHolder.Parent=card
+
+    -- KILLER PAGE
+    local killerPage=Instance.new("Frame")
+    killerPage.Size=UDim2.new(1,0,1,0)
+    killerPage.BackgroundTransparency=1
+    killerPage.Visible=true
+    killerPage.Parent=pageHolder
+
+    -- SURVIVAL PAGE
+    local survivalPage=Instance.new("Frame")
+    survivalPage.Size=UDim2.new(1,0,1,0)
+    survivalPage.BackgroundTransparency=1
+    survivalPage.Visible=false
+    survivalPage.Parent=pageHolder
+
+    -- SIDEBAR BUTTON STYLE
+    local function createSideButton(text)
+        local btn=Instance.new("TextButton")
+        btn.Size=UDim2.new(1,-12,0,34)
+        btn.BackgroundColor3=Color3.fromRGB(12,22,38)
+        btn.Text=text
+        btn.TextColor3=Color3.fromRGB(220,220,220)
+        btn.Font=Enum.Font.GothamBold
+        btn.TextSize=12
+        btn.BorderSizePixel=0
+        btn.AutoButtonColor=false
+        btn.Parent=sidebar
+        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
+        return btn
+    end
+
+    local killerBtn=createSideButton("KILLER")
+    local survivalBtn=createSideButton("SURVIVAL")
+
+    -- SWITCH PAGE (NO FUNCTION ADDED, INLINE ONLY)
+    killerBtn.MouseButton1Click:Connect(function()
+        killerPage.Visible=true
+        survivalPage.Visible=false
+        killerBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
+        survivalBtn.BackgroundColor3=Color3.fromRGB(12,22,38)
+    end)
+
+    survivalBtn.MouseButton1Click:Connect(function()
+        killerPage.Visible=false
+        survivalPage.Visible=true
+        survivalBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
+        killerBtn.BackgroundColor3=Color3.fromRGB(12,22,38)
+    end)
+
+    -- RESET COLOR DEFAULT
+    killerBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
+
+    -------------------------------------------------
+    -- KILLER FEATURES
+    -------------------------------------------------
+
+    local function makeFeatureButton(parent, text, configName)
+        local btn=Instance.new("TextButton")
+        btn.Size=UDim2.new(1,-20,0,36)
+        btn.Position=UDim2.new(0,10,0,10)
+        btn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        btn.Text=text
+        btn.TextColor3=Color3.fromRGB(220,220,220)
+        btn.Font=Enum.Font.GothamBold
+        btn.TextSize=12
+        btn.BorderSizePixel=0
+        btn.AutoButtonColor=false
+        btn.Parent=parent
+        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,8)
+
+        btn.MouseButton1Click:Connect(function()
+            local newState = not (config[configName] or false)
+
+            if configName == "massKillEnabled" then
+                config.massKillEnabled = newState
+                if newState then startMassKillLoop() else stopMassKillLoop() end
+
+            elseif configName == "shieldEnabled" then
+                config.shieldEnabled = newState
+                if newState then startShieldMonitor() else stopShieldMonitor() end
+            end
+
+            btn.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
+        end)
+
+        return btn
+    end
+
+    makeFeatureButton(killerPage,"MASS KILL","massKillEnabled")
+    makeFeatureButton(killerPage,"AUTO SHIELD","shieldEnabled")
+
+    -------------------------------------------------
+    -- SURVIVAL FEATURES
+    -------------------------------------------------
+
+    local function makeSurvivalButton(parent, text, configName)
+        local btn=Instance.new("TextButton")
+        btn.Size=UDim2.new(1,-20,0,36)
+        btn.Position=UDim2.new(0,10,0,10)
+        btn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        btn.Text=text
+        btn.TextColor3=Color3.fromRGB(220,220,220)
+        btn.Font=Enum.Font.GothamBold
+        btn.TextSize=12
+        btn.BorderSizePixel=0
+        btn.AutoButtonColor=false
+        btn.Parent=parent
+        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,8)
+
+        btn.MouseButton1Click:Connect(function()
+            local newState = not (config[configName] or false)
+
+            if configName == "stealthEnabled" then
+                config.stealthEnabled = newState
+                if newState then startStealthMonitor() else stopStealthMonitor() end
+
+            elseif configName == "autoSkillCheckEnabled" then
+                config.autoSkillCheckEnabled = newState
+                if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
+
+            elseif configName == "povMode" then
+                togglePOV()
+                return
+            end
+
+            btn.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
+        end)
+
+        return btn
+    end
+
+    makeSurvivalButton(survivalPage,"DAGGER / STEALTH","stealthEnabled")
+    makeSurvivalButton(survivalPage,"AUTO SKILLCHECK","autoSkillCheckEnabled")
+    makeSurvivalButton(survivalPage,"POV MODE","povMode")
 end
 
 local function createSettingsContent()

@@ -3501,65 +3501,6 @@ end
 -- HOME CONTENT
 -- ============================================================================
 local homeContent=nil
-local crosshairGui=nil
-local crosshairSize=12
-local crosshairShape="PLUS"
-
-local function updateCrosshair()
-    if crosshairGui then
-        crosshairGui:Destroy()
-    end
-
-    crosshairGui=Instance.new("ScreenGui")
-    crosshairGui.Name="CyberCrosshair"
-    crosshairGui.ResetOnSpawn=false
-    crosshairGui.IgnoreGuiInset=true
-    crosshairGui.Parent=CoreGui
-
-    local holder=Instance.new("Frame")
-    holder.Size=UDim2.new(0,0,0,0)
-    holder.Position=UDim2.new(0.5,0,0.5,0)
-    holder.BackgroundTransparency=1
-    holder.Parent=crosshairGui
-
-    local function createLine(size,pos,rot)
-        local line=Instance.new("Frame")
-        line.AnchorPoint=Vector2.new(0.5,0.5)
-        line.Size=UDim2.new(0,size,0,2)
-        line.Position=pos
-        line.Rotation=rot
-        line.BackgroundColor3=Color3.fromRGB(0,220,255)
-        line.BorderSizePixel=0
-        line.Parent=holder
-        Instance.new("UICorner",line).CornerRadius=UDim.new(1,0)
-    end
-
-    if crosshairShape=="PLUS" then
-        createLine(crosshairSize,UDim2.new(0,0,0,0),0)
-        createLine(crosshairSize,UDim2.new(0,0,0,0),90)
-
-    elseif crosshairShape=="X" then
-        createLine(crosshairSize,UDim2.new(0,0,0,0),45)
-        createLine(crosshairSize,UDim2.new(0,0,0,0),-45)
-
-    elseif crosshairShape=="O" then
-        local circle=Instance.new("Frame")
-        circle.AnchorPoint=Vector2.new(0.5,0.5)
-        circle.Size=UDim2.new(0,crosshairSize,0,crosshairSize)
-        circle.Position=UDim2.new(0,0,0,0)
-        circle.BackgroundTransparency=1
-        circle.BorderSizePixel=0
-        circle.Parent=holder
-
-        local stroke=Instance.new("UIStroke")
-        stroke.Color=Color3.fromRGB(0,220,255)
-        stroke.Thickness=2
-        stroke.Parent=circle
-
-        Instance.new("UICorner",circle).CornerRadius=UDim.new(1,0)
-    end
-end
-
 local function createHomeContent()
     if homeContent then homeContent:Destroy() end
 
@@ -3571,10 +3512,10 @@ local function createHomeContent()
     local scroll=Instance.new("ScrollingFrame")
     scroll.Size=UDim2.new(1,-6,1,-6)
     scroll.Position=UDim2.new(0,3,0,3)
-    scroll.CanvasSize=UDim2.new(0,0,0,540)
-    scroll.ScrollBarThickness=3
     scroll.BackgroundTransparency=1
     scroll.BorderSizePixel=0
+    scroll.ScrollBarThickness=3
+    scroll.CanvasSize=UDim2.new(0,0,0,520)
     scroll.Parent=homeContent
 
     local layout=Instance.new("UIListLayout")
@@ -3584,12 +3525,14 @@ local function createHomeContent()
 
     local padding=Instance.new("UIPadding")
     padding.PaddingTop=UDim.new(0,4)
-    padding.PaddingBottom=UDim.new(0,8)
+    padding.PaddingBottom=UDim.new(0,6)
+    padding.PaddingLeft=UDim.new(0,2)
+    padding.PaddingRight=UDim.new(0,2)
     padding.Parent=scroll
 
     local topCard=Instance.new("Frame")
-    topCard.Size=UDim2.new(1,-10,0,90)
-    topCard.BackgroundColor3=Color3.fromRGB(10,25,40)
+    topCard.Size=UDim2.new(1,-8,0,95)
+    topCard.BackgroundColor3=Color3.fromRGB(8,22,40)
     topCard.BorderSizePixel=0
     topCard.Parent=scroll
 
@@ -3597,12 +3540,12 @@ local function createHomeContent()
 
     local topStroke=Instance.new("UIStroke")
     topStroke.Color=Color3.fromRGB(0,180,255)
-    topStroke.Transparency=0.4
+    topStroke.Transparency=0.35
     topStroke.Parent=topCard
 
     local welcome=Instance.new("TextLabel")
-    welcome.Size=UDim2.new(1,-20,0,30)
-    welcome.Position=UDim2.new(0,10,0,10)
+    welcome.Size=UDim2.new(1,-20,0,28)
+    welcome.Position=UDim2.new(0,10,0,8)
     welcome.BackgroundTransparency=1
     welcome.Text="⚡ CYBERHEROES HUB"
     welcome.TextColor3=Color3.fromRGB(0,220,255)
@@ -3612,11 +3555,11 @@ local function createHomeContent()
     welcome.Parent=topCard
 
     local desc=Instance.new("TextLabel")
-    desc.Size=UDim2.new(1,-20,0,40)
-    desc.Position=UDim2.new(0,10,0,42)
+    desc.Size=UDim2.new(1,-20,0,45)
+    desc.Position=UDim2.new(0,10,0,38)
     desc.BackgroundTransparency=1
-    desc.Text="Modern utility interface with premium blue cyber style.\nUse sidebar navigation to access features and settings."
-    desc.TextColor3=Color3.fromRGB(210,210,210)
+    desc.Text="Modern utility interface with premium cyber blue style.\nAccess features, settings, information and crosshair customization."
+    desc.TextColor3=Color3.fromRGB(215,215,215)
     desc.Font=Enum.Font.Gotham
     desc.TextSize=11
     desc.TextWrapped=true
@@ -3625,8 +3568,8 @@ local function createHomeContent()
     desc.Parent=topCard
 
     local statsCard=Instance.new("Frame")
-    statsCard.Size=UDim2.new(1,-10,0,120)
-    statsCard.BackgroundColor3=Color3.fromRGB(8,18,32)
+    statsCard.Size=UDim2.new(1,-8,0,125)
+    statsCard.BackgroundColor3=Color3.fromRGB(10,18,32)
     statsCard.BorderSizePixel=0
     statsCard.Parent=scroll
 
@@ -3634,7 +3577,7 @@ local function createHomeContent()
 
     local statsStroke=Instance.new("UIStroke")
     statsStroke.Color=Color3.fromRGB(0,180,255)
-    statsStroke.Transparency=0.55
+    statsStroke.Transparency=0.5
     statsStroke.Parent=statsCard
 
     local info=Instance.new("TextLabel")
@@ -3664,8 +3607,8 @@ Kemi Studio
     info.Parent=statsCard
 
     local crosshairCard=Instance.new("Frame")
-    crosshairCard.Size=UDim2.new(1,-10,0,240)
-    crosshairCard.BackgroundColor3=Color3.fromRGB(8,18,32)
+    crosshairCard.Size=UDim2.new(1,-8,0,250)
+    crosshairCard.BackgroundColor3=Color3.fromRGB(8,20,36)
     crosshairCard.BorderSizePixel=0
     crosshairCard.Parent=scroll
 
@@ -3673,12 +3616,12 @@ Kemi Studio
 
     local crossStroke=Instance.new("UIStroke")
     crossStroke.Color=Color3.fromRGB(0,180,255)
-    crossStroke.Transparency=0.55
+    crossStroke.Transparency=0.45
     crossStroke.Parent=crosshairCard
 
     local crossTitle=Instance.new("TextLabel")
-    crossTitle.Size=UDim2.new(1,-20,0,25)
-    crossTitle.Position=UDim2.new(0,10,0,10)
+    crossTitle.Size=UDim2.new(1,-20,0,26)
+    crossTitle.Position=UDim2.new(0,10,0,8)
     crossTitle.BackgroundTransparency=1
     crossTitle.Text="🎯 CROSSHAIR SETTINGS"
     crossTitle.TextColor3=Color3.fromRGB(0,220,255)
@@ -3687,137 +3630,276 @@ Kemi Studio
     crossTitle.TextXAlignment=Enum.TextXAlignment.Left
     crossTitle.Parent=crosshairCard
 
-    local sizeText=Instance.new("TextLabel")
-    sizeText.Size=UDim2.new(1,-20,0,20)
-    sizeText.Position=UDim2.new(0,10,0,42)
-    sizeText.BackgroundTransparency=1
-    sizeText.Text="SIZE : "..crosshairSize
-    sizeText.TextColor3=Color3.fromRGB(220,220,220)
-    sizeText.Font=Enum.Font.Gotham
-    sizeText.TextSize=11
-    sizeText.TextXAlignment=Enum.TextXAlignment.Left
-    sizeText.Parent=crosshairCard
+    local preview=Instance.new("Frame")
+    preview.Size=UDim2.new(1,-20,0,95)
+    preview.Position=UDim2.new(0,10,0,38)
+    preview.BackgroundColor3=Color3.fromRGB(5,10,18)
+    preview.BorderSizePixel=0
+    preview.Parent=crosshairCard
 
-    local sliderBg=Instance.new("Frame")
-    sliderBg.Size=UDim2.new(1,-20,0,6)
-    sliderBg.Position=UDim2.new(0,10,0,72)
-    sliderBg.BackgroundColor3=Color3.fromRGB(20,40,60)
-    sliderBg.BorderSizePixel=0
-    sliderBg.Parent=crosshairCard
+    Instance.new("UICorner",preview).CornerRadius=UDim.new(0,6)
 
-    Instance.new("UICorner",sliderBg).CornerRadius=UDim.new(1,0)
+    local previewStroke=Instance.new("UIStroke")
+    previewStroke.Color=Color3.fromRGB(0,180,255)
+    previewStroke.Transparency=0.6
+    previewStroke.Parent=preview
+
+    local crossGui=game.CoreGui:FindFirstChild("CyberCrosshair")
+    if crossGui then
+        crossGui:Destroy()
+    end
+
+    crossGui=Instance.new("ScreenGui")
+    crossGui.Name="CyberCrosshair"
+    crossGui.IgnoreGuiInset=true
+    crossGui.ResetOnSpawn=false
+    crossGui.Parent=game.CoreGui
+
+    local center=Instance.new("Frame")
+    center.Size=UDim2.new(0,0,0,0)
+    center.Position=UDim2.new(0.5,0,0.5,0)
+    center.BackgroundTransparency=1
+    center.Parent=crossGui
+
+    local topLine=Instance.new("Frame")
+    topLine.Size=UDim2.new(0,2,0,12)
+    topLine.Position=UDim2.new(0,-1,0,-16)
+    topLine.BackgroundColor3=Color3.fromRGB(0,220,255)
+    topLine.BorderSizePixel=0
+    topLine.Parent=center
+
+    local bottomLine=Instance.new("Frame")
+    bottomLine.Size=UDim2.new(0,2,0,12)
+    bottomLine.Position=UDim2.new(0,-1,0,4)
+    bottomLine.BackgroundColor3=Color3.fromRGB(0,220,255)
+    bottomLine.BorderSizePixel=0
+    bottomLine.Parent=center
+
+    local leftLine=Instance.new("Frame")
+    leftLine.Size=UDim2.new(0,12,0,2)
+    leftLine.Position=UDim2.new(0,-16,0,-1)
+    leftLine.BackgroundColor3=Color3.fromRGB(0,220,255)
+    leftLine.BorderSizePixel=0
+    leftLine.Parent=center
+
+    local rightLine=Instance.new("Frame")
+    rightLine.Size=UDim2.new(0,12,0,2)
+    rightLine.Position=UDim2.new(0,4,0,-1)
+    rightLine.BackgroundColor3=Color3.fromRGB(0,220,255)
+    rightLine.BorderSizePixel=0
+    rightLine.Parent=center
+
+    local circle=Instance.new("Frame")
+    circle.Size=UDim2.new(0,12,0,12)
+    circle.Position=UDim2.new(0,-6,0,-6)
+    circle.BackgroundTransparency=1
+    circle.Visible=false
+    circle.Parent=center
+
+    local circleStroke=Instance.new("UIStroke")
+    circleStroke.Color=Color3.fromRGB(0,220,255)
+    circleStroke.Thickness=2
+    circleStroke.Parent=circle
+
+    Instance.new("UICorner",circle).CornerRadius=UDim.new(1,0)
+
+    local x1=Instance.new("Frame")
+    x1.Size=UDim2.new(0,2,0,18)
+    x1.Position=UDim2.new(0,-1,0,-9)
+    x1.Rotation=45
+    x1.BackgroundColor3=Color3.fromRGB(0,220,255)
+    x1.BorderSizePixel=0
+    x1.Visible=false
+    x1.Parent=center
+
+    local x2=Instance.new("Frame")
+    x2.Size=UDim2.new(0,2,0,18)
+    x2.Position=UDim2.new(0,-1,0,-9)
+    x2.Rotation=-45
+    x2.BackgroundColor3=Color3.fromRGB(0,220,255)
+    x2.BorderSizePixel=0
+    x2.Visible=false
+    x2.Parent=center
+
+    local sizeLabel=Instance.new("TextLabel")
+    sizeLabel.Size=UDim2.new(1,-20,0,20)
+    sizeLabel.Position=UDim2.new(0,10,0,142)
+    sizeLabel.BackgroundTransparency=1
+    sizeLabel.Text="Crosshair Size"
+    sizeLabel.TextColor3=Color3.fromRGB(220,220,220)
+    sizeLabel.Font=Enum.Font.GothamBold
+    sizeLabel.TextSize=11
+    sizeLabel.TextXAlignment=Enum.TextXAlignment.Left
+    sizeLabel.Parent=crosshairCard
+
+    local sliderBack=Instance.new("Frame")
+    sliderBack.Size=UDim2.new(1,-20,0,6)
+    sliderBack.Position=UDim2.new(0,10,0,168)
+    sliderBack.BackgroundColor3=Color3.fromRGB(20,35,55)
+    sliderBack.BorderSizePixel=0
+    sliderBack.Parent=crosshairCard
+
+    Instance.new("UICorner",sliderBack).CornerRadius=UDim.new(1,0)
 
     local sliderFill=Instance.new("Frame")
-    sliderFill.Size=UDim2.new(crosshairSize/40,0,1,0)
+    sliderFill.Size=UDim2.new(0.4,0,1,0)
     sliderFill.BackgroundColor3=Color3.fromRGB(0,220,255)
     sliderFill.BorderSizePixel=0
-    sliderFill.Parent=sliderBg
+    sliderFill.Parent=sliderBack
 
     Instance.new("UICorner",sliderFill).CornerRadius=UDim.new(1,0)
 
-    local sliderBtn=Instance.new("TextButton")
-    sliderBtn.Size=UDim2.new(1,0,0,18)
-    sliderBtn.Position=UDim2.new(0,0,-0.6,0)
-    sliderBtn.Text=""
-    sliderBtn.BackgroundTransparency=1
-    sliderBtn.Parent=sliderBg
+    local sliderButton=Instance.new("TextButton")
+    sliderButton.Size=UDim2.new(0,16,0,16)
+    sliderButton.Position=UDim2.new(0.4,-8,0.5,-8)
+    sliderButton.Text=""
+    sliderButton.BackgroundColor3=Color3.fromRGB(240,240,240)
+    sliderButton.BorderSizePixel=0
+    sliderButton.Parent=sliderBack
+
+    Instance.new("UICorner",sliderButton).CornerRadius=UDim.new(1,0)
+
+    local shapeLabel=Instance.new("TextLabel")
+    shapeLabel.Size=UDim2.new(1,-20,0,20)
+    shapeLabel.Position=UDim2.new(0,10,0,188)
+    shapeLabel.BackgroundTransparency=1
+    shapeLabel.Text="Crosshair Shape"
+    shapeLabel.TextColor3=Color3.fromRGB(220,220,220)
+    shapeLabel.Font=Enum.Font.GothamBold
+    shapeLabel.TextSize=11
+    shapeLabel.TextXAlignment=Enum.TextXAlignment.Left
+    shapeLabel.Parent=crosshairCard
+
+    local plusBtn=Instance.new("TextButton")
+    plusBtn.Size=UDim2.new(0.28,0,0,28)
+    plusBtn.Position=UDim2.new(0.05,0,0,212)
+    plusBtn.Text="+"
+    plusBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
+    plusBtn.TextColor3=Color3.fromRGB(255,255,255)
+    plusBtn.Font=Enum.Font.GothamBold
+    plusBtn.TextSize=14
+    plusBtn.BorderSizePixel=0
+    plusBtn.Parent=crosshairCard
+
+    Instance.new("UICorner",plusBtn).CornerRadius=UDim.new(0,6)
+
+    local xBtn=Instance.new("TextButton")
+    xBtn.Size=UDim2.new(0.28,0,0,28)
+    xBtn.Position=UDim2.new(0.36,0,0,212)
+    xBtn.Text="X"
+    xBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+    xBtn.TextColor3=Color3.fromRGB(220,220,220)
+    xBtn.Font=Enum.Font.GothamBold
+    xBtn.TextSize=14
+    xBtn.BorderSizePixel=0
+    xBtn.Parent=crosshairCard
+
+    Instance.new("UICorner",xBtn).CornerRadius=UDim.new(0,6)
+
+    local oBtn=Instance.new("TextButton")
+    oBtn.Size=UDim2.new(0.28,0,0,28)
+    oBtn.Position=UDim2.new(0.67,0,0,212)
+    oBtn.Text="O"
+    oBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+    oBtn.TextColor3=Color3.fromRGB(220,220,220)
+    oBtn.Font=Enum.Font.GothamBold
+    oBtn.TextSize=14
+    oBtn.BorderSizePixel=0
+    oBtn.Parent=crosshairCard
+
+    Instance.new("UICorner",oBtn).CornerRadius=UDim.new(0,6)
 
     local dragging=false
 
-    sliderBtn.InputBegan:Connect(function(input)
+    local function applySize(value)
+        local size=math.floor(8+(value*22))
+
+        topLine.Size=UDim2.new(0,2,0,size)
+        bottomLine.Size=UDim2.new(0,2,0,size)
+        leftLine.Size=UDim2.new(0,size,0,2)
+        rightLine.Size=UDim2.new(0,size,0,2)
+
+        topLine.Position=UDim2.new(0,-1,0,-(size+4))
+        bottomLine.Position=UDim2.new(0,-1,0,4)
+        leftLine.Position=UDim2.new(0,-(size+4),0,-1)
+        rightLine.Position=UDim2.new(0,4,0,-1)
+
+        x1.Size=UDim2.new(0,2,0,size+8)
+        x2.Size=UDim2.new(0,2,0,size+8)
+        x1.Position=UDim2.new(0,-1,0,-((size+8)/2))
+        x2.Position=UDim2.new(0,-1,0,-((size+8)/2))
+
+        circle.Size=UDim2.new(0,size+2,0,size+2)
+        circle.Position=UDim2.new(0,-((size+2)/2),0,-((size+2)/2))
+    end
+
+    sliderButton.InputBegan:Connect(function(input)
         if input.UserInputType==Enum.UserInputType.MouseButton1 then
             dragging=true
         end
     end)
 
-    sliderBtn.InputEnded:Connect(function(input)
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
         if input.UserInputType==Enum.UserInputType.MouseButton1 then
             dragging=false
         end
     end)
 
-    UserInputService.InputChanged:Connect(function(input)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
         if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
-            local percent=math.clamp((input.Position.X-sliderBg.AbsolutePosition.X)/sliderBg.AbsoluteSize.X,0,1)
-            crosshairSize=math.floor(6+(34*percent))
-            sliderFill.Size=UDim2.new(percent,0,1,0)
-            sizeText.Text="SIZE : "..crosshairSize
-            updateCrosshair()
+            local pos=(input.Position.X-sliderBack.AbsolutePosition.X)/sliderBack.AbsoluteSize.X
+            pos=math.clamp(pos,0,1)
+
+            sliderFill.Size=UDim2.new(pos,0,1,0)
+            sliderButton.Position=UDim2.new(pos,-8,0.5,-8)
+
+            applySize(pos)
         end
     end)
 
-    local shapeTitle=Instance.new("TextLabel")
-    shapeTitle.Size=UDim2.new(1,-20,0,20)
-    shapeTitle.Position=UDim2.new(0,10,0,95)
-    shapeTitle.BackgroundTransparency=1
-    shapeTitle.Text="SHAPE"
-    shapeTitle.TextColor3=Color3.fromRGB(220,220,220)
-    shapeTitle.Font=Enum.Font.GothamBold
-    shapeTitle.TextSize=11
-    shapeTitle.TextXAlignment=Enum.TextXAlignment.Left
-    shapeTitle.Parent=crosshairCard
+    plusBtn.MouseButton1Click:Connect(function()
+        topLine.Visible=true
+        bottomLine.Visible=true
+        leftLine.Visible=true
+        rightLine.Visible=true
+        x1.Visible=false
+        x2.Visible=false
+        circle.Visible=false
 
-    local function createShapeButton(txt,pos,mode)
-        local btn=Instance.new("TextButton")
-        btn.Size=UDim2.new(0,70,0,28)
-        btn.Position=pos
-        btn.Text=txt
-        btn.BackgroundColor3=Color3.fromRGB(15,35,55)
-        btn.TextColor3=Color3.fromRGB(220,220,220)
-        btn.Font=Enum.Font.GothamBold
-        btn.TextSize=11
-        btn.BorderSizePixel=0
-        btn.Parent=crosshairCard
-
-        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
-
-        local stroke=Instance.new("UIStroke")
-        stroke.Color=Color3.fromRGB(0,180,255)
-        stroke.Transparency=0.5
-        stroke.Parent=btn
-
-        btn.MouseButton1Click:Connect(function()
-            crosshairShape=mode
-            updateCrosshair()
-        end)
-    end
-
-    createShapeButton("+",UDim2.new(0,10,0,125),"PLUS")
-    createShapeButton("X",UDim2.new(0,90,0,125),"X")
-    createShapeButton("O",UDim2.new(0,170,0,125),"O")
-
-    local toggleBtn=Instance.new("TextButton")
-    toggleBtn.Size=UDim2.new(1,-20,0,32)
-    toggleBtn.Position=UDim2.new(0,10,0,175)
-    toggleBtn.Text="ENABLE CROSSHAIR"
-    toggleBtn.BackgroundColor3=Color3.fromRGB(0,140,220)
-    toggleBtn.TextColor3=Color3.fromRGB(255,255,255)
-    toggleBtn.Font=Enum.Font.GothamBold
-    toggleBtn.TextSize=11
-    toggleBtn.BorderSizePixel=0
-    toggleBtn.Parent=crosshairCard
-
-    Instance.new("UICorner",toggleBtn).CornerRadius=UDim.new(0,6)
-
-    local enabled=false
-
-    toggleBtn.MouseButton1Click:Connect(function()
-        enabled=not enabled
-
-        if enabled then
-            toggleBtn.Text="DISABLE CROSSHAIR"
-            toggleBtn.BackgroundColor3=Color3.fromRGB(0,180,255)
-            updateCrosshair()
-        else
-            toggleBtn.Text="ENABLE CROSSHAIR"
-            toggleBtn.BackgroundColor3=Color3.fromRGB(0,140,220)
-
-            if crosshairGui then
-                crosshairGui:Destroy()
-                crosshairGui=nil
-            end
-        end
+        plusBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
+        xBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        oBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
     end)
+
+    xBtn.MouseButton1Click:Connect(function()
+        topLine.Visible=false
+        bottomLine.Visible=false
+        leftLine.Visible=false
+        rightLine.Visible=false
+        x1.Visible=true
+        x2.Visible=true
+        circle.Visible=false
+
+        plusBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        xBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
+        oBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+    end)
+
+    oBtn.MouseButton1Click:Connect(function()
+        topLine.Visible=false
+        bottomLine.Visible=false
+        leftLine.Visible=false
+        rightLine.Visible=false
+        x1.Visible=false
+        x2.Visible=false
+        circle.Visible=true
+
+        plusBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        xBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        oBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
+    end)
+
+    applySize(0.4)
 end
 
 -- ============================================================================

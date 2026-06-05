@@ -3568,7 +3568,7 @@ local function createHomeContent()
     logo.Size=UDim2.new(1,-8,1,-8)
     logo.Position=UDim2.new(0,4,0,4)
     logo.BackgroundTransparency=1
-    logo.Image="rbxassetid://76051161792347"
+    logo.Image="rbxassetid://127173186832760"
     logo.ScaleType=Enum.ScaleType.Fit
     logo.Parent=logoHolder
 

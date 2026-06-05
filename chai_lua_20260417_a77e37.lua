@@ -5367,56 +5367,181 @@ end
     end  
   
     -- Navigation handlers  
-    homeItem.MouseButton1Click:Connect(function()  
-        homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
-    end)  
-    featuresItem.MouseButton1Click:Connect(function()  
-        featuresItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
-    end)  
-    settingsItem.MouseButton1Click:Connect(function()  
-        settingsItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        gridLayout.Parent = nil  
-        if infoContent then infoContent:Destroy() end  
-        createSettingsContent()  
-    end)  
-    infoItem.MouseButton1Click:Connect(function()  
-        infoItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        gridLayout.Parent = nil  
-        if settingsContent then settingsContent:Destroy() end  
-        createInfoContent()  
-    end)  
-    aboutItem.MouseButton1Click:Connect(function()  
-        aboutItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
-    end)  
+    homeItem.MouseButton1Click:Connect(function()
+
+    -- ACTIVE COLOR
+    homeItem.TextColor3 = Color3.fromRGB(0,170,255)
+    homeItem.BackgroundColor3 = Color3.fromRGB(65,65,65)
+
+    -- INACTIVE COLOR
+    featuresItem.TextColor3 = Color3.fromRGB(220,220,220)
+    featuresItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    settingsItem.TextColor3 = Color3.fromRGB(220,220,220)
+    settingsItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    infoItem.TextColor3 = Color3.fromRGB(220,220,220)
+    infoItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    aboutItem.TextColor3 = Color3.fromRGB(220,220,220)
+    aboutItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    -- CONTENT
+    if settingsContent then
+        settingsContent:Destroy()
+    end
+
+    if infoContent then
+        infoContent:Destroy()
+    end
+
+    if aboutContent then
+        aboutContent:Destroy()
+    end
+
+    gridLayout.Parent = contentPanel
+
+    createHomeContent()
+
+end)
+
+featuresItem.MouseButton1Click:Connect(function()
+
+    -- ACTIVE COLOR
+    featuresItem.TextColor3 = Color3.fromRGB(0,170,255)
+    featuresItem.BackgroundColor3 = Color3.fromRGB(65,65,65)
+
+    -- INACTIVE COLOR
+    homeItem.TextColor3 = Color3.fromRGB(220,220,220)
+    homeItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    settingsItem.TextColor3 = Color3.fromRGB(220,220,220)
+    settingsItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    infoItem.TextColor3 = Color3.fromRGB(220,220,220)
+    infoItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    aboutItem.TextColor3 = Color3.fromRGB(220,220,220)
+    aboutItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    -- CONTENT
+    if settingsContent then
+        settingsContent:Destroy()
+    end
+
+    if infoContent then
+        infoContent:Destroy()
+    end
+
+    if aboutContent then
+        aboutContent:Destroy()
+    end
+
+    gridLayout.Parent = contentPanel
+
+end)
+
+settingsItem.MouseButton1Click:Connect(function()
+
+    -- ACTIVE COLOR
+    settingsItem.TextColor3 = Color3.fromRGB(0,170,255)
+    settingsItem.BackgroundColor3 = Color3.fromRGB(65,65,65)
+
+    -- INACTIVE COLOR
+    homeItem.TextColor3 = Color3.fromRGB(220,220,220)
+    homeItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    featuresItem.TextColor3 = Color3.fromRGB(220,220,220)
+    featuresItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    infoItem.TextColor3 = Color3.fromRGB(220,220,220)
+    infoItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    aboutItem.TextColor3 = Color3.fromRGB(220,220,220)
+    aboutItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    -- CONTENT
+    gridLayout.Parent = nil
+
+    if infoContent then
+        infoContent:Destroy()
+    end
+
+    if aboutContent then
+        aboutContent:Destroy()
+    end
+
+    createSettingsContent()
+
+end)
+
+infoItem.MouseButton1Click:Connect(function()
+
+    -- ACTIVE COLOR
+    infoItem.TextColor3 = Color3.fromRGB(0,170,255)
+    infoItem.BackgroundColor3 = Color3.fromRGB(65,65,65)
+
+    -- INACTIVE COLOR
+    homeItem.TextColor3 = Color3.fromRGB(220,220,220)
+    homeItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    featuresItem.TextColor3 = Color3.fromRGB(220,220,220)
+    featuresItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    settingsItem.TextColor3 = Color3.fromRGB(220,220,220)
+    settingsItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    aboutItem.TextColor3 = Color3.fromRGB(220,220,220)
+    aboutItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    -- CONTENT
+    gridLayout.Parent = nil
+
+    if settingsContent then
+        settingsContent:Destroy()
+    end
+
+    if aboutContent then
+        aboutContent:Destroy()
+    end
+
+    createInfoContent()
+
+end)
+
+aboutItem.MouseButton1Click:Connect(function()
+
+    -- ACTIVE COLOR
+    aboutItem.TextColor3 = Color3.fromRGB(0,170,255)
+    aboutItem.BackgroundColor3 = Color3.fromRGB(65,65,65)
+
+    -- INACTIVE COLOR
+    homeItem.TextColor3 = Color3.fromRGB(220,220,220)
+    homeItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    featuresItem.TextColor3 = Color3.fromRGB(220,220,220)
+    featuresItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    settingsItem.TextColor3 = Color3.fromRGB(220,220,220)
+    settingsItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    infoItem.TextColor3 = Color3.fromRGB(220,220,220)
+    infoItem.BackgroundColor3 = Color3.fromRGB(45,45,45)
+
+    -- CONTENT
+    if settingsContent then
+        settingsContent:Destroy()
+    end
+
+    if infoContent then
+        infoContent:Destroy()
+    end
+
+    gridLayout.Parent = contentPanel
+
+    createAboutContent()
+
+end)
   
     makeDraggable(mainFrame)  
   

@@ -3602,11 +3602,8 @@ local function createHomeContent()
 <b>VERSION</b>  
 10.1 Experimental  
   
-<b>INTERFACE</b>  
-Blue Cyber Theme  
-  
 <b>DEVELOPER</b>  
-Kemi Studio  
+Kemi 
 ]]  
     info.Parent=statsCard  
   
@@ -3875,113 +3872,271 @@ local function createInfoContent()
     infoContent=Instance.new("Frame")
     infoContent.Size=UDim2.new(1,0,1,0)
     infoContent.BackgroundTransparency=1
+    infoContent.ClipsDescendants=true
     infoContent.Parent=contentPanel
 
     local scroll=Instance.new("ScrollingFrame")
-    scroll.Size=UDim2.new(1,-10,1,-10)
-    scroll.Position=UDim2.new(0,5,0,5)
-    scroll.BackgroundColor3=Color3.fromRGB(8,16,28)
+    scroll.Size=UDim2.new(1,-6,1,-6)
+    scroll.Position=UDim2.new(0,3,0,3)
+    scroll.BackgroundTransparency=1
     scroll.BorderSizePixel=0
     scroll.ScrollBarThickness=3
     scroll.AutomaticCanvasSize=Enum.AutomaticSize.Y
     scroll.CanvasSize=UDim2.new(0,0,0,0)
     scroll.Parent=infoContent
 
-    Instance.new("UICorner",scroll).CornerRadius=UDim.new(0,8)
-
-    local scrollStroke=Instance.new("UIStroke")
-    scrollStroke.Color=Color3.fromRGB(0,180,255)
-    scrollStroke.Transparency=0.5
-    scrollStroke.Parent=scroll
-
     local layout=Instance.new("UIListLayout")
     layout.Padding=UDim.new(0,8)
+    layout.HorizontalAlignment=Enum.HorizontalAlignment.Center
+    layout.SortOrder=Enum.SortOrder.LayoutOrder
     layout.Parent=scroll
 
     local padding=Instance.new("UIPadding")
-    padding.PaddingTop=UDim.new(0,10)
-    padding.PaddingLeft=UDim.new(0,10)
-    padding.PaddingRight=UDim.new(0,10)
-    padding.PaddingBottom=UDim.new(0,10)
+    padding.PaddingTop=UDim.new(0,4)
+    padding.PaddingBottom=UDim.new(0,8)
+    padding.PaddingLeft=UDim.new(0,2)
+    padding.PaddingRight=UDim.new(0,2)
     padding.Parent=scroll
 
-    local function createCard(title,text,height)
-        local card=Instance.new("Frame")
-        card.Size=UDim2.new(1,-2,0,height)
-        card.BackgroundColor3=Color3.fromRGB(10,22,38)
-        card.BorderSizePixel=0
-        card.Parent=scroll
+    local header=Instance.new("Frame")
+    header.Size=UDim2.new(1,-8,0,95)
+    header.BackgroundColor3=Color3.fromRGB(8,20,38)
+    header.BorderSizePixel=0
+    header.Parent=scroll
 
-        Instance.new("UICorner",card).CornerRadius=UDim.new(0,8)
+    Instance.new("UICorner",header).CornerRadius=UDim.new(0,8)
 
-        local stroke=Instance.new("UIStroke")
-        stroke.Color=Color3.fromRGB(0,180,255)
-        stroke.Transparency=0.65
-        stroke.Parent=card
+    local headerStroke=Instance.new("UIStroke")
+    headerStroke.Color=Color3.fromRGB(0,180,255)
+    headerStroke.Transparency=0.35
+    headerStroke.Parent=header
 
-        local titleLabel=Instance.new("TextLabel")
-        titleLabel.Size=UDim2.new(1,-20,0,24)
-        titleLabel.Position=UDim2.new(0,10,0,8)
-        titleLabel.BackgroundTransparency=1
-        titleLabel.Text=title
-        titleLabel.TextColor3=Color3.fromRGB(0,220,255)
-        titleLabel.Font=Enum.Font.GothamBold
-        titleLabel.TextSize=12
-        titleLabel.TextXAlignment=Enum.TextXAlignment.Left
-        titleLabel.Parent=card
+    local title=Instance.new("TextLabel")
+    title.Size=UDim2.new(1,-20,0,28)
+    title.Position=UDim2.new(0,10,0,8)
+    title.BackgroundTransparency=1
+    title.Text="🌐 COMMUNITY & INFORMATION"
+    title.TextColor3=Color3.fromRGB(0,220,255)
+    title.Font=Enum.Font.GothamBold
+    title.TextSize=15
+    title.TextWrapped=true
+    title.TextXAlignment=Enum.TextXAlignment.Left
+    title.Parent=header
 
-        local body=Instance.new("TextLabel")
-        body.Size=UDim2.new(1,-20,1,-40)
-        body.Position=UDim2.new(0,10,0,32)
-        body.BackgroundTransparency=1
-        body.RichText=true
-        body.TextWrapped=true
-        body.TextYAlignment=Enum.TextYAlignment.Top
-        body.TextXAlignment=Enum.TextXAlignment.Left
-        body.Text=text
-        body.TextColor3=Color3.fromRGB(220,220,220)
-        body.Font=Enum.Font.Gotham
-        body.TextSize=10
-        body.Parent=card
-    end
+    local desc=Instance.new("TextLabel")
+    desc.Size=UDim2.new(1,-20,0,42)
+    desc.Position=UDim2.new(0,10,0,40)
+    desc.BackgroundTransparency=1
+    desc.Text="Join our official community platforms and access script information, updates and announcements."
+    desc.TextColor3=Color3.fromRGB(210,210,210)
+    desc.Font=Enum.Font.Gotham
+    desc.TextSize=10
+    desc.TextWrapped=true
+    desc.TextXAlignment=Enum.TextXAlignment.Left
+    desc.TextYAlignment=Enum.TextYAlignment.Top
+    desc.Parent=header
 
-    createCard(
-        "🌐 COMMUNITY",
-[[
-💬 Discord Server
-📢 Telegram Channel
-▶ YouTube Updates
-🛠 Developer News
-]],
-90)
+    local communityCard=Instance.new("Frame")
+    communityCard.Size=UDim2.new(1,-8,0,180)
+    communityCard.BackgroundColor3=Color3.fromRGB(8,18,32)
+    communityCard.BorderSizePixel=0
+    communityCard.Parent=scroll
 
-    createCard(
-        "📜 SCRIPT INFORMATION",
-[[
-<b>CYBERHEROES v10.1</b>
+    Instance.new("UICorner",communityCard).CornerRadius=UDim.new(0,8)
 
-⚡ Modern blue cyber interface
-⚡ Smooth animation system
-⚡ Floating draggable UI
-⚡ Optimized performance
+    local communityStroke=Instance.new("UIStroke")
+    communityStroke.Color=Color3.fromRGB(0,180,255)
+    communityStroke.Transparency=0.45
+    communityStroke.Parent=communityCard
 
-<b>FEATURES</b>
-• ESP
+    local communityTitle=Instance.new("TextLabel")
+    communityTitle.Size=UDim2.new(1,-20,0,24)
+    communityTitle.Position=UDim2.new(0,10,0,8)
+    communityTitle.BackgroundTransparency=1
+    communityTitle.Text="📱 OFFICIAL SOCIAL"
+    communityTitle.TextColor3=Color3.fromRGB(0,220,255)
+    communityTitle.Font=Enum.Font.GothamBold
+    communityTitle.TextSize=13
+    communityTitle.TextXAlignment=Enum.TextXAlignment.Left
+    communityTitle.Parent=communityCard
+
+    local discordFrame=Instance.new("Frame")
+    discordFrame.Size=UDim2.new(1,-20,0,58)
+    discordFrame.Position=UDim2.new(0,10,0,40)
+    discordFrame.BackgroundColor3=Color3.fromRGB(10,24,42)
+    discordFrame.BorderSizePixel=0
+    discordFrame.Parent=communityCard
+
+    Instance.new("UICorner",discordFrame).CornerRadius=UDim.new(0,6)
+
+    local discordImage=Instance.new("ImageLabel")
+    discordImage.Size=UDim2.new(0,34,0,34)
+    discordImage.Position=UDim2.new(0,10,0.5,-17)
+    discordImage.BackgroundTransparency=1
+    discordImage.Image="rbxassetid://8560914563"
+    discordImage.Parent=discordFrame
+
+    local discordText=Instance.new("TextLabel")
+    discordText.Size=UDim2.new(0.45,0,1,0)
+    discordText.Position=UDim2.new(0,52,0,0)
+    discordText.BackgroundTransparency=1
+    discordText.Text="Discord Server"
+    discordText.TextColor3=Color3.fromRGB(220,220,220)
+    discordText.Font=Enum.Font.GothamBold
+    discordText.TextSize=11
+    discordText.TextXAlignment=Enum.TextXAlignment.Left
+    discordText.Parent=discordFrame
+
+    local discordButton=Instance.new("TextButton")
+    discordButton.Size=UDim2.new(0,88,0,30)
+    discordButton.Position=UDim2.new(1,-98,0.5,-15)
+    discordButton.BackgroundColor3=Color3.fromRGB(88,101,242)
+    discordButton.Text="COPY LINK"
+    discordButton.TextColor3=Color3.fromRGB(255,255,255)
+    discordButton.Font=Enum.Font.GothamBold
+    discordButton.TextSize=10
+    discordButton.BorderSizePixel=0
+    discordButton.Parent=discordFrame
+
+    Instance.new("UICorner",discordButton).CornerRadius=UDim.new(0,6)
+
+    local tiktokFrame=Instance.new("Frame")
+    tiktokFrame.Size=UDim2.new(1,-20,0,58)
+    tiktokFrame.Position=UDim2.new(0,10,0,108)
+    tiktokFrame.BackgroundColor3=Color3.fromRGB(10,24,42)
+    tiktokFrame.BorderSizePixel=0
+    tiktokFrame.Parent=communityCard
+
+    Instance.new("UICorner",tiktokFrame).CornerRadius=UDim.new(0,6)
+
+    local tiktokImage=Instance.new("ImageLabel")
+    tiktokImage.Size=UDim2.new(0,34,0,34)
+    tiktokImage.Position=UDim2.new(0,10,0.5,-17)
+    tiktokImage.BackgroundTransparency=1
+    tiktokImage.Image="rbxassetid://8606920267"
+    tiktokImage.Parent=tiktokFrame
+
+    local tiktokText=Instance.new("TextLabel")
+    tiktokText.Size=UDim2.new(0.45,0,1,0)
+    tiktokText.Position=UDim2.new(0,52,0,0)
+    tiktokText.BackgroundTransparency=1
+    tiktokText.Text="TikTok Channel"
+    tiktokText.TextColor3=Color3.fromRGB(220,220,220)
+    tiktokText.Font=Enum.Font.GothamBold
+    tiktokText.TextSize=11
+    tiktokText.TextXAlignment=Enum.TextXAlignment.Left
+    tiktokText.Parent=tiktokFrame
+
+    local tiktokButton=Instance.new("TextButton")
+    tiktokButton.Size=UDim2.new(0,88,0,30)
+    tiktokButton.Position=UDim2.new(1,-98,0.5,-15)
+    tiktokButton.BackgroundColor3=Color3.fromRGB(255,0,80)
+    tiktokButton.Text="COPY LINK"
+    tiktokButton.TextColor3=Color3.fromRGB(255,255,255)
+    tiktokButton.Font=Enum.Font.GothamBold
+    tiktokButton.TextSize=10
+    tiktokButton.BorderSizePixel=0
+    tiktokButton.Parent=tiktokFrame
+
+    Instance.new("UICorner",tiktokButton).CornerRadius=UDim.new(0,6)
+
+    local infoCard=Instance.new("Frame")
+    infoCard.Size=UDim2.new(1,-8,0,165)
+    infoCard.BackgroundColor3=Color3.fromRGB(8,20,36)
+    infoCard.BorderSizePixel=0
+    infoCard.Parent=scroll
+
+    Instance.new("UICorner",infoCard).CornerRadius=UDim.new(0,8)
+
+    local infoStroke=Instance.new("UIStroke")
+    infoStroke.Color=Color3.fromRGB(0,180,255)
+    infoStroke.Transparency=0.5
+    infoStroke.Parent=infoCard
+
+    local infoTitle=Instance.new("TextLabel")
+    infoTitle.Size=UDim2.new(1,-20,0,24)
+    infoTitle.Position=UDim2.new(0,10,0,8)
+    infoTitle.BackgroundTransparency=1
+    infoTitle.Text="SCRIPT INFORMATION"
+    infoTitle.TextColor3=Color3.fromRGB(0,220,255)
+    infoTitle.Font=Enum.Font.GothamBold
+    infoTitle.TextSize=13
+    infoTitle.TextXAlignment=Enum.TextXAlignment.Left
+    infoTitle.Parent=infoCard
+
+    local body=Instance.new("TextLabel")
+    body.Size=UDim2.new(1,-20,1,-40)
+    body.Position=UDim2.new(0,10,0,34)
+    body.BackgroundTransparency=1
+    body.RichText=true
+    body.TextWrapped=true
+    body.TextXAlignment=Enum.TextXAlignment.Left
+    body.TextYAlignment=Enum.TextYAlignment.Top
+    body.Font=Enum.Font.Gotham
+    body.TextSize=10
+    body.TextColor3=Color3.fromRGB(220,220,220)
+    body.Text=[[
+<b>CYBERHEROES HUB v10.1</b>
+
+<b>AVAILABLE FEATURES</b>
+
+• ESP System
 • Auto Win
 • Auto Skill Check
 • TP Walk
 • Auto Aim
-]],
-140)
+• dagger
+• Optimized Layout
 
-    createCard(
-        "⚠ NOTES",
-[[
-This interface was redesigned using a modern responsive layout with blue cyber styling and optimized visual effects.
-]],
-80)
+<b>STATUS</b>
+🟢 Stable Experimental Build
+]]
+    body.Parent=infoCard
+
+    local noteCard=Instance.new("Frame")
+    noteCard.Size=UDim2.new(1,-8,0,85)
+    noteCard.BackgroundColor3=Color3.fromRGB(8,18,32)
+    noteCard.BorderSizePixel=0
+    noteCard.Parent=scroll
+
+    Instance.new("UICorner",noteCard).CornerRadius=UDim.new(0,8)
+
+    local noteStroke=Instance.new("UIStroke")
+    noteStroke.Color=Color3.fromRGB(0,180,255)
+    noteStroke.Transparency=0.6
+    noteStroke.Parent=noteCard
+
+    local noteText=Instance.new("TextLabel")
+    noteText.Size=UDim2.new(1,-20,1,-20)
+    noteText.Position=UDim2.new(0,10,0,10)
+    noteText.BackgroundTransparency=1
+    noteText.Text="script comes from the cyberheroes community "
+    noteText.TextColor3=Color3.fromRGB(180,180,180)
+    noteText.Font=Enum.Font.Gotham
+    noteText.TextSize=10
+    noteText.TextWrapped=true
+    noteText.TextXAlignment=Enum.TextXAlignment.Left
+    noteText.TextYAlignment=Enum.TextYAlignment.Top
+    noteText.Parent=noteCard
+
+    discordButton.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard("https://discord.gg/blumbuat")
+            discordButton.Text="COPIED"
+            task.wait(1)
+            discordButton.Text="COPY LINK"
+        end
+    end)
+
+    tiktokButton.MouseButton1Click:Connect(function()
+        if setclipboard then
+            setclipboard("https://tiktok.com/@kemilinux22")
+            tiktokButton.Text="COPIED"
+            task.wait(1)
+            tiktokButton.Text="COPY LINK"
+        end
+    end)
 end
-
 -- ============================================================================
 -- ABOUT CONTENT
 -- ============================================================================

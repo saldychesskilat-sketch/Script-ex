@@ -4219,7 +4219,320 @@ This GUI focuses on responsive layout, modern visuals, smooth interaction, and o
     text.Parent=card
 end
 
+local function createSettingsContent()
 
+    if settingsContent then
+        settingsContent:Destroy()
+    end
+
+    settingsContent = Instance.new("Frame")
+    settingsContent.Size = UDim2.new(1,0,1,0)
+    settingsContent.BackgroundTransparency = 1
+    settingsContent.Parent = contentPanel
+
+    --// MAIN SCROLL
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1,-8,1,-8)
+    scroll.Position = UDim2.new(0,4,0,4)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 2
+    scroll.CanvasSize = UDim2.new(0,0,0,0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.Parent = settingsContent
+
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0,10)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0,4)
+    padding.PaddingBottom = UDim.new(0,10)
+    padding.PaddingLeft = UDim.new(0,2)
+    padding.PaddingRight = UDim.new(0,2)
+    padding.Parent = scroll
+
+    --// THEME CARD
+
+    local themeCard = Instance.new("Frame")
+    themeCard.Size = UDim2.new(1,-6,0,140)
+    themeCard.BackgroundColor3 = Color3.fromRGB(10,20,36)
+    themeCard.BorderSizePixel = 0
+    themeCard.Parent = scroll
+
+    Instance.new("UICorner",themeCard).CornerRadius = UDim.new(0,10)
+
+    local themeStroke = Instance.new("UIStroke")
+    themeStroke.Color = Color3.fromRGB(0,180,255)
+    themeStroke.Transparency = 0.45
+    themeStroke.Parent = themeCard
+
+    local colorLabel = Instance.new("TextLabel")
+    colorLabel.Size = UDim2.new(1,-20,0,22)
+    colorLabel.Position = UDim2.new(0,10,0,10)
+    colorLabel.Text = "THEME COLOR"
+    colorLabel.TextColor3 = Color3.fromRGB(0,220,255)
+    colorLabel.BackgroundTransparency = 1
+    colorLabel.Font = Enum.Font.GothamBold
+    colorLabel.TextSize = 13
+    colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    colorLabel.Parent = themeCard
+
+    local desc = Instance.new("TextLabel")
+    desc.Size = UDim2.new(1,-20,0,24)
+    desc.Position = UDim2.new(0,10,0,34)
+    desc.BackgroundTransparency = 1
+    desc.Text = "Customize the interface accent color."
+    desc.TextColor3 = Color3.fromRGB(180,180,180)
+    desc.Font = Enum.Font.Gotham
+    desc.TextSize = 10
+    desc.TextWrapped = true
+    desc.TextXAlignment = Enum.TextXAlignment.Left
+    desc.Parent = themeCard
+
+    --// COLOR HOLDER
+
+    local colorHolder = Instance.new("Frame")
+    colorHolder.Size = UDim2.new(1,-20,0,56)
+    colorHolder.Position = UDim2.new(0,10,0,72)
+    colorHolder.BackgroundTransparency = 1
+    colorHolder.Parent = themeCard
+
+    local grid = Instance.new("UIGridLayout")
+    grid.CellSize = UDim2.new(0,42,0,24)
+    grid.CellPadding = UDim2.new(0,8,0,8)
+    grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+    grid.VerticalAlignment = Enum.VerticalAlignment.Top
+    grid.Parent = colorHolder
+
+    local function createColorButton(name,color,textColor)
+
+        local btn = Instance.new("TextButton")
+        btn.Text = name
+        btn.BackgroundColor3 = color
+        btn.TextColor3 = textColor or Color3.fromRGB(255,255,255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 9
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.Parent = colorHolder
+
+        Instance.new("UICorner",btn).CornerRadius = UDim.new(0,6)
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(255,255,255)
+        stroke.Transparency = 0.8
+        stroke.Parent = btn
+
+        btn.MouseButton1Click:Connect(function()
+            config.guiThemeColor = color
+            updateTheme()
+        end)
+
+        return btn
+    end
+
+    local colorRed = createColorButton(
+        "RED",
+        Color3.fromRGB(255,60,60)
+    )
+
+    local colorCyan = createColorButton(
+        "CYAN",
+        Color3.fromRGB(0,255,255),
+        Color3.fromRGB(0,0,0)
+    )
+
+    local colorYellow = createColorButton(
+        "YELLOW",
+        Color3.fromRGB(255,220,40),
+        Color3.fromRGB(0,0,0)
+    )
+
+    local colorBlue = createColorButton(
+        "BLUE",
+        Color3.fromRGB(0,120,255)
+    )
+
+    local colorGreen = createColorButton(
+        "GREEN",
+        Color3.fromRGB(0,255,120),
+        Color3.fromRGB(0,0,0)
+    )
+
+    local colorPink = createColorButton(
+        "PINK",
+        Color3.fromRGB(255,80,180)
+    )
+
+    local colorPurple = createColorButton(
+        "PURPLE",
+        Color3.fromRGB(170,90,255)
+    )
+
+    local colorWhite = createColorButton(
+        "WHITE",
+        Color3.fromRGB(240,240,240),
+        Color3.fromRGB(0,0,0)
+    )
+
+    --// REPORT CARD
+
+    local reportCard = Instance.new("Frame")
+    reportCard.Size = UDim2.new(1,-6,0,190)
+    reportCard.BackgroundColor3 = Color3.fromRGB(8,18,32)
+    reportCard.BorderSizePixel = 0
+    reportCard.Parent = scroll
+
+    Instance.new("UICorner",reportCard).CornerRadius = UDim.new(0,10)
+
+    local reportStroke = Instance.new("UIStroke")
+    reportStroke.Color = Color3.fromRGB(0,180,255)
+    reportStroke.Transparency = 0.45
+    reportStroke.Parent = reportCard
+
+    local reportTitle = Instance.new("TextLabel")
+    reportTitle.Size = UDim2.new(1,-20,0,22)
+    reportTitle.Position = UDim2.new(0,10,0,10)
+    reportTitle.BackgroundTransparency = 1
+    reportTitle.Text = "📩 REPORT PANEL"
+    reportTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    reportTitle.Font = Enum.Font.GothamBold
+    reportTitle.TextSize = 13
+    reportTitle.TextXAlignment = Enum.TextXAlignment.Left
+    reportTitle.Parent = reportCard
+
+    local reportDesc = Instance.new("TextLabel")
+    reportDesc.Size = UDim2.new(1,-20,0,22)
+    reportDesc.Position = UDim2.new(0,10,0,34)
+    reportDesc.BackgroundTransparency = 1
+    reportDesc.Text = "Send bug reports or interface feedback."
+    reportDesc.TextColor3 = Color3.fromRGB(180,180,180)
+    reportDesc.Font = Enum.Font.Gotham
+    reportDesc.TextSize = 10
+    reportDesc.TextWrapped = true
+    reportDesc.TextXAlignment = Enum.TextXAlignment.Left
+    reportDesc.Parent = reportCard
+
+    --// CHAT LOG
+
+    chatLog = Instance.new("ScrollingFrame")
+    chatLog.Size = UDim2.new(1,-20,0,80)
+    chatLog.Position = UDim2.new(0,10,0,62)
+    chatLog.BackgroundColor3 = Color3.fromRGB(6,12,22)
+    chatLog.BackgroundTransparency = 0.1
+    chatLog.BorderSizePixel = 0
+    chatLog.ScrollBarThickness = 2
+    chatLog.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    chatLog.CanvasSize = UDim2.new(0,0,0,0)
+    chatLog.Parent = reportCard
+
+    Instance.new("UICorner",chatLog).CornerRadius = UDim.new(0,8)
+
+    local chatStroke = Instance.new("UIStroke")
+    chatStroke.Color = Color3.fromRGB(0,180,255)
+    chatStroke.Transparency = 0.7
+    chatStroke.Parent = chatLog
+
+    local chatPadding = Instance.new("UIPadding")
+    chatPadding.PaddingTop = UDim.new(0,4)
+    chatPadding.PaddingBottom = UDim.new(0,4)
+    chatPadding.PaddingLeft = UDim.new(0,6)
+    chatPadding.PaddingRight = UDim.new(0,6)
+    chatPadding.Parent = chatLog
+
+    local chatListLayout = Instance.new("UIListLayout")
+    chatListLayout.Padding = UDim.new(0,4)
+    chatListLayout.Parent = chatLog
+
+    --// INPUT
+
+    chatInput = Instance.new("TextBox")
+    chatInput.Size = UDim2.new(0.72,0,0,30)
+    chatInput.Position = UDim2.new(0,10,0,150)
+    chatInput.PlaceholderText = "Type report..."
+    chatInput.Text = ""
+    chatInput.BackgroundColor3 = Color3.fromRGB(12,20,34)
+    chatInput.TextColor3 = Color3.fromRGB(255,255,255)
+    chatInput.PlaceholderColor3 = Color3.fromRGB(140,140,140)
+    chatInput.Font = Enum.Font.Gotham
+    chatInput.TextSize = 10
+    chatInput.BorderSizePixel = 0
+    chatInput.ClearTextOnFocus = false
+    chatInput.Parent = reportCard
+
+    Instance.new("UICorner",chatInput).CornerRadius = UDim.new(0,8)
+
+    local inputStroke = Instance.new("UIStroke")
+    inputStroke.Color = Color3.fromRGB(0,180,255)
+    inputStroke.Transparency = 0.7
+    inputStroke.Parent = chatInput
+
+    --// SEND BUTTON
+
+    local sendBtn = Instance.new("TextButton")
+    sendBtn.Size = UDim2.new(0.22,0,0,30)
+    sendBtn.Position = UDim2.new(0.76,0,0,150)
+    sendBtn.Text = "SEND"
+    sendBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
+    sendBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    sendBtn.Font = Enum.Font.GothamBold
+    sendBtn.TextSize = 10
+    sendBtn.BorderSizePixel = 0
+    sendBtn.AutoButtonColor = false
+    sendBtn.Parent = reportCard
+
+    Instance.new("UICorner",sendBtn).CornerRadius = UDim.new(0,8)
+
+    local sendStroke = Instance.new("UIStroke")
+    sendStroke.Color = Color3.fromRGB(255,255,255)
+    sendStroke.Transparency = 0.8
+    sendStroke.Parent = sendBtn
+
+    --// SEND MESSAGE
+
+    sendBtn.MouseButton1Click:Connect(function()
+
+        local msg = chatInput.Text
+
+        if msg == "" then
+            return
+        end
+
+        local messageHolder = Instance.new("Frame")
+        messageHolder.Size = UDim2.new(1,0,0,22)
+        messageHolder.BackgroundTransparency = 1
+        messageHolder.Parent = chatLog
+
+        local newMsg = Instance.new("TextLabel")
+        newMsg.Size = UDim2.new(1,-4,1,0)
+        newMsg.BackgroundTransparency = 1
+        newMsg.Text = "[USER] "..msg
+        newMsg.TextColor3 = Color3.fromRGB(220,220,220)
+        newMsg.Font = Enum.Font.Gotham
+        newMsg.TextSize = 9
+        newMsg.TextWrapped = true
+        newMsg.TextXAlignment = Enum.TextXAlignment.Left
+        newMsg.TextYAlignment = Enum.TextYAlignment.Center
+        newMsg.Parent = messageHolder
+
+        chatInput.Text = ""
+
+        chatLog.CanvasPosition = Vector2.new(
+            0,
+            chatListLayout.AbsoluteContentSize.Y + 50
+        )
+
+        task.wait(2)
+
+        if messageHolder then
+            messageHolder:Destroy()
+        end
+    end)
+end
 -- ============================================================================  
 -- FLOATING BAR (MINI GUI) - VERSI DIPERBAIKI  
 -- ============================================================================  

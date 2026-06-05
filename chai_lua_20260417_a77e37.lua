@@ -3550,7 +3550,7 @@ local function createHomeContent()
     welcome.Size=UDim2.new(1,-20,0,28)  
     welcome.Position=UDim2.new(0,10,0,8)  
     welcome.BackgroundTransparency=1  
-    welcome.Text="⚡ CYBERHEROES HUB"  
+    welcome.Text="KEMI HUB"  
     welcome.TextColor3=Color3.fromRGB(0,220,255)  
     welcome.Font=Enum.Font.GothamBold  
     welcome.TextSize=16  
@@ -3562,7 +3562,7 @@ local function createHomeContent()
     desc.Size=UDim2.new(1,-20,0,50)  
     desc.Position=UDim2.new(0,10,0,38)  
     desc.BackgroundTransparency=1  
-    desc.Text="Modern utility interface with premium cyber blue style.\nAccess features, settings and crosshair customization."  
+    desc.Text="Access features, settings and crosshair customization."  
     desc.TextColor3=Color3.fromRGB(215,215,215)  
     desc.Font=Enum.Font.Gotham  
     desc.TextSize=11  
@@ -3596,15 +3596,13 @@ local function createHomeContent()
     info.TextSize=11  
     info.TextColor3=Color3.fromRGB(220,220,220)  
     info.Text=[[  
-<b>STATUS</b>  
-🟢 System Online  
-  
+<b>STATUS</b>    
 <b>VERSION</b>  
 10.1 Experimental  
-  
 <b>DEVELOPER</b>  
 Kemi 
-]]  
+
+    ]]  
     info.Parent=statsCard  
   
     local crosshairCard=Instance.new("Frame")  
@@ -3624,7 +3622,7 @@ Kemi
     crossTitle.Size=UDim2.new(1,-20,0,24)  
     crossTitle.Position=UDim2.new(0,10,0,8)  
     crossTitle.BackgroundTransparency=1  
-    crossTitle.Text="🎯 CROSSHAIR SETTINGS"  
+    crossTitle.Text="CROSSHAIR SETTINGS"  
     crossTitle.TextColor3=Color3.fromRGB(0,220,255)  
     crossTitle.Font=Enum.Font.GothamBold  
     crossTitle.TextSize=13  
@@ -4076,10 +4074,8 @@ local function createInfoContent()
     body.TextSize=10
     body.TextColor3=Color3.fromRGB(220,220,220)
     body.Text=[[
-<b>CYBERHEROES HUB v10.1</b>
-
+<b>KEMI HUB v10.1</b>
 <b>AVAILABLE FEATURES</b>
-
 • ESP System
 • Auto Win
 • Auto Skill Check
@@ -4087,9 +4083,6 @@ local function createInfoContent()
 • Auto Aim
 • dagger
 • Optimized Layout
-
-<b>STATUS</b>
-🟢 Stable Experimental Build
 ]]
     body.Parent=infoCard
 
@@ -4187,18 +4180,11 @@ local function createAboutContent()
     text.TextColor3=Color3.fromRGB(220,220,220)
     text.Text=[[
 <b>CYBERHEROES SCRIPT</b>
-
 Version : 10.1 Experimental
-
 Developer :
 Kemi Studio
-
-Interface :
-Blue Cyber Modern UI
-
 Special Thanks :
 Community & Supporters
-
 This GUI focuses on responsive layout, modern visuals, smooth interaction, and optimized performance.
 ]]
     text.Parent=card

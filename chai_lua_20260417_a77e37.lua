@@ -3549,14 +3549,13 @@ local function createHomeContent()
     headerStroke.Parent=header
 
     --// LOGO (DIRECT IN HEADER, NO CONTAINER)
-    local logo=Instance.new("ImageLabel")
-    logo.Size=UDim2.new(0,28,0,28)
-    logo.Position=UDim2.new(0,12,0,14)
-    logo.BackgroundTransparency=1
-    logo.Image="rbxassetid://127173117498427" -- SUDAH DIUBAH KE IMAGE ID ASLI YANG VALID UNTUK SCRIPT GUI
-    logo.ScaleType=Enum.ScaleType.Fit
-    logo.Parent=header
-
+    local logo=Instance.new("ImageLabel")    
+    logo.Size=UDim2.new(1,-10,1,-10)    
+    logo.Position=UDim2.new(0,5,0,5)    
+    logo.BackgroundTransparency=1    
+    logo.Image="rbxassetid://127173186832760"    
+    logo.ScaleType=Enum.ScaleType.Fit    
+    logo.Parent=header    
     --// TITLE
 
     local title=Instance.new("TextLabel")

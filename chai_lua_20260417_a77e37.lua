@@ -3553,7 +3553,7 @@ local function createHomeContent()
     logo.Size=UDim2.new(0,28,0,28)
     logo.Position=UDim2.new(0,12,0,14)
     logo.BackgroundTransparency=1
-    logo.Image="rbxassetid://127173186832760"
+    logo.Image="rbxassetid://115802866071757"
     logo.ScaleType=Enum.ScaleType.Fit
     logo.Parent=header
     --// TITLE

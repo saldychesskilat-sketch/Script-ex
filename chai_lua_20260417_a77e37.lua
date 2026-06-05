@@ -4187,8 +4187,8 @@ local function createAboutContent()
 
     -- MAIN CARD (lebih kecil)
     local card=Instance.new("Frame")
-    card.Size=UDim2.new(1,-14,1,-14)
-    card.Position=UDim2.new(0,7,0,7)
+    card.Size=UDim2.new(1,-12,1,-12)
+    card.Position=UDim2.new(0,6,0,6)
     card.BackgroundColor3=Color3.fromRGB(10,18,32)
     card.BorderSizePixel=0
     card.Parent=aboutContent
@@ -4197,247 +4197,148 @@ local function createAboutContent()
 
     local stroke=Instance.new("UIStroke")
     stroke.Color=Color3.fromRGB(0,180,255)
-    stroke.Transparency=0.45
+    stroke.Transparency=0.5
     stroke.Parent=card
 
-    -- TITLE (lebih kecil & atas)
+    -- TITLE (lebih kecil)
     local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-20,0,22)
+    title.Size=UDim2.new(1,-20,0,18)
     title.Position=UDim2.new(0,10,0,6)
     title.BackgroundTransparency=1
     title.Text="about"
     title.TextColor3=Color3.fromRGB(0,220,255)
     title.Font=Enum.Font.GothamBold
-    title.TextSize=13
+    title.TextSize=10
     title.TextXAlignment=Enum.TextXAlignment.Left
     title.Parent=card
 
     -------------------------------------------------
-    -- SIDEBAR
+    -- TABLE HEADER (GRID STYLE)
     -------------------------------------------------
 
-    local sidebar=Instance.new("Frame")
-    sidebar.Size=UDim2.new(0,110,1,-40)
-    sidebar.Position=UDim2.new(0,10,0,34)
-    sidebar.BackgroundColor3=Color3.fromRGB(8,14,25)
-    sidebar.BorderSizePixel=0
-    sidebar.Parent=card
+    local header=Instance.new("Frame")
+    header.Size=UDim2.new(1,-20,0,18)
+    header.Position=UDim2.new(0,10,0,28)
+    header.BackgroundTransparency=1
+    header.Parent=card
 
-    Instance.new("UICorner",sidebar).CornerRadius=UDim.new(0,8)
+    local killerLabel=Instance.new("TextLabel")
+    killerLabel.Size=UDim2.new(0.5,0,1,0)
+    killerLabel.BackgroundTransparency=1
+    killerLabel.Text="KILLER"
+    killerLabel.TextColor3=Color3.fromRGB(0,220,255)
+    killerLabel.Font=Enum.Font.GothamBold
+    killerLabel.TextSize=9
+    killerLabel.TextXAlignment=Enum.TextXAlignment.Left
+    killerLabel.Parent=header
 
-    local sideStroke=Instance.new("UIStroke")
-    sideStroke.Color=Color3.fromRGB(0,180,255)
-    sideStroke.Transparency=0.65
-    sideStroke.Parent=sidebar
-
-    local layout=Instance.new("UIListLayout")
-    layout.Padding=UDim.new(0,6)
-    layout.HorizontalAlignment=Enum.HorizontalAlignment.Center
-    layout.Parent=sidebar
-
-    -------------------------------------------------
-    -- PAGE HOLDER
-    -------------------------------------------------
-
-    local pageHolder=Instance.new("Frame")
-    pageHolder.Size=UDim2.new(1,-130,1,-40)
-    pageHolder.Position=UDim2.new(0,125,0,34)
-    pageHolder.BackgroundTransparency=1
-    pageHolder.Parent=card
-
-    local killerPage=Instance.new("Frame")
-    killerPage.Size=UDim2.new(1,0,1,0)
-    killerPage.BackgroundTransparency=1
-    killerPage.Visible=true
-    killerPage.Parent=pageHolder
-
-    local survivalPage=Instance.new("Frame")
-    survivalPage.Size=UDim2.new(1,0,1,0)
-    survivalPage.BackgroundTransparency=1
-    survivalPage.Visible=false
-    survivalPage.Parent=pageHolder
+    local survivalLabel=Instance.new("TextLabel")
+    survivalLabel.Size=UDim2.new(0.5,0,1,0)
+    survivalLabel.Position=UDim2.new(0.5,0,0,0)
+    survivalLabel.BackgroundTransparency=1
+    survivalLabel.Text="SURVIVAL"
+    survivalLabel.TextColor3=Color3.fromRGB(0,220,255)
+    survivalLabel.Font=Enum.Font.GothamBold
+    survivalLabel.TextSize=9
+    survivalLabel.TextXAlignment=Enum.TextXAlignment.Left
+    survivalLabel.Parent=header
 
     -------------------------------------------------
-    -- SIDE BUTTON
+    -- GRID CONTAINER
     -------------------------------------------------
 
-    local function createSideButton(text)
-        local btn=Instance.new("TextButton")
-        btn.Size=UDim2.new(1,-10,0,28)
-        btn.BackgroundColor3=Color3.fromRGB(12,22,38)
-        btn.Text=text
-        btn.TextColor3=Color3.fromRGB(220,220,220)
-        btn.Font=Enum.Font.GothamBold
-        btn.TextSize=11
-        btn.BorderSizePixel=0
-        btn.AutoButtonColor=false
-        btn.Parent=sidebar
-
-        Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
-        return btn
-    end
-
-    local killerBtn=createSideButton("KILLER")
-    local survivalBtn=createSideButton("SURVIVAL")
-
-    killerBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
-
-    killerBtn.MouseButton1Click:Connect(function()
-        killerPage.Visible=true
-        survivalPage.Visible=false
-        killerBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
-        survivalBtn.BackgroundColor3=Color3.fromRGB(12,22,38)
-    end)
-
-    survivalBtn.MouseButton1Click:Connect(function()
-        killerPage.Visible=false
-        survivalPage.Visible=true
-        survivalBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
-        killerBtn.BackgroundColor3=Color3.fromRGB(12,22,38)
-    end)
+    local grid=Instance.new("Frame")
+    grid.Size=UDim2.new(1,-20,1,-55)
+    grid.Position=UDim2.new(0,10,0,50)
+    grid.BackgroundTransparency=1
+    grid.Parent=card
 
     -------------------------------------------------
-    -- ACCORDION (KILLER / SURVIVAL GROUP)
+    -- ROW CREATOR (NO FUNCTION ADDED OUTSIDE LOGIC)
     -------------------------------------------------
 
-    local function createSection(parent, titleText, yPos)
-        local section=Instance.new("Frame")
-        section.Size=UDim2.new(1,-10,0,28)
-        section.Position=UDim2.new(0,5,0,yPos)
-        section.BackgroundColor3=Color3.fromRGB(12,20,35)
-        section.BorderSizePixel=0
-        section.ClipsDescendants=true
-        section.Parent=parent
+    local y=0
 
-        Instance.new("UICorner",section).CornerRadius=UDim.new(0,8)
+    local function makeRow(kText,sText,kConfig,sConfig,kAction,sAction)
 
-        local header=Instance.new("TextButton")
-        header.Size=UDim2.new(1,0,0,28)
-        header.BackgroundTransparency=1
-        header.Text=titleText
-        header.TextColor3=Color3.fromRGB(0,220,255)
-        header.Font=Enum.Font.GothamBold
-        header.TextSize=11
-        header.Parent=section
+        local row=Instance.new("Frame")
+        row.Size=UDim2.new(1,0,0,22)
+        row.Position=UDim2.new(0,0,0,y)
+        row.BackgroundTransparency=1
+        row.Parent=grid
 
-        local content=Instance.new("Frame")
-        content.Size=UDim2.new(1,0,0,0)
-        content.Position=UDim2.new(0,0,0,28)
-        content.BackgroundTransparency=1
-        content.Parent=section
+        -- LEFT BUTTON (KILLER)
+        local kBtn=Instance.new("TextButton")
+        kBtn.Size=UDim2.new(0.5,-4,1,0)
+        kBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        kBtn.Text=kText
+        kBtn.TextColor3=Color3.fromRGB(220,220,220)
+        kBtn.Font=Enum.Font.GothamBold
+        kBtn.TextSize=8
+        kBtn.BorderSizePixel=0
+        kBtn.Parent=row
+        Instance.new("UICorner",kBtn).CornerRadius=UDim.new(0,6)
 
-        local opened=false
+        -- RIGHT BUTTON (SURVIVAL)
+        local sBtn=Instance.new("TextButton")
+        sBtn.Size=UDim2.new(0.5,-4,1,0)
+        sBtn.Position=UDim2.new(0.5,4,0,0)
+        sBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
+        sBtn.Text=sText
+        sBtn.TextColor3=Color3.fromRGB(220,220,220)
+        sBtn.Font=Enum.Font.GothamBold
+        sBtn.TextSize=8
+        sBtn.BorderSizePixel=0
+        sBtn.Parent=row
+        Instance.new("UICorner",sBtn).CornerRadius=UDim.new(0,6)
 
-        header.MouseButton1Click:Connect(function()
-            opened = not opened
+        -- STATE UPDATE (KILLER)
+        kBtn.MouseButton1Click:Connect(function()
+            local newState = not (config[kConfig] or false)
 
-            if opened then
-                section:TweenSize(UDim2.new(1,-10,0,140),"Out","Quad",0.25,true)
-                content:TweenSize(UDim2.new(1,0,0,110),"Out","Quad",0.25,true)
-            else
-                section:TweenSize(UDim2.new(1,-10,0,28),"Out","Quad",0.25,true)
-                content:TweenSize(UDim2.new(1,0,0,0),"Out","Quad",0.25,true)
-            end
-        end)
-
-        return section,content
-    end
-
-    local killerSection,killerContent=createSection(killerPage,"KILLER FEATURES",10)
-    local survivalSection,survivalContent=createSection(survivalPage,"SURVIVAL FEATURES",10)
-
-    -------------------------------------------------
-    -- NEON SWIPE TOGGLE
-    -------------------------------------------------
-
-    local function createToggle(parent, text, configName, y)
-        local btn=Instance.new("TextButton")
-        btn.Size=UDim2.new(1,-10,0,26)
-        btn.Position=UDim2.new(0,5,0,y)
-        btn.BackgroundColor3=Color3.fromRGB(14,24,40)
-        btn.Text=""
-        btn.BorderSizePixel=0
-        btn.Parent=parent
-
-        Instance.new("UICorner",btn).CornerRadius=UDim.new(1,0)
-
-        local label=Instance.new("TextLabel")
-        label.Size=UDim2.new(1,-60,1,0)
-        label.Position=UDim2.new(0,10,0,0)
-        label.BackgroundTransparency=1
-        label.Text=text
-        label.TextColor3=Color3.fromRGB(220,220,220)
-        label.Font=Enum.Font.GothamBold
-        label.TextSize=10
-        label.TextXAlignment=Enum.TextXAlignment.Left
-        label.Parent=btn
-
-        local stateBox=Instance.new("Frame")
-        stateBox.Size=UDim2.new(0,40,0,18)
-        stateBox.Position=UDim2.new(1,-45,0.5,-9)
-        stateBox.BackgroundColor3=Color3.fromRGB(30,30,30)
-        stateBox.Parent=btn
-        Instance.new("UICorner",stateBox).CornerRadius=UDim.new(1,0)
-
-        local stateText=Instance.new("TextLabel")
-        stateText.Size=UDim2.new(1,0,1,0)
-        stateText.BackgroundTransparency=1
-        stateText.Font=Enum.Font.GothamBold
-        stateText.TextSize=10
-        stateText.Text="OFF"
-        stateText.TextColor3=Color3.fromRGB(255,80,80)
-        stateText.Parent=stateBox
-
-        btn.MouseButton1Click:Connect(function()
-            local newState = not (config[configName] or false)
-
-            if configName=="massKillEnabled" then
+            if kConfig=="massKill" then
                 config.massKillEnabled=newState
                 if newState then startMassKillLoop() else stopMassKillLoop() end
 
-            elseif configName=="shieldEnabled" then
+            elseif kConfig=="shield" then
                 config.shieldEnabled=newState
                 if newState then startShieldMonitor() else stopShieldMonitor() end
+            end
 
-            elseif configName=="stealthEnabled" then
+            kBtn.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
+        end)
+
+        -- STATE UPDATE (SURVIVAL)
+        sBtn.MouseButton1Click:Connect(function()
+            local newState = not (config[sConfig] or false)
+
+            if sConfig=="stealth" then
                 config.stealthEnabled=newState
                 if newState then startStealthMonitor() else stopStealthMonitor() end
 
-            elseif configName=="autoSkillCheckEnabled" then
+            elseif sConfig=="SkillCheck" then
                 config.autoSkillCheckEnabled=newState
                 if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
 
-            elseif configName=="povMode" then
+            elseif sConfig=="povMode" then
                 togglePOV()
                 return
             end
 
-            config[configName]=newState
-
-            if newState then
-                stateText.Text="ON"
-                stateText.TextColor3=Color3.fromRGB(0,255,180)
-                stateBox.BackgroundColor3=Color3.fromRGB(0,120,255)
-            else
-                stateText.Text="OFF"
-                stateText.TextColor3=Color3.fromRGB(255,80,80)
-                stateBox.BackgroundColor3=Color3.fromRGB(30,30,30)
-            end
+            config[sConfig]=newState
+            sBtn.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
         end)
 
-        return btn
+        y = y + 24
     end
 
     -------------------------------------------------
-    -- FEATURES
+    -- ROWS (TABLE STYLE)
     -------------------------------------------------
 
-    createToggle(killerContent,"MASS KILL","massKillEnabled",8)
-    createToggle(killerContent,"AUTO SHIELD","shieldEnabled",38)
-
-    createToggle(survivalContent,"STEALTH / DAGGER","stealthEnabled",8)
-    createToggle(survivalContent,"AUTO SKILLCHECK","autoSkillCheckEnabled",38)
-    createToggle(survivalContent,"POV MODE","povMode",68)
+    makeRow("MASS KILL","STEALTH", "massKillEnabled","stealthEnabled")
+    makeRow("AUTO SHIELD","SKILLCHECK", "shieldEnabled","autoSkillCheckEnabled")
+    makeRow("—","POV MODE", nil,"povMode")
 end
 
 local function createSettingsContent()

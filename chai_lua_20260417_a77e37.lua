@@ -3548,42 +3548,14 @@ local function createHomeContent()
     headerStroke.Transparency=0.35
     headerStroke.Parent=header
 
-    --// LOGO HOLDER (SEGI EMPAT)
-
-    local logoHolder=Instance.new("Frame")
-    logoHolder.Size=UDim2.new(0,56,0,56)
-    logoHolder.Position=UDim2.new(0,12,0,12)
-    logoHolder.BackgroundColor3=Color3.fromRGB(10,28,48)
-    logoHolder.BorderSizePixel=0
-    logoHolder.Parent=header
-
-    Instance.new("UICorner",logoHolder).CornerRadius=UDim.new(0,8)
-
-    local logoStroke=Instance.new("UIStroke")
-    logoStroke.Color=Color3.fromRGB(0,200,255)
-    logoStroke.Transparency=0.45
-    logoStroke.Parent=logoHolder
-
+    --// LOGO (DIRECT IN HEADER, NO CONTAINER)
     local logo=Instance.new("ImageLabel")
-logo.Size=UDim2.new(1,-8,1,-8)
-logo.Position=UDim2.new(0,4,0,4)
-logo.BackgroundTransparency=1
-
--- gunakan ImageRectSize agar gambar full render
-logo.ScaleType=Enum.ScaleType.Fit
-
--- pastikan format asset benar
-logo.Image="rbxassetid://76051161792347"
-
--- tambahan penting
-logo.Visible=true
-logo.BorderSizePixel=0
-
--- kadang image gagal tampil jika parent clips descendants
-logo.ClipsDescendants=false
-
-logo.Parent=logoHolder
-
+    logo.Size=UDim2.new(0,28,0,28)
+    logo.Position=UDim2.new(0,12,0,14)
+    logo.BackgroundTransparency=1
+    logo.Image="rbxassetid://127173186832760"
+    logo.ScaleType=Enum.ScaleType.Fit
+    logo.Parent=header
     --// TITLE
 
     local title=Instance.new("TextLabel")

@@ -4185,7 +4185,7 @@ local function createAboutContent()
     aboutContent.BackgroundTransparency=1
     aboutContent.Parent=contentPanel
 
-    -- MAIN CARD (lebih kecil)
+    -- MAIN CARD
     local card=Instance.new("Frame")
     card.Size=UDim2.new(1,-12,1,-12)
     card.Position=UDim2.new(0,6,0,6)
@@ -4200,20 +4200,28 @@ local function createAboutContent()
     stroke.Transparency=0.5
     stroke.Parent=card
 
-    -- TITLE (lebih kecil)
-    local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-20,0,18)
-    title.Position=UDim2.new(0,10,0,6)
-    title.BackgroundTransparency=1
-    title.Text="about"
-    title.TextColor3=Color3.fromRGB(0,220,255)
-    title.Font=Enum.Font.GothamBold
-    title.TextSize=10
-    title.TextXAlignment=Enum.TextXAlignment.Left
-    title.Parent=card
+    -------------------------------------------------
+    -- ABOUT TABLE TITLE (REPLACES OLD TITLE)
+    -------------------------------------------------
+
+    local aboutHeader=Instance.new("Frame")
+    aboutHeader.Size=UDim2.new(1,-20,0,18)
+    aboutHeader.Position=UDim2.new(0,10,0,6)
+    aboutHeader.BackgroundTransparency=1
+    aboutHeader.Parent=card
+
+    local aboutText=Instance.new("TextLabel")
+    aboutText.Size=UDim2.new(1,0,1,0)
+    aboutText.BackgroundTransparency=1
+    aboutText.Text="ABOUT / CYBERHEROES PANEL"
+    aboutText.TextColor3=Color3.fromRGB(0,220,255)
+    aboutText.Font=Enum.Font.GothamBold
+    aboutText.TextSize=10
+    aboutText.TextXAlignment=Enum.TextXAlignment.Left
+    aboutText.Parent=aboutHeader
 
     -------------------------------------------------
-    -- TABLE HEADER (GRID STYLE)
+    -- TABLE HEADER (KILLER | SURVIVAL)
     -------------------------------------------------
 
     local header=Instance.new("Frame")
@@ -4244,7 +4252,7 @@ local function createAboutContent()
     survivalLabel.Parent=header
 
     -------------------------------------------------
-    -- GRID CONTAINER
+    -- GRID
     -------------------------------------------------
 
     local grid=Instance.new("Frame")
@@ -4253,13 +4261,20 @@ local function createAboutContent()
     grid.BackgroundTransparency=1
     grid.Parent=card
 
-    -------------------------------------------------
-    -- ROW CREATOR (NO FUNCTION ADDED OUTSIDE LOGIC)
-    -------------------------------------------------
-
     local y=0
 
-    local function makeRow(kText,sText,kConfig,sConfig,kAction,sAction)
+    -------------------------------------------------
+    -- NEON TOGGLE (WITH ANIMATION)
+    -------------------------------------------------
+
+    local function neonEffect(obj, state)
+        obj:TweenBackgroundColor3(
+            state and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40),
+            "Out","Quad",0.2,true
+        )
+    end
+
+    local function makeRow(kText,sText,kConfig,sConfig)
 
         local row=Instance.new("Frame")
         row.Size=UDim2.new(1,0,0,22)
@@ -4267,7 +4282,7 @@ local function createAboutContent()
         row.BackgroundTransparency=1
         row.Parent=grid
 
-        -- LEFT BUTTON (KILLER)
+        -- LEFT (KILLER)
         local kBtn=Instance.new("TextButton")
         kBtn.Size=UDim2.new(0.5,-4,1,0)
         kBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
@@ -4279,7 +4294,7 @@ local function createAboutContent()
         kBtn.Parent=row
         Instance.new("UICorner",kBtn).CornerRadius=UDim.new(0,6)
 
-        -- RIGHT BUTTON (SURVIVAL)
+        -- RIGHT (SURVIVAL)
         local sBtn=Instance.new("TextButton")
         sBtn.Size=UDim2.new(0.5,-4,1,0)
         sBtn.Position=UDim2.new(0.5,4,0,0)
@@ -4292,31 +4307,38 @@ local function createAboutContent()
         sBtn.Parent=row
         Instance.new("UICorner",sBtn).CornerRadius=UDim.new(0,6)
 
-        -- STATE UPDATE (KILLER)
+        -------------------------------------------------
+        -- KILLER TOGGLE
+        -------------------------------------------------
+
         kBtn.MouseButton1Click:Connect(function()
             local newState = not (config[kConfig] or false)
 
-            if kConfig=="massKill" then
+            if kConfig=="massKillEnabled" then
                 config.massKillEnabled=newState
                 if newState then startMassKillLoop() else stopMassKillLoop() end
 
-            elseif kConfig=="shield" then
+            elseif kConfig=="shieldEnabled" then
                 config.shieldEnabled=newState
                 if newState then startShieldMonitor() else stopShieldMonitor() end
             end
 
-            kBtn.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
+            config[kConfig]=newState
+            neonEffect(kBtn,newState)
         end)
 
-        -- STATE UPDATE (SURVIVAL)
+        -------------------------------------------------
+        -- SURVIVAL TOGGLE
+        -------------------------------------------------
+
         sBtn.MouseButton1Click:Connect(function()
             local newState = not (config[sConfig] or false)
 
-            if sConfig=="stealth" then
+            if sConfig=="stealthEnabled" then
                 config.stealthEnabled=newState
                 if newState then startStealthMonitor() else stopStealthMonitor() end
 
-            elseif sConfig=="SkillCheck" then
+            elseif sConfig=="autoSkillCheckEnabled" then
                 config.autoSkillCheckEnabled=newState
                 if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
 
@@ -4326,21 +4348,19 @@ local function createAboutContent()
             end
 
             config[sConfig]=newState
-            sBtn.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
+            neonEffect(sBtn,newState)
         end)
 
         y = y + 24
     end
 
     -------------------------------------------------
-    -- ROWS (TABLE STYLE)
+    -- ROWS (FINAL TABLE)
     -------------------------------------------------
 
-    makeRow("MASS KILL","STEALTH", "massKillEnabled","stealthEnabled")
-    makeRow("AUTO SHIELD","SKILLCHECK", "shieldEnabled","autoSkillCheckEnabled")
-    makeRow("—","POV MODE", nil,"povMode")
+    makeRow("MASS KILL","STEALTH","massKillEnabled","stealthEnabled")
+    makeRow("AUTO SHIELD","SKILLCHECK","shieldEnabled","autoSkillCheckEnabled")
 end
-
 local function createSettingsContent()
 
     if settingsContent then

@@ -3454,11 +3454,6 @@ end
 local floatingBar = nil  
 local isFloatingVisible = false  
   
--- Teks untuk menu Info (bisa diedit langsung di sini)  
-local infoText = [[  
-CYBERHEROES SCRIPT v10.1  
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ]]  
-  
 -- ============================================================================  
 -- DRAGGABLE (tidak berubah)  
 -- ============================================================================  
@@ -3504,6 +3499,56 @@ end
 -- ============================================================================  
 -- SETTINGS CONTENT (sama seperti sebelumnya)  
 -- ============================================================================  
+local aboutContent = nil
+local function createAboutContent()
+    if aboutContent then aboutContent:Destroy() end
+    aboutContent = Instance.new("Frame")
+    aboutContent.Size = UDim2.new(1, 0, 1, 0)
+    aboutContent.BackgroundTransparency = 1
+    aboutContent.Parent = contentPanel
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, -20, 1, -20)
+    text.Position = UDim2.new(0, 10, 0, 10)
+    text.Text = "CYBERHEROES SCRIPT\nVersi 10.1\n\nDibuat oleh: kemilinux\n\nFitur: Auto Win, ESP, Speed Boost, dll.\n\nTerima kasih telah menggunakan."
+    text.TextColor3 = Color3.fromRGB(200,200,200)
+    text.BackgroundTransparency = 1
+    text.Font = Enum.Font.Gotham
+    text.TextSize = 10
+    text.TextYAlignment = Enum.TextYAlignment.Top
+    text.TextWrapped = true
+    text.Parent = aboutContent
+end
+local homeContent = nil
+local function createHomeContent()
+    if homeContent then homeContent:Destroy() end
+    homeContent = Instance.new("Frame")
+    homeContent.Size = UDim2.new(1, 0, 1, 0)
+    homeContent.BackgroundTransparency = 1
+    homeContent.Parent = contentPanel
+
+    local welcome = Instance.new("TextLabel")
+    welcome.Size = UDim2.new(1, -20, 0, 30)
+    welcome.Position = UDim2.new(0, 10, 0, 10)
+    welcome.Text = "WELCOME, USER"
+    welcome.TextColor3 = config.guiThemeColor
+    welcome.BackgroundTransparency = 1
+    welcome.Font = Enum.Font.GothamBold
+    welcome.TextSize = 14
+    welcome.Parent = homeContent
+
+    local statusText = Instance.new("TextLabel")
+    statusText.Size = UDim2.new(1, -20, 0, 50)
+    statusText.Position = UDim2.new(0, 10, 0, 50)
+    statusText.Text = "Script siap digunakan.\nPilih FEATURES untuk mengaktifkan mod."
+    statusText.TextColor3 = Color3.fromRGB(200,200,200)
+    statusText.BackgroundTransparency = 1
+    statusText.Font = Enum.Font.Gotham
+    statusText.TextSize = 10
+    statusText.TextWrapped = true
+    statusText.Parent = homeContent
+end
+
 local function createSettingsContent()  
     if settingsContent then settingsContent:Destroy() end  
     settingsContent = Instance.new("Frame")  
@@ -3640,44 +3685,219 @@ end
 -- ============================================================================  
 -- INFO CONTENT (baru)  
 -- ============================================================================  
-local infoContent = nil  
-local function createInfoContent()  
-    if infoContent then infoContent:Destroy() end  
-    infoContent = Instance.new("Frame")  
-    infoContent.Size = UDim2.new(1, 0, 1, 0)  
-    infoContent.BackgroundTransparency = 1  
-    infoContent.Parent = contentPanel  
-  
-    local scrollFrame = Instance.new("ScrollingFrame")  
-    scrollFrame.Size = UDim2.new(1, -10, 1, -10)  
-    scrollFrame.Position = UDim2.new(0, 5, 0, 5)  
-    scrollFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 2)  
-    scrollFrame.BackgroundTransparency = 0.3  
-    scrollFrame.BorderSizePixel = 0  
-    scrollFrame.ScrollBarThickness = 6  
-    scrollFrame.Parent = infoContent  
-    local scrollCorner = Instance.new("UICorner")  
-    scrollCorner.CornerRadius = UDim.new(0, 4)  
-    scrollCorner.Parent = scrollFrame  
-  
-    local textLabel = Instance.new("TextLabel")  
-    textLabel.Size = UDim2.new(1, 0, 0, 0)  
-    textLabel.Text = infoText  
-    textLabel.TextColor3 = Color3.fromRGB(200, 200, 200)  
-    textLabel.BackgroundTransparency = 1  
-    textLabel.Font = Enum.Font.Gotham  
-    textLabel.TextSize = 10  
-    textLabel.TextXAlignment = Enum.TextXAlignment.Left  
-    textLabel.TextYAlignment = Enum.TextYAlignment.Top  
-    textLabel.TextWrapped = true  
-    textLabel.Parent = scrollFrame  
-  
-    -- Hitung tinggi teks  
-    textLabel.Text = infoText  
-    local textBounds = textLabel.TextBounds  
-    textLabel.Size = UDim2.new(1, 0, 0, textBounds.Y + 20)  
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, textBounds.Y + 30)  
-end  
+local infoContent = nil
+
+local function createInfoContent()
+    if infoContent then
+        infoContent:Destroy()
+    end
+
+    infoContent = Instance.new("Frame")
+    infoContent.Size = UDim2.new(1, 0, 1, 0)
+    infoContent.BackgroundTransparency = 1
+    infoContent.Parent = contentPanel
+
+    -- MAIN SCROLL
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -10, 1, -10)
+    scrollFrame.Position = UDim2.new(0, 5, 0, 5)
+    scrollFrame.BackgroundColor3 = Color3.fromRGB(18, 8, 20)
+    scrollFrame.BackgroundTransparency = 0.15
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 4
+    scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
+    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scrollFrame.Parent = infoContent
+
+    local scrollCorner = Instance.new("UICorner")
+    scrollCorner.CornerRadius = UDim.new(0, 8)
+    scrollCorner.Parent = scrollFrame
+
+    local scrollStroke = Instance.new("UIStroke")
+    scrollStroke.Color = config.guiThemeColor
+    scrollStroke.Transparency = 0.6
+    scrollStroke.Thickness = 1
+    scrollStroke.Parent = scrollFrame
+
+    -- LIST LAYOUT
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 8)
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = scrollFrame
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, 10)
+    padding.PaddingBottom = UDim.new(0, 10)
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.Parent = scrollFrame
+
+    ------------------------------------------------------------------------
+    -- HEADER CARD
+    ------------------------------------------------------------------------
+
+    local headerCard = Instance.new("Frame")
+    headerCard.Size = UDim2.new(1, -5, 0, 80)
+    headerCard.BackgroundColor3 = Color3.fromRGB(25, 10, 35)
+    headerCard.BorderSizePixel = 0
+    headerCard.Parent = scrollFrame
+
+    local headerCorner = Instance.new("UICorner")
+    headerCorner.CornerRadius = UDim.new(0, 10)
+    headerCorner.Parent = headerCard
+
+    local headerStroke = Instance.new("UIStroke")
+    headerStroke.Color = config.guiThemeColor
+    headerStroke.Transparency = 0.5
+    headerStroke.Parent = headerCard
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -20, 0, 30)
+    title.Position = UDim2.new(0, 10, 0, 10)
+    title.BackgroundTransparency = 1
+    title.Text = "CYBERHEROES INFORMATION"
+    title.TextColor3 = config.guiThemeColor
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 15
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = headerCard
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Size = UDim2.new(1, -20, 0, 20)
+    subtitle.Position = UDim2.new(0, 10, 0, 42)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Text = "Official community, social links, updates & information"
+    subtitle.TextColor3 = Color3.fromRGB(180,180,180)
+    subtitle.Font = Enum.Font.Gotham
+    subtitle.TextSize = 11
+    subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    subtitle.Parent = headerCard
+
+    ------------------------------------------------------------------------
+    -- SOCIAL CARD
+    ------------------------------------------------------------------------
+
+    local socialCard = Instance.new("Frame")
+    socialCard.Size = UDim2.new(1, -5, 0, 145)
+    socialCard.BackgroundColor3 = Color3.fromRGB(20, 8, 28)
+    socialCard.BorderSizePixel = 0
+    socialCard.Parent = scrollFrame
+
+    local socialCorner = Instance.new("UICorner")
+    socialCorner.CornerRadius = UDim.new(0, 10)
+    socialCorner.Parent = socialCard
+
+    local socialStroke = Instance.new("UIStroke")
+    socialStroke.Color = config.guiThemeColor
+    socialStroke.Transparency = 0.65
+    socialStroke.Parent = socialCard
+
+    local socialTitle = Instance.new("TextLabel")
+    socialTitle.Size = UDim2.new(1, -20, 0, 25)
+    socialTitle.Position = UDim2.new(0, 10, 0, 10)
+    socialTitle.BackgroundTransparency = 1
+    socialTitle.Text = "COMMUNITY & SOCIAL"
+    socialTitle.TextColor3 = Color3.fromRGB(255,255,255)
+    socialTitle.Font = Enum.Font.GothamBold
+    socialTitle.TextSize = 13
+    socialTitle.TextXAlignment = Enum.TextXAlignment.Left
+    socialTitle.Parent = socialCard
+
+    local function createSocialButton(text, posY, color)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -20, 0, 28)
+        btn.Position = UDim2.new(0, 10, 0, posY)
+        btn.BackgroundColor3 = color
+        btn.BackgroundTransparency = 0.15
+        btn.BorderSizePixel = 0
+        btn.Text = text
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 11
+        btn.Parent = socialCard
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = btn
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = config.guiThemeColor
+        stroke.Transparency = 0.7
+        stroke.Parent = btn
+
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.15), {
+                BackgroundTransparency = 0
+            }):Play()
+        end)
+
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.15), {
+                BackgroundTransparency = 0.15
+            }):Play()
+        end)
+
+        return btn
+    end
+
+    createSocialButton("Join Discord Server", 40, Color3.fromRGB(45, 55, 120))
+    createSocialButton("Official Telegram Channel", 74, Color3.fromRGB(30, 90, 120))
+    createSocialButton("YouTube Updates", 108, Color3.fromRGB(120, 40, 40))
+
+    ------------------------------------------------------------------------
+    -- INFORMATION CARD
+    ------------------------------------------------------------------------
+
+    local infoCard = Instance.new("Frame")
+    infoCard.Size = UDim2.new(1, -5, 0, 240)
+    infoCard.BackgroundColor3 = Color3.fromRGB(20, 8, 28)
+    infoCard.BorderSizePixel = 0
+    infoCard.Parent = scrollFrame
+
+    local infoCorner = Instance.new("UICorner")
+    infoCorner.CornerRadius = UDim.new(0, 10)
+    infoCorner.Parent = infoCard
+
+    local infoStroke = Instance.new("UIStroke")
+    infoStroke.Color = config.guiThemeColor
+    infoStroke.Transparency = 0.65
+    infoStroke.Parent = infoCard
+
+    local infoTitle = Instance.new("TextLabel")
+    infoTitle.Size = UDim2.new(1, -20, 0, 25)
+    infoTitle.Position = UDim2.new(0, 10, 0, 10)
+    infoTitle.BackgroundTransparency = 1
+    infoTitle.Text = "SCRIPT INFORMATION"
+    infoTitle.TextColor3 = Color3.fromRGB(255,255,255)
+    infoTitle.Font = Enum.Font.GothamBold
+    infoTitle.TextSize = 13
+    infoTitle.TextXAlignment = Enum.TextXAlignment.Left
+    infoTitle.Parent = infoCard
+
+    local description = Instance.new("TextLabel")
+    description.Size = UDim2.new(1, -20, 1, -45)
+    description.Position = UDim2.new(0, 10, 0, 35)
+    description.BackgroundTransparency = 1
+    description.TextWrapped = true
+    description.TextYAlignment = Enum.TextYAlignment.Top
+    description.TextXAlignment = Enum.TextXAlignment.Left
+    description.Font = Enum.Font.Gotham
+    description.TextSize = 11
+    description.RichText = true
+    description.TextColor3 = Color3.fromRGB(200,200,200)
+
+    description.Text = [[
+<b>
+
+⚠ Notes:
+This GUI was redesigned with modern responsive layout, smooth animations, scrolling system, and premium cyber dark interface.
+
+Thank you for using CYBERHEROES.
+]]
+
+    description.Parent = infoCard
+end
   
 -- ============================================================================  
 -- FLOATING BAR (MINI GUI) - VERSI DIPERBAIKI  
@@ -4070,11 +4290,11 @@ end
     sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
     sidebarLayout.Parent = sidebarList  
   
-    local homeItem = createSidebarItem(sidebarList, "HOME", "", true)  
-    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)  
-    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)  
-    local infoItem = createSidebarItem(sidebarList, "INFO", "", false)  
-    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)  
+    local homeItem = createSidebarItem(sidebarList, " ", "HOME", true)  
+    local featuresItem = createSidebarItem(sidebarList, " ", "FEATURES", false)  
+    local settingsItem = createSidebarItem(sidebarList, " ", "SETTINGS", false)  
+    local infoItem = createSidebarItem(sidebarList, " ", "INFO", false)  
+    local aboutItem = createSidebarItem(sidebarList, " ", "ABOUT", false)  
     local sep = Instance.new("Frame")  
     sep.Size = UDim2.new(0.8, 0, 0, 1)  
     sep.BackgroundColor3 = Color3.fromRGB(0, 200, 255)  
@@ -4117,17 +4337,21 @@ end
         createGridButton(contentPanel, feat.name, feat.text, initialState)  
     end  
   
-    -- Navigation handlers  
-    homeItem.MouseButton1Click:Connect(function()  
-        homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
-    end)  
+    homeItem.MouseButton1Click:Connect(function()
+    -- update warna sidebar (biarkan seperti kode asli)
+    homeItem.TextColor3 = Color3.fromRGB(0, 230, 255)
+    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
+    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
+    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
+    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+    
+    -- bersihkan konten lain
+    if settingsContent then settingsContent:Destroy() end
+    if infoContent then infoContent:Destroy() end
+    gridLayout.Parent = nil  -- sembunyikan grid fitur
+    
+    createHomeContent()  -- tampilkan home
+end)
     featuresItem.MouseButton1Click:Connect(function()  
         featuresItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
         homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
@@ -4158,16 +4382,20 @@ end
         if settingsContent then settingsContent:Destroy() end  
         createInfoContent()  
     end)  
-    aboutItem.MouseButton1Click:Connect(function()  
-        aboutItem.TextColor3 = Color3.fromRGB(0, 230, 255)  
-        homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        gridLayout.Parent = contentPanel  
-    end)  
+    aboutItem.MouseButton1Click:Connect(function()
+    aboutItem.TextColor3 = Color3.fromRGB(0, 230, 255)
+    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
+    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
+    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
+    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
+    
+    if settingsContent then settingsContent:Destroy() end
+    if infoContent then infoContent:Destroy() end
+    gridLayout.Parent = nil
+    if homeContent then homeContent:Destroy() end
+    
+    createAboutContent()
+end)
   
     makeDraggable(mainFrame)  
   

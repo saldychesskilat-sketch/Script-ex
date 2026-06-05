@@ -3568,7 +3568,7 @@ local function createHomeContent()
     logo.Size=UDim2.new(1,-10,1,-10)
     logo.Position=UDim2.new(0,5,0,5)
     logo.BackgroundTransparency=1
-    logo.Image="rbxassetid://127173186832760"
+    logo.Image="rbxassetid://112078898123922"
     logo.ScaleType=Enum.ScaleType.Fit
     logo.Parent=logoHolder
 
@@ -3645,9 +3645,6 @@ local function createHomeContent()
 
 <b>VERSION</b>
 10.1 Experimental
-
-<b>INTERFACE</b>
-Blue Cyber Theme
 
 <b>DEVELOPER</b>
 Kemi Studio

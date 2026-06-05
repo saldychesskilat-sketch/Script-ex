@@ -3565,12 +3565,24 @@ local function createHomeContent()
     logoStroke.Parent=logoHolder
 
     local logo=Instance.new("ImageLabel")
-    logo.Size=UDim2.new(1,-8,1,-8)
-    logo.Position=UDim2.new(0,4,0,4)
-    logo.BackgroundTransparency=1
-    logo.Image="rbxassetid://127173186832760"
-    logo.ScaleType=Enum.ScaleType.Fit
-    logo.Parent=logoHolder
+logo.Size=UDim2.new(1,-8,1,-8)
+logo.Position=UDim2.new(0,4,0,4)
+logo.BackgroundTransparency=1
+
+-- gunakan ImageRectSize agar gambar full render
+logo.ScaleType=Enum.ScaleType.Fit
+
+-- pastikan format asset benar
+logo.Image="rbxassetid://127173186832760"
+
+-- tambahan penting
+logo.Visible=true
+logo.BorderSizePixel=0
+
+-- kadang image gagal tampil jika parent clips descendants
+logo.ClipsDescendants=false
+
+logo.Parent=logoHolder
 
     --// TITLE
 

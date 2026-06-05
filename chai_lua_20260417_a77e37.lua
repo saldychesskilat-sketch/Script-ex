@@ -4790,60 +4790,73 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
-local function createToggleButton(parent, text, name, initialState, onChange)
+local function createFeatureButton(parent, text, name, initialState, onChange)
 
     local button = Instance.new("TextButton")
     button.Name = name
     button.Size = UDim2.new(0, 85, 0, 32)
     button.Text = text .. (initialState and " [ON]" or " [OFF]")
-    
-    -- MODERN GRAY STYLE
-    button.BackgroundColor3 = initialState
-        and Color3.fromRGB(55, 90, 130)
-        or Color3.fromRGB(55, 55, 55)
-
+    button.BackgroundColor3 = initialState and Color3.fromRGB(65, 65, 65) or Color3.fromRGB(45, 45, 45)
     button.BackgroundTransparency = 0
-    button.TextColor3 = Color3.fromRGB(230,230,230)
+    button.TextColor3 = initialState and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(220, 220, 220)
     button.TextSize = 9
     button.Font = Enum.Font.GothamBold
     button.BorderSizePixel = 0
+    button.AutoButtonColor = false
     button.Parent = parent
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
+    corner.CornerRadius = UDim.new(0, 5)
     corner.Parent = button
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = initialState
-        and Color3.fromRGB(0,170,255)
-        or Color3.fromRGB(90,90,90)
-
+    stroke.Color = initialState and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(90, 90, 90)
     stroke.Thickness = 1
-    stroke.Transparency = 0.2
+    stroke.Transparency = 0.15
     stroke.Parent = button
-
-    ----------------------------------------------------------------
-    -- UPDATE VISUAL
-    ----------------------------------------------------------------
 
     local function updateState(state)
 
         button.Text = text .. (state and " [ON]" or " [OFF]")
 
-        button.BackgroundColor3 = state
-            and Color3.fromRGB(55, 90, 130)
-            or Color3.fromRGB(55, 55, 55)
+        button.BackgroundColor3 =
+            state and Color3.fromRGB(65, 65, 65)
+            or Color3.fromRGB(45, 45, 45)
 
-        button.TextColor3 = Color3.fromRGB(235,235,235)
+        button.TextColor3 =
+            state and Color3.fromRGB(0, 170, 255)
+            or Color3.fromRGB(220, 220, 220)
 
-        stroke.Color = state
-            and Color3.fromRGB(0,170,255)
-            or Color3.fromRGB(90,90,90)
+        stroke.Color =
+            state and Color3.fromRGB(0, 170, 255)
+            or Color3.fromRGB(90, 90, 90)
     end
 
-    ----------------------------------------------------------------
-    -- BUTTON CLICK
-    ----------------------------------------------------------------
+    button.MouseEnter:Connect(function()
+
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.15),
+            {
+                BackgroundColor3 = Color3.fromRGB(75, 75, 75)
+            }
+        ):Play()
+
+    end)
+
+    button.MouseLeave:Connect(function()
+
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.15),
+            {
+                BackgroundColor3 =
+                    (config[name] and Color3.fromRGB(65, 65, 65))
+                    or Color3.fromRGB(45, 45, 45)
+            }
+        ):Play()
+
+    end)
 
     button.MouseButton1Click:Connect(function()
 
@@ -4988,6 +5001,7 @@ local function createToggleButton(parent, text, name, initialState, onChange)
 
             togglePOV()
             return
+
         end
 
         updateState(newState)
@@ -4996,21 +5010,92 @@ local function createToggleButton(parent, text, name, initialState, onChange)
             onChange(newState)
         end
 
-        -- CLICK ANIMATION
-        TweenService:Create(button, TweenInfo.new(0.05), {
-            Size = UDim2.new(0, 82, 0, 30)
-        }):Play()
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.05),
+            {
+                Size = UDim2.new(0, 82, 0, 30)
+            }
+        ):Play()
 
         task.wait(0.05)
 
-        TweenService:Create(button, TweenInfo.new(0.05), {
-            Size = UDim2.new(0, 85, 0, 32)
-        }):Play()
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.05),
+            {
+                Size = UDim2.new(0, 85, 0, 32)
+            }
+        ):Play()
+
     end)
 
     return button
 end
 
+local function createSidebarItem(parent, text, icon, active)
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 28)
+    button.Text = "  " .. text
+
+    button.TextColor3 =
+        active and Color3.fromRGB(0, 170, 255)
+        or Color3.fromRGB(220, 220, 220)
+
+    button.BackgroundColor3 =
+        active and Color3.fromRGB(65, 65, 65)
+        or Color3.fromRGB(45, 45, 45)
+
+    button.BackgroundTransparency = 0
+    button.TextSize = 10
+    button.Font = Enum.Font.GothamBold
+    button.TextXAlignment = Enum.TextXAlignment.Left
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    button.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = button
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color =
+        active and Color3.fromRGB(0, 170, 255)
+        or Color3.fromRGB(85, 85, 85)
+
+    stroke.Thickness = 1
+    stroke.Transparency = 0.2
+    stroke.Parent = button
+
+    button.MouseEnter:Connect(function()
+
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.15),
+            {
+                BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+            }
+        ):Play()
+
+    end)
+
+    button.MouseLeave:Connect(function()
+
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.15),
+            {
+                BackgroundColor3 =
+                    active and Color3.fromRGB(65, 65, 65)
+                    or Color3.fromRGB(45, 45, 45)
+            }
+        ):Play()
+
+    end)
+
+    return button
+end
 ---------------------------------------------------------------------
 -- SIDEBAR BUTTON
 ---------------------------------------------------------------------

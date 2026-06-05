@@ -3548,35 +3548,35 @@ local function createHomeContent()
     headerStroke.Transparency=0.35
     headerStroke.Parent=header
 
-    -- LOGO
+    --// LOGO HOLDER (KOTAK)
 
     local logoHolder=Instance.new("Frame")
-    logoHolder.Size=UDim2.new(0,54,0,54)
+    logoHolder.Size=UDim2.new(0,58,0,58)
     logoHolder.Position=UDim2.new(0,12,0,12)
-    logoHolder.BackgroundColor3=Color3.fromRGB(10,28,48)
+    logoHolder.BackgroundColor3=Color3.fromRGB(12,26,46)
     logoHolder.BorderSizePixel=0
     logoHolder.Parent=header
 
-    Instance.new("UICorner",logoHolder).CornerRadius=UDim.new(1,0)
+    Instance.new("UICorner",logoHolder).CornerRadius=UDim.new(0,8)
 
     local logoStroke=Instance.new("UIStroke")
     logoStroke.Color=Color3.fromRGB(0,200,255)
-    logoStroke.Transparency=0.45
+    logoStroke.Transparency=0.4
     logoStroke.Parent=logoHolder
 
     local logo=Instance.new("ImageLabel")
-    logo.Size=UDim2.new(1,-10,1,-10)
-    logo.Position=UDim2.new(0,5,0,5)
+    logo.Size=UDim2.new(1,-8,1,-8)
+    logo.Position=UDim2.new(0,4,0,4)
     logo.BackgroundTransparency=1
-    logo.Image="rbxassetid://112078898123922"
+    logo.Image="rbxassetid://76051161792347"
     logo.ScaleType=Enum.ScaleType.Fit
     logo.Parent=logoHolder
 
-    -- TITLE
+    --// TITLE
 
     local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-84,0,28)
-    title.Position=UDim2.new(0,76,0,14)
+    title.Size=UDim2.new(1,-90,0,26)
+    title.Position=UDim2.new(0,80,0,14)
     title.BackgroundTransparency=1
     title.Text="KEMI HUB"
     title.TextColor3=Color3.fromRGB(0,225,255)
@@ -3584,13 +3584,14 @@ local function createHomeContent()
     title.TextSize=18
     title.TextWrapped=true
     title.TextXAlignment=Enum.TextXAlignment.Left
+    title.ClipsDescendants=true
     title.Parent=header
 
     local desc=Instance.new("TextLabel")
-    desc.Size=UDim2.new(1,-88,0,46)
-    desc.Position=UDim2.new(0,76,0,42)
+    desc.Size=UDim2.new(1,-92,0,44)
+    desc.Position=UDim2.new(0,80,0,42)
     desc.BackgroundTransparency=1
-    desc.Text=""
+    desc.Text="script by Kemi"
     desc.TextColor3=Color3.fromRGB(210,210,210)
     desc.Font=Enum.Font.Gotham
     desc.TextSize=11
@@ -3655,7 +3656,7 @@ Kemi Studio
     --// CROSSHAIR SETTINGS
 
     local crosshairCard=Instance.new("Frame")
-    crosshairCard.Size=UDim2.new(1,-6,0,240)
+    crosshairCard.Size=UDim2.new(1,-6,0,145)
     crosshairCard.BackgroundColor3=Color3.fromRGB(8,20,36)
     crosshairCard.BorderSizePixel=0
     crosshairCard.Parent=scroll
@@ -3678,33 +3679,20 @@ Kemi Studio
     crossTitle.TextXAlignment=Enum.TextXAlignment.Left
     crossTitle.Parent=crosshairCard
 
-    -- PREVIEW AREA
+    local crossDesc=Instance.new("TextLabel")
+    crossDesc.Size=UDim2.new(1,-20,0,34)
+    crossDesc.Position=UDim2.new(0,10,0,36)
+    crossDesc.BackgroundTransparency=1
+    crossDesc.Text="Customize your crosshair shape and enable real-time overlay display."
+    crossDesc.TextColor3=Color3.fromRGB(200,200,200)
+    crossDesc.Font=Enum.Font.Gotham
+    crossDesc.TextSize=10
+    crossDesc.TextWrapped=true
+    crossDesc.TextXAlignment=Enum.TextXAlignment.Left
+    crossDesc.TextYAlignment=Enum.TextYAlignment.Top
+    crossDesc.Parent=crosshairCard
 
-    local preview=Instance.new("Frame")
-    preview.Size=UDim2.new(1,-20,0,95)
-    preview.Position=UDim2.new(0,10,0,42)
-    preview.BackgroundColor3=Color3.fromRGB(5,12,22)
-    preview.BorderSizePixel=0
-    preview.Parent=crosshairCard
-
-    Instance.new("UICorner",preview).CornerRadius=UDim.new(0,8)
-
-    local previewStroke=Instance.new("UIStroke")
-    previewStroke.Color=Color3.fromRGB(0,180,255)
-    previewStroke.Transparency=0.6
-    previewStroke.Parent=preview
-
-    local previewText=Instance.new("TextLabel")
-    previewText.Size=UDim2.new(1,0,0,18)
-    previewText.Position=UDim2.new(0,0,1,-22)
-    previewText.BackgroundTransparency=1
-    previewText.Text="Crosshair Preview"
-    previewText.TextColor3=Color3.fromRGB(160,160,160)
-    previewText.Font=Enum.Font.Gotham
-    previewText.TextSize=10
-    previewText.Parent=preview
-
-    -- CROSSHAIR GUI
+    --// CROSSHAIR GUI
 
     local crossGui=game.CoreGui:FindFirstChild("CyberCrosshair")
 
@@ -3785,11 +3773,11 @@ Kemi Studio
     circleStroke.Thickness=2
     circleStroke.Parent=circle
 
-    -- TOGGLE BUTTON
+    --// TOGGLE BUTTON
 
     local toggleButton=Instance.new("TextButton")
     toggleButton.Size=UDim2.new(1,-20,0,36)
-    toggleButton.Position=UDim2.new(0,10,0,148)
+    toggleButton.Position=UDim2.new(0,10,0,78)
     toggleButton.BackgroundColor3=Color3.fromRGB(14,24,40)
     toggleButton.Text="CROSSHAIR DISABLED"
     toggleButton.TextColor3=Color3.fromRGB(220,220,220)
@@ -3801,11 +3789,11 @@ Kemi Studio
 
     Instance.new("UICorner",toggleButton).CornerRadius=UDim.new(0,8)
 
-    -- SHAPE BUTTONS
+    --// BUTTON HOLDER
 
     local buttonHolder=Instance.new("Frame")
     buttonHolder.Size=UDim2.new(1,-20,0,34)
-    buttonHolder.Position=UDim2.new(0,10,0,194)
+    buttonHolder.Position=UDim2.new(0,10,0,118)
     buttonHolder.BackgroundTransparency=1
     buttonHolder.Parent=crosshairCard
 
@@ -3902,6 +3890,7 @@ Kemi Studio
         oBtn.BackgroundColor3=Color3.fromRGB(0,140,255)
     end)
 end
+
 -- ============================================================================
 -- INFO CONTENT
 -- ============================================================================

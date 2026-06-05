@@ -4790,311 +4790,103 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
-local function createFeatureButton(parent, text, name, initialState, onChange)
-
-    local button = Instance.new("TextButton")
-    button.Name = name
-    button.Size = UDim2.new(0, 85, 0, 32)
-    button.Text = text .. (initialState and " [ON]" or " [OFF]")
-    button.BackgroundColor3 = initialState and Color3.fromRGB(65, 65, 65) or Color3.fromRGB(45, 45, 45)
-    button.BackgroundTransparency = 0
-    button.TextColor3 = initialState and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(220, 220, 220)
-    button.TextSize = 9
-    button.Font = Enum.Font.GothamBold
-    button.BorderSizePixel = 0
-    button.AutoButtonColor = false
-    button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = button
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = initialState and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(90, 90, 90)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.15
-    stroke.Parent = button
-
-    local function updateState(state)
-
-        button.Text = text .. (state and " [ON]" or " [OFF]")
-
-        button.BackgroundColor3 =
-            state and Color3.fromRGB(65, 65, 65)
-            or Color3.fromRGB(45, 45, 45)
-
-        button.TextColor3 =
-            state and Color3.fromRGB(0, 170, 255)
-            or Color3.fromRGB(220, 220, 220)
-
-        stroke.Color =
-            state and Color3.fromRGB(0, 170, 255)
-            or Color3.fromRGB(90, 90, 90)
-    end
-
-    button.MouseEnter:Connect(function()
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.15),
-            {
-                BackgroundColor3 = Color3.fromRGB(75, 75, 75)
-            }
-        ):Play()
-
-    end)
-
-    button.MouseLeave:Connect(function()
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.15),
-            {
-                BackgroundColor3 =
-                    (config[name] and Color3.fromRGB(65, 65, 65))
-                    or Color3.fromRGB(45, 45, 45)
-            }
-        ):Play()
-
-    end)
-
-    button.MouseButton1Click:Connect(function()
-
-        local newState = not (config[name] or false)
-
-        if name == "autoWinEnabled" then
-
-            config.autoWinEnabled = newState
-
-            if newState then
-                startAutoWin()
-            else
-                stopAutoWin()
-            end
-
-        elseif name == "autoTaskEnabled" then
-
-            config.autoTaskEnabled = newState
-
-            if newState then
-                startAutoTask()
-            else
-                stopAutoTask()
-            end
-
-        elseif name == "espEnabled" then
-
-            config.espEnabled = newState
-            updateAllESP()
-
-        elseif name == "speedBoostEnabled" then
-
-            config.speedBoostEnabled = newState
-
-            if not newState then
-                if localHumanoid then
-                    localHumanoid.WalkSpeed = config.originalWalkSpeed
-                end
-            end
-
-        elseif name == "stealthEnabled" then
-
-            config.stealthEnabled = newState
-
-            if newState then
-                startStealthMonitor()
-            else
-                stopStealthMonitor()
-            end
-
-        elseif name == "godModeEnabled" then
-
-            config.godModeEnabled = newState
-
-            if newState then
-                startGodMode()
-            else
-                stopGodMode()
-            end
-
-        elseif name == "infiniteAmmoEnabled" then
-
-            config.infiniteAmmoEnabled = newState
-
-            if newState then
-                startInfiniteAmmo()
-            else
-                stopInfiniteAmmo()
-            end
-
-        elseif name == "shieldEnabled" then
-
-            config.shieldEnabled = newState
-
-            if newState then
-                startShieldMonitor()
-            else
-                stopShieldMonitor()
-            end
-
-        elseif name == "tpwalkEnabled" then
-
-            config.tpwalkEnabled = newState
-
-            if newState then
-                startTpwalkMonitor()
-            else
-                stopTpwalkMonitor()
-            end
-
-        elseif name == "noCollideEnabled" then
-
-            config.noCollideEnabled = newState
-
-            if newState then
-                startNoCollideMonitor()
-            else
-                stopNoCollideMonitor()
-            end
-
-        elseif name == "massKillEnabled" then
-
-            config.massKillEnabled = newState
-
-            if newState then
-                startMassKillLoop()
-            else
-                stopMassKillLoop()
-            end
-
-        elseif name == "autoGeneratorEnabled" then
-
-            config.autoGeneratorEnabled = newState
-
-            if newState then
-                startAutoGeneratorLoop()
-            else
-                stopAutoGeneratorLoop()
-            end
-
-        elseif name == "autoSkillCheckEnabled" then
-
-            config.autoSkillCheckEnabled = newState
-
-            if newState then
-                startAutoSkillCheck()
-            else
-                stopAutoSkillCheck()
-            end
-
-        elseif name == "autoAimEnabled" then
-
-            config.autoAimEnabled = newState
-
-            if newState then
-                startAutoAim()
-            else
-                stopAutoAim()
-            end
-
-        elseif name == "povMode" then
-
-            togglePOV()
-            return
-
-        end
-
-        updateState(newState)
-
-        if onChange then
-            onChange(newState)
-        end
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.05),
-            {
-                Size = UDim2.new(0, 82, 0, 30)
-            }
-        ):Play()
-
-        task.wait(0.05)
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.05),
-            {
-                Size = UDim2.new(0, 85, 0, 32)
-            }
-        ):Play()
-
-    end)
-
-    return button
-end
-
-local function createSidebarItem(parent, text, icon, active)
-
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 28)
-    button.Text = "  " .. text
-
-    button.TextColor3 =
-        active and Color3.fromRGB(0, 170, 255)
-        or Color3.fromRGB(220, 220, 220)
-
-    button.BackgroundColor3 =
-        active and Color3.fromRGB(65, 65, 65)
-        or Color3.fromRGB(45, 45, 45)
-
-    button.BackgroundTransparency = 0
-    button.TextSize = 10
-    button.Font = Enum.Font.GothamBold
-    button.TextXAlignment = Enum.TextXAlignment.Left
-    button.BorderSizePixel = 0
-    button.AutoButtonColor = false
-    button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
-    corner.Parent = button
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color =
-        active and Color3.fromRGB(0, 170, 255)
-        or Color3.fromRGB(85, 85, 85)
-
-    stroke.Thickness = 1
-    stroke.Transparency = 0.2
-    stroke.Parent = button
-
-    button.MouseEnter:Connect(function()
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.15),
-            {
-                BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-            }
-        ):Play()
-
-    end)
-
-    button.MouseLeave:Connect(function()
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.15),
-            {
-                BackgroundColor3 =
-                    active and Color3.fromRGB(65, 65, 65)
-                    or Color3.fromRGB(45, 45, 45)
-            }
-        ):Play()
-
-    end)
-
-    return button
+button.Name = name              
+    button.Size = UDim2.new(0, 85, 0, 32)              
+    button.Text = text .. (initialState and " [ON]" or " [OFF]")              
+    button.BackgroundColor3 = initialState and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)              
+    button.BackgroundTransparency = 0.1              
+    button.TextColor3 = initialState and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)              
+    button.TextSize = 9              
+    button.Font = Enum.Font.GothamBold              
+    button.BorderSizePixel = 0              
+    button.Parent = parent              
+    local corner = Instance.new("UICorner")              
+    corner.CornerRadius = UDim.new(0, 4)              
+    corner.Parent = button              
+    local stroke = Instance.new("UIStroke")              
+    stroke.Color = initialState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 30, 30)              
+    stroke.Thickness = 1              
+    stroke.Transparency = 0.3              
+    stroke.Parent = button              
+    local function updateState(state)              
+        button.Text = text .. (state and " [ON]" or " [OFF]")              
+        button.BackgroundColor3 = state and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)              
+        button.TextColor3 = state and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)              
+        stroke.Color = state and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(150, 30, 30)              
+    end              
+    button.MouseButton1Click:Connect(function()              
+        local newState = not (config[name] or false)              
+        if name == "autoWinEnabled" then              
+            config.autoWinEnabled = newState              
+            if newState then startAutoWin() else stopAutoWin() end              
+        elseif name == "autoTaskEnabled" then              
+            config.autoTaskEnabled = newState              
+            if newState then startAutoTask() else stopAutoTask() end              
+        elseif name == "espEnabled" then            
+                config.espEnabled = newState            
+                updateAllESP()            
+        elseif name == "speedBoostEnabled" then              
+            config.speedBoostEnabled = newState              
+            if not newState then if localHumanoid then localHumanoid.WalkSpeed = config.originalWalkSpeed end end              
+        elseif name == "stealthEnabled" then              
+            config.stealthEnabled = newState              
+            if newState then startStealthMonitor() else stopStealthMonitor() end              
+        elseif name == "godModeEnabled" then              
+            config.godModeEnabled = newState              
+            if newState then startGodMode() else stopGodMode() end              
+        elseif name == "infiniteAmmoEnabled" then              
+            config.infiniteAmmoEnabled = newState              
+            if newState then startInfiniteAmmo() else stopInfiniteAmmo() end              
+        elseif name == "shieldEnabled" then              
+            config.shieldEnabled = newState              
+            if newState then startShieldMonitor() else stopShieldMonitor() end              
+        elseif name == "tpwalkEnabled" then              
+            config.tpwalkEnabled = newState              
+            if newState then startTpwalkMonitor() else stopTpwalkMonitor() end              
+        elseif name == "noCollideEnabled" then              
+            config.noCollideEnabled = newState              
+            if newState then startNoCollideMonitor() else stopNoCollideMonitor() end              
+        elseif name == "massKillEnabled" then              
+            config.massKillEnabled = newState              
+            if newState then startMassKillLoop() else stopMassKillLoop() end              
+        elseif name == "autoGeneratorEnabled" then              
+            config.autoGeneratorEnabled = newState              
+            if newState then startAutoGeneratorLoop() else stopAutoGeneratorLoop() end              
+        elseif name == "autoSkillCheckEnabled" then              
+            config.autoSkillCheckEnabled = newState              
+            if newState then startAutoSkillCheck() else stopAutoSkillCheck() end              
+        elseif name == "autoAimEnabled" then              
+            config.autoAimEnabled = newState              
+            if newState then startAutoAim() else stopAutoAim() end              
+        elseif name == "povMode" then            
+            togglePOV()            
+            return              
+        end              
+        updateState(newState)              
+        if onChange then onChange(newState) end              
+        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 8}):Play()              
+        task.wait(0.05)              
+        TweenService:Create(button, TweenInfo.new(0.05), {TextSize = 9}):Play()              
+    end)              
+    return button              
+end              
+              
+local function createSidebarItem(parent, text, icon, active)              
+    local button = Instance.new("TextButton")              
+    button.Size = UDim2.new(1, 0, 0, 28)              
+    button.Text = " " .. icon .. "  " .. text              
+    button.TextColor3 = active and Color3.fromRGB(0, 230, 255) or Color3.fromRGB(200, 200, 200)              
+    button.BackgroundColor3 = active and Color3.fromRGB(40, 5, 5) or Color3.fromRGB(15, 0, 2)              
+    button.BackgroundTransparency = 0.2              
+    button.TextSize = 10              
+    button.Font = Enum.Font.GothamBold              
+    button.TextXAlignment = Enum.TextXAlignment.Left              
+    button.BorderSizePixel = 0              
+    button.Parent = parent              
+    local corner = Instance.new("UICorner")              
+    corner.CornerRadius = UDim.new(0, 4)              
+    corner.Parent = button              
+    return button              
 end
 ---------------------------------------------------------------------
 -- SIDEBAR BUTTON

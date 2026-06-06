@@ -4896,46 +4896,38 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
+--// MODERN SWITCH BUTTON
 local function createGridButton(parent, name, text, initialState, onChange)
+
     local holder = Instance.new("Frame")
     holder.Name = name .. "_Holder"
-    holder.Size = UDim2.new(1, -8, 0, 42)
-    holder.BackgroundColor3 = Color3.fromRGB(12, 16, 28)
-    holder.BackgroundTransparency = 0.08
-    holder.BorderSizePixel = 0
+    holder.Size = UDim2.new(1,-4,0,42)
+    holder.BackgroundTransparency = 1
     holder.Parent = parent
 
-    local holderCorner = Instance.new("UICorner")
-    holderCorner.CornerRadius = UDim.new(0, 8)
-    holderCorner.Parent = holder
+    -- FEATURE NAME
 
-    local holderStroke = Instance.new("UIStroke")
-    holderStroke.Color = Color3.fromRGB(60, 60, 60)
-    holderStroke.Transparency = 0.45
-    holderStroke.Parent = holder
-
-    -- TITLE
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -80, 1, 0)
-    title.Position = UDim2.new(0, 12, 0, 0)
-    title.BackgroundTransparency = 1
-    title.Text = text
-    title.TextColor3 = Color3.fromRGB(235,235,235)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 11
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = holder
+    local featureLabel = Instance.new("TextLabel")
+    featureLabel.Size = UDim2.new(0.62,0,1,0)
+    featureLabel.Position = UDim2.new(0,8,0,0)
+    featureLabel.BackgroundTransparency = 1
+    featureLabel.Text = text
+    featureLabel.TextColor3 = Color3.fromRGB(235,235,235)
+    featureLabel.TextSize = 11
+    featureLabel.Font = Enum.Font.GothamBold
+    featureLabel.TextXAlignment = Enum.TextXAlignment.Left
+    featureLabel.Parent = holder
 
     -- SWITCH BUTTON
 
     local switch = Instance.new("TextButton")
-    switch.Size = UDim2.new(0, 54, 0, 24)
-    switch.Position = UDim2.new(1, -66, 0.5, -12)
-    switch.BackgroundColor3 = initialState and Color3.fromRGB(255,255,255) or Color3.fromRGB(70,70,70)
-    switch.BorderSizePixel = 0
-    switch.Text = ""
+    switch.Name = "Switch"
+    switch.Size = UDim2.new(0,64,0,28)
+    switch.Position = UDim2.new(1,-72,0.5,-14)
+    switch.BackgroundColor3 = initialState and Color3.fromRGB(240,240,240) or Color3.fromRGB(55,55,55)
     switch.AutoButtonColor = false
+    switch.Text = ""
+    switch.BorderSizePixel = 0
     switch.Parent = holder
 
     local switchCorner = Instance.new("UICorner")
@@ -4943,97 +4935,95 @@ local function createGridButton(parent, name, text, initialState, onChange)
     switchCorner.Parent = switch
 
     local switchStroke = Instance.new("UIStroke")
-    switchStroke.Thickness = 1.5
-    switchStroke.Color = initialState and Color3.fromRGB(255,255,255) or Color3.fromRGB(120,120,120)
+    switchStroke.Color = initialState and Color3.fromRGB(255,255,255) or Color3.fromRGB(140,140,140)
+    switchStroke.Thickness = 1.6
     switchStroke.Transparency = 0.15
     switchStroke.Parent = switch
 
-    -- GLOW
+    -- NEON EFFECT
 
-    local glow = Instance.new("UIStroke")
-    glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    glow.Thickness = 4
-    glow.Transparency = 0.7
-    glow.Color = Color3.fromRGB(255,255,255)
+    local glow = Instance.new("UIGradient")
+    glow.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(220,220,220))
+    }
     glow.Parent = switch
 
     -- CIRCLE
 
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 18, 0, 18)
-    knob.Position = initialState and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
-    knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    knob.BorderSizePixel = 0
-    knob.Parent = switch
+    local circle = Instance.new("Frame")
+    circle.Size = UDim2.new(0,22,0,22)
+    circle.Position = initialState and UDim2.new(1,-25,0.5,-11) or UDim2.new(0,3,0.5,-11)
+    circle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    circle.BorderSizePixel = 0
+    circle.Parent = switch
 
-    local knobCorner = Instance.new("UICorner")
-    knobCorner.CornerRadius = UDim.new(1,0)
-    knobCorner.Parent = knob
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1,0)
+    circleCorner.Parent = circle
 
-    local knobGlow = Instance.new("UIStroke")
-    knobGlow.Thickness = 2
-    knobGlow.Color = Color3.fromRGB(255,255,255)
-    knobGlow.Transparency = 0.35
-    knobGlow.Parent = knob
+    local circleStroke = Instance.new("UIStroke")
+    circleStroke.Color = Color3.fromRGB(255,255,255)
+    circleStroke.Thickness = 1.2
+    circleStroke.Transparency = 0
+    circleStroke.Parent = circle
 
     -- STATUS TEXT
 
-    local status = Instance.new("TextLabel")
-    status.Size = UDim2.new(0, 42, 0, 18)
-    status.Position = UDim2.new(1, -120, 0.5, -9)
-    status.BackgroundTransparency = 1
-    status.Text = initialState and "ON" or "OFF"
-    status.TextColor3 = initialState and Color3.fromRGB(180,255,180) or Color3.fromRGB(255,170,170)
-    status.Font = Enum.Font.GothamBold
-    status.TextSize = 10
-    status.TextXAlignment = Enum.TextXAlignment.Right
-    status.Parent = holder
+    local statusText = Instance.new("TextLabel")
+    statusText.Size = UDim2.new(0,30,1,0)
+    statusText.Position = initialState and UDim2.new(0,6,0,0) or UDim2.new(0,28,0,0)
+    statusText.BackgroundTransparency = 1
+    statusText.Text = initialState and "ON" or "OFF"
+    statusText.TextColor3 = initialState and Color3.fromRGB(120,255,120) or Color3.fromRGB(255,255,255)
+    statusText.TextSize = 10
+    statusText.Font = Enum.Font.GothamBold
+    statusText.Parent = switch
 
-    local statusGlow = Instance.new("UIStroke")
-    statusGlow.Color = status.TextColor3
-    statusGlow.Thickness = 1
-    statusGlow.Transparency = 0.45
-    statusGlow.Parent = status
+    -- UPDATE VISUAL
 
     local function updateState(state)
-        status.Text = state and "ON" or "OFF"
 
-        status.TextColor3 = state
-            and Color3.fromRGB(180,255,180)
-            or Color3.fromRGB(255,170,170)
+        if state then
 
-        statusGlow.Color = status.TextColor3
+            switch.BackgroundColor3 = Color3.fromRGB(245,245,245)
+            switchStroke.Color = Color3.fromRGB(255,255,255)
 
-        switch.BackgroundColor3 = state
-            and Color3.fromRGB(255,255,255)
-            or Color3.fromRGB(70,70,70)
+            statusText.Text = "ON"
+            statusText.TextColor3 = Color3.fromRGB(0,255,120)
+            statusText.Position = UDim2.new(0,6,0,0)
 
-        switchStroke.Color = state
-            and Color3.fromRGB(255,255,255)
-            or Color3.fromRGB(120,120,120)
+            TweenService:Create(
+                circle,
+                TweenInfo.new(0.18, Enum.EasingStyle.Quad),
+                {
+                    Position = UDim2.new(1,-25,0.5,-11)
+                }
+            ):Play()
 
-        local targetPos = state
-            and UDim2.new(1, -22, 0.5, -9)
-            or UDim2.new(0, 4, 0.5, -9)
+        else
 
-        TweenService:Create(
-            knob,
-            TweenInfo.new(0.18, Enum.EasingStyle.Quad),
-            {Position = targetPos}
-        ):Play()
+            switch.BackgroundColor3 = Color3.fromRGB(55,55,55)
+            switchStroke.Color = Color3.fromRGB(140,140,140)
 
-        TweenService:Create(
-            holderStroke,
-            TweenInfo.new(0.18),
-            {
-                Color = state
-                    and Color3.fromRGB(255,255,255)
-                    or Color3.fromRGB(60,60,60)
-            }
-        ):Play()
+            statusText.Text = "OFF"
+            statusText.TextColor3 = Color3.fromRGB(255,255,255)
+            statusText.Position = UDim2.new(0,28,0,0)
+
+            TweenService:Create(
+                circle,
+                TweenInfo.new(0.18, Enum.EasingStyle.Quad),
+                {
+                    Position = UDim2.new(0,3,0.5,-11)
+                }
+            ):Play()
+        end
     end
 
+    -- BUTTON EVENT
+
     switch.MouseButton1Click:Connect(function()
+
         local newState = not (config[name] or false)
 
         if name == "autoWinEnabled" then
@@ -5111,18 +5101,15 @@ local function createGridButton(parent, name, text, initialState, onChange)
     return holder
 end
 
+
+--// MODERN SIDEBAR ITEM
 local function createSidebarItem(parent, text, icon, active)
+
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -6, 0, 34)
+    button.Size = UDim2.new(1,0,0,34)
     button.Text = "   " .. icon .. "   " .. text
-    button.TextColor3 = active
-        and Color3.fromRGB(255,255,255)
-        or Color3.fromRGB(210,210,210)
-
-    button.BackgroundColor3 = active
-        and Color3.fromRGB(20,30,45)
-        or Color3.fromRGB(10,14,24)
-
+    button.TextColor3 = active and Color3.fromRGB(0,240,255) or Color3.fromRGB(220,220,220)
+    button.BackgroundColor3 = active and Color3.fromRGB(18,35,55) or Color3.fromRGB(10,16,26)
     button.BackgroundTransparency = 0.08
     button.TextSize = 11
     button.Font = Enum.Font.GothamBold
@@ -5132,91 +5119,148 @@ local function createSidebarItem(parent, text, icon, active)
     button.Parent = parent
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 7)
+    corner.CornerRadius = UDim.new(0,8)
     corner.Parent = button
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = active
-        and Color3.fromRGB(255,255,255)
-        or Color3.fromRGB(60,60,60)
-
-    stroke.Thickness = 1
-    stroke.Transparency = 0.45
+    stroke.Color = active and Color3.fromRGB(0,200,255) or Color3.fromRGB(70,70,70)
+    stroke.Transparency = active and 0.15 or 0.55
+    stroke.Thickness = 1.1
     stroke.Parent = button
 
     return button
 end
 
---// SIDEBAR SCROLL
 
-local sidebarScroll = Instance.new("ScrollingFrame")
-sidebarScroll.Size = UDim2.new(1, -6, 1, -6)
-sidebarScroll.Position = UDim2.new(0,3,0,3)
-sidebarScroll.BackgroundTransparency = 1
-sidebarScroll.BorderSizePixel = 0
-sidebarScroll.ScrollBarThickness = 2
-sidebarScroll.CanvasSize = UDim2.new(0,0,0,0)
-sidebarScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-sidebarScroll.Parent = sidebar
+--// FEATURE PANEL
+local function createFeaturePanel(parent)
 
-local sidebarLayout = Instance.new("UIListLayout")
-sidebarLayout.Padding = UDim.new(0,8)
-sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sidebarLayout.Parent = sidebarScroll
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1,-6,1,-6)
+    scroll.Position = UDim2.new(0,3,0,3)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 2
+    scroll.CanvasSize = UDim2.new(0,0,0,0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.Parent = parent
 
-local sidebarPadding = Instance.new("UIPadding")
-sidebarPadding.PaddingTop = UDim.new(0,4)
-sidebarPadding.PaddingBottom = UDim.new(0,8)
-sidebarPadding.PaddingLeft = UDim.new(0,2)
-sidebarPadding.PaddingRight = UDim.new(0,2)
-sidebarPadding.Parent = sidebarScroll
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0,8)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
 
---// TOP FEATURE BUTTONS
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0,4)
+    padding.PaddingBottom = UDim.new(0,8)
+    padding.PaddingLeft = UDim.new(0,4)
+    padding.PaddingRight = UDim.new(0,4)
+    padding.Parent = scroll
 
-local topHolder = Instance.new("Frame")
-topHolder.Size = UDim2.new(1,-4,0,46)
-topHolder.BackgroundTransparency = 1
-topHolder.Parent = sidebarScroll
+    -- TOP BUTTONS
 
-local topLayout = Instance.new("UIListLayout")
-topLayout.FillDirection = Enum.FillDirection.Horizontal
-topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-topLayout.Padding = UDim.new(0,8)
-topLayout.Parent = topHolder
+    local topHolder = Instance.new("Frame")
+    topHolder.Size = UDim2.new(1,-2,0,48)
+    topHolder.BackgroundTransparency = 1
+    topHolder.Parent = scroll
 
-local autoWinButton = createGridButton(
-    topHolder,
-    "autoWinEnabled",
-    "AUTO WIN",
-    config.autoWinEnabled
-)
+    local topLayout = Instance.new("UIListLayout")
+    topLayout.FillDirection = Enum.FillDirection.Horizontal
+    topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    topLayout.Padding = UDim.new(0,8)
+    topLayout.Parent = topHolder
 
-autoWinButton.Size = UDim2.new(0.48,0,1,0)
+    -- AUTO WIN
 
-local espButton = createGridButton(
-    topHolder,
-    "espEnabled",
-    "ESP",
-    config.espEnabled
-)
+    local autoWinFrame = Instance.new("Frame")
+    autoWinFrame.Size = UDim2.new(0.48,0,1,0)
+    autoWinFrame.BackgroundColor3 = Color3.fromRGB(10,18,30)
+    autoWinFrame.BorderSizePixel = 0
+    autoWinFrame.Parent = topHolder
 
-espButton.Size = UDim2.new(0.48,0,1,0)
+    Instance.new("UICorner",autoWinFrame).CornerRadius = UDim.new(0,8)
 
---// OTHER FEATURE SWITCHES
+    local awStroke = Instance.new("UIStroke")
+    awStroke.Color = Color3.fromRGB(0,200,255)
+    awStroke.Transparency = 0.45
+    awStroke.Parent = autoWinFrame
 
-createGridButton(sidebarScroll,"autoTaskEnabled","AUTO TASK",config.autoTaskEnabled)
-createGridButton(sidebarScroll,"speedBoostEnabled","SPEED BOOST",config.speedBoostEnabled)
-createGridButton(sidebarScroll,"stealthEnabled","STEALTH MODE",config.stealthEnabled)
-createGridButton(sidebarScroll,"godModeEnabled","GOD MODE",config.godModeEnabled)
-createGridButton(sidebarScroll,"infiniteAmmoEnabled","INFINITE AMMO",config.infiniteAmmoEnabled)
-createGridButton(sidebarScroll,"shieldEnabled","SHIELD",config.shieldEnabled)
-createGridButton(sidebarScroll,"tpwalkEnabled","TP WALK",config.tpwalkEnabled)
-createGridButton(sidebarScroll,"noCollideEnabled","NO COLLIDE",config.noCollideEnabled)
-createGridButton(sidebarScroll,"massKillEnabled","MASS KILL",config.massKillEnabled)
-createGridButton(sidebarScroll,"autoGeneratorEnabled","AUTO GENERATOR",config.autoGeneratorEnabled)
-createGridButton(sidebarScroll,"autoSkillCheckEnabled","AUTO SKILL CHECK",config.autoSkillCheckEnabled)
-createGridButton(sidebarScroll,"autoAimEnabled","AUTO AIM",config.autoAimEnabled)
-createGridButton(sidebarScroll,"povMode","POV MODE",false)
+    createGridButton(
+        autoWinFrame,
+        "autoWinEnabled",
+        "AUTO WIN",
+        config.autoWinEnabled
+    )
+
+    -- ESP
+
+    local espFrame = Instance.new("Frame")
+    espFrame.Size = UDim2.new(0.48,0,1,0)
+    espFrame.BackgroundColor3 = Color3.fromRGB(10,18,30)
+    espFrame.BorderSizePixel = 0
+    espFrame.Parent = topHolder
+
+    Instance.new("UICorner",espFrame).CornerRadius = UDim.new(0,8)
+
+    local espStroke = Instance.new("UIStroke")
+    espStroke.Color = Color3.fromRGB(0,200,255)
+    espStroke.Transparency = 0.45
+    espStroke.Parent = espFrame
+
+    createGridButton(
+        espFrame,
+        "espEnabled",
+        "ESP",
+        config.espEnabled
+    )
+
+    -- OTHER FEATURES
+
+    local featureContainer = Instance.new("Frame")
+    featureContainer.Size = UDim2.new(1,-2,0,420)
+    featureContainer.BackgroundColor3 = Color3.fromRGB(8,16,28)
+    featureContainer.BorderSizePixel = 0
+    featureContainer.Parent = scroll
+
+    Instance.new("UICorner",featureContainer).CornerRadius = UDim.new(0,10)
+
+    local featureStroke = Instance.new("UIStroke")
+    featureStroke.Color = Color3.fromRGB(0,180,255)
+    featureStroke.Transparency = 0.5
+    featureStroke.Parent = featureContainer
+
+    local featureLayout = Instance.new("UIListLayout")
+    featureLayout.Padding = UDim.new(0,4)
+    featureLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    featureLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    featureLayout.Parent = featureContainer
+
+    local featurePadding = Instance.new("UIPadding")
+    featurePadding.PaddingTop = UDim.new(0,6)
+    featurePadding.PaddingBottom = UDim.new(0,6)
+    featurePadding.PaddingLeft = UDim.new(0,6)
+    featurePadding.PaddingRight = UDim.new(0,6)
+    featurePadding.Parent = featureContainer
+
+    -- FEATURE LIST
+
+    createGridButton(featureContainer,"autoTaskEnabled","AUTO TASK",config.autoTaskEnabled)
+    createGridButton(featureContainer,"speedBoostEnabled","SPEED BOOST",config.speedBoostEnabled)
+    createGridButton(featureContainer,"stealthEnabled","STEALTH MODE",config.stealthEnabled)
+    createGridButton(featureContainer,"godModeEnabled","GOD MODE",config.godModeEnabled)
+    createGridButton(featureContainer,"infiniteAmmoEnabled","INFINITE AMMO",config.infiniteAmmoEnabled)
+    createGridButton(featureContainer,"shieldEnabled","AUTO SHIELD",config.shieldEnabled)
+    createGridButton(featureContainer,"tpwalkEnabled","TP WALK",config.tpwalkEnabled)
+    createGridButton(featureContainer,"noCollideEnabled","NO COLLIDE",config.noCollideEnabled)
+    createGridButton(featureContainer,"massKillEnabled","MASS KILL",config.massKillEnabled)
+    createGridButton(featureContainer,"autoGeneratorEnabled","AUTO GENERATOR",config.autoGeneratorEnabled)
+    createGridButton(featureContainer,"autoSkillCheckEnabled","AUTO SKILL CHECK",config.autoSkillCheckEnabled)
+    createGridButton(featureContainer,"autoAimEnabled","AUTO AIM",config.autoAimEnabled)
+    createGridButton(featureContainer,"povMode","POV MODE",false)
+
+    return scroll
+end
 -- ============================================================================  
 -- PERMANENT TELEPORT BUTTON (tidak berubah)  
 -- ============================================================================  

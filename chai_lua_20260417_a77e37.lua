@@ -3247,7 +3247,7 @@ end
 --========================
 -- Skull check
 --========================
-local function GetActionTarget()
+ local function GetActionTarget()
     local current = localPlayer:FindFirstChild("PlayerGui")
     if not current then return nil end
     for segment in string.gmatch(ActionPath, "[^%.]+") do
@@ -3255,84 +3255,181 @@ local function GetActionTarget()
     end
     return current
 end
-
 local function TriggerMobileButton()
     local b = GetActionTarget()
     if b and b:IsA("GuiObject") then
-        local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
-        local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
+        local p,s,i = b.AbsolutePosition,b.AbsoluteSize,GuiService:GetGuiInset()
+        local cx,cy = p.X + (s.X/2) + i.X,p.Y + (s.Y/2) + i.Y
         pcall(function()
-            VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy)
-            task.wait(0.01)
-            VirtualInputManager:SendTouchEvent(TouchID, 2, cx, cy)
+            VirtualInputManager:SendTouchEvent(TouchID,0,cx,cy)
+            task.wait(0.008)
+            VirtualInputManager:SendTouchEvent(TouchID,2,cx,cy)
         end)
     end
 end
-
 local function InitializeAutobuy()
     task.spawn(function()
         local playerGui = localPlayer:FindFirstChild("PlayerGui")
         if not playerGui then return end
         local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
         if not prompt then
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui",10)
         end
-        local check = prompt and prompt:FindFirstChild("Check")
+        if not prompt then return end
+        local check = prompt:FindFirstChild("Check")
         if not check then return end
         local line = check:FindFirstChild("Line")
         local goal = check:FindFirstChild("Goal")
         if not line or not goal then return end
-        if VisibilityConnection then VisibilityConnection:Disconnect() end
+        if VisibilityConnection then
+            VisibilityConnection:Disconnect()
+        end
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
-            if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then
-                if HeartbeatConnection then HeartbeatConnection:Disconnect() end
+            if localPlayer.Team
+            and localPlayer.Team.Name == "Survivors"
+            and check.Visible then
+                if HeartbeatConnection then
+                    HeartbeatConnection:Disconnect()
+                    HeartbeatConnection=nil
+                end
+                local hitDebounce = false
+                local lastGoalRotation = goal.Rotation
+                local multiGoalDetected = false
+                local stableHits = 0
                 HeartbeatConnection = RunService.Heartbeat:Connect(function()
+                    if not check.Visible then
+                        if HeartbeatConnection then
+                            HeartbeatConnection:Disconnect()
+                            HeartbeatConnection=nil
+                        end
+                        return
+                    end
                     local lr = line.Rotation % 360
                     local gr = goal.Rotation % 360
-                    local ss = (gr + 104) % 360
-                    local se = (gr + 118) % 360
-                    local inRange = false
-                    if ss > se then
-                        if lr >= ss or lr <= se then inRange = true end
-                    else
-                        if lr >= ss and lr <= se then inRange = true end
+                    -------------------------------------------------
+                    -- DETECT MULTI GOAL / MULTI PHASE
+                    -------------------------------------------------
+                    local rotDiff = math.abs(gr - lastGoalRotation)
+
+                    if rotDiff > 8 then
+                        multiGoalDetected = true
                     end
+
+                    lastGoalRotation = gr
+                    -------------------------------------------------
+                    -- SMART RANGE
+                    -------------------------------------------------
+                    local startRange = (gr + 102) % 360
+                    local endRange   = (gr + 120) % 360
+                    local inRange = false
+                    if startRange > endRange then
+                        if lr >= startRange or lr <= endRange then
+                            inRange = true
+                        end
+                    else
+                        if lr >= startRange and lr <= endRange then
+                            inRange = true
+                        end
+                    end
+                    -------------------------------------------------
+                    -- STABLE DETECTION
+                    -------------------------------------------------
                     if inRange then
+                        stableHits += 1
+                    else
+                        stableHits = 0
+                        hitDebounce = false
+                    end
+                    -------------------------------------------------
+                    -- FIRE INPUT
+                    -------------------------------------------------
+                    if stableHits >= 2 and not hitDebounce then
+                        hitDebounce = true
                         TriggerMobileButton()
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
+                        -------------------------------------------------
+                        -- MULTI GOAL SUPPORT
+                        -------------------------------------------------
+                        if multiGoalDetected then
+                            task.wait(0.12)
+                            hitDebounce = false
+                        end
                     end
                 end)
-            elseif HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
+            elseif HeartbeatConnection then
+                HeartbeatConnection:Disconnect()
+                HeartbeatConnection=nil
+            end
         end)
     end)
 end
 
 local function startAutoSkillCheck()
-    if autoSkillCheckConnection then return end
+
+    if autoSkillCheckConnection then
+        return
+    end
+
     autoSkillCheckConnection = RunService.Heartbeat:Connect(function()
-        if not config.autoSkillCheckEnabled then return end
-        if not getLocalCharacter() then return end
+
+        if not config.autoSkillCheckEnabled then
+            return
+        end
+
+        if not getLocalCharacter() then
+            return
+        end
+
         local playerGui = localPlayer:FindFirstChild("PlayerGui")
+
         if playerGui then
-            for _, gui in ipairs(playerGui:GetDescendants()) do
-                if gui:IsA("TextButton") or gui:IsA("ImageButton") then
+
+            for _,gui in ipairs(playerGui:GetDescendants()) do
+
+                if gui:IsA("TextButton")
+                or gui:IsA("ImageButton") then
+
                     local name = gui.Name:lower()
-                    if name:find("skill") or name:find("check") or name:find("qte") or name:find("repair") then
-                        if gui.Visible and gui.Active then
-                            pcall(function() gui:FireClick() end)
+
+                    if name:find("skill")
+                    or name:find("check")
+                    or name:find("qte")
+                    or name:find("repair") then
+
+                        if gui.Visible
+                        and gui.Active then
+
+                            pcall(function()
+                                gui:FireClick()
+                            end)
                         end
                     end
                 end
             end
         end
     end)
+
     InitializeAutobuy()
-    print("[AutoSkillCheck] Auto skill check started")
+
+    print("[AutoSkillCheck] Advanced auto skill check started")
 end
+
 local function stopAutoSkillCheck()
-    if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end
-    if VisibilityConnection then VisibilityConnection:Disconnect(); VisibilityConnection = nil end
-    if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
+
+    if autoSkillCheckConnection then
+        autoSkillCheckConnection:Disconnect()
+        autoSkillCheckConnection=nil
+    end
+
+    if VisibilityConnection then
+        VisibilityConnection:Disconnect()
+        VisibilityConnection=nil
+    end
+
+    if HeartbeatConnection then
+        HeartbeatConnection:Disconnect()
+        HeartbeatConnection=nil
+    end
+
     print("[AutoSkillCheck] Auto skill check stopped")
 end
 -- ============================================================================

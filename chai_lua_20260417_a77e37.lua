@@ -4896,24 +4896,24 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
---// MODERN SWITCH BUTTON
+--// MODERN MINI SWITCH BUTTON
 local function createGridButton(parent, name, text, initialState, onChange)
 
     local holder = Instance.new("Frame")
     holder.Name = name .. "_Holder"
-    holder.Size = UDim2.new(1,-4,0,42)
+    holder.Size = UDim2.new(1,-2,0,20)
     holder.BackgroundTransparency = 1
     holder.Parent = parent
 
     -- FEATURE NAME
 
     local featureLabel = Instance.new("TextLabel")
-    featureLabel.Size = UDim2.new(0.62,0,1,0)
-    featureLabel.Position = UDim2.new(0,8,0,0)
+    featureLabel.Size = UDim2.new(0.7,0,1,0)
+    featureLabel.Position = UDim2.new(0,2,0,0)
     featureLabel.BackgroundTransparency = 1
     featureLabel.Text = text
     featureLabel.TextColor3 = Color3.fromRGB(235,235,235)
-    featureLabel.TextSize = 11
+    featureLabel.TextSize = 7
     featureLabel.Font = Enum.Font.GothamBold
     featureLabel.TextXAlignment = Enum.TextXAlignment.Left
     featureLabel.Parent = holder
@@ -4922,11 +4922,11 @@ local function createGridButton(parent, name, text, initialState, onChange)
 
     local switch = Instance.new("TextButton")
     switch.Name = "Switch"
-    switch.Size = UDim2.new(0,64,0,28)
-    switch.Position = UDim2.new(1,-72,0.5,-14)
-    switch.BackgroundColor3 = initialState and Color3.fromRGB(240,240,240) or Color3.fromRGB(55,55,55)
-    switch.AutoButtonColor = false
+    switch.Size = UDim2.new(0,30,0,14)
+    switch.Position = UDim2.new(1,-32,0.5,-7)
+    switch.BackgroundColor3 = initialState and Color3.fromRGB(245,245,245) or Color3.fromRGB(45,45,45)
     switch.Text = ""
+    switch.AutoButtonColor = false
     switch.BorderSizePixel = 0
     switch.Parent = holder
 
@@ -4935,25 +4935,16 @@ local function createGridButton(parent, name, text, initialState, onChange)
     switchCorner.Parent = switch
 
     local switchStroke = Instance.new("UIStroke")
-    switchStroke.Color = initialState and Color3.fromRGB(255,255,255) or Color3.fromRGB(140,140,140)
-    switchStroke.Thickness = 1.6
-    switchStroke.Transparency = 0.15
+    switchStroke.Color = initialState and Color3.fromRGB(255,255,255) or Color3.fromRGB(110,110,110)
+    switchStroke.Thickness = 1
+    switchStroke.Transparency = 0.1
     switchStroke.Parent = switch
 
-    -- NEON EFFECT
-
-    local glow = Instance.new("UIGradient")
-    glow.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(220,220,220))
-    }
-    glow.Parent = switch
-
-    -- CIRCLE
+    -- SWITCH CIRCLE
 
     local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(0,22,0,22)
-    circle.Position = initialState and UDim2.new(1,-25,0.5,-11) or UDim2.new(0,3,0.5,-11)
+    circle.Size = UDim2.new(0,10,0,10)
+    circle.Position = initialState and UDim2.new(1,-12,0.5,-5) or UDim2.new(0,2,0.5,-5)
     circle.BackgroundColor3 = Color3.fromRGB(255,255,255)
     circle.BorderSizePixel = 0
     circle.Parent = switch
@@ -4962,23 +4953,11 @@ local function createGridButton(parent, name, text, initialState, onChange)
     circleCorner.CornerRadius = UDim.new(1,0)
     circleCorner.Parent = circle
 
-    local circleStroke = Instance.new("UIStroke")
-    circleStroke.Color = Color3.fromRGB(255,255,255)
-    circleStroke.Thickness = 1.2
-    circleStroke.Transparency = 0
-    circleStroke.Parent = circle
-
-    -- STATUS TEXT
-
-    local statusText = Instance.new("TextLabel")
-    statusText.Size = UDim2.new(0,30,1,0)
-    statusText.Position = initialState and UDim2.new(0,6,0,0) or UDim2.new(0,28,0,0)
-    statusText.BackgroundTransparency = 1
-    statusText.Text = initialState and "ON" or "OFF"
-    statusText.TextColor3 = initialState and Color3.fromRGB(120,255,120) or Color3.fromRGB(255,255,255)
-    statusText.TextSize = 10
-    statusText.Font = Enum.Font.GothamBold
-    statusText.Parent = switch
+    local glow = Instance.new("UIStroke")
+    glow.Color = Color3.fromRGB(255,255,255)
+    glow.Thickness = 1
+    glow.Transparency = 0.2
+    glow.Parent = circle
 
     -- UPDATE VISUAL
 
@@ -4986,35 +4965,27 @@ local function createGridButton(parent, name, text, initialState, onChange)
 
         if state then
 
-            switch.BackgroundColor3 = Color3.fromRGB(245,245,245)
+            switch.BackgroundColor3 = Color3.fromRGB(240,240,240)
             switchStroke.Color = Color3.fromRGB(255,255,255)
-
-            statusText.Text = "ON"
-            statusText.TextColor3 = Color3.fromRGB(0,255,120)
-            statusText.Position = UDim2.new(0,6,0,0)
 
             TweenService:Create(
                 circle,
-                TweenInfo.new(0.18, Enum.EasingStyle.Quad),
+                TweenInfo.new(0.16, Enum.EasingStyle.Quad),
                 {
-                    Position = UDim2.new(1,-25,0.5,-11)
+                    Position = UDim2.new(1,-12,0.5,-5)
                 }
             ):Play()
 
         else
 
-            switch.BackgroundColor3 = Color3.fromRGB(55,55,55)
-            switchStroke.Color = Color3.fromRGB(140,140,140)
-
-            statusText.Text = "OFF"
-            statusText.TextColor3 = Color3.fromRGB(255,255,255)
-            statusText.Position = UDim2.new(0,28,0,0)
+            switch.BackgroundColor3 = Color3.fromRGB(45,45,45)
+            switchStroke.Color = Color3.fromRGB(110,110,110)
 
             TweenService:Create(
                 circle,
-                TweenInfo.new(0.18, Enum.EasingStyle.Quad),
+                TweenInfo.new(0.16, Enum.EasingStyle.Quad),
                 {
-                    Position = UDim2.new(0,3,0.5,-11)
+                    Position = UDim2.new(0,2,0.5,-5)
                 }
             ):Play()
         end
@@ -5027,19 +4998,32 @@ local function createGridButton(parent, name, text, initialState, onChange)
         local newState = not (config[name] or false)
 
         if name == "autoWinEnabled" then
+
             config.autoWinEnabled = newState
-            if newState then startAutoWin() else stopAutoWin() end
+            if newState then
+                startAutoWin()
+            else
+                stopAutoWin()
+            end
 
         elseif name == "autoTaskEnabled" then
+
             config.autoTaskEnabled = newState
-            if newState then startAutoTask() else stopAutoTask() end
+            if newState then
+                startAutoTask()
+            else
+                stopAutoTask()
+            end
 
         elseif name == "espEnabled" then
+
             config.espEnabled = newState
             updateAllESP()
 
         elseif name == "speedBoostEnabled" then
+
             config.speedBoostEnabled = newState
+
             if not newState then
                 if localHumanoid then
                     localHumanoid.WalkSpeed = config.originalWalkSpeed
@@ -5047,46 +5031,97 @@ local function createGridButton(parent, name, text, initialState, onChange)
             end
 
         elseif name == "stealthEnabled" then
+
             config.stealthEnabled = newState
-            if newState then startStealthMonitor() else stopStealthMonitor() end
+            if newState then
+                startStealthMonitor()
+            else
+                stopStealthMonitor()
+            end
 
         elseif name == "godModeEnabled" then
+
             config.godModeEnabled = newState
-            if newState then startGodMode() else stopGodMode() end
+            if newState then
+                startGodMode()
+            else
+                stopGodMode()
+            end
 
         elseif name == "infiniteAmmoEnabled" then
+
             config.infiniteAmmoEnabled = newState
-            if newState then startInfiniteAmmo() else stopInfiniteAmmo() end
+            if newState then
+                startInfiniteAmmo()
+            else
+                stopInfiniteAmmo()
+            end
 
         elseif name == "shieldEnabled" then
+
             config.shieldEnabled = newState
-            if newState then startShieldMonitor() else stopShieldMonitor() end
+            if newState then
+                startShieldMonitor()
+            else
+                stopShieldMonitor()
+            end
 
         elseif name == "tpwalkEnabled" then
+
             config.tpwalkEnabled = newState
-            if newState then startTpwalkMonitor() else stopTpwalkMonitor() end
+            if newState then
+                startTpwalkMonitor()
+            else
+                stopTpwalkMonitor()
+            end
 
         elseif name == "noCollideEnabled" then
+
             config.noCollideEnabled = newState
-            if newState then startNoCollideMonitor() else stopNoCollideMonitor() end
+            if newState then
+                startNoCollideMonitor()
+            else
+                stopNoCollideMonitor()
+            end
 
         elseif name == "massKillEnabled" then
+
             config.massKillEnabled = newState
-            if newState then startMassKillLoop() else stopMassKillLoop() end
+            if newState then
+                startMassKillLoop()
+            else
+                stopMassKillLoop()
+            end
 
         elseif name == "autoGeneratorEnabled" then
+
             config.autoGeneratorEnabled = newState
-            if newState then startAutoGeneratorLoop() else stopAutoGeneratorLoop() end
+            if newState then
+                startAutoGeneratorLoop()
+            else
+                stopAutoGeneratorLoop()
+            end
 
         elseif name == "autoSkillCheckEnabled" then
+
             config.autoSkillCheckEnabled = newState
-            if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
+            if newState then
+                startAutoSkillCheck()
+            else
+                stopAutoSkillCheck()
+            end
 
         elseif name == "autoAimEnabled" then
+
             config.autoAimEnabled = newState
-            if newState then startAutoAim() else stopAutoAim() end
+            if newState then
+                startAutoAim()
+            else
+                stopAutoAim()
+            end
 
         elseif name == "povMode" then
+
             togglePOV()
             return
         end
@@ -5106,12 +5141,12 @@ end
 local function createSidebarItem(parent, text, icon, active)
 
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1,0,0,34)
-    button.Text = "   " .. icon .. "   " .. text
+    button.Size = UDim2.new(1,0,0,22)
+    button.Text = "  " .. icon .. "  " .. text
     button.TextColor3 = active and Color3.fromRGB(0,240,255) or Color3.fromRGB(220,220,220)
-    button.BackgroundColor3 = active and Color3.fromRGB(18,35,55) or Color3.fromRGB(10,16,26)
+    button.BackgroundColor3 = active and Color3.fromRGB(15,28,45) or Color3.fromRGB(10,15,24)
     button.BackgroundTransparency = 0.08
-    button.TextSize = 11
+    button.TextSize = 8
     button.Font = Enum.Font.GothamBold
     button.TextXAlignment = Enum.TextXAlignment.Left
     button.BorderSizePixel = 0
@@ -5119,13 +5154,13 @@ local function createSidebarItem(parent, text, icon, active)
     button.Parent = parent
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0,8)
+    corner.CornerRadius = UDim.new(0,6)
     corner.Parent = button
 
     local stroke = Instance.new("UIStroke")
-    stroke.Color = active and Color3.fromRGB(0,200,255) or Color3.fromRGB(70,70,70)
+    stroke.Color = active and Color3.fromRGB(0,220,255) or Color3.fromRGB(70,70,70)
     stroke.Transparency = active and 0.15 or 0.55
-    stroke.Thickness = 1.1
+    stroke.Thickness = 1
     stroke.Parent = button
 
     return button
@@ -5136,111 +5171,130 @@ end
 local function createFeaturePanel(parent)
 
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1,-6,1,-6)
-    scroll.Position = UDim2.new(0,3,0,3)
+    scroll.Size = UDim2.new(1,-4,1,-4)
+    scroll.Position = UDim2.new(0,2,0,2)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 2
+    scroll.ScrollBarThickness = 1
     scroll.CanvasSize = UDim2.new(0,0,0,0)
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     scroll.Parent = parent
 
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0,8)
+    layout.Padding = UDim.new(0,5)
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = scroll
 
     local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0,4)
-    padding.PaddingBottom = UDim.new(0,8)
-    padding.PaddingLeft = UDim.new(0,4)
-    padding.PaddingRight = UDim.new(0,4)
+    padding.PaddingTop = UDim.new(0,3)
+    padding.PaddingBottom = UDim.new(0,6)
+    padding.PaddingLeft = UDim.new(0,3)
+    padding.PaddingRight = UDim.new(0,3)
     padding.Parent = scroll
 
-    -- TOP BUTTONS
+    -- TOP FEATURE HOLDER
 
     local topHolder = Instance.new("Frame")
-    topHolder.Size = UDim2.new(1,-2,0,48)
+    topHolder.Size = UDim2.new(1,-2,0,26)
     topHolder.BackgroundTransparency = 1
     topHolder.Parent = scroll
 
     local topLayout = Instance.new("UIListLayout")
     topLayout.FillDirection = Enum.FillDirection.Horizontal
     topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    topLayout.Padding = UDim.new(0,8)
+    topLayout.Padding = UDim.new(0,5)
     topLayout.Parent = topHolder
 
-    -- AUTO WIN
+    -- AUTO WIN BUTTON
 
-    local autoWinFrame = Instance.new("Frame")
-    autoWinFrame.Size = UDim2.new(0.48,0,1,0)
-    autoWinFrame.BackgroundColor3 = Color3.fromRGB(10,18,30)
-    autoWinFrame.BorderSizePixel = 0
-    autoWinFrame.Parent = topHolder
+    local autoWinButton = Instance.new("TextButton")
+    autoWinButton.Size = UDim2.new(0.48,0,1,0)
+    autoWinButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
+    autoWinButton.Text = "AUTO WIN"
+    autoWinButton.TextColor3 = Color3.fromRGB(0,240,255)
+    autoWinButton.TextSize = 8
+    autoWinButton.Font = Enum.Font.GothamBold
+    autoWinButton.BorderSizePixel = 0
+    autoWinButton.Parent = topHolder
 
-    Instance.new("UICorner",autoWinFrame).CornerRadius = UDim.new(0,8)
+    Instance.new("UICorner",autoWinButton).CornerRadius = UDim.new(1,0)
 
     local awStroke = Instance.new("UIStroke")
-    awStroke.Color = Color3.fromRGB(0,200,255)
-    awStroke.Transparency = 0.45
-    awStroke.Parent = autoWinFrame
+    awStroke.Color = Color3.fromRGB(0,220,255)
+    awStroke.Transparency = 0.35
+    awStroke.Parent = autoWinButton
 
-    createGridButton(
-        autoWinFrame,
-        "autoWinEnabled",
-        "AUTO WIN",
-        config.autoWinEnabled
-    )
+    autoWinButton.MouseButton1Click:Connect(function()
 
-    -- ESP
+        config.autoWinEnabled = not config.autoWinEnabled
 
-    local espFrame = Instance.new("Frame")
-    espFrame.Size = UDim2.new(0.48,0,1,0)
-    espFrame.BackgroundColor3 = Color3.fromRGB(10,18,30)
-    espFrame.BorderSizePixel = 0
-    espFrame.Parent = topHolder
+        if config.autoWinEnabled then
+            startAutoWin()
+            autoWinButton.BackgroundColor3 = Color3.fromRGB(0,180,255)
+        else
+            stopAutoWin()
+            autoWinButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
+        end
+    end)
 
-    Instance.new("UICorner",espFrame).CornerRadius = UDim.new(0,8)
+    -- ESP BUTTON
+
+    local espButton = Instance.new("TextButton")
+    espButton.Size = UDim2.new(0.48,0,1,0)
+    espButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
+    espButton.Text = "ESP"
+    espButton.TextColor3 = Color3.fromRGB(0,240,255)
+    espButton.TextSize = 8
+    espButton.Font = Enum.Font.GothamBold
+    espButton.BorderSizePixel = 0
+    espButton.Parent = topHolder
+
+    Instance.new("UICorner",espButton).CornerRadius = UDim.new(1,0)
 
     local espStroke = Instance.new("UIStroke")
-    espStroke.Color = Color3.fromRGB(0,200,255)
-    espStroke.Transparency = 0.45
-    espStroke.Parent = espFrame
+    espStroke.Color = Color3.fromRGB(0,220,255)
+    espStroke.Transparency = 0.35
+    espStroke.Parent = espButton
 
-    createGridButton(
-        espFrame,
-        "espEnabled",
-        "ESP",
-        config.espEnabled
-    )
+    espButton.MouseButton1Click:Connect(function()
 
-    -- OTHER FEATURES
+        config.espEnabled = not config.espEnabled
+        updateAllESP()
+
+        if config.espEnabled then
+            espButton.BackgroundColor3 = Color3.fromRGB(0,180,255)
+        else
+            espButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
+        end
+    end)
+
+    -- FEATURE CONTAINER
 
     local featureContainer = Instance.new("Frame")
-    featureContainer.Size = UDim2.new(1,-2,0,420)
-    featureContainer.BackgroundColor3 = Color3.fromRGB(8,16,28)
+    featureContainer.Size = UDim2.new(1,-2,0,270)
+    featureContainer.BackgroundColor3 = Color3.fromRGB(8,15,25)
     featureContainer.BorderSizePixel = 0
     featureContainer.Parent = scroll
 
-    Instance.new("UICorner",featureContainer).CornerRadius = UDim.new(0,10)
+    Instance.new("UICorner",featureContainer).CornerRadius = UDim.new(0,8)
 
     local featureStroke = Instance.new("UIStroke")
     featureStroke.Color = Color3.fromRGB(0,180,255)
-    featureStroke.Transparency = 0.5
+    featureStroke.Transparency = 0.55
     featureStroke.Parent = featureContainer
 
     local featureLayout = Instance.new("UIListLayout")
-    featureLayout.Padding = UDim.new(0,4)
+    featureLayout.Padding = UDim.new(0,2)
     featureLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     featureLayout.SortOrder = Enum.SortOrder.LayoutOrder
     featureLayout.Parent = featureContainer
 
     local featurePadding = Instance.new("UIPadding")
-    featurePadding.PaddingTop = UDim.new(0,6)
-    featurePadding.PaddingBottom = UDim.new(0,6)
-    featurePadding.PaddingLeft = UDim.new(0,6)
-    featurePadding.PaddingRight = UDim.new(0,6)
+    featurePadding.PaddingTop = UDim.new(0,4)
+    featurePadding.PaddingBottom = UDim.new(0,4)
+    featurePadding.PaddingLeft = UDim.new(0,4)
+    featurePadding.PaddingRight = UDim.new(0,4)
     featurePadding.Parent = featureContainer
 
     -- FEATURE LIST
@@ -5261,6 +5315,7 @@ local function createFeaturePanel(parent)
 
     return scroll
 end
+
 -- ============================================================================  
 -- PERMANENT TELEPORT BUTTON (tidak berubah)  
 -- ============================================================================  

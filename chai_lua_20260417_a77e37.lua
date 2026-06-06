@@ -3645,14 +3645,12 @@ local function createHomeContent()
     headerStroke.Transparency=0.35
     headerStroke.Parent=header
 
-    --// LOGO (DIRECT IN HEADER, NO CONTAINER)
-    local logo=Instance.new("ImageLabel")    
-    logo.Size=UDim2.new(1,-10,1,-10)    
-    logo.Position=UDim2.new(0,5,0,5)    
-    logo.BackgroundTransparency=1    
-    logo.Image="rbxassetid://6031071053"    
-    logo.ScaleType=Enum.ScaleType.Fit    
-    logo.Parent=header    
+    logo.Size=UDim2.new(1,-8,1,-8)  
+    logo.Position=UDim2.new(0,4,0,4)  
+    logo.BackgroundTransparency=1  
+    logo.Image="rbxassetid://127173186832760"  
+    logo.ScaleType=Enum.ScaleType.Fit  
+    logo.Parent=logoHolder
     --// TITLE
 
     local title=Instance.new("TextLabel")

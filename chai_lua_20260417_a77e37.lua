@@ -3660,15 +3660,20 @@ local function createHomeContent()
     logoStroke.Parent=logoHolder
     --// LOGO IMAGE
     local logo=Instance.new("ImageLabel")
-    logo.Size=UDim2.new(1,-16,1,-16) -- lebih kecil & rapih
-    logo.AnchorPoint=Vector2.new(0.5,0.5)
-    logo.Position=UDim2.new(0.5,0,0.5,0) -- center otomatis
-    logo.BackgroundTransparency=1
-    logo.BorderSizePixel=0
-    logo.Image="rbxassetid://111520113876024"
-    logo.ScaleType=Enum.ScaleType.Fit
-    logo.ZIndex=5
-    logo.Parent=logoHolder
+logo.Size=UDim2.new(1,-16,1,-16)
+logo.AnchorPoint=Vector2.new(0.5,0.5)
+logo.Position=UDim2.new(0.5,0,0.5,0)
+logo.BackgroundTransparency=1
+logo.BorderSizePixel=0
+
+-- gunakan format URL lama agar lebih kompatibel
+logo.Image="http://www.roblox.com/asset/?id=111520113876024"
+
+logo.ScaleType=Enum.ScaleType.Fit
+logo.Visible=true
+logo.ImageTransparency=0
+logo.ZIndex=5
+logo.Parent=logoHolder
     --// TITLE
 
     local title=Instance.new("TextLabel")

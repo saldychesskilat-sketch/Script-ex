@@ -3645,26 +3645,29 @@ local function createHomeContent()
     headerStroke.Transparency=0.35
     headerStroke.Parent=header
 
+    --// LOGO HOLDER (SEGI EMPAT)
     local logoHolder=Instance.new("Frame")
     logoHolder.Size=UDim2.new(0,56,0,56)
     logoHolder.Position=UDim2.new(0,12,0,12)
     logoHolder.BackgroundColor3=Color3.fromRGB(10,28,48)
     logoHolder.BorderSizePixel=0
+    logoHolder.ClipsDescendants=true
     logoHolder.Parent=header
-
     Instance.new("UICorner",logoHolder).CornerRadius=UDim.new(0,8)
-
     local logoStroke=Instance.new("UIStroke")
     logoStroke.Color=Color3.fromRGB(0,200,255)
     logoStroke.Transparency=0.45
     logoStroke.Parent=logoHolder
-
+    --// LOGO IMAGE
     local logo=Instance.new("ImageLabel")
-    logo.Size=UDim2.new(1,-8,1,-8)
-    logo.Position=UDim2.new(0,4,0,4)
+    logo.Size=UDim2.new(1,-16,1,-16) -- lebih kecil & rapih
+    logo.AnchorPoint=Vector2.new(0.5,0.5)
+    logo.Position=UDim2.new(0.5,0,0.5,0) -- center otomatis
     logo.BackgroundTransparency=1
+    logo.BorderSizePixel=0
     logo.Image="rbxassetid://76051161792347"
     logo.ScaleType=Enum.ScaleType.Fit
+    logo.ZIndex=5
     logo.Parent=logoHolder
     --// TITLE
 

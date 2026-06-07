@@ -4896,422 +4896,220 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
---// MODERN MINI SWITCH BUTTON
+-- ===============================
+-- IMPROVED GRID BUTTON (per baris)
+-- ===============================
 local function createGridButton(parent, name, text, initialState, onChange)
-
     local holder = Instance.new("Frame")
     holder.Name = name .. "_Holder"
-    holder.Size = UDim2.new(1,-2,0,20)
+    holder.Size = UDim2.new(1, -8, 0, 32)      -- lebih tinggi agar nyaman disentuh
     holder.BackgroundTransparency = 1
     holder.Parent = parent
 
-    -- FEATURE NAME
-
+    -- Label fitur
     local featureLabel = Instance.new("TextLabel")
-    featureLabel.Size = UDim2.new(0.7,0,1,0)
-    featureLabel.Position = UDim2.new(0,2,0,0)
+    featureLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    featureLabel.Position = UDim2.new(0, 6, 0, 0)
     featureLabel.BackgroundTransparency = 1
     featureLabel.Text = text
-    featureLabel.TextColor3 = Color3.fromRGB(235,235,235)
-    featureLabel.TextSize = 7
+    featureLabel.TextColor3 = Color3.fromRGB(230, 240, 255)
+    featureLabel.TextSize = 12
     featureLabel.Font = Enum.Font.GothamBold
     featureLabel.TextXAlignment = Enum.TextXAlignment.Left
+    featureLabel.TextYAlignment = Enum.TextYAlignment.Center
     featureLabel.Parent = holder
 
-    -- SWITCH BUTTON
-
+    -- Tombol switch (slider)
     local switch = Instance.new("TextButton")
     switch.Name = "Switch"
-    switch.Size = UDim2.new(0,30,0,14)
-    switch.Position = UDim2.new(1,-32,0.5,-7)
-    switch.BackgroundColor3 = initialState and Color3.fromRGB(245,245,245) or Color3.fromRGB(45,45,45)
+    switch.Size = UDim2.new(0, 44, 0, 22)
+    switch.Position = UDim2.new(1, -50, 0.5, -11)
+    switch.BackgroundColor3 = initialState and Color3.fromRGB(0, 160, 255) or Color3.fromRGB(30, 30, 45)
     switch.Text = ""
     switch.AutoButtonColor = false
     switch.BorderSizePixel = 0
     switch.Parent = holder
 
     local switchCorner = Instance.new("UICorner")
-    switchCorner.CornerRadius = UDim.new(1,0)
+    switchCorner.CornerRadius = UDim.new(1, 0)
     switchCorner.Parent = switch
 
+    -- Stroke tipis untuk switch
     local switchStroke = Instance.new("UIStroke")
-    switchStroke.Color = initialState and Color3.fromRGB(255,255,255) or Color3.fromRGB(110,110,110)
+    switchStroke.Color = initialState and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(100, 100, 130)
     switchStroke.Thickness = 1
-    switchStroke.Transparency = 0.1
+    switchStroke.Transparency = 0.3
     switchStroke.Parent = switch
 
-    -- SWITCH CIRCLE
-
+    -- Lingkaran slider
     local circle = Instance.new("Frame")
-    circle.Size = UDim2.new(0,10,0,10)
-    circle.Position = initialState and UDim2.new(1,-12,0.5,-5) or UDim2.new(0,2,0.5,-5)
-    circle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    circle.Size = UDim2.new(0, 18, 0, 18)
+    circle.Position = initialState and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
+    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     circle.BorderSizePixel = 0
     circle.Parent = switch
 
     local circleCorner = Instance.new("UICorner")
-    circleCorner.CornerRadius = UDim.new(1,0)
+    circleCorner.CornerRadius = UDim.new(1, 0)
     circleCorner.Parent = circle
 
-    local glow = Instance.new("UIStroke")
-    glow.Color = Color3.fromRGB(255,255,255)
-    glow.Thickness = 1
-    glow.Transparency = 0.2
-    glow.Parent = circle
+    -- Efek glow kecil pada lingkaran
+    local circleGlow = Instance.new("UIStroke")
+    circleGlow.Color = Color3.fromRGB(255, 255, 255)
+    circleGlow.Thickness = 1.5
+    circleGlow.Transparency = 0.4
+    circleGlow.Parent = circle
 
-    -- UPDATE VISUAL
-
+    -- Update visual
     local function updateState(state)
-
         if state then
-
-            switch.BackgroundColor3 = Color3.fromRGB(240,240,240)
-            switchStroke.Color = Color3.fromRGB(255,255,255)
-
-            TweenService:Create(
-                circle,
-                TweenInfo.new(0.16, Enum.EasingStyle.Quad),
-                {
-                    Position = UDim2.new(1,-12,0.5,-5)
-                }
-            ):Play()
-
+            -- Mode ON
+            switch.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+            switchStroke.Color = Color3.fromRGB(0, 220, 255)
+            switchStroke.Transparency = 0.1
+            TweenService:Create(circle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                Position = UDim2.new(1, -22, 0.5, -9)
+            }):Play()
         else
-
-            switch.BackgroundColor3 = Color3.fromRGB(45,45,45)
-            switchStroke.Color = Color3.fromRGB(110,110,110)
-
-            TweenService:Create(
-                circle,
-                TweenInfo.new(0.16, Enum.EasingStyle.Quad),
-                {
-                    Position = UDim2.new(0,2,0.5,-5)
-                }
-            ):Play()
+            -- Mode OFF
+            switch.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+            switchStroke.Color = Color3.fromRGB(100, 100, 130)
+            switchStroke.Transparency = 0.3
+            TweenService:Create(circle, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {
+                Position = UDim2.new(0, 4, 0.5, -9)
+            }):Play()
         end
     end
 
-    -- BUTTON EVENT
-
+    -- Event klik
     switch.MouseButton1Click:Connect(function()
-
         local newState = not (config[name] or false)
+        config[name] = newState
 
+        -- Panggil fungsi-fungsi kontrol yang sudah ada di script asli
         if name == "autoWinEnabled" then
-
-            config.autoWinEnabled = newState
-            if newState then
-                startAutoWin()
-            else
-                stopAutoWin()
-            end
-
+            if newState then startAutoWin() else stopAutoWin() end
         elseif name == "autoTaskEnabled" then
-
-            config.autoTaskEnabled = newState
-            if newState then
-                startAutoTask()
-            else
-                stopAutoTask()
-            end
-
+            if newState then startAutoTask() else stopAutoTask() end
         elseif name == "espEnabled" then
-
-            config.espEnabled = newState
             updateAllESP()
-
         elseif name == "speedBoostEnabled" then
-
-            config.speedBoostEnabled = newState
-
-            if not newState then
-                if localHumanoid then
-                    localHumanoid.WalkSpeed = config.originalWalkSpeed
-                end
+            if not newState and localHumanoid then
+                localHumanoid.WalkSpeed = config.originalWalkSpeed
             end
-
         elseif name == "stealthEnabled" then
-
-            config.stealthEnabled = newState
-            if newState then
-                startStealthMonitor()
-            else
-                stopStealthMonitor()
-            end
-
+            if newState then startStealthMonitor() else stopStealthMonitor() end
         elseif name == "godModeEnabled" then
-
-            config.godModeEnabled = newState
-            if newState then
-                startGodMode()
-            else
-                stopGodMode()
-            end
-
+            if newState then startGodMode() else stopGodMode() end
         elseif name == "infiniteAmmoEnabled" then
-
-            config.infiniteAmmoEnabled = newState
-            if newState then
-                startInfiniteAmmo()
-            else
-                stopInfiniteAmmo()
-            end
-
+            if newState then startInfiniteAmmo() else stopInfiniteAmmo() end
         elseif name == "shieldEnabled" then
-
-            config.shieldEnabled = newState
-            if newState then
-                startShieldMonitor()
-            else
-                stopShieldMonitor()
-            end
-
+            if newState then startShieldMonitor() else stopShieldMonitor() end
         elseif name == "tpwalkEnabled" then
-
-            config.tpwalkEnabled = newState
-            if newState then
-                startTpwalkMonitor()
-            else
-                stopTpwalkMonitor()
-            end
-
+            if newState then startTpwalkMonitor() else stopTpwalkMonitor() end
         elseif name == "noCollideEnabled" then
-
-            config.noCollideEnabled = newState
-            if newState then
-                startNoCollideMonitor()
-            else
-                stopNoCollideMonitor()
-            end
-
+            if newState then startNoCollideMonitor() else stopNoCollideMonitor() end
         elseif name == "massKillEnabled" then
-
-            config.massKillEnabled = newState
-            if newState then
-                startMassKillLoop()
-            else
-                stopMassKillLoop()
-            end
-
+            if newState then startMassKillLoop() else stopMassKillLoop() end
         elseif name == "autoGeneratorEnabled" then
-
-            config.autoGeneratorEnabled = newState
-            if newState then
-                startAutoGeneratorLoop()
-            else
-                stopAutoGeneratorLoop()
-            end
-
+            if newState then startAutoGeneratorLoop() else stopAutoGeneratorLoop() end
         elseif name == "autoSkillCheckEnabled" then
-
-            config.autoSkillCheckEnabled = newState
-            if newState then
-                startAutoSkillCheck()
-            else
-                stopAutoSkillCheck()
-            end
-
+            if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
         elseif name == "autoAimEnabled" then
-
-            config.autoAimEnabled = newState
-            if newState then
-                startAutoAim()
-            else
-                stopAutoAim()
-            end
-
+            if newState then startAutoAim() else stopAutoAim() end
         elseif name == "povMode" then
-
             togglePOV()
-            return
+            return  -- POV tidak pakai updateState biasa
         end
 
         updateState(newState)
-
-        if onChange then
-            onChange(newState)
-        end
+        if onChange then onChange(newState) end
     end)
 
+    -- Set initial state
+    updateState(initialState)
     return holder
 end
 
-
---// MODERN SIDEBAR ITEM
-local function createSidebarItem(parent, text, icon, active)
-
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1,0,0,22)
-    button.Text = "  " .. icon .. "  " .. text
-    button.TextColor3 = active and Color3.fromRGB(0,240,255) or Color3.fromRGB(220,220,220)
-    button.BackgroundColor3 = active and Color3.fromRGB(15,28,45) or Color3.fromRGB(10,15,24)
-    button.BackgroundTransparency = 0.08
-    button.TextSize = 8
-    button.Font = Enum.Font.GothamBold
-    button.TextXAlignment = Enum.TextXAlignment.Left
-    button.BorderSizePixel = 0
-    button.AutoButtonColor = false
-    button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0,6)
-    corner.Parent = button
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = active and Color3.fromRGB(0,220,255) or Color3.fromRGB(70,70,70)
-    stroke.Transparency = active and 0.15 or 0.55
-    stroke.Thickness = 1
-    stroke.Parent = button
-
-    return button
-end
-
-
---// FEATURE PANEL
+-- ===============================
+-- IMPROVED FEATURE PANEL (dengan scrolling & 1 kolom)
+-- ===============================
 local function createFeaturePanel(parent)
-
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1,-4,1,-4)
-    scroll.Position = UDim2.new(0,2,0,2)
+    scroll.Size = UDim2.new(1, -8, 1, -8)
+    scroll.Position = UDim2.new(0, 4, 0, 4)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 1
-    scroll.CanvasSize = UDim2.new(0,0,0,0)
+    scroll.ScrollBarThickness = 4
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     scroll.Parent = parent
 
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0,5)
+    layout.Padding = UDim.new(0, 8)
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = scroll
 
     local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0,3)
-    padding.PaddingBottom = UDim.new(0,6)
-    padding.PaddingLeft = UDim.new(0,3)
-    padding.PaddingRight = UDim.new(0,3)
+    padding.PaddingTop = UDim.new(0, 8)
+    padding.PaddingBottom = UDim.new(0, 12)
+    padding.PaddingLeft = UDim.new(0, 6)
+    padding.PaddingRight = UDim.new(0, 6)
     padding.Parent = scroll
 
-    -- TOP FEATURE HOLDER
-
-    local topHolder = Instance.new("Frame")
-    topHolder.Size = UDim2.new(1,-2,0,26)
-    topHolder.BackgroundTransparency = 1
-    topHolder.Parent = scroll
-
-    local topLayout = Instance.new("UIListLayout")
-    topLayout.FillDirection = Enum.FillDirection.Horizontal
-    topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    topLayout.Padding = UDim.new(0,5)
-    topLayout.Parent = topHolder
-
-    -- AUTO WIN BUTTON
-
-    local autoWinButton = Instance.new("TextButton")
-    autoWinButton.Size = UDim2.new(0.48,0,1,0)
-    autoWinButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
-    autoWinButton.Text = "AUTO WIN"
-    autoWinButton.TextColor3 = Color3.fromRGB(0,240,255)
-    autoWinButton.TextSize = 8
-    autoWinButton.Font = Enum.Font.GothamBold
-    autoWinButton.BorderSizePixel = 0
-    autoWinButton.Parent = topHolder
-
-    Instance.new("UICorner",autoWinButton).CornerRadius = UDim.new(1,0)
-
-    local awStroke = Instance.new("UIStroke")
-    awStroke.Color = Color3.fromRGB(0,220,255)
-    awStroke.Transparency = 0.35
-    awStroke.Parent = autoWinButton
-
-    autoWinButton.MouseButton1Click:Connect(function()
-
-        config.autoWinEnabled = not config.autoWinEnabled
-
-        if config.autoWinEnabled then
-            startAutoWin()
-            autoWinButton.BackgroundColor3 = Color3.fromRGB(0,180,255)
-        else
-            stopAutoWin()
-            autoWinButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
-        end
-    end)
-
-    -- ESP BUTTON
-
-    local espButton = Instance.new("TextButton")
-    espButton.Size = UDim2.new(0.48,0,1,0)
-    espButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
-    espButton.Text = "ESP"
-    espButton.TextColor3 = Color3.fromRGB(0,240,255)
-    espButton.TextSize = 8
-    espButton.Font = Enum.Font.GothamBold
-    espButton.BorderSizePixel = 0
-    espButton.Parent = topHolder
-
-    Instance.new("UICorner",espButton).CornerRadius = UDim.new(1,0)
-
-    local espStroke = Instance.new("UIStroke")
-    espStroke.Color = Color3.fromRGB(0,220,255)
-    espStroke.Transparency = 0.35
-    espStroke.Parent = espButton
-
-    espButton.MouseButton1Click:Connect(function()
-
-        config.espEnabled = not config.espEnabled
-        updateAllESP()
-
-        if config.espEnabled then
-            espButton.BackgroundColor3 = Color3.fromRGB(0,180,255)
-        else
-            espButton.BackgroundColor3 = Color3.fromRGB(10,18,30)
-        end
-    end)
-
-    -- FEATURE CONTAINER
-
+    -- Container utama (kartu gelap dengan stroke biru)
     local featureContainer = Instance.new("Frame")
-    featureContainer.Size = UDim2.new(1,-2,0,270)
-    featureContainer.BackgroundColor3 = Color3.fromRGB(8,15,25)
+    featureContainer.Size = UDim2.new(1, -4, 0, 0)  -- tinggi otomatis mengikuti isi
+    featureContainer.BackgroundColor3 = Color3.fromRGB(8, 16, 28)
     featureContainer.BorderSizePixel = 0
     featureContainer.Parent = scroll
 
-    Instance.new("UICorner",featureContainer).CornerRadius = UDim.new(0,8)
+    Instance.new("UICorner", featureContainer).CornerRadius = UDim.new(0, 12)
 
-    local featureStroke = Instance.new("UIStroke")
-    featureStroke.Color = Color3.fromRGB(0,180,255)
-    featureStroke.Transparency = 0.55
-    featureStroke.Parent = featureContainer
+    local containerStroke = Instance.new("UIStroke")
+    containerStroke.Color = Color3.fromRGB(0, 180, 255)
+    containerStroke.Thickness = 1.2
+    containerStroke.Transparency = 0.45
+    containerStroke.Parent = featureContainer
 
-    local featureLayout = Instance.new("UIListLayout")
-    featureLayout.Padding = UDim.new(0,2)
-    featureLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    featureLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    featureLayout.Parent = featureContainer
+    -- Layout di dalam container
+    local innerLayout = Instance.new("UIListLayout")
+    innerLayout.Padding = UDim.new(0, 6)
+    innerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    innerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    innerLayout.Parent = featureContainer
 
-    local featurePadding = Instance.new("UIPadding")
-    featurePadding.PaddingTop = UDim.new(0,4)
-    featurePadding.PaddingBottom = UDim.new(0,4)
-    featurePadding.PaddingLeft = UDim.new(0,4)
-    featurePadding.PaddingRight = UDim.new(0,4)
-    featurePadding.Parent = featureContainer
+    local innerPadding = Instance.new("UIPadding")
+    innerPadding.PaddingTop = UDim.new(0, 10)
+    innerPadding.PaddingBottom = UDim.new(0, 10)
+    innerPadding.PaddingLeft = UDim.new(0, 8)
+    innerPadding.PaddingRight = UDim.new(0, 8)
+    innerPadding.Parent = featureContainer
 
-    -- FEATURE LIST
+    -- Daftar semua fitur (satu per baris)
+    createGridButton(featureContainer, "autoTaskEnabled", "AUTO TASK", config.autoTaskEnabled)
+    createGridButton(featureContainer, "speedBoostEnabled", "SPEED BOOST", config.speedBoostEnabled)
+    createGridButton(featureContainer, "stealthEnabled", "STEALTH MODE", config.stealthEnabled)
+    createGridButton(featureContainer, "godModeEnabled", "GOD MODE", config.godModeEnabled)
+    createGridButton(featureContainer, "infiniteAmmoEnabled", "INFINITE AMMO", config.infiniteAmmoEnabled)
+    createGridButton(featureContainer, "shieldEnabled", "AUTO SHIELD", config.shieldEnabled)
+    createGridButton(featureContainer, "tpwalkEnabled", "TP WALK", config.tpwalkEnabled)
+    createGridButton(featureContainer, "noCollideEnabled", "NO COLLIDE", config.noCollideEnabled)
+    createGridButton(featureContainer, "massKillEnabled", "MASS KILL", config.massKillEnabled)
+    createGridButton(featureContainer, "autoGeneratorEnabled", "AUTO GENERATOR", config.autoGeneratorEnabled)
+    createGridButton(featureContainer, "autoSkillCheckEnabled", "AUTO SKILL CHECK", config.autoSkillCheckEnabled)
+    createGridButton(featureContainer, "autoAimEnabled", "AUTO AIM", config.autoAimEnabled)
+    createGridButton(featureContainer, "povMode", "POV MODE", false)
 
-    createGridButton(featureContainer,"autoTaskEnabled","AUTO TASK",config.autoTaskEnabled)
-    createGridButton(featureContainer,"speedBoostEnabled","SPEED BOOST",config.speedBoostEnabled)
-    createGridButton(featureContainer,"stealthEnabled","STEALTH MODE",config.stealthEnabled)
-    createGridButton(featureContainer,"godModeEnabled","GOD MODE",config.godModeEnabled)
-    createGridButton(featureContainer,"infiniteAmmoEnabled","INFINITE AMMO",config.infiniteAmmoEnabled)
-    createGridButton(featureContainer,"shieldEnabled","AUTO SHIELD",config.shieldEnabled)
-    createGridButton(featureContainer,"tpwalkEnabled","TP WALK",config.tpwalkEnabled)
-    createGridButton(featureContainer,"noCollideEnabled","NO COLLIDE",config.noCollideEnabled)
-    createGridButton(featureContainer,"massKillEnabled","MASS KILL",config.massKillEnabled)
-    createGridButton(featureContainer,"autoGeneratorEnabled","AUTO GENERATOR",config.autoGeneratorEnabled)
-    createGridButton(featureContainer,"autoSkillCheckEnabled","AUTO SKILL CHECK",config.autoSkillCheckEnabled)
-    createGridButton(featureContainer,"autoAimEnabled","AUTO AIM",config.autoAimEnabled)
-    createGridButton(featureContainer,"povMode","POV MODE",false)
+    -- Hapus duplikasi autoWin & ESP dari sini karena sekarang sudah masuk ke dalam list baris
+    -- (jika ingin tetap ada tombol cepat di atas, bisa ditambahkan terpisah, tapi sesuai permintaan dibuat 1 kolom vertikal)
+
+    -- Pastikan container menyesuaikan tinggi
+    featureContainer.Size = UDim2.new(1, -4, 0, 0)
+    innerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        featureContainer.Size = UDim2.new(1, -4, 0, innerLayout.AbsoluteContentSize.Y + 20)
+    end)
 
     return scroll
 end

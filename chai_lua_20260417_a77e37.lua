@@ -4901,10 +4901,14 @@ local function createSidebarItem(parent,text,icon,active)
     local button=Instance.new("TextButton")
     button.Size=UDim2.new(1,-4,0,22)
     button.BackgroundColor3=active and Color3.fromRGB(0,85,140) or Color3.fromRGB(10,20,35)
-    button.BackgroundTransparency=0.12
+    button.BackgroundTransparency=0.08
     button.Text=""
     button.AutoButtonColor=false
     button.BorderSizePixel=0
+    button.ClipsDescendants=true
+    button.Active=true
+    button.Selectable=true
+    button.ZIndex=5
     button.Parent=parent
 
     local corner=Instance.new("UICorner")
@@ -4914,12 +4918,12 @@ local function createSidebarItem(parent,text,icon,active)
     local stroke=Instance.new("UIStroke")
     stroke.Color=active and Color3.fromRGB(0,220,255) or Color3.fromRGB(0,90,130)
     stroke.Thickness=1
-    stroke.Transparency=active and 0.15 or 0.45
+    stroke.Transparency=active and 0.12 or 0.45
     stroke.Parent=button
 
     local gradient=Instance.new("UIGradient")
     gradient.Color=ColorSequence.new{
-        ColorSequenceKeypoint.new(0,Color3.fromRGB(12,24,42)),
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(14,26,44)),
         ColorSequenceKeypoint.new(1,Color3.fromRGB(8,16,28))
     }
     gradient.Rotation=90
@@ -4929,8 +4933,11 @@ local function createSidebarItem(parent,text,icon,active)
     glow.Size=UDim2.new(0,2,1,-6)
     glow.Position=UDim2.new(0,3,0,3)
     glow.BackgroundColor3=Color3.fromRGB(0,220,255)
+    glow.BackgroundTransparency=active and 0 or 0.7
     glow.BorderSizePixel=0
-    glow.BackgroundTransparency=active and 0 or 0.65
+    glow.Active=false
+    glow.Selectable=false
+    glow.ZIndex=1
     glow.Parent=button
 
     local glowCorner=Instance.new("UICorner")
@@ -4938,63 +4945,113 @@ local function createSidebarItem(parent,text,icon,active)
     glowCorner.Parent=glow
 
     local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-10,1,0)
+    title.Size=UDim2.new(1,-12,1,0)
     title.Position=UDim2.new(0,8,0,0)
     title.BackgroundTransparency=1
     title.Text=icon.."  "..text
-    title.TextColor3=active and Color3.fromRGB(0,235,255) or Color3.fromRGB(200,210,220)
+    title.TextColor3=active and Color3.fromRGB(0,235,255) or Color3.fromRGB(205,215,225)
     title.Font=Enum.Font.GothamBold
     title.TextSize=8
     title.TextXAlignment=Enum.TextXAlignment.Left
+    title.Active=false
+    title.Selectable=false
+    title.ZIndex=6
     title.Parent=button
 
+    local hover=false
+
+    local function updateVisual(state)
+
+        TweenService:Create(button,TweenInfo.new(0.14),{
+            BackgroundColor3=state and Color3.fromRGB(0,85,140) or Color3.fromRGB(10,20,35)
+        }):Play()
+
+        TweenService:Create(stroke,TweenInfo.new(0.14),{
+            Color=state and Color3.fromRGB(0,220,255) or Color3.fromRGB(0,90,130),
+            Transparency=state and 0.1 or 0.45
+        }):Play()
+
+        TweenService:Create(glow,TweenInfo.new(0.14),{
+            BackgroundTransparency=state and 0 or 0.7
+        }):Play()
+
+        TweenService:Create(title,TweenInfo.new(0.14),{
+            TextColor3=state and Color3.fromRGB(0,235,255) or Color3.fromRGB(205,215,225)
+        }):Play()
+    end
+
     button.MouseEnter:Connect(function()
+
+        hover=true
+
         TweenService:Create(button,TweenInfo.new(0.12),{
             BackgroundColor3=Color3.fromRGB(16,32,52)
         }):Play()
 
         TweenService:Create(stroke,TweenInfo.new(0.12),{
-            Transparency=0.1
+            Transparency=0.08
         }):Play()
 
         TweenService:Create(glow,TweenInfo.new(0.12),{
-            BackgroundTransparency=0.1
+            BackgroundTransparency=0.08
         }):Play()
 
         TweenService:Create(title,TweenInfo.new(0.12),{
-            TextColor3=Color3.fromRGB(0,235,255)
+            TextColor3=Color3.fromRGB(0,240,255)
         }):Play()
     end)
 
     button.MouseLeave:Connect(function()
-        TweenService:Create(button,TweenInfo.new(0.12),{
-            BackgroundColor3=active and Color3.fromRGB(0,85,140) or Color3.fromRGB(10,20,35)
-        }):Play()
 
-        TweenService:Create(stroke,TweenInfo.new(0.12),{
-            Transparency=active and 0.15 or 0.45
-        }):Play()
-
-        TweenService:Create(glow,TweenInfo.new(0.12),{
-            BackgroundTransparency=active and 0 or 0.65
-        }):Play()
-
-        TweenService:Create(title,TweenInfo.new(0.12),{
-            TextColor3=active and Color3.fromRGB(0,235,255) or Color3.fromRGB(200,210,220)
-        }):Play()
+        hover=false
+        updateVisual(active)
     end)
 
     button.MouseButton1Down:Connect(function()
+
         TweenService:Create(button,TweenInfo.new(0.05),{
-            Size=UDim2.new(1,-6,0,20)
+            BackgroundTransparency=0
+        }):Play()
+
+        TweenService:Create(button,TweenInfo.new(0.05),{
+            Position=UDim2.new(
+                button.Position.X.Scale,
+                button.Position.X.Offset,
+                button.Position.Y.Scale,
+                button.Position.Y.Offset+1
+            )
         }):Play()
     end)
 
     button.MouseButton1Up:Connect(function()
+
         TweenService:Create(button,TweenInfo.new(0.06),{
-            Size=UDim2.new(1,-4,0,22)
+            Position=UDim2.new(
+                button.Position.X.Scale,
+                button.Position.X.Offset,
+                button.Position.Y.Scale,
+                button.Position.Y.Offset-1
+            )
         }):Play()
+
+        if hover then
+            TweenService:Create(button,TweenInfo.new(0.06),{
+                BackgroundTransparency=0.05
+            }):Play()
+        else
+            TweenService:Create(button,TweenInfo.new(0.06),{
+                BackgroundTransparency=0.08
+            }):Play()
+        end
     end)
+
+    button:SetAttribute("ActiveState",active)
+
+    function button:SetActive(state)
+        active=state
+        button:SetAttribute("ActiveState",state)
+        updateVisual(state)
+    end
 
     return button
 end
@@ -5004,6 +5061,8 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     local holder=Instance.new("Frame")
     holder.Size=UDim2.new(1,-4,0,24)
     holder.BackgroundTransparency=1
+    holder.Active=false
+    holder.ZIndex=1
     holder.Parent=parent
 
     local button=Instance.new("TextButton")
@@ -5013,6 +5072,9 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     button.Text=""
     button.BorderSizePixel=0
     button.AutoButtonColor=false
+    button.Active=true
+    button.Selectable=true
+    button.ZIndex=5
     button.Parent=holder
 
     local corner=Instance.new("UICorner")
@@ -5022,7 +5084,7 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     local stroke=Instance.new("UIStroke")
     stroke.Color=initialState and Color3.fromRGB(0,220,255) or Color3.fromRGB(0,90,130)
     stroke.Thickness=1
-    stroke.Transparency=initialState and 0.1 or 0.5
+    stroke.Transparency=initialState and 0.08 or 0.5
     stroke.Parent=button
 
     local gradient=Instance.new("UIGradient")
@@ -5034,7 +5096,7 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     gradient.Parent=button
 
     local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-50,1,0)
+    title.Size=UDim2.new(1,-52,1,0)
     title.Position=UDim2.new(0,8,0,0)
     title.BackgroundTransparency=1
     title.Text=text
@@ -5042,6 +5104,9 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     title.Font=Enum.Font.GothamBold
     title.TextSize=8
     title.TextXAlignment=Enum.TextXAlignment.Left
+    title.Active=false
+    title.Selectable=false
+    title.ZIndex=6
     title.Parent=button
 
     local switch=Instance.new("Frame")
@@ -5049,6 +5114,9 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     switch.Position=UDim2.new(1,-38,0.5,-7)
     switch.BackgroundColor3=initialState and Color3.fromRGB(0,120,255) or Color3.fromRGB(30,35,45)
     switch.BorderSizePixel=0
+    switch.Active=false
+    switch.Selectable=false
+    switch.ZIndex=6
     switch.Parent=button
 
     local switchCorner=Instance.new("UICorner")
@@ -5060,6 +5128,9 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     knob.Position=initialState and UDim2.new(1,-13,0.5,-6) or UDim2.new(0,1,0.5,-6)
     knob.BackgroundColor3=Color3.fromRGB(255,255,255)
     knob.BorderSizePixel=0
+    knob.Active=false
+    knob.Selectable=false
+    knob.ZIndex=7
     knob.Parent=switch
 
     local knobCorner=Instance.new("UICorner")
@@ -5074,6 +5145,9 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     stateText.TextColor3=initialState and Color3.fromRGB(0,255,220) or Color3.fromRGB(180,180,180)
     stateText.Font=Enum.Font.GothamBold
     stateText.TextSize=6
+    stateText.Active=false
+    stateText.Selectable=false
+    stateText.ZIndex=7
     stateText.Parent=switch
 
     local function updateState(state)
@@ -5097,26 +5171,30 @@ local function createToggleButton(parent,name,text,initialState,onChange)
     end
 
     button.MouseEnter:Connect(function()
+
         TweenService:Create(button,TweenInfo.new(0.12),{
             BackgroundColor3=Color3.fromRGB(14,28,46)
         }):Play()
     end)
 
     button.MouseLeave:Connect(function()
+
         TweenService:Create(button,TweenInfo.new(0.12),{
             BackgroundColor3=Color3.fromRGB(10,20,35)
         }):Play()
     end)
 
     button.MouseButton1Down:Connect(function()
+
         TweenService:Create(button,TweenInfo.new(0.05),{
-            Size=UDim2.new(1,-2,1,-2)
+            BackgroundTransparency=0
         }):Play()
     end)
 
     button.MouseButton1Up:Connect(function()
+
         TweenService:Create(button,TweenInfo.new(0.06),{
-            Size=UDim2.new(1,0,1,0)
+            BackgroundTransparency=0.08
         }):Play()
     end)
 

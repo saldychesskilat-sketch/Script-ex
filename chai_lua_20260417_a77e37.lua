@@ -3246,8 +3246,10 @@ end
 
 --========================
 -- Skull check
---========================
- local function GetActionTarget()
+--=======================
+-- Upgrade Auto Skill Check dengan akurasi tinggi dan pencegahan double trigger
+
+local function GetActionTarget()
     local current = localPlayer:FindFirstChild("PlayerGui")
     if not current then return nil end
     for segment in string.gmatch(ActionPath, "[^%.]+") do
@@ -3255,183 +3257,182 @@ end
     end
     return current
 end
+
 local function TriggerMobileButton()
     local b = GetActionTarget()
     if b and b:IsA("GuiObject") then
-        local p,s,i = b.AbsolutePosition,b.AbsoluteSize,GuiService:GetGuiInset()
-        local cx,cy = p.X + (s.X/2) + i.X,p.Y + (s.Y/2) + i.Y
+        local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
+        local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
         pcall(function()
-            VirtualInputManager:SendTouchEvent(TouchID,0,cx,cy)
-            task.wait(0.008)
-            VirtualInputManager:SendTouchEvent(TouchID,2,cx,cy)
+            VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy)
+            task.wait(0.01)
+            VirtualInputManager:SendTouchEvent(TouchID, 2, cx, cy)
         end)
     end
 end
+
+local skillCheckActive = false
+local currentSkillCheckConnection = nil
+local currentVisibilityConnection = nil
+
+local function findSkillCheckComponents(promptGui)
+    -- Cari semua Line dan Goal, prioritaskan yang visible
+    local line, goal = nil, nil
+    for _, child in ipairs(promptGui:GetDescendants()) do
+        if child:IsA("Frame") or child:IsA("ImageLabel") then
+            if child.Name:lower():find("line") and child.Visible then
+                line = child
+            elseif child.Name:lower():find("goal") and child.Visible then
+                goal = child
+            end
+        end
+    end
+    return line, goal
+end
+
+local function isRotationInRange(lineRot, goalRot, toleranceLow, toleranceHigh)
+    -- Normalisasi sudut ke [0, 360)
+    lineRot = lineRot % 360
+    goalRot = goalRot % 360
+    local startAngle = (goalRot + toleranceLow) % 360
+    local endAngle = (goalRot + toleranceHigh) % 360
+    
+    if startAngle <= endAngle then
+        return lineRot >= startAngle and lineRot <= endAngle
+    else
+        -- Melewati batas 0 derajat
+        return lineRot >= startAngle or lineRot <= endAngle
+    end
+end
+
+local function monitorSkillCheck(checkFrame, line, goal)
+    if currentSkillCheckConnection then
+        currentSkillCheckConnection:Disconnect()
+        currentSkillCheckConnection = nil
+    end
+    
+    local triggered = false
+    
+    currentSkillCheckConnection = RunService.Heartbeat:Connect(function()
+        if not config.autoSkillCheckEnabled then
+            return
+        end
+        if not checkFrame or not checkFrame.Visible then
+            -- Skill check selesai
+            if currentSkillCheckConnection then
+                currentSkillCheckConnection:Disconnect()
+                currentSkillCheckConnection = nil
+            end
+            skillCheckActive = false
+            return
+        end
+        if triggered then
+            return
+        end
+        
+        -- Dapatkan line dan goal terbaru (bisa berubah karena animasi)
+        local currentLine, currentGoal = findSkillCheckComponents(checkFrame.Parent)
+        if not currentLine or not currentGoal then
+            return
+        end
+        
+        local lineRot = currentLine.Rotation % 360
+        local goalRot = currentGoal.Rotation % 360
+        
+        -- Toleransi dinamis: lebih lebar untuk kemudahan, bisa disesuaikan
+        local lowTol = 100   -- awal range (goal + 100 derajat)
+        local highTol = 120  -- akhir range (goal + 120 derajat)
+        
+        if isRotationInRange(lineRot, goalRot, lowTol, highTol) then
+            triggered = true
+            TriggerMobileButton()
+            -- Matikan koneksi setelah trigger agar tidak double
+            if currentSkillCheckConnection then
+                currentSkillCheckConnection:Disconnect()
+                currentSkillCheckConnection = nil
+            end
+            skillCheckActive = false
+        end
+    end)
+end
+
+local function onSkillCheckVisibilityChanged(checkFrame)
+    return function()
+        if not config.autoSkillCheckEnabled then
+            return
+        end
+        if checkFrame.Visible and not skillCheckActive then
+            skillCheckActive = true
+            local line, goal = findSkillCheckComponents(checkFrame.Parent)
+            if line and goal then
+                monitorSkillCheck(checkFrame, line, goal)
+            end
+        elseif not checkFrame.Visible and skillCheckActive then
+            -- Skill check hilang, bersihkan
+            if currentSkillCheckConnection then
+                currentSkillCheckConnection:Disconnect()
+                currentSkillCheckConnection = nil
+            end
+            skillCheckActive = false
+        end
+    end
+end
+
 local function InitializeAutobuy()
     task.spawn(function()
         local playerGui = localPlayer:FindFirstChild("PlayerGui")
         if not playerGui then return end
         local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
         if not prompt then
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui",10)
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)
         end
-        if not prompt then return end
-        local check = prompt:FindFirstChild("Check")
+        local check = prompt and prompt:FindFirstChild("Check")
         if not check then return end
-        local line = check:FindFirstChild("Line")
-        local goal = check:FindFirstChild("Goal")
-        if not line or not goal then return end
-        if VisibilityConnection then
-            VisibilityConnection:Disconnect()
+        
+        -- Gunakan metode visibility event yang lebih bersih
+        if currentVisibilityConnection then
+            currentVisibilityConnection:Disconnect()
         end
-        VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
-            if localPlayer.Team
-            and localPlayer.Team.Name == "Survivors"
-            and check.Visible then
-                if HeartbeatConnection then
-                    HeartbeatConnection:Disconnect()
-                    HeartbeatConnection=nil
-                end
-                local hitDebounce = false
-                local lastGoalRotation = goal.Rotation
-                local multiGoalDetected = false
-                local stableHits = 0
-                HeartbeatConnection = RunService.Heartbeat:Connect(function()
-                    if not check.Visible then
-                        if HeartbeatConnection then
-                            HeartbeatConnection:Disconnect()
-                            HeartbeatConnection=nil
-                        end
-                        return
-                    end
-                    local lr = line.Rotation % 360
-                    local gr = goal.Rotation % 360
-                    -------------------------------------------------
-                    -- DETECT MULTI GOAL / MULTI PHASE
-                    -------------------------------------------------
-                    local rotDiff = math.abs(gr - lastGoalRotation)
-
-                    if rotDiff > 8 then
-                        multiGoalDetected = true
-                    end
-
-                    lastGoalRotation = gr
-                    -------------------------------------------------
-                    -- SMART RANGE
-                    -------------------------------------------------
-                    local startRange = (gr + 102) % 360
-                    local endRange   = (gr + 120) % 360
-                    local inRange = false
-                    if startRange > endRange then
-                        if lr >= startRange or lr <= endRange then
-                            inRange = true
-                        end
-                    else
-                        if lr >= startRange and lr <= endRange then
-                            inRange = true
-                        end
-                    end
-                    -------------------------------------------------
-                    -- STABLE DETECTION
-                    -------------------------------------------------
-                    if inRange then
-                        stableHits += 1
-                    else
-                        stableHits = 0
-                        hitDebounce = false
-                    end
-                    -------------------------------------------------
-                    -- FIRE INPUT
-                    -------------------------------------------------
-                    if stableHits >= 2 and not hitDebounce then
-                        hitDebounce = true
-                        TriggerMobileButton()
-                        -------------------------------------------------
-                        -- MULTI GOAL SUPPORT
-                        -------------------------------------------------
-                        if multiGoalDetected then
-                            task.wait(0.12)
-                            hitDebounce = false
-                        end
-                    end
-                end)
-            elseif HeartbeatConnection then
-                HeartbeatConnection:Disconnect()
-                HeartbeatConnection=nil
-            end
-        end)
+        currentVisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(onSkillCheckVisibilityChanged(check))
+        -- Panggil sekali untuk mengecek status awal
+        onSkillCheckVisibilityChanged(check)()
     end)
 end
 
 local function startAutoSkillCheck()
-
     if autoSkillCheckConnection then
         return
     end
-
-    autoSkillCheckConnection = RunService.Heartbeat:Connect(function()
-
-        if not config.autoSkillCheckEnabled then
-            return
-        end
-
-        if not getLocalCharacter() then
-            return
-        end
-
-        local playerGui = localPlayer:FindFirstChild("PlayerGui")
-
-        if playerGui then
-
-            for _,gui in ipairs(playerGui:GetDescendants()) do
-
-                if gui:IsA("TextButton")
-                or gui:IsA("ImageButton") then
-
-                    local name = gui.Name:lower()
-
-                    if name:find("skill")
-                    or name:find("check")
-                    or name:find("qte")
-                    or name:find("repair") then
-
-                        if gui.Visible
-                        and gui.Active then
-
-                            pcall(function()
-                                gui:FireClick()
-                            end)
-                        end
-                    end
-                end
-            end
-        end
-    end)
-
+    -- Matikan mode scanning button yang lama karena tidak akurat
+    -- Kita akan gunakan metode rotasi eksklusif
+    if autoSkillCheckConnection then
+        autoSkillCheckConnection:Disconnect()
+        autoSkillCheckConnection = nil
+    end
+    
     InitializeAutobuy()
-
-    print("[AutoSkillCheck] Advanced auto skill check started")
+    print("[AutoSkillCheck] Auto skill check started (enhanced accuracy)")
 end
 
 local function stopAutoSkillCheck()
-
+    if currentSkillCheckConnection then
+        currentSkillCheckConnection:Disconnect()
+        currentSkillCheckConnection = nil
+    end
+    if currentVisibilityConnection then
+        currentVisibilityConnection:Disconnect()
+        currentVisibilityConnection = nil
+    end
     if autoSkillCheckConnection then
         autoSkillCheckConnection:Disconnect()
-        autoSkillCheckConnection=nil
+        autoSkillCheckConnection = nil
     end
-
-    if VisibilityConnection then
-        VisibilityConnection:Disconnect()
-        VisibilityConnection=nil
-    end
-
-    if HeartbeatConnection then
-        HeartbeatConnection:Disconnect()
-        HeartbeatConnection=nil
-    end
-
+    skillCheckActive = false
     print("[AutoSkillCheck] Auto skill check stopped")
 end
+
+-- Override fungsi lama dengan yang baru
+-- (Asumsikan variabel config, autoSkillCheckConnection, dll sudah ada di script utama)
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================

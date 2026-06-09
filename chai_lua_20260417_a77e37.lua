@@ -1805,6 +1805,9 @@ local function autoParryLoop()
         "Animations.StunAnimation",
         "Animations.WipeMachete",
         "sfx.attackline",
+        "Arm.Handle.Handle.BasicAttack",
+        "Weapon.Right",
+        "Arm.Machete.Main.BasicAttack",
         -- Tambahkan sendiri di sini sesuai hasil scanner Anda
     }
     -- ==========================================

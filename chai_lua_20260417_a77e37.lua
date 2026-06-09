@@ -4896,373 +4896,131 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
-local function createSidebarItem(parent,text,icon,active)
+local function createGridButton(parent, name, text, initialState, onChange)
 
-    local button=Instance.new("TextButton")
-    button.Size=UDim2.new(1,-4,0,22)
-    button.BackgroundColor3=active and Color3.fromRGB(0,85,140) or Color3.fromRGB(10,20,35)
-    button.BackgroundTransparency=0.08
-    button.Text=""
-    button.AutoButtonColor=false
-    button.BorderSizePixel=0
-    button.ClipsDescendants=true
-    button.Active=true
-    button.Selectable=true
-    button.ZIndex=5
-    button.Parent=parent
+    local button = Instance.new("TextButton")
+    button.Name = name
+    button.Size = UDim2.new(0,85,0,32)
 
-    local corner=Instance.new("UICorner")
-    corner.CornerRadius=UDim.new(0,5)
-    corner.Parent=button
+    button.Text = text .. (initialState and " [ON]" or " [OFF]")
+    button.TextSize = 9
+    button.Font = Enum.Font.GothamBold
 
-    local stroke=Instance.new("UIStroke")
-    stroke.Color=active and Color3.fromRGB(0,220,255) or Color3.fromRGB(0,90,130)
-    stroke.Thickness=1
-    stroke.Transparency=active and 0.12 or 0.45
-    stroke.Parent=button
+    button.TextColor3 =
+        initialState
+        and Color3.fromRGB(0,225,255)
+        or Color3.fromRGB(220,220,220)
 
-    local gradient=Instance.new("UIGradient")
-    gradient.Color=ColorSequence.new{
-        ColorSequenceKeypoint.new(0,Color3.fromRGB(14,26,44)),
-        ColorSequenceKeypoint.new(1,Color3.fromRGB(8,16,28))
-    }
-    gradient.Rotation=90
-    gradient.Parent=button
+    button.BackgroundColor3 =
+        initialState
+        and Color3.fromRGB(12,28,46)
+        or Color3.fromRGB(8,18,32)
 
-    local glow=Instance.new("Frame")
-    glow.Size=UDim2.new(0,2,1,-6)
-    glow.Position=UDim2.new(0,3,0,3)
-    glow.BackgroundColor3=Color3.fromRGB(0,220,255)
-    glow.BackgroundTransparency=active and 0 or 0.7
-    glow.BorderSizePixel=0
-    glow.Active=false
-    glow.Selectable=false
-    glow.ZIndex=1
-    glow.Parent=button
+    button.BackgroundTransparency = 0.05
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    button.Parent = parent
 
-    local glowCorner=Instance.new("UICorner")
-    glowCorner.CornerRadius=UDim.new(1,0)
-    glowCorner.Parent=glow
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0,8)
+    corner.Parent = button
 
-    local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-12,1,0)
-    title.Position=UDim2.new(0,8,0,0)
-    title.BackgroundTransparency=1
-    title.Text=icon.."  "..text
-    title.TextColor3=active and Color3.fromRGB(0,235,255) or Color3.fromRGB(205,215,225)
-    title.Font=Enum.Font.GothamBold
-    title.TextSize=8
-    title.TextXAlignment=Enum.TextXAlignment.Left
-    title.Active=false
-    title.Selectable=false
-    title.ZIndex=6
-    title.Parent=button
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.2
+    stroke.Transparency = 0.35
 
-    local hover=false
+    stroke.Color =
+        initialState
+        and Color3.fromRGB(0,200,255)
+        or Color3.fromRGB(70,120,160)
 
-    local function updateVisual(state)
-
-        TweenService:Create(button,TweenInfo.new(0.14),{
-            BackgroundColor3=state and Color3.fromRGB(0,85,140) or Color3.fromRGB(10,20,35)
-        }):Play()
-
-        TweenService:Create(stroke,TweenInfo.new(0.14),{
-            Color=state and Color3.fromRGB(0,220,255) or Color3.fromRGB(0,90,130),
-            Transparency=state and 0.1 or 0.45
-        }):Play()
-
-        TweenService:Create(glow,TweenInfo.new(0.14),{
-            BackgroundTransparency=state and 0 or 0.7
-        }):Play()
-
-        TweenService:Create(title,TweenInfo.new(0.14),{
-            TextColor3=state and Color3.fromRGB(0,235,255) or Color3.fromRGB(205,215,225)
-        }):Play()
-    end
-
-    button.MouseEnter:Connect(function()
-
-        hover=true
-
-        TweenService:Create(button,TweenInfo.new(0.12),{
-            BackgroundColor3=Color3.fromRGB(16,32,52)
-        }):Play()
-
-        TweenService:Create(stroke,TweenInfo.new(0.12),{
-            Transparency=0.08
-        }):Play()
-
-        TweenService:Create(glow,TweenInfo.new(0.12),{
-            BackgroundTransparency=0.08
-        }):Play()
-
-        TweenService:Create(title,TweenInfo.new(0.12),{
-            TextColor3=Color3.fromRGB(0,240,255)
-        }):Play()
-    end)
-
-    button.MouseLeave:Connect(function()
-
-        hover=false
-        updateVisual(active)
-    end)
-
-    button.MouseButton1Down:Connect(function()
-
-        TweenService:Create(button,TweenInfo.new(0.05),{
-            BackgroundTransparency=0
-        }):Play()
-
-        TweenService:Create(button,TweenInfo.new(0.05),{
-            Position=UDim2.new(
-                button.Position.X.Scale,
-                button.Position.X.Offset,
-                button.Position.Y.Scale,
-                button.Position.Y.Offset+1
-            )
-        }):Play()
-    end)
-
-    button.MouseButton1Up:Connect(function()
-
-        TweenService:Create(button,TweenInfo.new(0.06),{
-            Position=UDim2.new(
-                button.Position.X.Scale,
-                button.Position.X.Offset,
-                button.Position.Y.Scale,
-                button.Position.Y.Offset-1
-            )
-        }):Play()
-
-        if hover then
-            TweenService:Create(button,TweenInfo.new(0.06),{
-                BackgroundTransparency=0.05
-            }):Play()
-        else
-            TweenService:Create(button,TweenInfo.new(0.06),{
-                BackgroundTransparency=0.08
-            }):Play()
-        end
-    end)
-
-    button:SetAttribute("ActiveState",active)
-
-    function button:SetActive(state)
-        active=state
-        button:SetAttribute("ActiveState",state)
-        updateVisual(state)
-    end
-
-    return button
-end
-
-local function createToggleButton(parent,name,text,initialState,onChange)
-
-    local holder=Instance.new("Frame")
-    holder.Size=UDim2.new(1,-4,0,24)
-    holder.BackgroundTransparency=1
-    holder.Active=false
-    holder.ZIndex=1
-    holder.Parent=parent
-
-    local button=Instance.new("TextButton")
-    button.Size=UDim2.new(1,0,1,0)
-    button.BackgroundColor3=Color3.fromRGB(10,20,35)
-    button.BackgroundTransparency=0.08
-    button.Text=""
-    button.BorderSizePixel=0
-    button.AutoButtonColor=false
-    button.Active=true
-    button.Selectable=true
-    button.ZIndex=5
-    button.Parent=holder
-
-    local corner=Instance.new("UICorner")
-    corner.CornerRadius=UDim.new(0,6)
-    corner.Parent=button
-
-    local stroke=Instance.new("UIStroke")
-    stroke.Color=initialState and Color3.fromRGB(0,220,255) or Color3.fromRGB(0,90,130)
-    stroke.Thickness=1
-    stroke.Transparency=initialState and 0.08 or 0.5
-    stroke.Parent=button
-
-    local gradient=Instance.new("UIGradient")
-    gradient.Color=ColorSequence.new{
-        ColorSequenceKeypoint.new(0,Color3.fromRGB(14,26,44)),
-        ColorSequenceKeypoint.new(1,Color3.fromRGB(8,16,28))
-    }
-    gradient.Rotation=90
-    gradient.Parent=button
-
-    local title=Instance.new("TextLabel")
-    title.Size=UDim2.new(1,-52,1,0)
-    title.Position=UDim2.new(0,8,0,0)
-    title.BackgroundTransparency=1
-    title.Text=text
-    title.TextColor3=Color3.fromRGB(220,220,220)
-    title.Font=Enum.Font.GothamBold
-    title.TextSize=8
-    title.TextXAlignment=Enum.TextXAlignment.Left
-    title.Active=false
-    title.Selectable=false
-    title.ZIndex=6
-    title.Parent=button
-
-    local switch=Instance.new("Frame")
-    switch.Size=UDim2.new(0,30,0,14)
-    switch.Position=UDim2.new(1,-38,0.5,-7)
-    switch.BackgroundColor3=initialState and Color3.fromRGB(0,120,255) or Color3.fromRGB(30,35,45)
-    switch.BorderSizePixel=0
-    switch.Active=false
-    switch.Selectable=false
-    switch.ZIndex=6
-    switch.Parent=button
-
-    local switchCorner=Instance.new("UICorner")
-    switchCorner.CornerRadius=UDim.new(1,0)
-    switchCorner.Parent=switch
-
-    local knob=Instance.new("Frame")
-    knob.Size=UDim2.new(0,12,0,12)
-    knob.Position=initialState and UDim2.new(1,-13,0.5,-6) or UDim2.new(0,1,0.5,-6)
-    knob.BackgroundColor3=Color3.fromRGB(255,255,255)
-    knob.BorderSizePixel=0
-    knob.Active=false
-    knob.Selectable=false
-    knob.ZIndex=7
-    knob.Parent=switch
-
-    local knobCorner=Instance.new("UICorner")
-    knobCorner.CornerRadius=UDim.new(1,0)
-    knobCorner.Parent=knob
-
-    local stateText=Instance.new("TextLabel")
-    stateText.Size=UDim2.new(0,18,1,0)
-    stateText.Position=initialState and UDim2.new(0,3,0,0) or UDim2.new(1,-20,0,0)
-    stateText.BackgroundTransparency=1
-    stateText.Text=initialState and "ON" or "OFF"
-    stateText.TextColor3=initialState and Color3.fromRGB(0,255,220) or Color3.fromRGB(180,180,180)
-    stateText.Font=Enum.Font.GothamBold
-    stateText.TextSize=6
-    stateText.Active=false
-    stateText.Selectable=false
-    stateText.ZIndex=7
-    stateText.Parent=switch
+    stroke.Parent = button
 
     local function updateState(state)
 
-        TweenService:Create(switch,TweenInfo.new(0.16),{
-            BackgroundColor3=state and Color3.fromRGB(0,120,255) or Color3.fromRGB(30,35,45)
-        }):Play()
+        button.Text = text .. (state and " [ON]" or " [OFF]")
 
-        TweenService:Create(knob,TweenInfo.new(0.16),{
-            Position=state and UDim2.new(1,-13,0.5,-6) or UDim2.new(0,1,0.5,-6)
-        }):Play()
+        button.BackgroundColor3 =
+            state
+            and Color3.fromRGB(12,28,46)
+            or Color3.fromRGB(8,18,32)
 
-        TweenService:Create(stroke,TweenInfo.new(0.16),{
-            Color=state and Color3.fromRGB(0,220,255) or Color3.fromRGB(0,90,130),
-            Transparency=state and 0.08 or 0.5
-        }):Play()
+        button.TextColor3 =
+            state
+            and Color3.fromRGB(0,225,255)
+            or Color3.fromRGB(220,220,220)
 
-        stateText.Text=state and "ON" or "OFF"
-        stateText.Position=state and UDim2.new(0,3,0,0) or UDim2.new(1,-20,0,0)
-        stateText.TextColor3=state and Color3.fromRGB(0,255,220) or Color3.fromRGB(180,180,180)
+        stroke.Color =
+            state
+            and Color3.fromRGB(0,200,255)
+            or Color3.fromRGB(70,120,160)
     end
-
-    button.MouseEnter:Connect(function()
-
-        TweenService:Create(button,TweenInfo.new(0.12),{
-            BackgroundColor3=Color3.fromRGB(14,28,46)
-        }):Play()
-    end)
-
-    button.MouseLeave:Connect(function()
-
-        TweenService:Create(button,TweenInfo.new(0.12),{
-            BackgroundColor3=Color3.fromRGB(10,20,35)
-        }):Play()
-    end)
-
-    button.MouseButton1Down:Connect(function()
-
-        TweenService:Create(button,TweenInfo.new(0.05),{
-            BackgroundTransparency=0
-        }):Play()
-    end)
-
-    button.MouseButton1Up:Connect(function()
-
-        TweenService:Create(button,TweenInfo.new(0.06),{
-            BackgroundTransparency=0.08
-        }):Play()
-    end)
 
     button.MouseButton1Click:Connect(function()
 
-        local newState=not(config[name]or false)
+        local newState = not (config[name] or false)
 
-        if name=="autoWinEnabled" then
-            config.autoWinEnabled=newState
+        if name == "autoWinEnabled" then
+            config.autoWinEnabled = newState
             if newState then startAutoWin() else stopAutoWin() end
 
-        elseif name=="autoTaskEnabled" then
-            config.autoTaskEnabled=newState
+        elseif name == "autoTaskEnabled" then
+            config.autoTaskEnabled = newState
             if newState then startAutoTask() else stopAutoTask() end
 
-        elseif name=="espEnabled" then
-            config.espEnabled=newState
+        elseif name == "espEnabled" then
+            config.espEnabled = newState
             updateAllESP()
 
-        elseif name=="speedBoostEnabled" then
-            config.speedBoostEnabled=newState
+        elseif name == "speedBoostEnabled" then
+            config.speedBoostEnabled = newState
             if not newState then
                 if localHumanoid then
-                    localHumanoid.WalkSpeed=config.originalWalkSpeed
+                    localHumanoid.WalkSpeed = config.originalWalkSpeed
                 end
             end
 
-        elseif name=="stealthEnabled" then
-            config.stealthEnabled=newState
+        elseif name == "stealthEnabled" then
+            config.stealthEnabled = newState
             if newState then startStealthMonitor() else stopStealthMonitor() end
 
-        elseif name=="godModeEnabled" then
-            config.godModeEnabled=newState
+        elseif name == "godModeEnabled" then
+            config.godModeEnabled = newState
             if newState then startGodMode() else stopGodMode() end
 
-        elseif name=="infiniteAmmoEnabled" then
-            config.infiniteAmmoEnabled=newState
+        elseif name == "infiniteAmmoEnabled" then
+            config.infiniteAmmoEnabled = newState
             if newState then startInfiniteAmmo() else stopInfiniteAmmo() end
 
-        elseif name=="shieldEnabled" then
-            config.shieldEnabled=newState
+        elseif name == "shieldEnabled" then
+            config.shieldEnabled = newState
             if newState then startShieldMonitor() else stopShieldMonitor() end
 
-        elseif name=="tpwalkEnabled" then
-            config.tpwalkEnabled=newState
+        elseif name == "tpwalkEnabled" then
+            config.tpwalkEnabled = newState
             if newState then startTpwalkMonitor() else stopTpwalkMonitor() end
 
-        elseif name=="noCollideEnabled" then
-            config.noCollideEnabled=newState
+        elseif name == "noCollideEnabled" then
+            config.noCollideEnabled = newState
             if newState then startNoCollideMonitor() else stopNoCollideMonitor() end
 
-        elseif name=="massKillEnabled" then
-            config.massKillEnabled=newState
+        elseif name == "massKillEnabled" then
+            config.massKillEnabled = newState
             if newState then startMassKillLoop() else stopMassKillLoop() end
 
-        elseif name=="autoGeneratorEnabled" then
-            config.autoGeneratorEnabled=newState
+        elseif name == "autoGeneratorEnabled" then
+            config.autoGeneratorEnabled = newState
             if newState then startAutoGeneratorLoop() else stopAutoGeneratorLoop() end
 
-        elseif name=="autoSkillCheckEnabled" then
-            config.autoSkillCheckEnabled=newState
+        elseif name == "autoSkillCheckEnabled" then
+            config.autoSkillCheckEnabled = newState
             if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
 
-        elseif name=="autoAimEnabled" then
-            config.autoAimEnabled=newState
+        elseif name == "autoAimEnabled" then
+            config.autoAimEnabled = newState
             if newState then startAutoAim() else stopAutoAim() end
 
-        elseif name=="povMode" then
+        elseif name == "povMode" then
             togglePOV()
             return
         end
@@ -5272,11 +5030,71 @@ local function createToggleButton(parent,name,text,initialState,onChange)
         if onChange then
             onChange(newState)
         end
+
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.06),
+            {Size = UDim2.new(0,82,0,30)}
+        ):Play()
+
+        task.wait(0.06)
+
+        TweenService:Create(
+            button,
+            TweenInfo.new(0.06),
+            {Size = UDim2.new(0,85,0,32)}
+        ):Play()
     end)
 
-    return holder
+    return button
 end
+local function createSidebarItem(parent, text, icon, active)
 
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1,0,0,30)
+
+    button.Text = "   " .. icon .. "   " .. text
+    button.TextSize = 10
+    button.Font = Enum.Font.GothamBold
+
+    button.TextXAlignment = Enum.TextXAlignment.Left
+
+    button.TextColor3 =
+        active
+        and Color3.fromRGB(0,225,255)
+        or Color3.fromRGB(210,210,210)
+
+    button.BackgroundColor3 =
+        active
+        and Color3.fromRGB(12,30,50)
+        or Color3.fromRGB(8,18,32)
+
+    button.BackgroundTransparency = 0.08
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    button.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0,8)
+    corner.Parent = button
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.2
+
+    stroke.Color =
+        active
+        and Color3.fromRGB(0,200,255)
+        or Color3.fromRGB(60,100,140)
+
+    stroke.Transparency =
+        active
+        and 0.25
+        or 0.55
+
+    stroke.Parent = button
+
+    return button
+end
 -- ============================================================================  
 -- PERMANENT TELEPORT BUTTON (tidak berubah)  
 -- ============================================================================  

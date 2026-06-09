@@ -1769,7 +1769,7 @@ local function getKillerDistance()
     end        
     return minDist        
 end        
-                        
+
 local combatHeartbeat = nil    
 local radiusFolder = nil    
 
@@ -1778,19 +1778,19 @@ local function autoParryLoop()
     combatStateConnected = true    
 
     local DETECTION_RADIUS = 8    
-    local PARRY_COOLDOWN = 0.12          -- cooldown global
+    local PARRY_COOLDOWN = 0.1          -- cooldown global (detik)
     local lastParry = 0    
     local pulseTick = 0    
     local lastPulse = 0    
     local rainbowTick = 0    
 
-    -- Daftar keyword combat berdasarkan hasil scanner
+    -- Keyword combat berdasarkan hasil scanner
     local COMBAT_SOUNDS = {
         "attackline", "swingsound", "wallhitsound", "stunline",
-        "parrysound", "hitsound", "basickill"
+        "parrysound", "frenzysound", "hitsound"
     }
-    local COMBAT_OBJECTS = {
-        "basicattack", "killerost", "lookscriptkiller", "weapon"
+    local COMBAT_ATTRIBUTES = {
+        "frenzy", "parry", "hookprogress", "hookcount"
     }
 
     local scannedObjects = {}    
@@ -1801,7 +1801,7 @@ local function autoParryLoop()
         return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")    
     end    
 
-    -- Deteksi killer berdasarkan team dan keberadaan script khas
+    -- Deteksi killer berdasarkan team dan keberadaan script/attribute khas
     local function isKiller(player)    
         if not player or player == localPlayer then return false end    
         if player.Team then    
@@ -1812,7 +1812,7 @@ local function autoParryLoop()
         end    
         local char = player.Character    
         if char then    
-            if char:FindFirstChild("Killerost") or char:FindFirstChild("Lookscriptkiller") then    
+            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then    
                 return true    
             end    
             local tool = char:FindFirstChildWhichIsA("Tool")    
@@ -1839,11 +1839,39 @@ local function autoParryLoop()
         lastParry = tick()    
         lastParryPerPlayer[player] = tick()    
 
-        print("[AutoParry]", reason, player.Name, "dist=", math.floor(dist))    
+        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))    
         pcall(function() fireParryRemote(player) end)    
     end    
 
-    -- Hook sound combat
+    -- Hook attribute perubahan pada karakter killer
+    local function hookAttributes(player, char)    
+        local function onAttributeChanged(attrName)    
+            return function()    
+                if not config.infiniteAmmoEnabled then return end    
+                local val = char:GetAttribute(attrName)    
+                -- Trigger jika attribute bernilai true (untuk Frenzy/Parry) atau numeric (HookProgress)
+                if attrName:lower() == "frenzy" and val == true then    
+                    triggerParry("Attribute:Frenzy", player)    
+                elseif attrName:lower() == "parry" and val == true then    
+                    triggerParry("Attribute:Parry", player)    
+                elseif attrName:lower() == "hookprogress" and type(val) == "number" and val > 0 then    
+                    -- HookProgress berubah cepat, hanya trigger sekali per serangan (gunakan cooldown per player)
+                    triggerParry("Attribute:HookProgress", player)    
+                elseif attrName:lower() == "hookcount" and val and tonumber(val) and tonumber(val) > 0 then    
+                    triggerParry("Attribute:HookCount", player)    
+                end    
+            end    
+        end    
+
+        for _, attrName in ipairs(COMBAT_ATTRIBUTES) do    
+            if char:GetAttribute(attrName) ~= nil then    
+                local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))    
+                table.insert(stateConnections, conn)    
+            end    
+        end    
+    end    
+
+    -- Hook sound combat (tetap)
     local function hookSound(sound, player)    
         if scannedObjects[sound] then return end    
         scannedObjects[sound] = true    
@@ -1861,10 +1889,13 @@ local function autoParryLoop()
         table.insert(stateConnections, conn)    
     end    
 
-    -- Hook karakter killer (hanya sekali)
+    -- Hook karakter killer
     local function hookCharacter(player, char)    
         if not isKiller(player) then return end    
         print("[AutoParry] Hooked killer:", player.Name)    
+
+        -- Pantau attribute
+        hookAttributes(player, char)    
 
         -- Scan sound yang sudah ada
         for _, obj in ipairs(char:GetDescendants()) do    
@@ -1873,7 +1904,7 @@ local function autoParryLoop()
             end    
         end    
 
-        -- Pantau object baru (sound atau combat object)
+        -- Pantau descendant baru
         local addedConn = char.DescendantAdded:Connect(function(obj)    
             if obj:IsA("Sound") then    
                 hookSound(obj, player)    
@@ -1881,15 +1912,23 @@ local function autoParryLoop()
                     triggerParry("NewSound:"..obj.Name, player)    
                 end    
             end    
-            local objName = obj.Name:lower()    
-            for _, kw in ipairs(COMBAT_OBJECTS) do    
-                if objName:find(kw) then    
-                    triggerParry("Object:"..obj.Name, player)    
-                    break    
-                end    
+            -- Jika objek memiliki attribute combat (misal tool dengan BasicAttack)
+            if obj:IsA("Tool") and obj:FindFirstChild("BasicAttack") then    
+                triggerParry("Tool:BasicAttack", player)    
             end    
         end)    
         table.insert(stateConnections, addedConn)    
+
+        -- Pantau jika character mendapat attribute baru (misal Frenzy ditambahkan kemudian)
+        local attrConn = char.AttributeChanged:Connect(function(attrName)    
+            if attrName:lower() == "frenzy" or attrName:lower() == "parry" or attrName:lower() == "hookprogress" then    
+                local val = char:GetAttribute(attrName)    
+                if (attrName:lower() == "frenzy" and val == true) or (attrName:lower() == "parry" and val == true) then    
+                    triggerParry("AttributeChanged:"..attrName, player)    
+                end    
+            end    
+        end)    
+        table.insert(stateConnections, attrConn)    
     end    
 
     -- Hook existing killers
@@ -1971,7 +2010,7 @@ local function autoParryLoop()
         end)    
     end    
 
-    -- MAIN LOOP (hanya update ESP, tidak scan berat)
+    -- MAIN LOOP (update ESP)
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)    
         if not config.infiniteAmmoEnabled then    
             combatStateConnected = false    
@@ -2001,9 +2040,8 @@ local function autoParryLoop()
         end    
     end)    
 
-    print("[AutoParry] Sound-based combat scanner initialized (optimized)")    
+    print("[AutoParry] Attribute & sound-based combat scanner (optimized for Frenzy/HookProgress)")    
 end
-
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

@@ -1777,7 +1777,7 @@ local function autoParryLoop()
     if combatStateConnected then return end    
     combatStateConnected = true    
 
-    local DETECTION_RADIUS = 8    
+    local DETECTION_RADIUS = 9   
     local PARRY_COOLDOWN = 0.1    
     local lastParry = 0    
     local pulseTick = 0    
@@ -1814,11 +1814,11 @@ local function autoParryLoop()
 
     -- Keyword combat untuk sound & attribute (fallback)
     local COMBAT_SOUNDS = {
-        "attackline", "swingsound", "wallhitsound", "stunline",
+        "attackline", "swingsound", "stunline",
         "parrysound", "frenzysound", "hitsound"
     }
     local COMBAT_ATTRIBUTES = {
-        "frenzy", "parry", "hookprogress", "hookcount"
+        "frenzy", "parry", "hookcount"
     }
 
     local scannedObjects = {}    

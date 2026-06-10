@@ -3160,12 +3160,12 @@ end
 -- ============================================================================
 local homeContent = nil
 
--- Simpan state crosshair di luar agar tidak hilang saat pindah sidebar
+-- State crosshair (disimpan di luar fungsi agar tidak hilang)
 local crosshairState = {
     enabled = false,
-    style = "plus", -- plus, x, o
-    posX = 0,
-    posY = 0
+    posX = 50,
+    posY = 50,
+    style = "plus"
 }
 
 local function createHomeContent()
@@ -3202,7 +3202,7 @@ local function createHomeContent()
     padding.PaddingRight = UDim.new(0,2)
     padding.Parent = scroll
 
-    --// HEADER CARD (sama seperti sebelumnya, tidak diubah)
+    --// HEADER CARD
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1,-6,0,110)
     header.BackgroundColor3 = Color3.fromRGB(8,18,34)
@@ -3316,14 +3316,12 @@ Kemi Studio
     ]]
     infoText.Parent = infoCard
 
-    --// CROSSHAIR SETTINGS (dengan slider posisi X dan Y)
-    -- perbesar card untuk muat slider
+    --// CROSSHAIR SETTINGS
     local crosshairCard = Instance.new("Frame")
     crosshairCard.Size = UDim2.new(1,-6,0,260)
     crosshairCard.BackgroundColor3 = Color3.fromRGB(8,20,36)
     crosshairCard.BorderSizePixel = 0
     crosshairCard.Parent = scroll
-
     Instance.new("UICorner",crosshairCard).CornerRadius = UDim.new(0,10)
     local crossStroke = Instance.new("UIStroke")
     crossStroke.Color = Color3.fromRGB(0,180,255)
@@ -3351,104 +3349,102 @@ Kemi Studio
     crossDesc.TextSize = 10
     crossDesc.TextWrapped = true
     crossDesc.TextXAlignment = Enum.TextXAlignment.Left
-    crossDesc.TextYAlignment = Enum.TextYAlignment.Top
     crossDesc.Parent = crosshairCard
 
-    -- // SLIDER POSISI X
-    local sliderXHolder = Instance.new("Frame")
-    sliderXHolder.Size = UDim2.new(1,-20,0,28)
-    sliderXHolder.Position = UDim2.new(0,10,0,70)
-    sliderXHolder.BackgroundTransparency = 1
-    sliderXHolder.Parent = crosshairCard
+    -- Helper untuk membuat slider
+    local function createSlider(parent, labelText, yOffset, initialValue, onValueChanged)
+        local holder = Instance.new("Frame")
+        holder.Size = UDim2.new(1,-20,0,28)
+        holder.Position = UDim2.new(0,10,0,yOffset)
+        holder.BackgroundTransparency = 1
+        holder.Parent = parent
 
-    local labelX = Instance.new("TextLabel")
-    labelX.Size = UDim2.new(0.3,0,1,0)
-    labelX.BackgroundTransparency = 1
-    labelX.Text = "Position X"
-    labelX.TextColor3 = Color3.fromRGB(220,220,220)
-    labelX.Font = Enum.Font.GothamBold
-    labelX.TextSize = 11
-    labelX.TextXAlignment = Enum.TextXAlignment.Left
-    labelX.Parent = sliderXHolder
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0.3,0,1,0)
+        label.BackgroundTransparency = 1
+        label.Text = labelText
+        label.TextColor3 = Color3.fromRGB(220,220,220)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 11
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = holder
 
-    local valueX = Instance.new("TextLabel")
-    valueX.Size = UDim2.new(0.2,0,1,0)
-    valueX.Position = UDim2.new(0.3,0,0,0)
-    valueX.BackgroundTransparency = 1
-    valueX.Text = tostring(crosshairState.posX)
-    valueX.TextColor3 = Color3.fromRGB(0,220,255)
-    valueX.Font = Enum.Font.GothamBold
-    valueX.TextSize = 11
-    valueX.TextXAlignment = Enum.TextXAlignment.Left
-    valueX.Parent = sliderXHolder
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Size = UDim2.new(0.2,0,1,0)
+        valueLabel.Position = UDim2.new(0.3,0,0,0)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Text = tostring(initialValue)
+        valueLabel.TextColor3 = Color3.fromRGB(0,220,255)
+        valueLabel.Font = Enum.Font.GothamBold
+        valueLabel.TextSize = 11
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+        valueLabel.Parent = holder
 
-    local sliderXbg = Instance.new("Frame")
-    sliderXbg.Size = UDim2.new(0.45,0,0.6,0)
-    sliderXbg.Position = UDim2.new(0.55,0,0.2,0)
-    sliderXbg.BackgroundColor3 = Color3.fromRGB(25,35,50)
-    sliderXbg.BorderSizePixel = 0
-    sliderXbg.Parent = sliderXHolder
-    Instance.new("UICorner",sliderXbg).CornerRadius = UDim.new(1,0)
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(0.45,0,0.6,0)
+        bg.Position = UDim2.new(0.55,0,0.2,0)
+        bg.BackgroundColor3 = Color3.fromRGB(25,35,50)
+        bg.BorderSizePixel = 0
+        bg.Parent = holder
+        Instance.new("UICorner",bg).CornerRadius = UDim.new(1,0)
 
-    local sliderXthumb = Instance.new("TextButton")
-    sliderXthumb.Size = UDim2.new(0,12,0,12)
-    local thumbXPos = crosshairState.posX / 100
-    sliderXthumb.Position = UDim2.new(thumbXPos, -6, 0.5, -6)
-    sliderXthumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
-    sliderXthumb.AutoButtonColor = false
-    sliderXthumb.Text = ""
-    sliderXthumb.BorderSizePixel = 0
-    sliderXthumb.Parent = sliderXbg
-    Instance.new("UICorner",sliderXthumb).CornerRadius = UDim.new(1,0)
+        local thumb = Instance.new("TextButton")
+        thumb.Size = UDim2.new(0,12,0,12)
+        thumb.Position = UDim2.new(initialValue/100, -6, 0.5, -6)
+        thumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
+        thumb.AutoButtonColor = false
+        thumb.Text = ""
+        thumb.BorderSizePixel = 0
+        thumb.Parent = bg
+        Instance.new("UICorner",thumb).CornerRadius = UDim.new(1,0)
 
-    -- // SLIDER POSISI Y
-    local sliderYHolder = Instance.new("Frame")
-    sliderYHolder.Size = UDim2.new(1,-20,0,28)
-    sliderYHolder.Position = UDim2.new(0,10,0,102)
-    sliderYHolder.BackgroundTransparency = 1
-    sliderYHolder.Parent = crosshairCard
+        local dragging = false
+        local function updateThumb(mouseX)
+            local relX = math.clamp((mouseX - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
+            local val = math.floor(relX * 100)
+            valueLabel.Text = tostring(val)
+            thumb.Position = UDim2.new(relX, -6, 0.5, -6)
+            if onValueChanged then
+                onValueChanged(val)
+            end
+        end
 
-    local labelY = Instance.new("TextLabel")
-    labelY.Size = UDim2.new(0.3,0,1,0)
-    labelY.BackgroundTransparency = 1
-    labelY.Text = "Position Y"
-    labelY.TextColor3 = Color3.fromRGB(220,220,220)
-    labelY.Font = Enum.Font.GothamBold
-    labelY.TextSize = 11
-    labelY.TextXAlignment = Enum.TextXAlignment.Left
-    labelY.Parent = sliderYHolder
+        thumb.MouseButton1Down:Connect(function()
+            dragging = true
+        end)
 
-    local valueY = Instance.new("TextLabel")
-    valueY.Size = UDim2.new(0.2,0,1,0)
-    valueY.Position = UDim2.new(0.3,0,0,0)
-    valueY.BackgroundTransparency = 1
-    valueY.Text = tostring(crosshairState.posY)
-    valueY.TextColor3 = Color3.fromRGB(0,220,255)
-    valueY.Font = Enum.Font.GothamBold
-    valueY.TextSize = 11
-    valueY.TextXAlignment = Enum.TextXAlignment.Left
-    valueY.Parent = sliderYHolder
+        UIS.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                updateThumb(input.Position.X)
+            end
+        end)
 
-    local sliderYbg = Instance.new("Frame")
-    sliderYbg.Size = UDim2.new(0.45,0,0.6,0)
-    sliderYbg.Position = UDim2.new(0.55,0,0.2,0)
-    sliderYbg.BackgroundColor3 = Color3.fromRGB(25,35,50)
-    sliderYbg.BorderSizePixel = 0
-    sliderYbg.Parent = sliderYHolder
-    Instance.new("UICorner",sliderYbg).CornerRadius = UDim.new(1,0)
+        UIS.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
 
-    local sliderYthumb = Instance.new("TextButton")
-    sliderYthumb.Size = UDim2.new(0,12,0,12)
-    local thumbYPos = crosshairState.posY / 100
-    sliderYthumb.Position = UDim2.new(thumbYPos, -6, 0.5, -6)
-    sliderYthumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
-    sliderYthumb.AutoButtonColor = false
-    sliderYthumb.Text = ""
-    sliderYthumb.BorderSizePixel = 0
-    sliderYthumb.Parent = sliderYbg
-    Instance.new("UICorner",sliderYthumb).CornerRadius = UDim.new(1,0)
+        bg.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                updateThumb(input.Position.X)
+            end
+        end)
 
-    -- // SHAPE BUTTONS (style)
+        return { holder = holder, valueLabel = valueLabel, thumb = thumb }
+    end
+
+    -- Buat slider X dan Y
+    createSlider(crosshairCard, "Position X", 70, crosshairState.posX, function(val)
+        crosshairState.posX = val
+        updateCrosshairPosition()
+    end)
+    createSlider(crosshairCard, "Position Y", 102, crosshairState.posY, function(val)
+        crosshairState.posY = val
+        updateCrosshairPosition()
+    end)
+
+    -- Shape buttons
     local buttonHolder = Instance.new("Frame")
     buttonHolder.Size = UDim2.new(1,-20,0,34)
     buttonHolder.Position = UDim2.new(0,10,0,140)
@@ -3480,7 +3476,7 @@ Kemi Studio
     local xBtn = createShapeButton("X", crosshairState.style == "x")
     local oBtn = createShapeButton("O", crosshairState.style == "o")
 
-    -- // TOGGLE BUTTON
+    -- Toggle button
     local toggleButton = Instance.new("TextButton")
     toggleButton.Size = UDim2.new(1,-20,0,36)
     toggleButton.Position = UDim2.new(0,10,0,185)
@@ -3494,7 +3490,7 @@ Kemi Studio
     toggleButton.Parent = crosshairCard
     Instance.new("UICorner",toggleButton).CornerRadius = UDim.new(0,8)
 
-    -- // LOGIKA CROSSHAIR GUI
+    -- Crosshair GUI
     local crossGui = game.CoreGui:FindFirstChild("CyberCrosshair")
     if crossGui then crossGui:Destroy() end
 
@@ -3529,7 +3525,6 @@ Kemi Studio
     local x1 = createLine(UDim2.new(0,2,0,30), UDim2.new(0,-1,0,-15))
     x1.Rotation = 45
     x1.Visible = false
-
     local x2 = createLine(UDim2.new(0,2,0,30), UDim2.new(0,-1,0,-15))
     x2.Rotation = -45
     x2.Visible = false
@@ -3546,22 +3541,7 @@ Kemi Studio
     circleStroke.Thickness = 2
     circleStroke.Parent = circle
 
-    -- Fungsi update posisi crosshair berdasarkan nilai slider
-    local function updateCrosshairPosition()
-        local posX = tonumber(valueX.Text) or 0
-        local posY = tonumber(valueY.Text) or 0
-        -- simpan ke state
-        crosshairState.posX = posX
-        crosshairState.posY = posY
-        -- konversi ke offset
-        local offsetX = (posX - 50) * 0.004 * (center.AbsoluteSize.X or 800) -- fallback
-        local offsetY = (posY - 50) * 0.004 * (center.AbsoluteSize.Y or 600)
-        center.Position = UDim2.new(0.5, offsetX, 0.5, offsetY)
-    end
-
-    -- Fungsi update style visual
-    local function applyStyle(style)
-        crosshairState.style = style
+    local function setStyle(style)
         if style == "plus" then
             topLine.Visible = true
             bottomLine.Visible = true
@@ -3588,95 +3568,20 @@ Kemi Studio
             circle.Visible = true
         end
     end
+    setStyle(crosshairState.style)
 
-    applyStyle(crosshairState.style)
-
-    -- Event untuk slider X dan Y dengan drag
-    local userInput = game:GetService("UserInputService")
-
-    -- Slider X
-    local draggingX = false
-    local function setSliderX(value)
-        value = math.clamp(value, 0, 100)
-        valueX.Text = tostring(value)
-        local rel = value / 100
-        sliderXthumb.Position = UDim2.new(rel, -6, 0.5, -6)
-        updateCrosshairPosition()
+    local function updateCrosshairPosition()
+        local posX = crosshairState.posX
+        local posY = crosshairState.posY
+        -- Batasi offset agar tidak keluar layar
+        local offsetX = (posX - 50) * 0.004 * (center.AbsoluteSize.X or 0)
+        local offsetY = (posY - 50) * 0.004 * (center.AbsoluteSize.Y or 0)
+        center.Position = UDim2.new(0.5, offsetX, 0.5, offsetY)
     end
 
-    local function onMouseMoveX(input)
-        if not draggingX then return end
-        local mouseX = input.Position.X
-        local bgPos = sliderXbg.AbsolutePosition.X
-        local bgWidth = sliderXbg.AbsoluteSize.X
-        if bgWidth <= 0 then return end
-        local rel = (mouseX - bgPos) / bgWidth
-        local val = math.floor(math.clamp(rel, 0, 1) * 100)
-        setSliderX(val)
-    end
+    updateCrosshairPosition()
 
-    sliderXthumb.MouseButton1Down:Connect(function()
-        draggingX = true
-    end)
-    sliderXbg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingX = true
-            onMouseMoveX(input)
-        end
-    end)
-    userInput.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            onMouseMoveX(input)
-        end
-    end)
-    userInput.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingX = false
-        end
-    end)
-
-    -- Slider Y
-    local draggingY = false
-    local function setSliderY(value)
-        value = math.clamp(value, 0, 100)
-        valueY.Text = tostring(value)
-        local rel = value / 100
-        sliderYthumb.Position = UDim2.new(rel, -6, 0.5, -6)
-        updateCrosshairPosition()
-    end
-
-    local function onMouseMoveY(input)
-        if not draggingY then return end
-        local mouseY = input.Position.Y
-        local bgPos = sliderYbg.AbsolutePosition.Y
-        local bgHeight = sliderYbg.AbsoluteSize.Y
-        if bgHeight <= 0 then return end
-        local rel = (mouseY - bgPos) / bgHeight
-        local val = math.floor(math.clamp(rel, 0, 1) * 100)
-        setSliderY(val)
-    end
-
-    sliderYthumb.MouseButton1Down:Connect(function()
-        draggingY = true
-    end)
-    sliderYbg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingY = true
-            onMouseMoveY(input)
-        end
-    end)
-    userInput.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            onMouseMoveY(input)
-        end
-    end)
-    userInput.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingY = false
-        end
-    end)
-
-    -- Style button logic
+    -- Event handlers
     local function resetButtons()
         plusBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
         xBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
@@ -3686,19 +3591,22 @@ Kemi Studio
     plusBtn.MouseButton1Click:Connect(function()
         resetButtons()
         plusBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("plus")
+        crosshairState.style = "plus"
+        setStyle("plus")
     end)
 
     xBtn.MouseButton1Click:Connect(function()
         resetButtons()
         xBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("x")
+        crosshairState.style = "x"
+        setStyle("x")
     end)
 
     oBtn.MouseButton1Click:Connect(function()
         resetButtons()
         oBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("o")
+        crosshairState.style = "o"
+        setStyle("o")
     end)
 
     toggleButton.MouseButton1Click:Connect(function()
@@ -3715,12 +3623,7 @@ Kemi Studio
         end
     end)
 
-    -- Inisialisasi posisi crosshair sesuai state
-    setSliderX(crosshairState.posX)
-    setSliderY(crosshairState.posY)
-    updateCrosshairPosition()
-
-    print("[Home] Crosshair settings with position sliders loaded (state preserved)")
+    print("[Home] Crosshair settings with position sliders loaded")
 end
 -- ============================================================================
 -- INFO CONTENT

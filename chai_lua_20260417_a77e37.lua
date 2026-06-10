@@ -1795,11 +1795,15 @@ local function autoParryLoop()
     --         "Killerost" (langsung di karakter)
     local COMBAT_PATHS = {
         "Weapon.TheCureStaff.BasicAttack",
+        "Weapon.bat.bat.BasicAttack",
+        "Character.Weapon.bat.bat.BasicAttack",
         "HumanoidRootPart.FrenzySound",
         "HumanoidRootPart.SwingSound",
         "HumanoidRootPart.attackline",
         "HumanoidRootPart.stunline",
         "HumanoidRootPart.WallHitSound",
+        "Character.Weapon.Right",
+        "Arm.knife",
         "Killerost",
         "Lookscriptkiller",
         "Animations.StunAnimation",

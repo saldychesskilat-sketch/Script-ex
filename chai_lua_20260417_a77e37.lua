@@ -4027,11 +4027,11 @@ end
 -- ABOUT CONTENT
 -- ============================================================================
 local aboutContent = nil
+
+local function createAboutContent()
 local walkSpeedSliderValue = 16 -- default
 local tpwalkActive = false
 local tpwalkConnection = nil
-
-local function createAboutContent()
     if aboutContent then
         aboutContent:Destroy()
     end
@@ -4107,7 +4107,7 @@ local function createAboutContent()
     end
 
     -- ======================== KARTU MOVEMENT ========================
-    local moveCard, moveContainer, moveLayout = createCard("🏃 MOVEMENT")
+    local moveCard, moveContainer, moveLayout = createCard("MOVEMENT")
 
     -- Walk Speed Slider
     local wsHolder = Instance.new("Frame")

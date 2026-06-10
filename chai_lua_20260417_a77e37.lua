@@ -1811,6 +1811,7 @@ local function autoParryLoop()
         "sfx.attackline",
         "Arm.Handle.Handle.BasicAttack",
         "Weapon.Right",
+        "Arm.Knide.Main.BasicAttack",
         "Arm.Machete.Main.BasicAttack",
         -- Tambahkan sendiri di sini sesuai hasil scanner Anda
     }

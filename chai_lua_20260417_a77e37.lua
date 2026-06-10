@@ -1794,8 +1794,10 @@ local function autoParryLoop()
     --         "Torso.redlight" (jika ada)
     --         "Killerost" (langsung di karakter)
     local COMBAT_PATHS = {
+        "Character.Weapon.TheCureStaff.BasicAttack",
         "Weapon.TheCureStaff.BasicAttack",
-        "Weapon.bat.bat.BasicAttack",
+        "Character.Weapon.bat.bat.BasicAttack",
+        "Character.Weapon.Right",
         "Character.Weapon.bat.bat.BasicAttack",
         "HumanoidRootPart.FrenzySound",
         "HumanoidRootPart.SwingSound",
@@ -1811,6 +1813,7 @@ local function autoParryLoop()
         "sfx.attackline",
         "Arm.Handle.Handle.BasicAttack",
         "Weapon.Right",
+        "Character.Weapon.Right",
         "Arm.Knide.Main.BasicAttack",
         "Arm.Machete.Main.BasicAttack",
         -- Tambahkan sendiri di sini sesuai hasil scanner Anda
@@ -1820,7 +1823,7 @@ local function autoParryLoop()
     -- Keyword combat untuk sound & attribute (fallback)
     local COMBAT_SOUNDS = {
         "attackline", "swingsound", "stunline",
-        "parrysound", "frenzysound", "hitsound"
+        "parrysound", "frenzysound", "hitsound", "WallHitStun"
     }
     local COMBAT_ATTRIBUTES = {
         "frenzy", "parry", "hookprogress", "hookcount"

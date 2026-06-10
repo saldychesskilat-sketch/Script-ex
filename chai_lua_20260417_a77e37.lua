@@ -3202,7 +3202,7 @@ local function createHomeContent()
     padding.PaddingRight = UDim.new(0,2)
     padding.Parent = scroll
 
-    --// HEADER CARD (tidak berubah)
+    --// HEADER CARD
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1,-6,0,110)
     header.BackgroundColor3 = Color3.fromRGB(8,18,34)
@@ -3391,8 +3391,6 @@ Kemi Studio
 
     local sliderXthumb = Instance.new("TextButton")
     sliderXthumb.Size = UDim2.new(0,12,0,12)
-    local thumbXPos = crosshairState.posX / 100
-    sliderXthumb.Position = UDim2.new(thumbXPos, -6, 0.5, -6)
     sliderXthumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
     sliderXthumb.AutoButtonColor = false
     sliderXthumb.Text = ""
@@ -3438,8 +3436,6 @@ Kemi Studio
 
     local sliderYthumb = Instance.new("TextButton")
     sliderYthumb.Size = UDim2.new(0,12,0,12)
-    local thumbYPos = crosshairState.posY / 100
-    sliderYthumb.Position = UDim2.new(thumbYPos, -6, 0.5, -6)
     sliderYthumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
     sliderYthumb.AutoButtonColor = false
     sliderYthumb.Text = ""
@@ -3545,15 +3541,16 @@ Kemi Studio
     circleStroke.Thickness = 2
     circleStroke.Parent = circle
 
-    -- Fungsi update posisi crosshair berdasarkan nilai slider
+    -- Fungsi update posisi crosshair (perbaiki dengan viewport)
+    local camera = workspace.CurrentCamera
     local function updateCrosshairPosition()
         local posX = tonumber(valueX.Text) or 0
         local posY = tonumber(valueY.Text) or 0
         crosshairState.posX = posX
         crosshairState.posY = posY
-        -- konversi ke offset (skala -0.2..0.2 dari layar)
-        local offsetX = (posX - 50) * 0.004 * (center.AbsoluteSize.X or 800)
-        local offsetY = (posY - 50) * 0.004 * (center.AbsoluteSize.Y or 600)
+        local viewport = camera.ViewportSize
+        local offsetX = (posX - 50) * viewport.X * 0.004
+        local offsetY = (posY - 50) * viewport.Y * 0.004
         center.Position = UDim2.new(0.5, offsetX, 0.5, offsetY)
     end
 
@@ -3590,89 +3587,114 @@ Kemi Studio
     applyStyle(crosshairState.style)
 
     -- ========================
-    -- SLIDER X & Y - REAL TIME DRAG (Template YouTube)
+    -- SLIDER X & Y - REAL TIME DRAG (RenderStepped + GetMouseLocation)
     -- ========================
     local userInput = game:GetService("UserInputService")
+    local runService = game:GetService("RunService")
 
     -- Slider X
     local draggingX = false
     local function setSliderX(val)
         val = math.clamp(val, 0, 100)
         valueX.Text = tostring(val)
-        local rel = val / 100
-        sliderXthumb.Position = UDim2.new(rel, -6, 0.5, -6)
+        -- Hitung posisi thumb agar tidak keluar track
+        local thumbSize = sliderXthumb.AbsoluteSize.X
+        local trackSize = sliderXbg.AbsoluteSize.X
+        if trackSize > 0 then
+            local rel = val / 100
+            local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
+            sliderXthumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
+        else
+            -- fallback
+            sliderXthumb.Position = UDim2.new(val/100, -thumbSize/2, 0.5, -thumbSize/2)
+        end
         crosshairState.posX = val
         updateCrosshairPosition()
     end
 
-    local function updateSliderXFromMouse(mouseX)
+    local function updateSliderXFromMouse()
+        if not draggingX then return end
+        local mousePos = userInput:GetMouseLocation()
         local bgPos = sliderXbg.AbsolutePosition.X
         local bgWidth = sliderXbg.AbsoluteSize.X
         if bgWidth <= 0 then return end
-        local rel = (mouseX - bgPos) / bgWidth
+        local rel = (mousePos.X - bgPos) / bgWidth
         local val = math.floor(math.clamp(rel, 0, 1) * 100)
         setSliderX(val)
     end
 
-    sliderXthumb.MouseButton1Down:Connect(function(input)
-        draggingX = true
-        updateSliderXFromMouse(input.Position.X)
-    end)
-    sliderXbg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    sliderXthumb.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             draggingX = true
-            updateSliderXFromMouse(input.Position.X)
+            updateSliderXFromMouse()
         end
     end)
-    userInput.InputChanged:Connect(function(input)
-        if draggingX and input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateSliderXFromMouse(input.Position.X)
+    sliderXbg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingX = true
+            updateSliderXFromMouse()
         end
     end)
     userInput.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             draggingX = false
         end
     end)
+    runService.RenderStepped:Connect(function()
+        if draggingX then
+            updateSliderXFromMouse()
+        end
+    end)
 
-    -- Slider Y
+    -- Slider Y (horizontal movement)
     local draggingY = false
     local function setSliderY(val)
         val = math.clamp(val, 0, 100)
         valueY.Text = tostring(val)
-        local rel = val / 100
-        sliderYthumb.Position = UDim2.new(rel, -6, 0.5, -6)
+        local thumbSize = sliderYthumb.AbsoluteSize.X
+        local trackSize = sliderYbg.AbsoluteSize.X
+        if trackSize > 0 then
+            local rel = val / 100
+            local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
+            sliderYthumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
+        else
+            sliderYthumb.Position = UDim2.new(val/100, -thumbSize/2, 0.5, -thumbSize/2)
+        end
         crosshairState.posY = val
         updateCrosshairPosition()
     end
 
-    local function updateSliderYFromMouse(mouseY)
-        local bgPos = sliderYbg.AbsolutePosition.Y
-        local bgHeight = sliderYbg.AbsoluteSize.Y
-        if bgHeight <= 0 then return end
-        local rel = (mouseY - bgPos) / bgHeight
+    local function updateSliderYFromMouse()
+        if not draggingY then return end
+        local mousePos = userInput:GetMouseLocation()
+        local bgPos = sliderYbg.AbsolutePosition.X  -- perhatikan: pakai X
+        local bgWidth = sliderYbg.AbsoluteSize.X
+        if bgWidth <= 0 then return end
+        local rel = (mousePos.X - bgPos) / bgWidth
         local val = math.floor(math.clamp(rel, 0, 1) * 100)
         setSliderY(val)
     end
 
-    sliderYthumb.MouseButton1Down:Connect(function(input)
-        draggingY = true
-        updateSliderYFromMouse(input.Position.Y)
-    end)
-    sliderYbg.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+    sliderYthumb.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             draggingY = true
-            updateSliderYFromMouse(input.Position.Y)
+            updateSliderYFromMouse()
         end
     end)
-    userInput.InputChanged:Connect(function(input)
-        if draggingY and input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateSliderYFromMouse(input.Position.Y)
+    sliderYbg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingY = true
+            updateSliderYFromMouse()
         end
     end)
     userInput.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             draggingY = false
+        end
+    end)
+    runService.RenderStepped:Connect(function()
+        if draggingY then
+            updateSliderYFromMouse()
         end
     end)
 
@@ -3721,7 +3743,7 @@ Kemi Studio
     setSliderY(crosshairState.posY)
     updateCrosshairPosition()
 
-    print("[Home] Crosshair settings with position sliders loaded (state preserved)")
+    print("[Home] Crosshair settings with position sliders loaded (state preserved, drag fixed)")
 end
 -- ============================================================================
 -- INFO CONTENT

@@ -4027,192 +4027,490 @@ end
 -- ABOUT CONTENT
 -- ============================================================================
 
-local aboutContent=nil
+local aboutContent = nil
+
+-- State untuk TPWalk
+local tpwalkEnabled = false
+local tpwalkSpeed = 16 -- default 16 studs/detik (bisa diatur slider 0.1-10, tapi kita kalikan 16 untuk feels)
+local tpwalkConnection = nil
+local originalWalkSpeed = nil
+
+-- Fungsi TPWalk (CFrame-based)
+local function startTpwalk()
+    if tpwalkConnection then return end
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    -- Simpan walkspeed asli
+    if originalWalkSpeed == nil then
+        originalWalkSpeed = humanoid.WalkSpeed
+    end
+    -- Nonaktifkan walkspeed normal agar tidak konflik
+    humanoid.WalkSpeed = 0
+    tpwalkConnection = game:GetService("RunService").Heartbeat:Connect(function(deltaTime)
+        if not tpwalkEnabled then return end
+        local char = player.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local moveDir = Vector3.new()
+        local userInput = game:GetService("UserInputService")
+        if userInput:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Vector3.new(0,0,-1) end
+        if userInput:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir + Vector3.new(0,0,1) end
+        if userInput:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir + Vector3.new(-1,0,0) end
+        if userInput:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Vector3.new(1,0,0) end
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit
+            local camera = workspace.CurrentCamera
+            local forward = camera.CFrame.LookVector
+            local right = camera.CFrame.RightVector
+            local moveVector = (forward * moveDir.Z + right * moveDir.X) * Vector3.new(1,0,1)
+            if moveVector.Magnitude > 0 then
+                moveVector = moveVector.Unit
+                local newPos = hrp.Position + moveVector * tpwalkSpeed * deltaTime
+                hrp.CFrame = CFrame.new(newPos, newPos + moveVector)
+            end
+        end
+    end)
+end
+
+local function stopTpwalk()
+    if tpwalkConnection then
+        tpwalkConnection:Disconnect()
+        tpwalkConnection = nil
+    end
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and originalWalkSpeed then
+            humanoid.WalkSpeed = originalWalkSpeed
+        end
+    end
+end
+
+-- Fungsi untuk morph avatar (mengubah pakaian karakter lokal)
+local function morphAvatar(targetUsername)
+    -- Mencari player dengan username target (case-sensitive)
+    local players = game:GetService("Players")
+    local targetPlayer = nil
+    for _, plr in ipairs(players:GetPlayers()) do
+        if plr.Name == targetUsername or plr.DisplayName == targetUsername then
+            targetPlayer = plr
+            break
+        end
+    end
+    if not targetPlayer then
+        warn("Player not found: " .. targetUsername)
+        return
+    end
+    local targetChar = targetPlayer.Character
+    if not targetChar then
+        warn("Target character not loaded")
+        return
+    end
+    local localChar = players.LocalPlayer.Character
+    if not localChar then return end
+    -- Salin pakaian (Shirt, ShirtGraphic, Pants, dan semua Accessories)
+    local function copyClothing(from, to)
+        local shirt = from:FindFirstChild("Shirt")
+        local pants = from:FindFirstChild("Pants")
+        local shirtGraphic = from:FindFirstChild("ShirtGraphic")
+        if shirt then
+            local newShirt = shirt:Clone()
+            newShirt.Parent = to
+        end
+        if pants then
+            local newPants = pants:Clone()
+            newPants.Parent = to
+        end
+        if shirtGraphic then
+            local newGraphic = shirtGraphic:Clone()
+            newGraphic.Parent = to
+        end
+        -- Hapus yang lama
+        for _, child in ipairs(to:GetChildren()) do
+            if child:IsA("Shirt") or child:IsA("Pants") or child:IsA("ShirtGraphic") then
+                if child ~= newShirt and child ~= newPants and child ~= newGraphic then
+                    child:Destroy()
+                end
+            end
+        end
+    end
+    copyClothing(targetChar, localChar)
+    -- Salin aksesoris (bisa pakai Humanoid:GetAccessories() atau looping)
+    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        -- Hapus aksesoris lama
+        for _, acc in ipairs(humanoid:GetAccessories()) do
+            acc:Destroy()
+        end
+        -- Salin aksesoris dari target
+        local targetHumanoid = targetChar:FindFirstChildOfClass("Humanoid")
+        if targetHumanoid then
+            for _, acc in ipairs(targetHumanoid:GetAccessories()) do
+                local newAcc = acc:Clone()
+                newAcc.Parent = localChar
+                local handle = newAcc:FindFirstChild("Handle")
+                if handle then
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = localChar:FindFirstChild("Head") or localChar:FindFirstChild("HumanoidRootPart")
+                    weld.Part1 = handle
+                    weld.C0 = handle.CFrame:inverse() * (weld.Part0.CFrame or CFrame.new())
+                    weld.Parent = handle
+                end
+            end
+        end
+    end
+end
+
+-- Reset skin ke asli (bisa simpan skin asli saat pertama kali)
+local originalSkin = nil
+local function saveOriginalSkin()
+    local localChar = game.Players.LocalPlayer.Character
+    if not localChar then return end
+    -- Simpan salinan pakaian dan aksesoris
+    originalSkin = {}
+    -- Simpan shirt, pants, shirtgraphic
+    for _, child in ipairs(localChar:GetChildren()) do
+        if child:IsA("Shirt") or child:IsA("Pants") or child:IsA("ShirtGraphic") then
+            originalSkin[child.ClassName] = child:Clone()
+        end
+    end
+    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        originalSkin.accessories = {}
+        for _, acc in ipairs(humanoid:GetAccessories()) do
+            table.insert(originalSkin.accessories, acc:Clone())
+        end
+    end
+end
+
+local function resetToOriginal()
+    local localChar = game.Players.LocalPlayer.Character
+    if not localChar or not originalSkin then return end
+    -- Hapus semua pakaian dan aksesoris saat ini
+    for _, child in ipairs(localChar:GetChildren()) do
+        if child:IsA("Shirt") or child:IsA("Pants") or child:IsA("ShirtGraphic") then
+            child:Destroy()
+        end
+    end
+    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        for _, acc in ipairs(humanoid:GetAccessories()) do
+            acc:Destroy()
+        end
+    end
+    -- Restore dari originalSkin
+    if originalSkin.Shirt then originalSkin.Shirt:Clone().Parent = localChar end
+    if originalSkin.Pants then originalSkin.Pants:Clone().Parent = localChar end
+    if originalSkin.ShirtGraphic then originalSkin.ShirtGraphic:Clone().Parent = localChar end
+    if originalSkin.accessories then
+        for _, acc in ipairs(originalSkin.accessories) do
+            local newAcc = acc:Clone()
+            newAcc.Parent = localChar
+            -- Re-weld handle jika perlu
+            local handle = newAcc:FindFirstChild("Handle")
+            if handle then
+                local weld = Instance.new("Weld")
+                weld.Part0 = localChar:FindFirstChild("Head") or localChar:FindFirstChild("HumanoidRootPart")
+                weld.Part1 = handle
+                weld.C0 = handle.CFrame:inverse() * (weld.Part0.CFrame or CFrame.new())
+                weld.Parent = handle
+            end
+        end
+    end
+end
 
 local function createAboutContent()
     if aboutContent then aboutContent:Destroy() end
 
-    aboutContent=Instance.new("Frame")
-    aboutContent.Size=UDim2.new(1,0,1,0)
-    aboutContent.BackgroundTransparency=1
-    aboutContent.Parent=contentPanel
+    aboutContent = Instance.new("Frame")
+    aboutContent.Size = UDim2.new(1,0,1,0)
+    aboutContent.BackgroundTransparency = 1
+    aboutContent.Parent = contentPanel
 
-    -- MAIN CARD
-    local card=Instance.new("Frame")
-    card.Size=UDim2.new(1,-12,1,-12)
-    card.Position=UDim2.new(0,6,0,6)
-    card.BackgroundColor3=Color3.fromRGB(10,18,32)
-    card.BorderSizePixel=0
-    card.Parent=aboutContent
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1,-8,1,-8)
+    scroll.Position = UDim2.new(0,4,0,4)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 2
+    scroll.CanvasSize = UDim2.new(0,0,0,0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.Parent = aboutContent
 
-    Instance.new("UICorner",card).CornerRadius=UDim.new(0,10)
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0,10)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = scroll
 
-    local stroke=Instance.new("UIStroke")
-    stroke.Color=Color3.fromRGB(0,180,255)
-    stroke.Transparency=0.5
-    stroke.Parent=card
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0,4)
+    padding.PaddingBottom = UDim.new(0,10)
+    padding.PaddingLeft = UDim.new(0,2)
+    padding.PaddingRight = UDim.new(0,2)
+    padding.Parent = scroll
 
-    -------------------------------------------------
-    -- ABOUT TABLE TITLE (REPLACES OLD TITLE)
-    -------------------------------------------------
+    -- CARD UTAMA
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1,-6,0,0)
+    card.BackgroundColor3 = Color3.fromRGB(8,18,34)
+    card.BorderSizePixel = 0
+    card.Parent = scroll
+    Instance.new("UICorner",card).CornerRadius = UDim.new(0,10)
+    local cardStroke = Instance.new("UIStroke")
+    cardStroke.Color = Color3.fromRGB(0,180,255)
+    cardStroke.Transparency = 0.45
+    cardStroke.Parent = card
 
-    local aboutHeader=Instance.new("Frame")
-    aboutHeader.Size=UDim2.new(1,-20,0,18)
-    aboutHeader.Position=UDim2.new(0,10,0,6)
-    aboutHeader.BackgroundTransparency=1
-    aboutHeader.Parent=card
+    local innerLayout = Instance.new("UIListLayout")
+    innerLayout.Padding = UDim.new(0,12)
+    innerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    innerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    innerLayout.Parent = card
 
-    local aboutText=Instance.new("TextLabel")
-    aboutText.Size=UDim2.new(1,0,1,0)
-    aboutText.BackgroundTransparency=1
-    aboutText.Text="ABOUT / CYBERHEROES PANEL"
-    aboutText.TextColor3=Color3.fromRGB(0,220,255)
-    aboutText.Font=Enum.Font.GothamBold
-    aboutText.TextSize=10
-    aboutText.TextXAlignment=Enum.TextXAlignment.Left
-    aboutText.Parent=aboutHeader
+    local innerPadding = Instance.new("UIPadding")
+    innerPadding.PaddingTop = UDim.new(0,12)
+    innerPadding.PaddingBottom = UDim.new(0,12)
+    innerPadding.PaddingLeft = UDim.new(0,12)
+    innerPadding.PaddingRight = UDim.new(0,12)
+    innerPadding.Parent = card
 
-    -------------------------------------------------
-    -- TABLE HEADER (KILLER | SURVIVAL)
-    -------------------------------------------------
+    -- ================================
+    -- MORPH AVATAR SECTION
+    -- ================================
+    local morphTitle = Instance.new("TextLabel")
+    morphTitle.Size = UDim2.new(1,0,0,24)
+    morphTitle.BackgroundTransparency = 1
+    morphTitle.Text = "MORPH AVATAR"
+    morphTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    morphTitle.Font = Enum.Font.GothamBold
+    morphTitle.TextSize = 14
+    morphTitle.TextXAlignment = Enum.TextXAlignment.Left
+    morphTitle.Parent = card
 
-    local header=Instance.new("Frame")
-    header.Size=UDim2.new(1,-20,0,18)
-    header.Position=UDim2.new(0,10,0,28)
-    header.BackgroundTransparency=1
-    header.Parent=card
+    -- Target Username Input
+    local usernameBox = Instance.new("TextBox")
+    usernameBox.Size = UDim2.new(1,0,0,32)
+    usernameBox.PlaceholderText = "Ketik username target..."
+    usernameBox.Text = ""
+    usernameBox.BackgroundColor3 = Color3.fromRGB(12,22,38)
+    usernameBox.TextColor3 = Color3.fromRGB(220,220,220)
+    usernameBox.Font = Enum.Font.Gotham
+    usernameBox.TextSize = 12
+    usernameBox.BorderSizePixel = 0
+    usernameBox.Parent = card
+    Instance.new("UICorner",usernameBox).CornerRadius = UDim.new(0,6)
 
-    local killerLabel=Instance.new("TextLabel")
-    killerLabel.Size=UDim2.new(0.5,0,1,0)
-    killerLabel.BackgroundTransparency=1
-    killerLabel.Text="KILLER"
-    killerLabel.TextColor3=Color3.fromRGB(0,220,255)
-    killerLabel.Font=Enum.Font.GothamBold
-    killerLabel.TextSize=9
-    killerLabel.TextXAlignment=Enum.TextXAlignment.Left
-    killerLabel.Parent=header
+    -- Tombol Copy Avatar
+    local copyBtn = Instance.new("TextButton")
+    copyBtn.Size = UDim2.new(1,0,0,34)
+    copyBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
+    copyBtn.Text = "Copy Avatar"
+    copyBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    copyBtn.Font = Enum.Font.GothamBold
+    copyBtn.TextSize = 12
+    copyBtn.BorderSizePixel = 0
+    copyBtn.Parent = card
+    Instance.new("UICorner",copyBtn).CornerRadius = UDim.new(0,8)
+    copyBtn.MouseButton1Click:Connect(function()
+        local targetName = usernameBox.Text
+        if targetName ~= "" then
+            morphAvatar(targetName)
+        end
+    end)
 
-    local survivalLabel=Instance.new("TextLabel")
-    survivalLabel.Size=UDim2.new(0.5,0,1,0)
-    survivalLabel.Position=UDim2.new(0.5,0,0,0)
-    survivalLabel.BackgroundTransparency=1
-    survivalLabel.Text="SURVIVAL"
-    survivalLabel.TextColor3=Color3.fromRGB(0,220,255)
-    survivalLabel.Font=Enum.Font.GothamBold
-    survivalLabel.TextSize=9
-    survivalLabel.TextXAlignment=Enum.TextXAlignment.Left
-    survivalLabel.Parent=header
+    -- Reset to Original Skin
+    local resetSkinBtn = Instance.new("TextButton")
+    resetSkinBtn.Size = UDim2.new(1,0,0,34)
+    resetSkinBtn.BackgroundColor3 = Color3.fromRGB(20,30,45)
+    resetSkinBtn.Text = "Reset to Original Skin"
+    resetSkinBtn.TextColor3 = Color3.fromRGB(220,220,220)
+    resetSkinBtn.Font = Enum.Font.GothamBold
+    resetSkinBtn.TextSize = 12
+    resetSkinBtn.BorderSizePixel = 0
+    resetSkinBtn.Parent = card
+    Instance.new("UICorner",resetSkinBtn).CornerRadius = UDim.new(0,8)
+    resetSkinBtn.MouseButton1Click:Connect(function()
+        resetToOriginal()
+    end)
 
-    -------------------------------------------------
-    -- GRID
-    -------------------------------------------------
+    -- Save Current as Original
+    local saveSkinBtn = Instance.new("TextButton")
+    saveSkinBtn.Size = UDim2.new(1,0,0,34)
+    saveSkinBtn.BackgroundColor3 = Color3.fromRGB(20,30,45)
+    saveSkinBtn.Text = "Save Current as Original"
+    saveSkinBtn.TextColor3 = Color3.fromRGB(220,220,220)
+    saveSkinBtn.Font = Enum.Font.GothamBold
+    saveSkinBtn.TextSize = 12
+    saveSkinBtn.BorderSizePixel = 0
+    saveSkinBtn.Parent = card
+    Instance.new("UICorner",saveSkinBtn).CornerRadius = UDim.new(0,8)
+    saveSkinBtn.MouseButton1Click:Connect(function()
+        saveOriginalSkin()
+    end)
 
-    local grid=Instance.new("Frame")
-    grid.Size=UDim2.new(1,-20,1,-55)
-    grid.Position=UDim2.new(0,10,0,50)
-    grid.BackgroundTransparency=1
-    grid.Parent=card
+    -- ================================
+    -- TPWALK SECTION
+    -- ================================
+    local tpwalkTitle = Instance.new("TextLabel")
+    tpwalkTitle.Size = UDim2.new(1,0,0,24)
+    tpwalkTitle.BackgroundTransparency = 1
+    tpwalkTitle.Text = "TPWALK (CFRAME-BASED)"
+    tpwalkTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    tpwalkTitle.Font = Enum.Font.GothamBold
+    tpwalkTitle.TextSize = 14
+    tpwalkTitle.TextXAlignment = Enum.TextXAlignment.Left
+    tpwalkTitle.Parent = card
 
-    local y=0
+    -- Toggle TPWalk
+    local tpwalkToggle = Instance.new("TextButton")
+    tpwalkToggle.Size = UDim2.new(1,0,0,34)
+    tpwalkToggle.BackgroundColor3 = Color3.fromRGB(14,24,40)
+    tpwalkToggle.Text = "TPWALK DISABLED"
+    tpwalkToggle.TextColor3 = Color3.fromRGB(220,220,220)
+    tpwalkToggle.Font = Enum.Font.GothamBold
+    tpwalkToggle.TextSize = 12
+    tpwalkToggle.BorderSizePixel = 0
+    tpwalkToggle.AutoButtonColor = false
+    tpwalkToggle.Parent = card
+    Instance.new("UICorner",tpwalkToggle).CornerRadius = UDim.new(0,8)
 
-    -------------------------------------------------
-    -- NEON TOGGLE (WITH ANIMATION)
-    -------------------------------------------------
+    -- Slider kecepatan TPWalk (0.1 - 10)
+    local speedHolder = Instance.new("Frame")
+    speedHolder.Size = UDim2.new(1,0,0,40)
+    speedHolder.BackgroundTransparency = 1
+    speedHolder.Parent = card
 
-    local function neonEffect(obj, state)
-        obj:TweenBackgroundColor3(
-            state and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40),
-            "Out","Quad",0.2,true
-        )
+    local speedLabel = Instance.new("TextLabel")
+    speedLabel.Size = UDim2.new(0.4,0,1,0)
+    speedLabel.BackgroundTransparency = 1
+    speedLabel.Text = "Speed (studs/sec):"
+    speedLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    speedLabel.Font = Enum.Font.Gotham
+    speedLabel.TextSize = 11
+    speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    speedLabel.Parent = speedHolder
+
+    local speedValue = Instance.new("TextLabel")
+    speedValue.Size = UDim2.new(0.2,0,1,0)
+    speedValue.Position = UDim2.new(0.4,0,0,0)
+    speedValue.BackgroundTransparency = 1
+    speedValue.Text = string.format("%.1f", tpwalkSpeed)
+    speedValue.TextColor3 = Color3.fromRGB(0,220,255)
+    speedValue.Font = Enum.Font.GothamBold
+    speedValue.TextSize = 11
+    speedValue.TextXAlignment = Enum.TextXAlignment.Left
+    speedValue.Parent = speedHolder
+
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(0.35,0,0.5,0)
+    sliderBg.Position = UDim2.new(0.65,0,0.25,0)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(25,35,50)
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = speedHolder
+    Instance.new("UICorner",sliderBg).CornerRadius = UDim.new(1,0)
+
+    local thumb = Instance.new("TextButton")
+    thumb.Size = UDim2.new(0,12,0,12)
+    thumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
+    thumb.AutoButtonColor = false
+    thumb.Text = ""
+    thumb.BorderSizePixel = 0
+    thumb.Parent = sliderBg
+    Instance.new("UICorner",thumb).CornerRadius = UDim.new(1,0)
+
+    -- Update slider posisi
+    local function updateSpeedSlider()
+        local rel = (tpwalkSpeed - 0.1) / (10 - 0.1)
+        local thumbSize = thumb.AbsoluteSize.X
+        local trackSize = sliderBg.AbsoluteSize.X
+        if trackSize > 0 then
+            local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
+            thumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
+        else
+            thumb.Position = UDim2.new(rel, -thumbSize/2, 0.5, -thumbSize/2)
+        end
+        speedValue.Text = string.format("%.1f", tpwalkSpeed)
     end
 
-    local function makeRow(kText,sText,kConfig,sConfig)
-
-        local row=Instance.new("Frame")
-        row.Size=UDim2.new(1,0,0,22)
-        row.Position=UDim2.new(0,0,0,y)
-        row.BackgroundTransparency=1
-        row.Parent=grid
-
-        -- LEFT (KILLER)
-        local kBtn=Instance.new("TextButton")
-        kBtn.Size=UDim2.new(0.5,-4,1,0)
-        kBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
-        kBtn.Text=kText
-        kBtn.TextColor3=Color3.fromRGB(220,220,220)
-        kBtn.Font=Enum.Font.GothamBold
-        kBtn.TextSize=8
-        kBtn.BorderSizePixel=0
-        kBtn.Parent=row
-        Instance.new("UICorner",kBtn).CornerRadius=UDim.new(0,6)
-
-        -- RIGHT (SURVIVAL)
-        local sBtn=Instance.new("TextButton")
-        sBtn.Size=UDim2.new(0.5,-4,1,0)
-        sBtn.Position=UDim2.new(0.5,4,0,0)
-        sBtn.BackgroundColor3=Color3.fromRGB(14,24,40)
-        sBtn.Text=sText
-        sBtn.TextColor3=Color3.fromRGB(220,220,220)
-        sBtn.Font=Enum.Font.GothamBold
-        sBtn.TextSize=8
-        sBtn.BorderSizePixel=0
-        sBtn.Parent=row
-        Instance.new("UICorner",sBtn).CornerRadius=UDim.new(0,6)
-
-        -------------------------------------------------
-        -- KILLER TOGGLE
-        -------------------------------------------------
-
-        kBtn.MouseButton1Click:Connect(function()
-            local newState = not (config[kConfig] or false)
-
-            if kConfig=="massKillEnabled" then
-                config.massKillEnabled=newState
-                if newState then startMassKillLoop() else stopMassKillLoop() end
-
-            elseif kConfig=="shieldEnabled" then
-                config.shieldEnabled=newState
-                if newState then startShieldMonitor() else stopShieldMonitor() end
-            end
-
-            config[kConfig]=newState
-            neonEffect(kBtn,newState)
-        end)
-
-        -------------------------------------------------
-        -- SURVIVAL TOGGLE
-        -------------------------------------------------
-
-        sBtn.MouseButton1Click:Connect(function()
-            local newState = not (config[sConfig] or false)
-
-            if sConfig=="stealthEnabled" then
-                config.stealthEnabled=newState
-                if newState then startStealthMonitor() else stopStealthMonitor() end
-
-            elseif sConfig=="autoSkillCheckEnabled" then
-                config.autoSkillCheckEnabled=newState
-                if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
-
-            elseif sConfig=="povMode" then
-                togglePOV()
-                return
-            end
-
-            config[sConfig]=newState
-            neonEffect(sBtn,newState)
-        end)
-
-        y = y + 24
+    local dragging = false
+    local function updateSpeedFromMouse()
+        if not dragging then return end
+        local mousePos = game:GetService("UserInputService"):GetMouseLocation()
+        local bgPos = sliderBg.AbsolutePosition.X
+        local bgWidth = sliderBg.AbsoluteSize.X
+        if bgWidth <= 0 then return end
+        local rel = math.clamp((mousePos.X - bgPos) / bgWidth, 0, 1)
+        tpwalkSpeed = 0.1 + rel * (10 - 0.1)
+        updateSpeedSlider()
     end
 
-    -------------------------------------------------
-    -- ROWS (FINAL TABLE)
-    -------------------------------------------------
+    thumb.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            updateSpeedFromMouse()
+        end
+    end)
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            updateSpeedFromMouse()
+        end
+    end)
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    game:GetService("RunService").RenderStepped:Connect(function()
+        if dragging then updateSpeedFromMouse() end
+    end)
 
-    makeRow("MASS KILL","STEALTH","massKillEnabled","stealthEnabled")
-    makeRow("AUTO SHIELD","SKILLCHECK","shieldEnabled","autoSkillCheckEnabled")
+    -- Fungsi toggle TPWalk
+    local tpwalkActive = false
+    tpwalkToggle.MouseButton1Click:Connect(function()
+        tpwalkActive = not tpwalkActive
+        if tpwalkActive then
+            tpwalkEnabled = true
+            startTpwalk()
+            tpwalkToggle.Text = "TPWALK ENABLED"
+            tpwalkToggle.BackgroundColor3 = Color3.fromRGB(0,140,255)
+            tpwalkToggle.TextColor3 = Color3.fromRGB(255,255,255)
+        else
+            tpwalkEnabled = false
+            stopTpwalk()
+            tpwalkToggle.Text = "TPWALK DISABLED"
+            tpwalkToggle.BackgroundColor3 = Color3.fromRGB(14,24,40)
+            tpwalkToggle.TextColor3 = Color3.fromRGB(220,220,220)
+        end
+    end)
+
+    -- Update ukuran card sesuai konten
+    local function updateCardSize()
+        local totalHeight = 0
+        for _, child in ipairs(card:GetChildren()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") or child:IsA("Frame") then
+                totalHeight = totalHeight + child.AbsoluteSize.Y
+            end
+        end
+        card.Size = UDim2.new(1,-6,0, totalHeight + 30)
+    end
+    task.wait(0.1)
+    updateCardSize()
+    innerLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCardSize)
+
+    -- Simpan original skin otomatis saat pertama kali
+    task.spawn(function()
+        wait(1)
+        saveOriginalSkin()
+    end)
 end
+
 local function createSettingsContent()
 
     if settingsContent then

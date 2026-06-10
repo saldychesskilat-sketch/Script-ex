@@ -4029,9 +4029,6 @@ end
 local aboutContent = nil
 
 local function createAboutContent()
-local walkSpeedSliderValue = 16 -- default
-local tpwalkActive = false
-local tpwalkConnection = nil
     if aboutContent then
         aboutContent:Destroy()
     end
@@ -4065,7 +4062,7 @@ local tpwalkConnection = nil
     padding.PaddingRight = UDim.new(0, 2)
     padding.Parent = scroll
 
-    -- Helper membuat kartu dengan stroke biru
+    -- Helper: kartu dengan stroke biru (sama seperti home)
     local function createCard(titleText)
         local card = Instance.new("Frame")
         card.Size = UDim2.new(1, -6, 0, 0)
@@ -4155,7 +4152,7 @@ local tpwalkConnection = nil
     wsThumb.Parent = wsSliderBg
     Instance.new("UICorner", wsThumb).CornerRadius = UDim.new(1, 0)
 
-    -- TP Walk Toggle
+    -- TP Walk Toggle (switch)
     local tpHolder = Instance.new("Frame")
     tpHolder.Size = UDim2.new(1, 0, 0, 32)
     tpHolder.BackgroundTransparency = 1
@@ -4164,7 +4161,7 @@ local tpwalkConnection = nil
     local tpLabel = Instance.new("TextLabel")
     tpLabel.Size = UDim2.new(0.7, 0, 1, 0)
     tpLabel.BackgroundTransparency = 1
-    tpLabel.Text = "TP Walk (CFrame based)"
+    tpLabel.Text = "TP Walk"
     tpLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
     tpLabel.Font = Enum.Font.GothamBold
     tpLabel.TextSize = 12
@@ -4179,14 +4176,12 @@ local tpwalkConnection = nil
     tpSwitch.AutoButtonColor = false
     tpSwitch.BorderSizePixel = 0
     tpSwitch.Parent = tpHolder
-    local switchCorner = Instance.new("UICorner")
-    switchCorner.CornerRadius = UDim.new(1, 0)
-    switchCorner.Parent = tpSwitch
-    local switchStroke = Instance.new("UIStroke")
-    switchStroke.Color = Color3.fromRGB(100, 100, 130)
-    switchStroke.Thickness = 1.2
-    switchStroke.Transparency = 0.2
-    switchStroke.Parent = tpSwitch
+    Instance.new("UICorner", tpSwitch).CornerRadius = UDim.new(1, 0)
+    local tpStroke = Instance.new("UIStroke")
+    tpStroke.Color = Color3.fromRGB(100, 100, 130)
+    tpStroke.Thickness = 1.2
+    tpStroke.Transparency = 0.2
+    tpStroke.Parent = tpSwitch
     local tpCircle = Instance.new("Frame")
     tpCircle.Size = UDim2.new(0, 20, 0, 20)
     tpCircle.Position = UDim2.new(0, 3, 0.5, -10)
@@ -4196,11 +4191,11 @@ local tpwalkConnection = nil
     Instance.new("UICorner", tpCircle).CornerRadius = UDim.new(1, 0)
 
     -- ======================== KARTU MORPH AVATAR ========================
-    local morphCard, morphContainer, morphLayout = createCard("🎭 MORPH AVATAR")
+    local morphCard, morphContainer, morphLayout = createCard("MORPH AVATAR")
 
     local usernameBox = Instance.new("TextBox")
     usernameBox.Size = UDim2.new(1, 0, 0, 36)
-    usernameBox.PlaceholderText = "Masukkan username target..."
+    usernameBox.PlaceholderText = "Enter target username..."
     usernameBox.Text = ""
     usernameBox.BackgroundColor3 = Color3.fromRGB(14, 24, 40)
     usernameBox.TextColor3 = Color3.fromRGB(220, 220, 220)
@@ -4242,7 +4237,7 @@ local tpwalkConnection = nil
     local resetBtn = createMorphButton("RESET SKIN", Color3.fromRGB(100, 70, 30))
     local saveBtn = createMorphButton("SAVE CURRENT", Color3.fromRGB(30, 100, 50))
 
-    -- Efek hover sederhana (opsional)
+    -- Efek hover
     for _, btn in {copyBtn, resetBtn, saveBtn} do
         btn.MouseEnter:Connect(function()
             btn.BackgroundTransparency = 0.2
@@ -4275,9 +4270,14 @@ local tpwalkConnection = nil
     local localPlayer = players.LocalPlayer
     local currentChar = localPlayer.Character or localPlayer.CharacterAdded:Wait()
     local humanoid = currentChar:WaitForChild("Humanoid")
-    local originalWalkSpeed = humanoid.WalkSpeed
 
-    -- Update tampilan walk speed slider
+    -- State lokal
+    local walkSpeedSliderValue = math.min(humanoid.WalkSpeed, 32)
+    if walkSpeedSliderValue == 0 then walkSpeedSliderValue = 16 end
+    local tpwalkActive = false
+    local tpwalkConnection = nil
+
+    -- Update tampilan slider
     local function setWalkSpeedDisplay(value)
         local rounded = math.floor(value * 10) / 10
         wsValue.Text = rounded .. " / 32"
@@ -4292,7 +4292,6 @@ local tpwalkConnection = nil
         end
     end
 
-    -- Set walk speed (memengaruhi humanoid)
     local function setWalkSpeed(value)
         value = math.clamp(value, 0, 32)
         if humanoid and humanoid.Parent then
@@ -4302,7 +4301,7 @@ local tpwalkConnection = nil
         setWalkSpeedDisplay(value)
     end
 
-    -- Slider drag logic
+    -- Slider drag
     local draggingWS = false
     local function updateWSFromMouse()
         if not draggingWS then return end
@@ -4338,10 +4337,7 @@ local tpwalkConnection = nil
         end
     end)
 
-    -- Set nilai awal dari humanoid saat ini (atau default 16 jika lebih dari 32)
-    local initialSpeed = math.min(humanoid.WalkSpeed, 32)
-    if initialSpeed == 0 then initialSpeed = 16 end
-    setWalkSpeed(initialSpeed)
+    setWalkSpeed(walkSpeedSliderValue)
 
     -- TP Walk logic
     local function startTPWalk()
@@ -4374,14 +4370,14 @@ local tpwalkConnection = nil
         if enabled then
             startTPWalk()
             tpSwitch.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
-            switchStroke.Color = Color3.fromRGB(0, 220, 255)
-            switchStroke.Transparency = 0.1
+            tpStroke.Color = Color3.fromRGB(0, 220, 255)
+            tpStroke.Transparency = 0.1
             tpCircle.Position = UDim2.new(1, -25, 0.5, -10)
         else
             stopTPWalk()
             tpSwitch.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-            switchStroke.Color = Color3.fromRGB(100, 100, 130)
-            switchStroke.Transparency = 0.2
+            tpStroke.Color = Color3.fromRGB(100, 100, 130)
+            tpStroke.Transparency = 0.2
             tpCircle.Position = UDim2.new(0, 3, 0.5, -10)
         end
     end
@@ -4390,37 +4386,29 @@ local tpwalkConnection = nil
         setTPWalk(not tpwalkActive)
     end)
 
-    -- Character respawn handler (reset humanoid reference)
+    -- Respawn handler
     local function onCharacterAdded(newChar)
         currentChar = newChar
         humanoid = newChar:WaitForChild("Humanoid")
-        originalWalkSpeed = humanoid.WalkSpeed
         setWalkSpeed(walkSpeedSliderValue)
     end
     localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-    -- Morph Avatar Functions (placeholder, sesuaikan dengan game)
+    -- Morph Avatar functions (placeholder)
     local function copyAvatar(username)
         print("[Morph] Copy avatar from:", username)
-        -- Contoh implementasi jika game menggunakan LoadCharacterAppearanceAsync
-        -- local target = players:FindFirstChild(username)
-        -- if target then target:LoadCharacterAppearanceAsync() end
     end
     local function resetSkin()
         print("[Morph] Reset skin to original")
-        -- Implementasi reset skin
     end
     local function saveSkin()
         print("[Morph] Save current skin as default")
-        -- Implementasi menyimpan skin
     end
 
     copyBtn.MouseButton1Click:Connect(function()
         local name = usernameBox.Text
         if name ~= "" then
             copyAvatar(name)
-        else
-            print("[Morph] Username kosong")
         end
     end)
     resetBtn.MouseButton1Click:Connect(resetSkin)
@@ -4428,7 +4416,6 @@ local tpwalkConnection = nil
 
     print("[About] Content loaded - Movement & Morph Avatar (UI improved)")
 end
-
 local function createSettingsContent()
 
     if settingsContent then

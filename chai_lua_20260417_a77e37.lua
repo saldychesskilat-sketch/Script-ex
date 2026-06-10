@@ -3242,7 +3242,7 @@ local function createHomeContent()
     logo.Position = UDim2.new(0.5,0,0.5,0)
     logo.BackgroundTransparency = 1
     logo.BorderSizePixel = 0
-    logo.Image = "http://www.roblox.com/asset/?id=111520113876024"
+    logo.Image = "rbxassetid://10590477450"
     logo.ScaleType = Enum.ScaleType.Fit
     logo.Visible = true
     logo.ImageTransparency = 0

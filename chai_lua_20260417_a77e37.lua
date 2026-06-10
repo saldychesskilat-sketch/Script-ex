@@ -4026,11 +4026,15 @@ end
 -- ============================================================================
 -- ABOUT CONTENT
 -- ============================================================================
-
 local aboutContent = nil
+local walkSpeedSliderValue = 16 -- default
+local tpwalkActive = false
+local tpwalkConnection = nil
 
 local function createAboutContent()
-    if aboutContent then aboutContent:Destroy() end
+    if aboutContent then
+        aboutContent:Destroy()
+    end
 
     aboutContent = Instance.new("Frame")
     aboutContent.Size = UDim2.new(1, 0, 1, 0)
@@ -4038,19 +4042,18 @@ local function createAboutContent()
     aboutContent.ClipsDescendants = true
     aboutContent.Parent = contentPanel
 
-    -- Scrolling Frame
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, -8, 1, -8)
     scroll.Position = UDim2.new(0, 4, 0, 4)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 2
+    scroll.ScrollBarThickness = 4
     scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     scroll.Parent = aboutContent
 
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 10)
+    layout.Padding = UDim.new(0, 12)
     layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = scroll
@@ -4062,59 +4065,53 @@ local function createAboutContent()
     padding.PaddingRight = UDim.new(0, 2)
     padding.Parent = scroll
 
-    ------------------------------------------------------------
-    -- FUNCTION MEMBUAT KARTU DENGAN HEADER DAN STROKE
-    ------------------------------------------------------------
+    -- Helper membuat kartu dengan stroke biru
     local function createCard(titleText)
         local card = Instance.new("Frame")
-        card.Size = UDim2.new(1, -6, 0, 0)  -- tinggi otomatis diatur nanti
+        card.Size = UDim2.new(1, -6, 0, 0)
         card.BackgroundColor3 = Color3.fromRGB(8, 18, 34)
         card.BorderSizePixel = 0
         card.Parent = scroll
-
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+
         local stroke = Instance.new("UIStroke")
         stroke.Color = Color3.fromRGB(0, 180, 255)
         stroke.Transparency = 0.45
+        stroke.Thickness = 1
         stroke.Parent = card
 
-        -- Header
-        local header = Instance.new("TextLabel")
-        header.Size = UDim2.new(1, -20, 0, 28)
-        header.Position = UDim2.new(0, 10, 0, 8)
-        header.BackgroundTransparency = 1
-        header.Text = titleText
-        header.TextColor3 = Color3.fromRGB(0, 220, 255)
-        header.Font = Enum.Font.GothamBold
-        header.TextSize = 13
-        header.TextXAlignment = Enum.TextXAlignment.Left
-        header.Parent = card
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, -20, 0, 30)
+        titleLabel.Position = UDim2.new(0, 10, 0, 8)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Text = titleText
+        titleLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextSize = 14
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.Parent = card
 
-        -- Container untuk isi (padding dalam)
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, -20, 0, 0)
-        container.Position = UDim2.new(0, 10, 0, 40)
+        container.Position = UDim2.new(0, 10, 0, 42)
         container.BackgroundTransparency = 1
         container.Parent = card
 
         local containerLayout = Instance.new("UIListLayout")
-        containerLayout.Padding = UDim.new(0, 12)
+        containerLayout.Padding = UDim.new(0, 14)
         containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
         containerLayout.Parent = container
 
-        -- Kita simpan container dan card untuk menyesuaikan tinggi nanti
         return card, container, containerLayout
     end
 
-    ------------------------------------------------------------
-    -- KARTU 1: MOVEMENT
-    ------------------------------------------------------------
+    -- ======================== KARTU MOVEMENT ========================
     local moveCard, moveContainer, moveLayout = createCard("🏃 MOVEMENT")
 
-    -- WALK SPEED SLIDER
+    -- Walk Speed Slider
     local wsHolder = Instance.new("Frame")
-    wsHolder.Size = UDim2.new(1, 0, 0, 44)
+    wsHolder.Size = UDim2.new(1, 0, 0, 48)
     wsHolder.BackgroundTransparency = 1
     wsHolder.Parent = moveContainer
 
@@ -4125,7 +4122,7 @@ local function createAboutContent()
     wsLabel.Text = "Walk Speed"
     wsLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
     wsLabel.Font = Enum.Font.GothamBold
-    wsLabel.TextSize = 11
+    wsLabel.TextSize = 12
     wsLabel.TextXAlignment = Enum.TextXAlignment.Left
     wsLabel.Parent = wsHolder
 
@@ -4136,11 +4133,10 @@ local function createAboutContent()
     wsValue.Text = "16 / 32"
     wsValue.TextColor3 = Color3.fromRGB(0, 220, 255)
     wsValue.Font = Enum.Font.GothamBold
-    wsValue.TextSize = 11
+    wsValue.TextSize = 12
     wsValue.TextXAlignment = Enum.TextXAlignment.Left
     wsValue.Parent = wsHolder
 
-    -- Slider background
     local wsSliderBg = Instance.new("Frame")
     wsSliderBg.Size = UDim2.new(0.55, 0, 0, 4)
     wsSliderBg.Position = UDim2.new(0, 0, 1, -12)
@@ -4150,8 +4146,8 @@ local function createAboutContent()
     Instance.new("UICorner", wsSliderBg).CornerRadius = UDim.new(1, 0)
 
     local wsThumb = Instance.new("TextButton")
-    wsThumb.Size = UDim2.new(0, 12, 0, 12)
-    wsThumb.Position = UDim2.new(0.5, -6, 0.5, -6)
+    wsThumb.Size = UDim2.new(0, 14, 0, 14)
+    wsThumb.Position = UDim2.new(0.5, -7, 0.5, -7)
     wsThumb.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
     wsThumb.Text = ""
     wsThumb.AutoButtonColor = false
@@ -4159,100 +4155,108 @@ local function createAboutContent()
     wsThumb.Parent = wsSliderBg
     Instance.new("UICorner", wsThumb).CornerRadius = UDim.new(1, 0)
 
-    -- TPWalk Toggle
-    local tpToggleHolder = Instance.new("Frame")
-    tpToggleHolder.Size = UDim2.new(1, 0, 0, 32)
-    tpToggleHolder.BackgroundTransparency = 1
-    tpToggleHolder.Parent = moveContainer
+    -- TP Walk Toggle
+    local tpHolder = Instance.new("Frame")
+    tpHolder.Size = UDim2.new(1, 0, 0, 32)
+    tpHolder.BackgroundTransparency = 1
+    tpHolder.Parent = moveContainer
 
     local tpLabel = Instance.new("TextLabel")
     tpLabel.Size = UDim2.new(0.7, 0, 1, 0)
     tpLabel.BackgroundTransparency = 1
-    tpLabel.Text = "TP Walk (CFrame)"
+    tpLabel.Text = "TP Walk (CFrame based)"
     tpLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
     tpLabel.Font = Enum.Font.GothamBold
-    tpLabel.TextSize = 11
+    tpLabel.TextSize = 12
     tpLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tpLabel.Parent = tpToggleHolder
+    tpLabel.Parent = tpHolder
 
     local tpSwitch = Instance.new("TextButton")
-    tpSwitch.Size = UDim2.new(0, 44, 0, 22)
-    tpSwitch.Position = UDim2.new(1, -50, 0.5, -11)
+    tpSwitch.Size = UDim2.new(0, 48, 0, 24)
+    tpSwitch.Position = UDim2.new(1, -54, 0.5, -12)
     tpSwitch.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
     tpSwitch.Text = ""
     tpSwitch.AutoButtonColor = false
     tpSwitch.BorderSizePixel = 0
-    tpSwitch.Parent = tpToggleHolder
+    tpSwitch.Parent = tpHolder
     local switchCorner = Instance.new("UICorner")
     switchCorner.CornerRadius = UDim.new(1, 0)
     switchCorner.Parent = tpSwitch
     local switchStroke = Instance.new("UIStroke")
     switchStroke.Color = Color3.fromRGB(100, 100, 130)
-    switchStroke.Thickness = 1
-    switchStroke.Transparency = 0.3
+    switchStroke.Thickness = 1.2
+    switchStroke.Transparency = 0.2
     switchStroke.Parent = tpSwitch
     local tpCircle = Instance.new("Frame")
-    tpCircle.Size = UDim2.new(0, 18, 0, 18)
-    tpCircle.Position = UDim2.new(0, 4, 0.5, -9)
+    tpCircle.Size = UDim2.new(0, 20, 0, 20)
+    tpCircle.Position = UDim2.new(0, 3, 0.5, -10)
     tpCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     tpCircle.BorderSizePixel = 0
     tpCircle.Parent = tpSwitch
     Instance.new("UICorner", tpCircle).CornerRadius = UDim.new(1, 0)
 
-    ------------------------------------------------------------
-    -- KARTU 2: MORPH AVATAR
-    ------------------------------------------------------------
+    -- ======================== KARTU MORPH AVATAR ========================
     local morphCard, morphContainer, morphLayout = createCard("🎭 MORPH AVATAR")
 
-    -- Input username
     local usernameBox = Instance.new("TextBox")
-    usernameBox.Size = UDim2.new(1, 0, 0, 32)
-    usernameBox.PlaceholderText = "Ketik username target..."
+    usernameBox.Size = UDim2.new(1, 0, 0, 36)
+    usernameBox.PlaceholderText = "Masukkan username target..."
     usernameBox.Text = ""
     usernameBox.BackgroundColor3 = Color3.fromRGB(14, 24, 40)
     usernameBox.TextColor3 = Color3.fromRGB(220, 220, 220)
     usernameBox.Font = Enum.Font.Gotham
-    usernameBox.TextSize = 11
+    usernameBox.TextSize = 12
     usernameBox.BorderSizePixel = 0
+    usernameBox.ClearTextOnFocus = false
     usernameBox.Parent = morphContainer
-    Instance.new("UICorner", usernameBox).CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", usernameBox).CornerRadius = UDim.new(0, 8)
 
-    -- Tombol-tombol dalam satu baris horizontal
     local btnHolder = Instance.new("Frame")
-    btnHolder.Size = UDim2.new(1, 0, 0, 34)
+    btnHolder.Size = UDim2.new(1, 0, 0, 38)
     btnHolder.BackgroundTransparency = 1
     btnHolder.Parent = morphContainer
 
     local btnLayout = Instance.new("UIListLayout")
     btnLayout.FillDirection = Enum.FillDirection.Horizontal
     btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    btnLayout.Padding = UDim.new(0, 8)
+    btnLayout.Padding = UDim.new(0, 10)
     btnLayout.Parent = btnHolder
 
-    local function makeMorphButton(text, color)
+    local function createMorphButton(text, bgColor)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0.3, 0, 1, 0)
-        btn.BackgroundColor3 = color or Color3.fromRGB(14, 24, 40)
+        btn.BackgroundColor3 = bgColor
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 10
+        btn.TextSize = 11
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
         btn.Parent = btnHolder
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        btn.BackgroundTransparency = 0
         return btn
     end
 
-    local copyBtn = makeMorphButton("COPY AVATAR", Color3.fromRGB(0, 100, 200))
-    local resetBtn = makeMorphButton("RESET SKIN", Color3.fromRGB(100, 70, 30))
-    local saveBtn = makeMorphButton("SAVE CURRENT", Color3.fromRGB(30, 100, 50))
+    local copyBtn = createMorphButton("COPY AVATAR", Color3.fromRGB(0, 100, 200))
+    local resetBtn = createMorphButton("RESET SKIN", Color3.fromRGB(100, 70, 30))
+    local saveBtn = createMorphButton("SAVE CURRENT", Color3.fromRGB(30, 100, 50))
 
-    -- Atur tinggi card otomatis
+    -- Efek hover sederhana (opsional)
+    for _, btn in {copyBtn, resetBtn, saveBtn} do
+        btn.MouseEnter:Connect(function()
+            btn.BackgroundTransparency = 0.2
+        end)
+        btn.MouseLeave:Connect(function()
+            btn.BackgroundTransparency = 0
+        end)
+    end
+
+    -- Atur tinggi kartu otomatis
     local function adjustCardHeight(card, container)
         task.wait(0.05)
         local containerHeight = container.AbsoluteSize.Y
-        card.Size = UDim2.new(1, -6, 0, containerHeight + 56) -- header + padding
+        card.Size = UDim2.new(1, -6, 0, containerHeight + 60)
     end
     moveLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         adjustCardHeight(moveCard, moveContainer)
@@ -4264,85 +4268,95 @@ local function createAboutContent()
     adjustCardHeight(moveCard, moveContainer)
     adjustCardHeight(morphCard, morphContainer)
 
-    ------------------------------------------------------------
-    -- LOGIKA INTERAKSI (SLIDER + TPWALK + MORPH)
-    ------------------------------------------------------------
+    -- ======================== LOGIKA FUNGSI ========================
     local userInput = game:GetService("UserInputService")
     local runService = game:GetService("RunService")
-    local localPlayer = game.Players.LocalPlayer
-    local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-    local humanoid = character:WaitForChild("Humanoid")
+    local players = game:GetService("Players")
+    local localPlayer = players.LocalPlayer
+    local currentChar = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    local humanoid = currentChar:WaitForChild("Humanoid")
     local originalWalkSpeed = humanoid.WalkSpeed
 
-    -- Walk Speed Slider (range 0-32, default 16)
-    local wsDragging = false
-    local function setWalkSpeedValue(val)
-        val = math.clamp(val, 0, 32)
-        local speedVal = math.floor(val * 10) / 10
-        wsValue.Text = speedVal .. " / 32"
-        -- Update humanoid walkspeed
-        if humanoid and humanoid.Parent then
-            humanoid.WalkSpeed = speedVal
-        end
-        -- Update thumb position
-        local thumbSize = wsThumb.AbsoluteSize.X
+    -- Update tampilan walk speed slider
+    local function setWalkSpeedDisplay(value)
+        local rounded = math.floor(value * 10) / 10
+        wsValue.Text = rounded .. " / 32"
+        local rel = value / 32
         local trackSize = wsSliderBg.AbsoluteSize.X
+        local thumbSize = wsThumb.AbsoluteSize.X
         if trackSize > 0 then
-            local rel = (speedVal / 32)
             local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
             wsThumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
         else
-            wsThumb.Position = UDim2.new(speedVal/32, -thumbSize/2, 0.5, -thumbSize/2)
+            wsThumb.Position = UDim2.new(rel, -thumbSize/2, 0.5, -thumbSize/2)
         end
     end
 
-    local function updateSliderFromMouse()
-        if not wsDragging then return end
+    -- Set walk speed (memengaruhi humanoid)
+    local function setWalkSpeed(value)
+        value = math.clamp(value, 0, 32)
+        if humanoid and humanoid.Parent then
+            humanoid.WalkSpeed = value
+        end
+        walkSpeedSliderValue = value
+        setWalkSpeedDisplay(value)
+    end
+
+    -- Slider drag logic
+    local draggingWS = false
+    local function updateWSFromMouse()
+        if not draggingWS then return end
         local mousePos = userInput:GetMouseLocation()
         local bgPos = wsSliderBg.AbsolutePosition.X
-        local bgWidth = wsSliderBg.AbsoluteSize.X
-        if bgWidth <= 0 then return end
-        local rel = (mousePos.X - bgPos) / bgWidth
-        local speedVal = math.clamp(rel, 0, 1) * 32
-        setWalkSpeedValue(speedVal)
+        local bgW = wsSliderBg.AbsoluteSize.X
+        if bgW <= 0 then return end
+        local rel = (mousePos.X - bgPos) / bgW
+        local newVal = math.clamp(rel, 0, 1) * 32
+        setWalkSpeed(newVal)
     end
 
     wsThumb.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            wsDragging = true
-            updateSliderFromMouse()
+            draggingWS = true
+            updateWSFromMouse()
         end
     end)
     wsSliderBg.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            wsDragging = true
-            updateSliderFromMouse()
+            draggingWS = true
+            updateWSFromMouse()
         end
     end)
     userInput.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            wsDragging = false
+            draggingWS = false
         end
     end)
     runService.RenderStepped:Connect(function()
-        if wsDragging then updateSliderFromMouse() end
+        if draggingWS then
+            updateWSFromMouse()
+        end
     end)
 
-    -- Set default walkspeed dari humanoid saat ini (jika belum diubah)
-    setWalkSpeedValue(humanoid.WalkSpeed)
+    -- Set nilai awal dari humanoid saat ini (atau default 16 jika lebih dari 32)
+    local initialSpeed = math.min(humanoid.WalkSpeed, 32)
+    if initialSpeed == 0 then initialSpeed = 16 end
+    setWalkSpeed(initialSpeed)
 
-    -- TPWalk toggle (CFrame-based)
-    local tpwalkActive = false
-    local tpwalkConnection = nil
+    -- TP Walk logic
     local function startTPWalk()
         if tpwalkConnection then return end
         tpwalkConnection = runService.RenderStepped:Connect(function()
             if not tpwalkActive then return end
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local moveDirection = humanoid.MoveDirection
-                if moveDirection.Magnitude > 0 then
-                    local newPos = hrp.Position + (moveDirection * (humanoid.WalkSpeed * 0.1))
+            local char = localPlayer.Character
+            if not char then return end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then
+                local moveDir = hum.MoveDirection
+                if moveDir.Magnitude > 0 then
+                    local speed = hum.WalkSpeed
+                    local newPos = hrp.Position + (moveDir * (speed * 0.1))
                     hrp.CFrame = CFrame.new(newPos, newPos + hrp.CFrame.LookVector)
                 end
             end
@@ -4361,12 +4375,14 @@ local function createAboutContent()
             startTPWalk()
             tpSwitch.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
             switchStroke.Color = Color3.fromRGB(0, 220, 255)
-            tpCircle.Position = UDim2.new(1, -22, 0.5, -9)
+            switchStroke.Transparency = 0.1
+            tpCircle.Position = UDim2.new(1, -25, 0.5, -10)
         else
             stopTPWalk()
             tpSwitch.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
             switchStroke.Color = Color3.fromRGB(100, 100, 130)
-            tpCircle.Position = UDim2.new(0, 4, 0.5, -9)
+            switchStroke.Transparency = 0.2
+            tpCircle.Position = UDim2.new(0, 3, 0.5, -10)
         end
     end
 
@@ -4374,32 +4390,43 @@ local function createAboutContent()
         setTPWalk(not tpwalkActive)
     end)
 
-    -- Morph Avatar functions (placeholder, sesuaikan dengan game)
+    -- Character respawn handler (reset humanoid reference)
+    local function onCharacterAdded(newChar)
+        currentChar = newChar
+        humanoid = newChar:WaitForChild("Humanoid")
+        originalWalkSpeed = humanoid.WalkSpeed
+        setWalkSpeed(walkSpeedSliderValue)
+    end
+    localPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+    -- Morph Avatar Functions (placeholder, sesuaikan dengan game)
     local function copyAvatar(username)
-        -- Implementasi copy avatar dari username target
         print("[Morph] Copy avatar from:", username)
-        -- Contoh: pcall(function() game:GetService("Players"):GetPlayerByUserId() ... end)
+        -- Contoh implementasi jika game menggunakan LoadCharacterAppearanceAsync
+        -- local target = players:FindFirstChild(username)
+        -- if target then target:LoadCharacterAppearanceAsync() end
     end
-    local function resetToOriginalSkin()
-        print("[Morph] Reset to original skin")
-        -- Kembalikan ke skin awal yang disimpan
+    local function resetSkin()
+        print("[Morph] Reset skin to original")
+        -- Implementasi reset skin
     end
-    local function saveCurrentAsOriginal()
-        print("[Morph] Save current as original")
+    local function saveSkin()
+        print("[Morph] Save current skin as default")
+        -- Implementasi menyimpan skin
     end
 
     copyBtn.MouseButton1Click:Connect(function()
-        local username = usernameBox.Text
-        if username and username ~= "" then
-            copyAvatar(username)
+        local name = usernameBox.Text
+        if name ~= "" then
+            copyAvatar(name)
         else
             print("[Morph] Username kosong")
         end
     end)
-    resetBtn.MouseButton1Click:Connect(resetToOriginalSkin)
-    saveBtn.MouseButton1Click:Connect(saveCurrentAsOriginal)
+    resetBtn.MouseButton1Click:Connect(resetSkin)
+    saveBtn.MouseButton1Click:Connect(saveSkin)
 
-    print("[About] Content loaded: Movement + Morph Avatar")
+    print("[About] Content loaded - Movement & Morph Avatar (UI improved)")
 end
 
 local function createSettingsContent()

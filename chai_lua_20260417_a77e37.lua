@@ -1818,7 +1818,7 @@ local function autoParryLoop()
         "parrysound", "frenzysound", "hitsound"
     }
     local COMBAT_ATTRIBUTES = {
-        "frenzy", "parry", "hookcount"
+        "frenzy", "parry", "hookprogress", "hookcount"
     }
 
     local scannedObjects = {}    

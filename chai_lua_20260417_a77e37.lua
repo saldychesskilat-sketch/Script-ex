@@ -3164,8 +3164,8 @@ local homeContent = nil
 local crosshairState = {
     enabled = false,
     style = "plus", -- plus, x, o
-    posX = 0,
-    posY = 0
+    posX = 50,
+    posY = 50
 }
 
 local function createHomeContent()

@@ -4026,18 +4026,17 @@ end
 -- ============================================================================
 -- ABOUT CONTENT
 -- ============================================================================
-local movementContent = nil
--- State permanen untuk movement
+-- Movement state (permanen, tidak hilang saat ganti sidebar)
 local movementState = {
     enabled = false,
-    speed = 50  -- 0-100, nanti dikonversi ke kecepatan stud/detik (misal 0-200)
+    speed = 50
 }
 
--- Fungsi untuk menerapkan kecepatan CFrame (TP Walk)
-local tpWalkConnection = nil
-local currentSpeed = 16  -- default normal
+-- Variabel internal untuk loop movement (diberi nama unik)
+local cframeMovementConnection = nil
 
-local function applyTPWalk()
+-- Fungsi terapkan CFrame walk
+local function applyCframeMovement()
     if not movementState.enabled then return end
     local char = localPlayer.Character
     if not char then return end
@@ -4046,16 +4045,16 @@ local function applyTPWalk()
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
     
-    -- Nonaktifkan WalkSpeed normal agar tidak konflik
     humanoid.WalkSpeed = 0
     
-    if tpWalkConnection then tpWalkConnection:Disconnect() end
+    if cframeMovementConnection then
+        cframeMovementConnection:Disconnect()
+    end
     
-    local speedStud = (movementState.speed / 100) * 200  -- range 0-200 stud/detik
-    local lastPos = hrp.Position
+    local speedStud = (movementState.speed / 100) * 200
     local lastTime = tick()
     
-    tpWalkConnection = RunService.Heartbeat:Connect(function()
+    cframeMovementConnection = RunService.Heartbeat:Connect(function()
         if not movementState.enabled or not hrp or hrp.Parent ~= char then
             return
         end
@@ -4067,46 +4066,45 @@ local function applyTPWalk()
             local move = direction * speedStud * delta
             hrp.CFrame = hrp.CFrame + move
         end
-        lastPos = hrp.Position
         lastTime = now
     end)
 end
 
-local function stopTPWalk()
-    if tpWalkConnection then
-        tpWalkConnection:Disconnect()
-        tpWalkConnection = nil
+local function stopCframeMovement()
+    if cframeMovementConnection then
+        cframeMovementConnection:Disconnect()
+        cframeMovementConnection = nil
     end
     local char = localPlayer.Character
     if char then
         local humanoid = char:FindFirstChildOfClass("Humanoid")
         if humanoid and humanoid.WalkSpeed == 0 then
-            humanoid.WalkSpeed = 16  -- reset ke default
-        end
-    end
-end
-
--- Event ketika karakter baru lahir
-local function onCharacterAdded(char)
-    task.wait(0.5)
-    if movementState.enabled then
-        applyTPWalk()
-    else
-        -- Pastikan WalkSpeed normal
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid then
             humanoid.WalkSpeed = 16
         end
     end
 end
 
--- Hook character added (hanya sekali)
-if not characterAddedConnected then
-    localPlayer.CharacterAdded:Connect(onCharacterAdded)
-    characterAddedConnected = true
+-- Event karakter baru lahir
+local function onCharacterAddedForMovement(char)
+    task.wait(0.5)
+    if movementState.enabled then
+        applyCframeMovement()
+    else
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.WalkSpeed == 0 then
+            humanoid.WalkSpeed = 16
+        end
+    end
 end
 
--- Fungsi utama GUI
+-- Pasang hook (hanya sekali)
+if not movementCharacterAddedConnected then
+    localPlayer.CharacterAdded:Connect(onCharacterAddedForMovement)
+    movementCharacterAddedConnected = true
+end
+
+-- Fungsi GUI movement
+local movementContent = nil
 local function createMovementContent()
     if movementContent then
         movementContent:Destroy()
@@ -4168,7 +4166,7 @@ local function createMovementContent()
     desc.Size = UDim2.new(1,-20,0,30)
     desc.Position = UDim2.new(0,10,0,34)
     desc.BackgroundTransparency = 1
-    desc.Text = "CFrame-based teleport walk. Speed persists after death."
+    desc.Text = "CFrame-based movement. Speed persists after death."
     desc.TextColor3 = Color3.fromRGB(180,180,180)
     desc.Font = Enum.Font.Gotham
     desc.TextSize = 10
@@ -4231,7 +4229,7 @@ local function createMovementContent()
     local toggleLabel = Instance.new("TextLabel")
     toggleLabel.Size = UDim2.new(0.5,0,1,0)
     toggleLabel.BackgroundTransparency = 1
-    toggleLabel.Text = "Enable TP Walk"
+    toggleLabel.Text = "Enable CFrame Walk"
     toggleLabel.TextColor3 = Color3.fromRGB(220,220,220)
     toggleLabel.Font = Enum.Font.GothamBold
     toggleLabel.TextSize = 11
@@ -4261,7 +4259,7 @@ local function createMovementContent()
     toggleCircle.Parent = toggleBtn
     Instance.new("UICorner",toggleCircle).CornerRadius = UDim.new(1,0)
 
-    -- LOGIKA SLIDER (drag real-time)
+    -- LOGIKA SLIDER
     local userInput = game:GetService("UserInputService")
     local runService = game:GetService("RunService")
     local dragging = false
@@ -4279,9 +4277,8 @@ local function createMovementContent()
         else
             sliderThumb.Position = UDim2.new(val/100, -thumbSize/2, 0.5, -thumbSize/2)
         end
-        -- Jika TP Walk sedang aktif, kecepatan berubah secara real-time
         if movementState.enabled then
-            applyTPWalk()  -- restart dengan kecepatan baru
+            applyCframeMovement()  -- restart dengan kecepatan baru
         end
     end
 
@@ -4327,13 +4324,13 @@ local function createMovementContent()
             toggleStroke.Color = Color3.fromRGB(0,200,255)
             toggleStroke.Transparency = 0.1
             toggleCircle.Position = UDim2.new(1,-22,0.5,-9)
-            applyTPWalk()
+            applyCframeMovement()
         else
             toggleBtn.BackgroundColor3 = Color3.fromRGB(30,30,45)
             toggleStroke.Color = Color3.fromRGB(100,100,130)
             toggleStroke.Transparency = 0.3
             toggleCircle.Position = UDim2.new(0,4,0.5,-9)
-            stopTPWalk()
+            stopCframeMovement()
         end
     end
 
@@ -4341,12 +4338,11 @@ local function createMovementContent()
         setToggle(not movementState.enabled)
     end)
 
-    -- Inisialisasi posisi slider thumb
+    -- Inisialisasi
     setSliderValue(movementState.speed)
-    -- Pastikan state toggle sinkron
     setToggle(movementState.enabled)
 
-    -- Tambahkan info card (opsional)
+    -- Info card
     local infoCard = Instance.new("Frame")
     infoCard.Size = UDim2.new(1,-6,0,120)
     infoCard.BackgroundColor3 = Color3.fromRGB(8,18,32)
@@ -4381,13 +4377,13 @@ local function createMovementContent()
     infoText.TextSize = 11
     infoText.TextColor3 = Color3.fromRGB(225,225,225)
     infoText.Text = [[
-<b>TP WALK</b> uses CFrame manipulation.
+<b>CFRAME WALK</b> uses CFrame manipulation.
 Speed persists after death / respawn.
 Sliders work in real-time.
 ]]
     infoText.Parent = infoCard
 
-    print("[Movement] TP Walk config loaded")
+    print("[Movement] CFrame Walk config loaded")
 end
 
 local function createSettingsContent()

@@ -4029,9 +4029,7 @@ end
 local aboutContent = nil
 
 local function createAboutContent()
-    if aboutContent then
-        aboutContent:Destroy()
-    end
+    if aboutContent then aboutContent:Destroy() end
 
     aboutContent = Instance.new("Frame")
     aboutContent.Size = UDim2.new(1, 0, 1, 0)
@@ -4044,58 +4042,58 @@ local function createAboutContent()
     scroll.Position = UDim2.new(0, 4, 0, 4)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 4
+    scroll.ScrollBarThickness = 6
     scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     scroll.Parent = aboutContent
 
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 12)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = scroll
+    local mainLayout = Instance.new("UIListLayout")
+    mainLayout.Padding = UDim.new(0, 14)
+    mainLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    mainLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    mainLayout.Parent = scroll
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0, 4)
-    padding.PaddingBottom = UDim.new(0, 10)
-    padding.PaddingLeft = UDim.new(0, 2)
-    padding.PaddingRight = UDim.new(0, 2)
-    padding.Parent = scroll
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 6)
+    pad.PaddingBottom = UDim.new(0, 12)
+    pad.PaddingLeft = UDim.new(0, 4)
+    pad.PaddingRight = UDim.new(0, 4)
+    pad.Parent = scroll
 
-    -- Helper: kartu dengan stroke biru (sama seperti home)
+    -- Helper: buat kartu (sama dengan home)
     local function createCard(titleText)
         local card = Instance.new("Frame")
         card.Size = UDim2.new(1, -6, 0, 0)
         card.BackgroundColor3 = Color3.fromRGB(8, 18, 34)
         card.BorderSizePixel = 0
+        card.ClipsDescendants = true
         card.Parent = scroll
-        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
-
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
         local stroke = Instance.new("UIStroke")
         stroke.Color = Color3.fromRGB(0, 180, 255)
         stroke.Transparency = 0.45
-        stroke.Thickness = 1
+        stroke.Thickness = 1.2
         stroke.Parent = card
 
-        local titleLabel = Instance.new("TextLabel")
-        titleLabel.Size = UDim2.new(1, -20, 0, 30)
-        titleLabel.Position = UDim2.new(0, 10, 0, 8)
-        titleLabel.BackgroundTransparency = 1
-        titleLabel.Text = titleText
-        titleLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
-        titleLabel.Font = Enum.Font.GothamBold
-        titleLabel.TextSize = 14
-        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        titleLabel.Parent = card
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, -20, 0, 32)
+        title.Position = UDim2.new(0, 10, 0, 8)
+        title.BackgroundTransparency = 1
+        title.Text = titleText
+        title.TextColor3 = Color3.fromRGB(0, 220, 255)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 14
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Parent = card
 
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, -20, 0, 0)
-        container.Position = UDim2.new(0, 10, 0, 42)
+        container.Position = UDim2.new(0, 10, 0, 44)
         container.BackgroundTransparency = 1
         container.Parent = card
 
         local containerLayout = Instance.new("UIListLayout")
-        containerLayout.Padding = UDim.new(0, 14)
+        containerLayout.Padding = UDim.new(0, 16)
         containerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
         containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
         containerLayout.Parent = container
@@ -4103,28 +4101,30 @@ local function createAboutContent()
         return card, container, containerLayout
     end
 
-    -- ======================== KARTU MOVEMENT ========================
+    -- ==============================
+    -- KARTU MOVEMENT
+    -- ==============================
     local moveCard, moveContainer, moveLayout = createCard("MOVEMENT")
 
-    -- Walk Speed Slider
-    local wsHolder = Instance.new("Frame")
-    wsHolder.Size = UDim2.new(1, 0, 0, 48)
-    wsHolder.BackgroundTransparency = 1
-    wsHolder.Parent = moveContainer
+    -- Walk Speed slider
+    local wsFrame = Instance.new("Frame")
+    wsFrame.Size = UDim2.new(1, 0, 0, 48)
+    wsFrame.BackgroundTransparency = 1
+    wsFrame.Parent = moveContainer
 
     local wsLabel = Instance.new("TextLabel")
-    wsLabel.Size = UDim2.new(0.4, 0, 0, 20)
+    wsLabel.Size = UDim2.new(0.4, 0, 0, 22)
     wsLabel.Position = UDim2.new(0, 0, 0, 0)
     wsLabel.BackgroundTransparency = 1
     wsLabel.Text = "Walk Speed"
-    wsLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    wsLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
     wsLabel.Font = Enum.Font.GothamBold
     wsLabel.TextSize = 12
     wsLabel.TextXAlignment = Enum.TextXAlignment.Left
-    wsLabel.Parent = wsHolder
+    wsLabel.Parent = wsFrame
 
     local wsValue = Instance.new("TextLabel")
-    wsValue.Size = UDim2.new(0.2, 0, 0, 20)
+    wsValue.Size = UDim2.new(0.2, 0, 0, 22)
     wsValue.Position = UDim2.new(0.4, 0, 0, 0)
     wsValue.BackgroundTransparency = 1
     wsValue.Text = "16 / 32"
@@ -4132,15 +4132,15 @@ local function createAboutContent()
     wsValue.Font = Enum.Font.GothamBold
     wsValue.TextSize = 12
     wsValue.TextXAlignment = Enum.TextXAlignment.Left
-    wsValue.Parent = wsHolder
+    wsValue.Parent = wsFrame
 
-    local wsSliderBg = Instance.new("Frame")
-    wsSliderBg.Size = UDim2.new(0.55, 0, 0, 4)
-    wsSliderBg.Position = UDim2.new(0, 0, 1, -12)
-    wsSliderBg.BackgroundColor3 = Color3.fromRGB(25, 35, 50)
-    wsSliderBg.BorderSizePixel = 0
-    wsSliderBg.Parent = wsHolder
-    Instance.new("UICorner", wsSliderBg).CornerRadius = UDim.new(1, 0)
+    local wsTrack = Instance.new("Frame")
+    wsTrack.Size = UDim2.new(0.55, 0, 0, 4)
+    wsTrack.Position = UDim2.new(0, 0, 1, -10)
+    wsTrack.BackgroundColor3 = Color3.fromRGB(30, 40, 55)
+    wsTrack.BorderSizePixel = 0
+    wsTrack.Parent = wsFrame
+    Instance.new("UICorner", wsTrack).CornerRadius = UDim.new(1, 0)
 
     local wsThumb = Instance.new("TextButton")
     wsThumb.Size = UDim2.new(0, 14, 0, 14)
@@ -4149,24 +4149,24 @@ local function createAboutContent()
     wsThumb.Text = ""
     wsThumb.AutoButtonColor = false
     wsThumb.BorderSizePixel = 0
-    wsThumb.Parent = wsSliderBg
+    wsThumb.Parent = wsTrack
     Instance.new("UICorner", wsThumb).CornerRadius = UDim.new(1, 0)
 
-    -- TP Walk Toggle (switch)
-    local tpHolder = Instance.new("Frame")
-    tpHolder.Size = UDim2.new(1, 0, 0, 32)
-    tpHolder.BackgroundTransparency = 1
-    tpHolder.Parent = moveContainer
+    -- TP Walk toggle
+    local tpFrame = Instance.new("Frame")
+    tpFrame.Size = UDim2.new(1, 0, 0, 36)
+    tpFrame.BackgroundTransparency = 1
+    tpFrame.Parent = moveContainer
 
     local tpLabel = Instance.new("TextLabel")
     tpLabel.Size = UDim2.new(0.7, 0, 1, 0)
     tpLabel.BackgroundTransparency = 1
     tpLabel.Text = "TP Walk"
-    tpLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    tpLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
     tpLabel.Font = Enum.Font.GothamBold
     tpLabel.TextSize = 12
     tpLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tpLabel.Parent = tpHolder
+    tpLabel.Parent = tpFrame
 
     local tpSwitch = Instance.new("TextButton")
     tpSwitch.Size = UDim2.new(0, 48, 0, 24)
@@ -4175,13 +4175,15 @@ local function createAboutContent()
     tpSwitch.Text = ""
     tpSwitch.AutoButtonColor = false
     tpSwitch.BorderSizePixel = 0
-    tpSwitch.Parent = tpHolder
+    tpSwitch.Parent = tpFrame
     Instance.new("UICorner", tpSwitch).CornerRadius = UDim.new(1, 0)
+
     local tpStroke = Instance.new("UIStroke")
     tpStroke.Color = Color3.fromRGB(100, 100, 130)
     tpStroke.Thickness = 1.2
     tpStroke.Transparency = 0.2
     tpStroke.Parent = tpSwitch
+
     local tpCircle = Instance.new("Frame")
     tpCircle.Size = UDim2.new(0, 20, 0, 20)
     tpCircle.Position = UDim2.new(0, 3, 0.5, -10)
@@ -4190,11 +4192,13 @@ local function createAboutContent()
     tpCircle.Parent = tpSwitch
     Instance.new("UICorner", tpCircle).CornerRadius = UDim.new(1, 0)
 
-    -- ======================== KARTU MORPH AVATAR ========================
+    -- ==============================
+    -- KARTU MORPH AVATAR
+    -- ==============================
     local morphCard, morphContainer, morphLayout = createCard("MORPH AVATAR")
 
     local usernameBox = Instance.new("TextBox")
-    usernameBox.Size = UDim2.new(1, 0, 0, 36)
+    usernameBox.Size = UDim2.new(1, 0, 0, 38)
     usernameBox.PlaceholderText = "Enter target username..."
     usernameBox.Text = ""
     usernameBox.BackgroundColor3 = Color3.fromRGB(14, 24, 40)
@@ -4207,7 +4211,7 @@ local function createAboutContent()
     Instance.new("UICorner", usernameBox).CornerRadius = UDim.new(0, 8)
 
     local btnHolder = Instance.new("Frame")
-    btnHolder.Size = UDim2.new(1, 0, 0, 38)
+    btnHolder.Size = UDim2.new(1, 0, 0, 42)
     btnHolder.BackgroundTransparency = 1
     btnHolder.Parent = morphContainer
 
@@ -4217,10 +4221,10 @@ local function createAboutContent()
     btnLayout.Padding = UDim.new(0, 10)
     btnLayout.Parent = btnHolder
 
-    local function createMorphButton(text, bgColor)
+    local function makeBtn(text, color)
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0.3, 0, 1, 0)
-        btn.BackgroundColor3 = bgColor
+        btn.BackgroundColor3 = color
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.GothamBold
@@ -4233,62 +4237,62 @@ local function createAboutContent()
         return btn
     end
 
-    local copyBtn = createMorphButton("COPY AVATAR", Color3.fromRGB(0, 100, 200))
-    local resetBtn = createMorphButton("RESET SKIN", Color3.fromRGB(100, 70, 30))
-    local saveBtn = createMorphButton("SAVE CURRENT", Color3.fromRGB(30, 100, 50))
+    local copyBtn = makeBtn("COPY AVATAR", Color3.fromRGB(0, 100, 200))
+    local resetBtn = makeBtn("RESET SKIN", Color3.fromRGB(100, 70, 30))
+    local saveBtn = makeBtn("SAVE CURRENT", Color3.fromRGB(30, 100, 50))
 
-    -- Efek hover
+    -- Hover efek
     for _, btn in {copyBtn, resetBtn, saveBtn} do
-        btn.MouseEnter:Connect(function()
-            btn.BackgroundTransparency = 0.2
-        end)
-        btn.MouseLeave:Connect(function()
-            btn.BackgroundTransparency = 0
-        end)
+        btn.MouseEnter:Connect(function() btn.BackgroundTransparency = 0.2 end)
+        btn.MouseLeave:Connect(function() btn.BackgroundTransparency = 0 end)
     end
 
-    -- Atur tinggi kartu otomatis
-    local function adjustCardHeight(card, container)
+    -- Auto height adjustment
+    local function fixCardHeight(card, container)
         task.wait(0.05)
-        local containerHeight = container.AbsoluteSize.Y
-        card.Size = UDim2.new(1, -6, 0, containerHeight + 60)
+        local h = container.AbsoluteSize.Y
+        card.Size = UDim2.new(1, -6, 0, h + 60)
     end
+
     moveLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        adjustCardHeight(moveCard, moveContainer)
+        fixCardHeight(moveCard, moveContainer)
     end)
     morphLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        adjustCardHeight(morphCard, morphContainer)
+        fixCardHeight(morphCard, morphContainer)
     end)
     task.wait(0.1)
-    adjustCardHeight(moveCard, moveContainer)
-    adjustCardHeight(morphCard, morphContainer)
+    fixCardHeight(moveCard, moveContainer)
+    fixCardHeight(morphCard, morphContainer)
 
-    -- ======================== LOGIKA FUNGSI ========================
+    -- ==============================
+    -- LOGIKA FUNGSI
+    -- ==============================
     local userInput = game:GetService("UserInputService")
     local runService = game:GetService("RunService")
     local players = game:GetService("Players")
     local localPlayer = players.LocalPlayer
-    local currentChar = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-    local humanoid = currentChar:WaitForChild("Humanoid")
+    local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
 
-    -- State lokal
-    local walkSpeedSliderValue = math.min(humanoid.WalkSpeed, 32)
-    if walkSpeedSliderValue == 0 then walkSpeedSliderValue = 16 end
+    -- State
+    local currentWalkSpeed = math.clamp(humanoid.WalkSpeed, 0, 32)
+    if currentWalkSpeed == 0 then currentWalkSpeed = 16 end
+    humanoid.WalkSpeed = currentWalkSpeed
     local tpwalkActive = false
     local tpwalkConnection = nil
 
-    -- Update tampilan slider
-    local function setWalkSpeedDisplay(value)
+    -- Update slider UI
+    local function updateWalkSpeedUI(value)
         local rounded = math.floor(value * 10) / 10
         wsValue.Text = rounded .. " / 32"
         local rel = value / 32
-        local trackSize = wsSliderBg.AbsoluteSize.X
-        local thumbSize = wsThumb.AbsoluteSize.X
-        if trackSize > 0 then
-            local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
-            wsThumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
+        local trackW = wsTrack.AbsoluteSize.X
+        local thumbW = wsThumb.AbsoluteSize.X
+        if trackW > 0 then
+            local px = math.clamp(rel * trackW, thumbW/2, trackW - thumbW/2)
+            wsThumb.Position = UDim2.new(0, px - thumbW/2, 0.5, -thumbW/2)
         else
-            wsThumb.Position = UDim2.new(rel, -thumbSize/2, 0.5, -thumbSize/2)
+            wsThumb.Position = UDim2.new(rel, -thumbW/2, 0.5, -thumbW/2)
         end
     end
 
@@ -4297,49 +4301,47 @@ local function createAboutContent()
         if humanoid and humanoid.Parent then
             humanoid.WalkSpeed = value
         end
-        walkSpeedSliderValue = value
-        setWalkSpeedDisplay(value)
+        currentWalkSpeed = value
+        updateWalkSpeedUI(value)
     end
 
     -- Slider drag
-    local draggingWS = false
-    local function updateWSFromMouse()
-        if not draggingWS then return end
-        local mousePos = userInput:GetMouseLocation()
-        local bgPos = wsSliderBg.AbsolutePosition.X
-        local bgW = wsSliderBg.AbsoluteSize.X
+    local dragging = false
+    local function updateFromMouse()
+        if not dragging then return end
+        local mouse = userInput:GetMouseLocation()
+        local bgX = wsTrack.AbsolutePosition.X
+        local bgW = wsTrack.AbsoluteSize.X
         if bgW <= 0 then return end
-        local rel = (mousePos.X - bgPos) / bgW
-        local newVal = math.clamp(rel, 0, 1) * 32
-        setWalkSpeed(newVal)
+        local rel = (mouse.X - bgX) / bgW
+        local val = math.clamp(rel, 0, 1) * 32
+        setWalkSpeed(val)
     end
 
     wsThumb.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingWS = true
-            updateWSFromMouse()
+            dragging = true
+            updateFromMouse()
         end
     end)
-    wsSliderBg.InputBegan:Connect(function(input)
+    wsTrack.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingWS = true
-            updateWSFromMouse()
+            dragging = true
+            updateFromMouse()
         end
     end)
     userInput.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingWS = false
+            dragging = false
         end
     end)
     runService.RenderStepped:Connect(function()
-        if draggingWS then
-            updateWSFromMouse()
-        end
+        if dragging then updateFromMouse() end
     end)
 
-    setWalkSpeed(walkSpeedSliderValue)
+    setWalkSpeed(currentWalkSpeed)
 
-    -- TP Walk logic
+    -- TPWalk logic
     local function startTPWalk()
         if tpwalkConnection then return end
         tpwalkConnection = runService.RenderStepped:Connect(function()
@@ -4352,8 +4354,8 @@ local function createAboutContent()
                 local moveDir = hum.MoveDirection
                 if moveDir.Magnitude > 0 then
                     local speed = hum.WalkSpeed
-                    local newPos = hrp.Position + (moveDir * (speed * 0.1))
-                    hrp.CFrame = CFrame.new(newPos, newPos + hrp.CFrame.LookVector)
+                    local step = moveDir * (speed * 0.1)
+                    hrp.CFrame = hrp.CFrame + step
                 end
             end
         end)
@@ -4386,36 +4388,36 @@ local function createAboutContent()
         setTPWalk(not tpwalkActive)
     end)
 
-    -- Respawn handler
+    -- Respawn handler (keep walk speed)
     local function onCharacterAdded(newChar)
-        currentChar = newChar
+        character = newChar
         humanoid = newChar:WaitForChild("Humanoid")
-        setWalkSpeed(walkSpeedSliderValue)
+        setWalkSpeed(currentWalkSpeed)
     end
     localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-    -- Morph Avatar functions (placeholder)
+    -- Morph functions (placeholder)
     local function copyAvatar(username)
         print("[Morph] Copy avatar from:", username)
+        -- Implementasi sesuai game
     end
     local function resetSkin()
-        print("[Morph] Reset skin to original")
+        print("[Morph] Reset to original skin")
     end
     local function saveSkin()
-        print("[Morph] Save current skin as default")
+        print("[Morph] Save current skin")
     end
 
     copyBtn.MouseButton1Click:Connect(function()
         local name = usernameBox.Text
-        if name ~= "" then
-            copyAvatar(name)
-        end
+        if name ~= "" then copyAvatar(name) end
     end)
     resetBtn.MouseButton1Click:Connect(resetSkin)
     saveBtn.MouseButton1Click:Connect(saveSkin)
 
-    print("[About] Content loaded - Movement & Morph Avatar (UI improved)")
+    print("[About] Content loaded - Movement + Morph Avatar")
 end
+
 local function createSettingsContent()
 
     if settingsContent then

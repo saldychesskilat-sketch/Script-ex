@@ -2923,57 +2923,76 @@ local function TriggerMobileButton()
     end                
 end                
                 
-local function InitializeAutobuy()                
-    task.spawn(function()                
-        local playerGui = localPlayer:FindFirstChild("PlayerGui")                
-        if not playerGui then return end                
-        local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")                
-        if not prompt then                
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)                
-        end                
-        local check = prompt and prompt:FindFirstChild("Check")                
-        if not check then return end                
-        local line = check:FindFirstChild("Line")                
-        local goal = check:FindFirstChild("Goal")                
-        if not line or not goal then return end                
-        if VisibilityConnection then VisibilityConnection:Disconnect() end                
-        local hasTriggered = false  -- flag lokal untuk mencegah multiple trigger dalam satu skillcheck
-        VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                
-            if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                
-                hasTriggered = false  -- reset flag saat skillcheck baru muncul
-                if HeartbeatConnection then HeartbeatConnection:Disconnect() end                
-                HeartbeatConnection = RunService.Heartbeat:Connect(function()                
-                    if not check.Visible then 
+local function InitializeAutobuy()                    
+    task.spawn(function()                    
+        local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
+        if not playerGui then return end                    
+        local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")                    
+        if not prompt then                    
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)                    
+        end                    
+        local check = prompt and prompt:FindFirstChild("Check")                    
+        if not check then return end                    
+        local line = check:FindFirstChild("Line")                    
+        local goal = check:FindFirstChild("Goal")                    
+        if not line or not goal then return end                    
+        if VisibilityConnection then VisibilityConnection:Disconnect() end                    
+        
+        local triggerCount = 0          -- ganti dari hasTriggered
+        local MAX_TRIGGER = 2           -- jumlah trigger yang diinginkan
+        local lastTriggerTime = 0
+        
+        VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
+            if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
+                triggerCount = 0         -- reset saat skillcheck baru muncul
+                lastTriggerTime = 0
+                if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
+                HeartbeatConnection = RunService.Heartbeat:Connect(function()                    
+                    if not check.Visible then     
+                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end    
+                        return     
+                    end    
+                    if triggerCount >= MAX_TRIGGER then 
+                        -- sudah mencapai batas, hentikan heartbeat
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
-                        return 
+                        return
                     end
-                    if hasTriggered then return end  -- sudah trigger, skip
-                    local currentLine = check:FindFirstChild("Line") or line
-                    local currentGoal = check:FindFirstChild("Goal") or goal
-                    local lr = currentLine.Rotation % 360                
-                    local gr = currentGoal.Rotation % 360                
-                    local ss = (gr + 104) % 360                
-                    local se = (gr + 118) % 360                
-                    local inRange = false                
-                    if ss > se then                
-                        if lr >= ss or lr <= se then inRange = true end                
-                    else                
-                        if lr >= ss and lr <= se then inRange = true end                
-                    end                
-                    if inRange then                
-                        hasTriggered = true
-                        TriggerMobileButton()                
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end                
-                    end                
-                end)                
-            elseif HeartbeatConnection then 
-                HeartbeatConnection:Disconnect(); 
-                HeartbeatConnection = nil 
-                hasTriggered = false
-            end                
-        end)                
-    end)                
-end                
+                    
+                    local currentLine = check:FindFirstChild("Line") or line    
+                    local currentGoal = check:FindFirstChild("Goal") or goal    
+                    local lr = currentLine.Rotation % 360                    
+                    local gr = currentGoal.Rotation % 360                    
+                    local ss = (gr + 104) % 360                    
+                    local se = (gr + 118) % 360                    
+                    local inRange = false                    
+                    if ss > se then                    
+                        if lr >= ss or lr <= se then inRange = true end                    
+                    else                    
+                        if lr >= ss and lr <= se then inRange = true end                    
+                    end                    
+                    
+                    if inRange then                    
+                        local now = tick()
+                        -- minimal jeda 0.05 detik antar trigger untuk menghindari spam dalam frame yang sama
+                        if now - lastTriggerTime > 0.05 then
+                            lastTriggerTime = now
+                            triggerCount = triggerCount + 1
+                            TriggerMobileButton()                    
+                            if triggerCount >= MAX_TRIGGER then
+                                if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
+                            end
+                        end
+                    end                    
+                end)                    
+            elseif HeartbeatConnection then     
+                HeartbeatConnection:Disconnect();     
+                HeartbeatConnection = nil     
+                triggerCount = 0
+                lastTriggerTime = 0
+            end                    
+        end)                    
+    end)                    
+end
                 
 local function startAutoSkillCheck()                
     if autoSkillCheckConnection then return end                

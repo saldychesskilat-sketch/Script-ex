@@ -2939,7 +2939,7 @@ local function InitializeAutobuy()
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
         local triggerCount = 0          -- ganti dari hasTriggered
-        local MAX_TRIGGER = 2           -- jumlah trigger yang diinginkan
+        local MAX_TRIGGER = 20           -- jumlah trigger yang diinginkan
         local lastTriggerTime = 0
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    

@@ -4026,192 +4026,165 @@ end
 -- ============================================================================
 -- ABOUT CONTENT
 -- ============================================================================
--- Movement state (permanen, tidak hilang saat ganti sidebar)
-local movementState = {
-    enabled = false,
-    speed = 50
-}
+local aboutContent = nil
 
--- Variabel internal untuk loop movement (diberi nama unik)
-local cframeMovementConnection = nil
-
--- Fungsi terapkan CFrame walk
-local function applyCframeMovement()
-    if not movementState.enabled then return end
-    local char = localPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-    
-    humanoid.WalkSpeed = 0
-    
-    if cframeMovementConnection then
-        cframeMovementConnection:Disconnect()
+local function createAboutContent()
+    if aboutContent then
+        aboutContent:Destroy()
     end
-    
-    local speedStud = (movementState.speed / 100) * 200
-    local lastTime = tick()
-    
-    cframeMovementConnection = RunService.Heartbeat:Connect(function()
-        if not movementState.enabled or not hrp or hrp.Parent ~= char then
-            return
-        end
-        local now = tick()
-        local delta = now - lastTime
-        if delta <= 0 then return end
-        local direction = humanoid.MoveDirection
-        if direction.Magnitude > 0 then
-            local move = direction * speedStud * delta
-            hrp.CFrame = hrp.CFrame + move
-        end
-        lastTime = now
-    end)
-end
 
-local function stopCframeMovement()
-    if cframeMovementConnection then
-        cframeMovementConnection:Disconnect()
-        cframeMovementConnection = nil
+    -- Variabel lokal untuk state movement (tidak global)
+    local currentSpeed = 2          -- nilai kecepatan 0-100
+    local tpwalkActive = false
+    local tpwalkConnection = nil
+    local characterAddedConn = nil
+
+    -- Fungsi untuk memulai TP Walk (CFrame-based movement)
+    local function startTPWalk()
+        if tpwalkConnection then
+            tpwalkConnection:Disconnect()
+            tpwalkConnection = nil
+        end
+        tpwalkConnection = RunService.RenderStepped:Connect(function(dt)
+            if not tpwalkActive then return end
+            local char = localPlayer.Character
+            if not char then return end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if not hrp or not humanoid then return end
+            if humanoid.Health <= 0 then return end
+
+            -- Input WASD
+            local moveDirection = Vector3.new(
+                (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0),
+                0,
+                (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
+            )
+            if moveDirection.Magnitude > 0 then
+                moveDirection = moveDirection.Unit
+                local camera = workspace.CurrentCamera
+                local cameraCF = camera.CFrame
+                local forward = cameraCF.LookVector * moveDirection.Z
+                local right = cameraCF.RightVector * moveDirection.X
+                local direction = (forward + right).Unit
+                local speedValue = currentSpeed / 10   -- 0-10 stud/detik
+                local delta = direction * speedValue * dt
+                hrp.CFrame = hrp.CFrame + delta
+            end
+        end)
     end
-    local char = localPlayer.Character
-    if char then
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.WalkSpeed == 0 then
-            humanoid.WalkSpeed = 16
+
+    local function stopTPWalk()
+        if tpwalkConnection then
+            tpwalkConnection:Disconnect()
+            tpwalkConnection = nil
         end
     end
-end
 
--- Event karakter baru lahir
-local function onCharacterAddedForMovement(char)
-    task.wait(0.5)
-    if movementState.enabled then
-        applyCframeMovement()
-    else
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.WalkSpeed == 0 then
-            humanoid.WalkSpeed = 16
+    -- Fungsi untuk menerapkan ulang saat karakter respawn
+    local function onCharacterAdded()
+        if tpwalkActive then
+            stopTPWalk()
+            startTPWalk()
         end
     end
-end
 
--- Pasang hook (hanya sekali)
-if not movementCharacterAddedConnected then
-    localPlayer.CharacterAdded:Connect(onCharacterAddedForMovement)
-    movementCharacterAddedConnected = true
-end
+    -- Buat GUI
+    aboutContent = Instance.new("Frame")
+    aboutContent.Size = UDim2.new(1,0,1,0)
+    aboutContent.BackgroundTransparency = 1
+    aboutContent.Parent = contentPanel
 
--- Fungsi GUI movement
-local movementContent = nil
-local function createMovementContent()
-    if movementContent then
-        movementContent:Destroy()
-    end
+    -- Card utama
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1,-12,1,-12)
+    card.Position = UDim2.new(0,6,0,6)
+    card.BackgroundColor3 = Color3.fromRGB(8,18,34)
+    card.BorderSizePixel = 0
+    card.Parent = aboutContent
+    Instance.new("UICorner",card).CornerRadius = UDim.new(0,10)
+    local cardStroke = Instance.new("UIStroke")
+    cardStroke.Color = Color3.fromRGB(0,180,255)
+    cardStroke.Transparency = 0.5
+    cardStroke.Parent = card
 
-    movementContent = Instance.new("Frame")
-    movementContent.Size = UDim2.new(1,0,1,0)
-    movementContent.BackgroundTransparency = 1
-    movementContent.Parent = contentPanel
-
+    -- ScrollingFrame
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1,-8,1,-8)
-    scroll.Position = UDim2.new(0,4,0,4)
+    scroll.Size = UDim2.new(1,0,1,0)
     scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 2
     scroll.CanvasSize = UDim2.new(0,0,0,0)
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.Parent = movementContent
+    scroll.Parent = card
+    local scrollLayout = Instance.new("UIListLayout")
+    scrollLayout.Padding = UDim.new(0,12)
+    scrollLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    scrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    scrollLayout.Parent = scroll
+    local scrollPadding = Instance.new("UIPadding")
+    scrollPadding.PaddingTop = UDim.new(0,12)
+    scrollPadding.PaddingBottom = UDim.new(0,12)
+    scrollPadding.PaddingLeft = UDim.new(0,12)
+    scrollPadding.PaddingRight = UDim.new(0,12)
+    scrollPadding.Parent = scroll
 
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0,10)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = scroll
+    -- ========== SLIDER KECEPATAN ==========
+    local speedCard = Instance.new("Frame")
+    speedCard.Size = UDim2.new(1,0,0,90)
+    speedCard.BackgroundColor3 = Color3.fromRGB(10,20,36)
+    speedCard.BorderSizePixel = 0
+    speedCard.Parent = scroll
+    Instance.new("UICorner",speedCard).CornerRadius = UDim.new(0,8)
+    local speedStroke = Instance.new("UIStroke")
+    speedStroke.Color = Color3.fromRGB(0,180,255)
+    speedStroke.Transparency = 0.4
+    speedStroke.Parent = speedCard
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0,4)
-    padding.PaddingBottom = UDim.new(0,10)
-    padding.PaddingLeft = UDim.new(0,2)
-    padding.PaddingRight = UDim.new(0,2)
-    padding.Parent = scroll
+    local speedTitle = Instance.new("TextLabel")
+    speedTitle.Size = UDim2.new(1,-16,0,24)
+    speedTitle.Position = UDim2.new(0,8,0,6)
+    speedTitle.BackgroundTransparency = 1
+    speedTitle.Text = "MOVEMENT SPEED"
+    speedTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    speedTitle.Font = Enum.Font.GothamBold
+    speedTitle.TextSize = 12
+    speedTitle.TextXAlignment = Enum.TextXAlignment.Left
+    speedTitle.Parent = speedCard
 
-    -- Kartu utama
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1,-6,0,210)
-    card.BackgroundColor3 = Color3.fromRGB(8,20,36)
-    card.BorderSizePixel = 0
-    card.Parent = scroll
-    Instance.new("UICorner",card).CornerRadius = UDim.new(0,10)
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0,180,255)
-    stroke.Transparency = 0.4
-    stroke.Parent = card
+    local speedDesc = Instance.new("TextLabel")
+    speedDesc.Size = UDim2.new(1,-16,0,16)
+    speedDesc.Position = UDim2.new(0,8,0,30)
+    speedDesc.BackgroundTransparency = 1
+    speedDesc.Text = "CFrame-based movement (permanent)"
+    speedDesc.TextColor3 = Color3.fromRGB(160,160,160)
+    speedDesc.Font = Enum.Font.Gotham
+    speedDesc.TextSize = 9
+    speedDesc.TextXAlignment = Enum.TextXAlignment.Left
+    speedDesc.Parent = speedCard
 
-    -- Judul
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1,-20,0,24)
-    title.Position = UDim2.new(0,10,0,10)
-    title.BackgroundTransparency = 1
-    title.Text = "MOVEMENT CONFIG"
-    title.TextColor3 = Color3.fromRGB(0,220,255)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 13
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = card
-
-    local desc = Instance.new("TextLabel")
-    desc.Size = UDim2.new(1,-20,0,30)
-    desc.Position = UDim2.new(0,10,0,34)
-    desc.BackgroundTransparency = 1
-    desc.Text = "CFrame-based movement. Speed persists after death."
-    desc.TextColor3 = Color3.fromRGB(180,180,180)
-    desc.Font = Enum.Font.Gotham
-    desc.TextSize = 10
-    desc.TextWrapped = true
-    desc.TextXAlignment = Enum.TextXAlignment.Left
-    desc.Parent = card
-
-    -- SLIDER KECEPATAN
-    local sliderHolder = Instance.new("Frame")
-    sliderHolder.Size = UDim2.new(1,-20,0,28)
-    sliderHolder.Position = UDim2.new(0,10,0,70)
-    sliderHolder.BackgroundTransparency = 1
-    sliderHolder.Parent = card
-
-    local labelSpeed = Instance.new("TextLabel")
-    labelSpeed.Size = UDim2.new(0.3,0,1,0)
-    labelSpeed.BackgroundTransparency = 1
-    labelSpeed.Text = "Speed"
-    labelSpeed.TextColor3 = Color3.fromRGB(220,220,220)
-    labelSpeed.Font = Enum.Font.GothamBold
-    labelSpeed.TextSize = 11
-    labelSpeed.TextXAlignment = Enum.TextXAlignment.Left
-    labelSpeed.Parent = sliderHolder
-
-    local valueSpeed = Instance.new("TextLabel")
-    valueSpeed.Size = UDim2.new(0.2,0,1,0)
-    valueSpeed.Position = UDim2.new(0.3,0,0,0)
-    valueSpeed.BackgroundTransparency = 1
-    valueSpeed.Text = tostring(movementState.speed)
-    valueSpeed.TextColor3 = Color3.fromRGB(0,220,255)
-    valueSpeed.Font = Enum.Font.GothamBold
-    valueSpeed.TextSize = 11
-    valueSpeed.TextXAlignment = Enum.TextXAlignment.Left
-    valueSpeed.Parent = sliderHolder
+    local speedValueLabel = Instance.new("TextLabel")
+    speedValueLabel.Size = UDim2.new(0.2,0,0,20)
+    speedValueLabel.Position = UDim2.new(0.75,0,0,52)
+    speedValueLabel.BackgroundTransparency = 1
+    speedValueLabel.Text = tostring(currentSpeed)
+    speedValueLabel.TextColor3 = Color3.fromRGB(0,220,255)
+    speedValueLabel.Font = Enum.Font.GothamBold
+    speedValueLabel.TextSize = 12
+    speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    speedValueLabel.Parent = speedCard
 
     local sliderBg = Instance.new("Frame")
-    sliderBg.Size = UDim2.new(0.45,0,0.6,0)
-    sliderBg.Position = UDim2.new(0.55,0,0.2,0)
-    sliderBg.BackgroundColor3 = Color3.fromRGB(25,35,50)
+    sliderBg.Size = UDim2.new(0.7,0,0,4)
+    sliderBg.Position = UDim2.new(0,0,0,60)
+    sliderBg.AnchorPoint = Vector2.new(0,0.5)
+    sliderBg.BackgroundColor3 = Color3.fromRGB(35,45,65)
     sliderBg.BorderSizePixel = 0
-    sliderBg.Parent = sliderHolder
+    sliderBg.Parent = speedCard
     Instance.new("UICorner",sliderBg).CornerRadius = UDim.new(1,0)
 
     local sliderThumb = Instance.new("TextButton")
-    sliderThumb.Size = UDim2.new(0,12,0,12)
+    sliderThumb.Size = UDim2.new(0,14,0,14)
+    sliderThumb.Position = UDim2.new(currentSpeed/100, -7, 0.5, -7)
     sliderThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
     sliderThumb.AutoButtonColor = false
     sliderThumb.Text = ""
@@ -4219,78 +4192,92 @@ local function createMovementContent()
     sliderThumb.Parent = sliderBg
     Instance.new("UICorner",sliderThumb).CornerRadius = UDim.new(1,0)
 
-    -- TOGGLE SWITCH
-    local toggleHolder = Instance.new("Frame")
-    toggleHolder.Size = UDim2.new(1,-20,0,28)
-    toggleHolder.Position = UDim2.new(0,10,0,110)
-    toggleHolder.BackgroundTransparency = 1
-    toggleHolder.Parent = card
-
-    local toggleLabel = Instance.new("TextLabel")
-    toggleLabel.Size = UDim2.new(0.5,0,1,0)
-    toggleLabel.BackgroundTransparency = 1
-    toggleLabel.Text = "Enable CFrame Walk"
-    toggleLabel.TextColor3 = Color3.fromRGB(220,220,220)
-    toggleLabel.Font = Enum.Font.GothamBold
-    toggleLabel.TextSize = 11
-    toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    toggleLabel.Parent = toggleHolder
-
-    local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0,44,0,22)
-    toggleBtn.Position = UDim2.new(1,-50,0.5,-11)
-    toggleBtn.BackgroundColor3 = movementState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(30,30,45)
-    toggleBtn.Text = ""
-    toggleBtn.AutoButtonColor = false
-    toggleBtn.BorderSizePixel = 0
-    toggleBtn.Parent = toggleHolder
-    Instance.new("UICorner",toggleBtn).CornerRadius = UDim.new(1,0)
+    -- ========== TOGGLE TP WALK ==========
+    local toggleCard = Instance.new("Frame")
+    toggleCard.Size = UDim2.new(1,0,0,70)
+    toggleCard.BackgroundColor3 = Color3.fromRGB(10,20,36)
+    toggleCard.BorderSizePixel = 0
+    toggleCard.Parent = scroll
+    Instance.new("UICorner",toggleCard).CornerRadius = UDim.new(0,8)
     local toggleStroke = Instance.new("UIStroke")
-    toggleStroke.Color = movementState.enabled and Color3.fromRGB(0,200,255) or Color3.fromRGB(100,100,130)
-    toggleStroke.Thickness = 1
-    toggleStroke.Transparency = 0.3
-    toggleStroke.Parent = toggleBtn
+    toggleStroke.Color = Color3.fromRGB(0,180,255)
+    toggleStroke.Transparency = 0.4
+    toggleStroke.Parent = toggleCard
 
-    local toggleCircle = Instance.new("Frame")
-    toggleCircle.Size = UDim2.new(0,18,0,18)
-    toggleCircle.Position = movementState.enabled and UDim2.new(1,-22,0.5,-9) or UDim2.new(0,4,0.5,-9)
-    toggleCircle.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    toggleCircle.BorderSizePixel = 0
-    toggleCircle.Parent = toggleBtn
-    Instance.new("UICorner",toggleCircle).CornerRadius = UDim.new(1,0)
+    local toggleTitle = Instance.new("TextLabel")
+    toggleTitle.Size = UDim2.new(1,-16,0,24)
+    toggleTitle.Position = UDim2.new(0,8,0,8)
+    toggleTitle.BackgroundTransparency = 1
+    toggleTitle.Text = "ENABLE TP WALK"
+    toggleTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    toggleTitle.Font = Enum.Font.GothamBold
+    toggleTitle.TextSize = 12
+    toggleTitle.TextXAlignment = Enum.TextXAlignment.Left
+    toggleTitle.Parent = toggleCard
 
-    -- LOGIKA SLIDER
-    local userInput = game:GetService("UserInputService")
-    local runService = game:GetService("RunService")
+    local toggleDesc = Instance.new("TextLabel")
+    toggleDesc.Size = UDim2.new(1,-70,0,16)
+    toggleDesc.Position = UDim2.new(0,8,0,32)
+    toggleDesc.BackgroundTransparency = 1
+    toggleDesc.Text = "CFrame teleport walk (bypass speed limit)"
+    toggleDesc.TextColor3 = Color3.fromRGB(160,160,160)
+    toggleDesc.Font = Enum.Font.Gotham
+    toggleDesc.TextSize = 9
+    toggleDesc.TextXAlignment = Enum.TextXAlignment.Left
+    toggleDesc.Parent = toggleCard
+
+    local toggleSwitch = Instance.new("TextButton")
+    toggleSwitch.Size = UDim2.new(0,44,0,22)
+    toggleSwitch.Position = UDim2.new(1,-52,0.5,-11)
+    toggleSwitch.BackgroundColor3 = tpwalkActive and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+    toggleSwitch.Text = ""
+    toggleSwitch.AutoButtonColor = false
+    toggleSwitch.BorderSizePixel = 0
+    toggleSwitch.Parent = toggleCard
+    local switchCorner = Instance.new("UICorner")
+    switchCorner.CornerRadius = UDim.new(1,0)
+    switchCorner.Parent = toggleSwitch
+    local switchStroke = Instance.new("UIStroke")
+    switchStroke.Color = tpwalkActive and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
+    switchStroke.Thickness = 1
+    switchStroke.Transparency = 0.3
+    switchStroke.Parent = toggleSwitch
+
+    local switchCircle = Instance.new("Frame")
+    switchCircle.Size = UDim2.new(0,18,0,18)
+    switchCircle.Position = tpwalkActive and UDim2.new(1,-22,0.5,-9) or UDim2.new(0,4,0.5,-9)
+    switchCircle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    switchCircle.BorderSizePixel = 0
+    switchCircle.Parent = toggleSwitch
+    Instance.new("UICorner",switchCircle).CornerRadius = UDim.new(1,0)
+
+    -- ========== LOGIKA SLIDER ==========
     local dragging = false
-
-    local function setSliderValue(val)
+    local function setSpeedValue(val)
         val = math.clamp(val, 0, 100)
-        movementState.speed = val
-        valueSpeed.Text = tostring(val)
+        currentSpeed = val
+        speedValueLabel.Text = tostring(val)
+        local rel = val / 100
+        local trackWidth = sliderBg.AbsoluteSize.X
         local thumbSize = sliderThumb.AbsoluteSize.X
-        local trackSize = sliderBg.AbsoluteSize.X
-        if trackSize > 0 then
-            local rel = val / 100
-            local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
+        if trackWidth > 0 then
+            local px = math.clamp(rel * trackWidth, thumbSize/2, trackWidth - thumbSize/2)
             sliderThumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
         else
-            sliderThumb.Position = UDim2.new(val/100, -thumbSize/2, 0.5, -thumbSize/2)
+            sliderThumb.Position = UDim2.new(rel, -thumbSize/2, 0.5, -thumbSize/2)
         end
-        if movementState.enabled then
-            applyCframeMovement()  -- restart dengan kecepatan baru
-        end
+        -- Jika TP Walk aktif, kecepatan langsung berubah (tidak perlu restart koneksi)
     end
 
     local function updateSliderFromMouse()
         if not dragging then return end
-        local mousePos = userInput:GetMouseLocation()
+        local mousePos = UserInputService:GetMouseLocation()
         local bgPos = sliderBg.AbsolutePosition.X
         local bgWidth = sliderBg.AbsoluteSize.X
         if bgWidth <= 0 then return end
         local rel = (mousePos.X - bgPos) / bgWidth
         local val = math.floor(math.clamp(rel, 0, 1) * 100)
-        setSliderValue(val)
+        setSpeedValue(val)
     end
 
     sliderThumb.InputBegan:Connect(function(input)
@@ -4305,85 +4292,57 @@ local function createMovementContent()
             updateSliderFromMouse()
         end
     end)
-    userInput.InputEnded:Connect(function(input)
+    UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end)
-    runService.RenderStepped:Connect(function()
+    RunService.RenderStepped:Connect(function()
         if dragging then
             updateSliderFromMouse()
         end
     end)
 
-    -- LOGIKA TOGGLE
-    local function setToggle(state)
-        movementState.enabled = state
+    -- ========== LOGIKA TOGGLE ==========
+    local function updateToggleUI(state)
+        tpwalkActive = state
         if state then
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-            toggleStroke.Color = Color3.fromRGB(0,200,255)
-            toggleStroke.Transparency = 0.1
-            toggleCircle.Position = UDim2.new(1,-22,0.5,-9)
-            applyCframeMovement()
+            toggleSwitch.BackgroundColor3 = Color3.fromRGB(0,140,255)
+            switchStroke.Color = Color3.fromRGB(0,220,255)
+            switchStroke.Transparency = 0.1
+            TweenService:Create(switchCircle, TweenInfo.new(0.16, Enum.EasingStyle.Quad), {
+                Position = UDim2.new(1,-22,0.5,-9)
+            }):Play()
+            startTPWalk()
         else
-            toggleBtn.BackgroundColor3 = Color3.fromRGB(30,30,45)
-            toggleStroke.Color = Color3.fromRGB(100,100,130)
-            toggleStroke.Transparency = 0.3
-            toggleCircle.Position = UDim2.new(0,4,0.5,-9)
-            stopCframeMovement()
+            toggleSwitch.BackgroundColor3 = Color3.fromRGB(45,45,65)
+            switchStroke.Color = Color3.fromRGB(100,100,130)
+            switchStroke.Transparency = 0.3
+            TweenService:Create(switchCircle, TweenInfo.new(0.16, Enum.EasingStyle.Quad), {
+                Position = UDim2.new(0,4,0.5,-9)
+            }):Play()
+            stopTPWalk()
         end
     end
 
-    toggleBtn.MouseButton1Click:Connect(function()
-        setToggle(not movementState.enabled)
+    toggleSwitch.MouseButton1Click:Connect(function()
+        updateToggleUI(not tpwalkActive)
     end)
 
-    -- Inisialisasi
-    setSliderValue(movementState.speed)
-    setToggle(movementState.enabled)
+    -- ========== HANDLE RESPAWN ==========
+    characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-    -- Info card
-    local infoCard = Instance.new("Frame")
-    infoCard.Size = UDim2.new(1,-6,0,120)
-    infoCard.BackgroundColor3 = Color3.fromRGB(8,18,32)
-    infoCard.BorderSizePixel = 0
-    infoCard.Parent = scroll
-    Instance.new("UICorner",infoCard).CornerRadius = UDim.new(0,10)
-    local infoStroke = Instance.new("UIStroke")
-    infoStroke.Color = Color3.fromRGB(0,180,255)
-    infoStroke.Transparency = 0.45
-    infoStroke.Parent = infoCard
+    -- Cleanup koneksi saat content dihancurkan
+    aboutContent.Destroying:Connect(function()
+        if characterAddedConn then characterAddedConn:Disconnect() end
+        stopTPWalk()
+    end)
 
-    local infoTitle = Instance.new("TextLabel")
-    infoTitle.Size = UDim2.new(1,-20,0,22)
-    infoTitle.Position = UDim2.new(0,10,0,10)
-    infoTitle.BackgroundTransparency = 1
-    infoTitle.Text = "INFORMATION"
-    infoTitle.TextColor3 = Color3.fromRGB(0,220,255)
-    infoTitle.Font = Enum.Font.GothamBold
-    infoTitle.TextSize = 13
-    infoTitle.TextXAlignment = Enum.TextXAlignment.Left
-    infoTitle.Parent = infoCard
+    -- Inisialisasi nilai slider dan toggle sesuai state
+    setSpeedValue(currentSpeed)
+    updateToggleUI(tpwalkActive)
 
-    local infoText = Instance.new("TextLabel")
-    infoText.Size = UDim2.new(1,-20,1,-44)
-    infoText.Position = UDim2.new(0,10,0,36)
-    infoText.BackgroundTransparency = 1
-    infoText.RichText = true
-    infoText.TextWrapped = true
-    infoText.TextXAlignment = Enum.TextXAlignment.Left
-    infoText.TextYAlignment = Enum.TextYAlignment.Top
-    infoText.Font = Enum.Font.Gotham
-    infoText.TextSize = 11
-    infoText.TextColor3 = Color3.fromRGB(225,225,225)
-    infoText.Text = [[
-<b>CFRAME WALK</b> uses CFrame manipulation.
-Speed persists after death / respawn.
-Sliders work in real-time.
-]]
-    infoText.Parent = infoCard
-
-    print("[Movement] CFrame Walk config loaded")
+    print("[Movement] Speed slider & TP Walk ready")
 end
 
 local function createSettingsContent()

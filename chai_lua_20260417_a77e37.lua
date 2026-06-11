@@ -4033,13 +4033,26 @@ local function createAboutContent()
         aboutContent:Destroy()
     end
 
-    -- Variabel lokal untuk state movement (tidak global)
-    local currentSpeed = 2          -- nilai kecepatan 0-100
+    -- Variabel lokal untuk state movement
+    local MIN_SPEED = 16
+    local MAX_SPEED = 20
+    local currentSpeed = MIN_SPEED          -- kecepatan aktual (16-20)
+    local speedPercent = 0                   -- 0-100, akan dihitung ulang
     local tpwalkActive = false
     local tpwalkConnection = nil
     local characterAddedConn = nil
 
-    -- Fungsi untuk memulai TP Walk (CFrame-based movement)
+    -- Fungsi mengonversi persen ke kecepatan
+    local function percentToSpeed(percent)
+        return MIN_SPEED + ((MAX_SPEED - MIN_SPEED) * (percent / 100))
+    end
+
+    -- Fungsi mengonversi kecepatan ke persen
+    local function speedToPercent(speed)
+        return ((speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)) * 100
+    end
+
+    -- TP Walk berbasis CFrame (menggunakan Humanoid.MoveDirection)
     local function startTPWalk()
         if tpwalkConnection then
             tpwalkConnection:Disconnect()
@@ -4054,21 +4067,10 @@ local function createAboutContent()
             if not hrp or not humanoid then return end
             if humanoid.Health <= 0 then return end
 
-            -- Input WASD
-            local moveDirection = Vector3.new(
-                (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0),
-                0,
-                (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0)
-            )
+            -- Gunakan MoveDirection (support PC dan mobile)
+            local moveDirection = humanoid.MoveDirection
             if moveDirection.Magnitude > 0 then
-                moveDirection = moveDirection.Unit
-                local camera = workspace.CurrentCamera
-                local cameraCF = camera.CFrame
-                local forward = cameraCF.LookVector * moveDirection.Z
-                local right = cameraCF.RightVector * moveDirection.X
-                local direction = (forward + right).Unit
-                local speedValue = currentSpeed / 10   -- 0-10 stud/detik
-                local delta = direction * speedValue * dt
+                local delta = moveDirection.Unit * currentSpeed * dt
                 hrp.CFrame = hrp.CFrame + delta
             end
         end)
@@ -4081,7 +4083,7 @@ local function createAboutContent()
         end
     end
 
-    -- Fungsi untuk menerapkan ulang saat karakter respawn
+    -- Saat karakter respawn, restart TP Walk jika aktif
     local function onCharacterAdded()
         if tpwalkActive then
             stopTPWalk()
@@ -4162,29 +4164,32 @@ local function createAboutContent()
     speedDesc.TextXAlignment = Enum.TextXAlignment.Left
     speedDesc.Parent = speedCard
 
+    -- Label nilai kecepatan (format 16.0 ~ 20.0)
     local speedValueLabel = Instance.new("TextLabel")
     speedValueLabel.Size = UDim2.new(0.2,0,0,20)
     speedValueLabel.Position = UDim2.new(0.75,0,0,52)
     speedValueLabel.BackgroundTransparency = 1
-    speedValueLabel.Text = tostring(currentSpeed)
+    speedValueLabel.Text = string.format("%.1f", currentSpeed)
     speedValueLabel.TextColor3 = Color3.fromRGB(0,220,255)
     speedValueLabel.Font = Enum.Font.GothamBold
     speedValueLabel.TextSize = 12
     speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
     speedValueLabel.Parent = speedCard
 
+    -- Track slider (tinggi 6px, margin kiri 14px)
     local sliderBg = Instance.new("Frame")
-    sliderBg.Size = UDim2.new(0.7,0,0,4)
-    sliderBg.Position = UDim2.new(0,0,0,60)
-    sliderBg.AnchorPoint = Vector2.new(0,0.5)
+    sliderBg.Size = UDim2.new(0.68,0,0,6)
+    sliderBg.Position = UDim2.new(0,14,0,64)
     sliderBg.BackgroundColor3 = Color3.fromRGB(35,45,65)
     sliderBg.BorderSizePixel = 0
     sliderBg.Parent = speedCard
     Instance.new("UICorner",sliderBg).CornerRadius = UDim.new(1,0)
 
+    -- Thumb slider (ukuran 12x12)
     local sliderThumb = Instance.new("TextButton")
-    sliderThumb.Size = UDim2.new(0,14,0,14)
-    sliderThumb.Position = UDim2.new(currentSpeed/100, -7, 0.5, -7)
+    sliderThumb.Size = UDim2.new(0,12,0,12)
+    local initPercent = speedToPercent(currentSpeed)
+    sliderThumb.Position = UDim2.new(initPercent / 100, -6, 0.5, -6)
     sliderThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
     sliderThumb.AutoButtonColor = false
     sliderThumb.Text = ""
@@ -4253,11 +4258,12 @@ local function createAboutContent()
 
     -- ========== LOGIKA SLIDER ==========
     local dragging = false
-    local function setSpeedValue(val)
-        val = math.clamp(val, 0, 100)
-        currentSpeed = val
-        speedValueLabel.Text = tostring(val)
-        local rel = val / 100
+    local function setSpeedFromPercent(percent)
+        percent = math.clamp(percent, 0, 100)
+        speedPercent = percent
+        currentSpeed = percentToSpeed(percent)
+        speedValueLabel.Text = string.format("%.1f", currentSpeed)
+        local rel = percent / 100
         local trackWidth = sliderBg.AbsoluteSize.X
         local thumbSize = sliderThumb.AbsoluteSize.X
         if trackWidth > 0 then
@@ -4266,7 +4272,6 @@ local function createAboutContent()
         else
             sliderThumb.Position = UDim2.new(rel, -thumbSize/2, 0.5, -thumbSize/2)
         end
-        -- Jika TP Walk aktif, kecepatan langsung berubah (tidak perlu restart koneksi)
     end
 
     local function updateSliderFromMouse()
@@ -4276,8 +4281,8 @@ local function createAboutContent()
         local bgWidth = sliderBg.AbsoluteSize.X
         if bgWidth <= 0 then return end
         local rel = (mousePos.X - bgPos) / bgWidth
-        local val = math.floor(math.clamp(rel, 0, 1) * 100)
-        setSpeedValue(val)
+        local percent = math.floor(math.clamp(rel, 0, 1) * 100)
+        setSpeedFromPercent(percent)
     end
 
     sliderThumb.InputBegan:Connect(function(input)
@@ -4332,19 +4337,21 @@ local function createAboutContent()
     -- ========== HANDLE RESPAWN ==========
     characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-    -- Cleanup koneksi saat content dihancurkan
+    -- Cleanup saat content dihancurkan
     aboutContent.Destroying:Connect(function()
         if characterAddedConn then characterAddedConn:Disconnect() end
         stopTPWalk()
     end)
 
-    -- Inisialisasi nilai slider dan toggle sesuai state
-    setSpeedValue(currentSpeed)
+    -- Inisialisasi nilai slider dan toggle
+    setSpeedFromPercent(speedToPercent(currentSpeed))
     updateToggleUI(tpwalkActive)
 
-    print("[Movement] Speed slider & TP Walk ready")
+    print("[Movement] Speed slider (16-20) & TP Walk (Humanoid.MoveDirection) ready")
 end
-
+-- ============================================================================
+-- settings content 
+-- ============================================================================
 local function createSettingsContent()
 
     if settingsContent then

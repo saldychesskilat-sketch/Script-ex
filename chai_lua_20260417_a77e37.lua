@@ -4028,23 +4028,26 @@ end
 -- ============================================================================
 local aboutContent = nil
 
+-- State movement disimpan di luar fungsi agar persist saat pindah sidebar
+local movementState = {
+    speed = 16.0,      -- kecepatan aktual (default 16.0)
+    percent = 79.9,    -- persen setara 16.0 dalam range 0.1-20.0 (dihitung otomatis nanti)
+    enabled = false
+}
+
 local function createAboutContent()
     if aboutContent then
         aboutContent:Destroy()
     end
 
-    -- Variabel lokal untuk state movement
-    local MIN_SPEED = 16
-    local MAX_SPEED = 20
-    local currentSpeed = MIN_SPEED          -- kecepatan aktual (16-20)
-    local speedPercent = 0                   -- 0-100, akan dihitung ulang
-    local tpwalkActive = false
-    local tpwalkConnection = nil
-    local characterAddedConn = nil
+    -- Konstanta range kecepatan (min 0.1, max 20.0)
+    local MIN_SPEED = 0.1
+    local MAX_SPEED = 20.0
 
-    -- Fungsi mengonversi persen ke kecepatan
+    -- Fungsi mengonversi persen ke kecepatan (dengan pembulatan 1 desimal)
     local function percentToSpeed(percent)
-        return MIN_SPEED + ((MAX_SPEED - MIN_SPEED) * (percent / 100))
+        local speed = MIN_SPEED + ((MAX_SPEED - MIN_SPEED) * (percent / 100))
+        return math.floor(speed * 10 + 0.5) / 10
     end
 
     -- Fungsi mengonversi kecepatan ke persen
@@ -4052,7 +4055,20 @@ local function createAboutContent()
         return ((speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)) * 100
     end
 
-    -- TP Walk berbasis CFrame (menggunakan Humanoid.MoveDirection)
+    -- Ambil state dari luar (jika pertama kali, hitung percent dari speed)
+    local currentSpeed = movementState.speed
+    local speedPercent = movementState.percent
+    if speedPercent == 0 and currentSpeed > 0 then
+        speedPercent = speedToPercent(currentSpeed)
+        movementState.percent = speedPercent
+    end
+    local tpwalkActive = movementState.enabled
+
+    local tpwalkConnection = nil
+    local characterAddedConn = nil
+    local sliderDragConnection = nil
+
+    -- TP Walk berbasis CFrame (Humanoid.MoveDirection)
     local function startTPWalk()
         if tpwalkConnection then
             tpwalkConnection:Disconnect()
@@ -4067,7 +4083,6 @@ local function createAboutContent()
             if not hrp or not humanoid then return end
             if humanoid.Health <= 0 then return end
 
-            -- Gunakan MoveDirection (support PC dan mobile)
             local moveDirection = humanoid.MoveDirection
             if moveDirection.Magnitude > 0 then
                 local delta = moveDirection.Unit * currentSpeed * dt
@@ -4083,7 +4098,6 @@ local function createAboutContent()
         end
     end
 
-    -- Saat karakter respawn, restart TP Walk jika aktif
     local function onCharacterAdded()
         if tpwalkActive then
             stopTPWalk()
@@ -4164,7 +4178,6 @@ local function createAboutContent()
     speedDesc.TextXAlignment = Enum.TextXAlignment.Left
     speedDesc.Parent = speedCard
 
-    -- Label nilai kecepatan (format 16.0 ~ 20.0)
     local speedValueLabel = Instance.new("TextLabel")
     speedValueLabel.Size = UDim2.new(0.2,0,0,20)
     speedValueLabel.Position = UDim2.new(0.75,0,0,52)
@@ -4176,7 +4189,7 @@ local function createAboutContent()
     speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
     speedValueLabel.Parent = speedCard
 
-    -- Track slider (tinggi 6px, margin kiri 14px)
+    -- Track slider
     local sliderBg = Instance.new("Frame")
     sliderBg.Size = UDim2.new(0.68,0,0,6)
     sliderBg.Position = UDim2.new(0,14,0,64)
@@ -4185,11 +4198,10 @@ local function createAboutContent()
     sliderBg.Parent = speedCard
     Instance.new("UICorner",sliderBg).CornerRadius = UDim.new(1,0)
 
-    -- Thumb slider (ukuran 12x12)
     local sliderThumb = Instance.new("TextButton")
     sliderThumb.Size = UDim2.new(0,12,0,12)
-    local initPercent = speedToPercent(currentSpeed)
-    sliderThumb.Position = UDim2.new(initPercent / 100, -6, 0.5, -6)
+    local initRel = speedPercent / 100
+    sliderThumb.Position = UDim2.new(initRel, -6, 0.5, -6)
     sliderThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
     sliderThumb.AutoButtonColor = false
     sliderThumb.Text = ""
@@ -4258,11 +4270,16 @@ local function createAboutContent()
 
     -- ========== LOGIKA SLIDER ==========
     local dragging = false
+
     local function setSpeedFromPercent(percent)
         percent = math.clamp(percent, 0, 100)
         speedPercent = percent
         currentSpeed = percentToSpeed(percent)
         speedValueLabel.Text = string.format("%.1f", currentSpeed)
+        -- Simpan ke state global
+        movementState.speed = currentSpeed
+        movementState.percent = percent
+
         local rel = percent / 100
         local trackWidth = sliderBg.AbsoluteSize.X
         local thumbSize = sliderThumb.AbsoluteSize.X
@@ -4302,7 +4319,9 @@ local function createAboutContent()
             dragging = false
         end
     end)
-    RunService.RenderStepped:Connect(function()
+
+    -- RenderStepped connection disimpan untuk cleanup
+    sliderDragConnection = RunService.RenderStepped:Connect(function()
         if dragging then
             updateSliderFromMouse()
         end
@@ -4311,6 +4330,7 @@ local function createAboutContent()
     -- ========== LOGIKA TOGGLE ==========
     local function updateToggleUI(state)
         tpwalkActive = state
+        movementState.enabled = state
         if state then
             toggleSwitch.BackgroundColor3 = Color3.fromRGB(0,140,255)
             switchStroke.Color = Color3.fromRGB(0,220,255)
@@ -4337,18 +4357,20 @@ local function createAboutContent()
     -- ========== HANDLE RESPAWN ==========
     characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-    -- Cleanup saat content dihancurkan
+    -- ========== CLEANUP ==========
     aboutContent.Destroying:Connect(function()
+        if sliderDragConnection then sliderDragConnection:Disconnect() end
         if characterAddedConn then characterAddedConn:Disconnect() end
         stopTPWalk()
     end)
 
     -- Inisialisasi nilai slider dan toggle
-    setSpeedFromPercent(speedToPercent(currentSpeed))
+    setSpeedFromPercent(speedPercent)
     updateToggleUI(tpwalkActive)
 
-    print("[Movement] Speed slider (16-20) & TP Walk (Humanoid.MoveDirection) ready")
+    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
 end
+
 -- ============================================================================
 -- settings content 
 -- ============================================================================

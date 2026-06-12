@@ -1816,6 +1816,7 @@ local function autoParryLoop()
         "Character.Weapon.Right",
         "Arm.Knide.Main.BasicAttack",
         "Arm.Machete.Main.BasicAttack",
+        "Character.Animations.WipeMachete"
         -- Tambahkan sendiri di sini sesuai hasil scanner Anda
     }
     -- ==========================================
@@ -1915,7 +1916,7 @@ local function autoParryLoop()
                 elseif attrName:lower() == "parry" and val == true then    
                     triggerParry("Attribute:Parry", player)    
                 elseif attrName:lower() == "hookprogress" and type(val) == "number" and val > 0 then    
-                    triggerParry("Attribute:HookProgress", player)    
+                    triggerParry("Attribute:hookprogress", player)    
                 elseif attrName:lower() == "hookcount" and val and tonumber(val) and tonumber(val) > 0 then    
                     triggerParry("Attribute:HookCount", player)    
                 end    

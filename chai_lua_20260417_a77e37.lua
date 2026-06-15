@@ -5554,93 +5554,93 @@ end
         local initialState = (feat.name ~= "restartScript") and config[feat.name] or false  
         createGridButton(contentPanel, feat.name, feat.text, initialState)  
     end 
-local function setFeatureButtonsVisible(state)
-    for _, v in ipairs(contentPanel:GetChildren()) do
-        if v:IsA("TextButton") then
-            v.Visible = state
-        end
-    end
-end
+homeItem.MouseButton1Click:Connect(function()
+homeItem.TextColor3=Color3.fromRGB(0,230,255)
+featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+infoItem.TextColor3=Color3.fromRGB(200,200,200)
+aboutItem.TextColor3=Color3.fromRGB(200,200,200)
 
--- Navigation handlers  
-    homeItem.MouseButton1Click:Connect(function()
-    homeItem.TextColor3=Color3.fromRGB(0,230,255)
-    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
-    infoItem.TextColor3=Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+if settingsContent then settingsContent:Destroy() end
+if infoContent then infoContent:Destroy() end
+if aboutContent then aboutContent:Destroy() end
 
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
+contentPanel.Visible = false
+gridLayout.Parent = nil
 
-    gridLayout.Parent = nil
-    setFeatureButtonsVisible(false)
-    createHomeContent()
+createHomeContent()
+
 end)
 
 featuresItem.MouseButton1Click:Connect(function()
-    featuresItem.TextColor3=Color3.fromRGB(0,230,255)
-    homeItem.TextColor3=Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
-    infoItem.TextColor3=Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+featuresItem.TextColor3=Color3.fromRGB(0,230,255)
+homeItem.TextColor3=Color3.fromRGB(200,200,200)
+settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+infoItem.TextColor3=Color3.fromRGB(200,200,200)
+aboutItem.TextColor3=Color3.fromRGB(200,200,200)
 
-    if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
+if homeContent then homeContent:Destroy() end
+if settingsContent then settingsContent:Destroy() end
+if infoContent then infoContent:Destroy() end
+if aboutContent then aboutContent:Destroy() end
 
-    setFeatureButtonsVisible(true)
-    gridLayout.Parent=contentPanel
+contentPanel.Visible = true
+gridLayout.Parent = contentPanel
+
 end)
 
 settingsItem.MouseButton1Click:Connect(function()
-    settingsItem.TextColor3=Color3.fromRGB(0,230,255)
-    homeItem.TextColor3=Color3.fromRGB(200,200,200)
-    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
-    infoItem.TextColor3=Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+settingsItem.TextColor3=Color3.fromRGB(0,230,255)
+homeItem.TextColor3=Color3.fromRGB(200,200,200)
+featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+infoItem.TextColor3=Color3.fromRGB(200,200,200)
+aboutItem.TextColor3=Color3.fromRGB(200,200,200)
 
-    if homeContent then homeContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
+if homeContent then homeContent:Destroy() end
+if infoContent then infoContent:Destroy() end
+if aboutContent then aboutContent:Destroy() end
 
-    gridLayout.Parent = nil
-    setFeatureButtonsVisible(false)
-    createSettingsContent()
+contentPanel.Visible = false
+gridLayout.Parent = nil
+
+createSettingsContent()
+
 end)
 
 infoItem.MouseButton1Click:Connect(function()
-    infoItem.TextColor3=Color3.fromRGB(0,230,255)
-    homeItem.TextColor3=Color3.fromRGB(200,200,200)
-    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3=Color3.fromRGB(200,200,200)
+infoItem.TextColor3=Color3.fromRGB(0,230,255)
+homeItem.TextColor3=Color3.fromRGB(200,200,200)
+featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+aboutItem.TextColor3=Color3.fromRGB(200,200,200)
 
-    if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
+if homeContent then homeContent:Destroy() end
+if settingsContent then settingsContent:Destroy() end
+if aboutContent then aboutContent:Destroy() end
 
-    gridLayout.Parent = nil
-    setFeatureButtonsVisible(false)
-    createInfoContent()
+contentPanel.Visible = false
+gridLayout.Parent = nil
+
+createInfoContent()
+
 end)
 
 aboutItem.MouseButton1Click:Connect(function()
-    aboutItem.TextColor3=Color3.fromRGB(0,230,255)
-    homeItem.TextColor3=Color3.fromRGB(200,200,200)
-    featuresItem.TextColor3=Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3=Color3.fromRGB(200,200,200)
-    infoItem.TextColor3=Color3.fromRGB(200,200,200)
+aboutItem.TextColor3=Color3.fromRGB(0,230,255)
+homeItem.TextColor3=Color3.fromRGB(200,200,200)
+featuresItem.TextColor3=Color3.fromRGB(200,200,200)
+settingsItem.TextColor3=Color3.fromRGB(200,200,200)
+infoItem.TextColor3=Color3.fromRGB(200,200,200)
 
-    if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
+if homeContent then homeContent:Destroy() end
+if settingsContent then settingsContent:Destroy() end
+if infoContent then infoContent:Destroy() end
 
-    gridLayout.Parent = nil
-    setFeatureButtonsVisible(false)
-    createAboutContent()
+contentPanel.Visible = false
+gridLayout.Parent = nil
+
+createAboutContent()
+
 end)
   
     makeDraggable(mainFrame)  

@@ -1866,8 +1866,7 @@ local function autoParryLoop()
         end
     end
         
-    -- ========== MEMBUAT GUI SLIDER (dengan drag & toggle) ==========
-        -- ========== MEMBUAT GUI SLIDER (tanpa toggle, bisa drag) ==========
+    -- ========== MEMBUAT GUI SLIDER (tanpa toggle, rapi, bisa drag) ==========
     local function createConfigGUI()
         if parryConfigGui then parryConfigGui:Destroy() end
         
@@ -1877,8 +1876,8 @@ local function autoParryLoop()
         gui.Parent = game.CoreGui
         
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 260, 0, 110)
-        frame.Position = UDim2.new(0.5, -130, 0.5, -55)  -- tengah layar
+        frame.Size = UDim2.new(0, 260, 0, 100)
+        frame.Position = UDim2.new(0.5, -130, 0.5, -50)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BorderSizePixel = 0
         frame.Parent = gui
@@ -1928,11 +1927,10 @@ local function autoParryLoop()
             parryConfigGui = nil
         end)
         
-        -- Konten langsung di frame (tanpa contentFrame)
-        -- Slider Radius
+        -- Slider Radius (posisi Y disesuaikan)
         local radLabel = Instance.new("TextLabel")
         radLabel.Size = UDim2.new(0.5, -10, 0, 20)
-        radLabel.Position = UDim2.new(0,10,0,8)
+        radLabel.Position = UDim2.new(0, 10, 0, 36)
         radLabel.BackgroundTransparency = 1
         radLabel.Text = "Radius: " .. DETECTION_RADIUS
         radLabel.TextColor3 = Color3.fromRGB(210,210,210)
@@ -1941,8 +1939,8 @@ local function autoParryLoop()
         radLabel.Parent = frame
         
         local radBg = Instance.new("Frame")
-        radBg.Size = UDim2.new(0.45,0,0,4)
-        radBg.Position = UDim2.new(0.52,0,0.18,0)
+        radBg.Size = UDim2.new(0.45, 0, 0, 4)
+        radBg.Position = UDim2.new(0.52, 0, 0.46, 0)
         radBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
         radBg.BorderSizePixel = 0
         radBg.Parent = frame
@@ -1959,7 +1957,7 @@ local function autoParryLoop()
         -- Slider Cooldown
         local cdLabel = Instance.new("TextLabel")
         cdLabel.Size = UDim2.new(0.5, -10, 0, 20)
-        cdLabel.Position = UDim2.new(0,10,0,38)
+        cdLabel.Position = UDim2.new(0, 10, 0, 66)
         cdLabel.BackgroundTransparency = 1
         cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
         cdLabel.TextColor3 = Color3.fromRGB(210,210,210)
@@ -1968,8 +1966,8 @@ local function autoParryLoop()
         cdLabel.Parent = frame
         
         local cdBg = Instance.new("Frame")
-        cdBg.Size = UDim2.new(0.45,0,0,4)
-        cdBg.Position = UDim2.new(0.52,0,0.48,0)
+        cdBg.Size = UDim2.new(0.45, 0, 0, 4)
+        cdBg.Position = UDim2.new(0.52, 0, 0.76, 0)
         cdBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
         cdBg.BorderSizePixel = 0
         cdBg.Parent = frame
@@ -1983,7 +1981,7 @@ local function autoParryLoop()
         cdThumb.Parent = cdBg
         Instance.new("UICorner", cdThumb).CornerRadius = UDim.new(1,0)
         
-        -- Update thumb position functions
+        -- Update functions
         local function updateRadUI()
             local rel = (DETECTION_RADIUS - 1) / 19
             local w = radBg.AbsoluteSize.X

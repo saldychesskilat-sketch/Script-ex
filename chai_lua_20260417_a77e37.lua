@@ -1853,20 +1853,43 @@ local function autoParryLoop()
     local stateConnections = {}            
     local lastParryPerPlayer = {}            
         
-    -- ========== FUNGSI MEMBUAT ULANG ESP SAAT RADIUS BERUBAH ==========
+    -- ========== FUNGSI MEMBUAT ULANG ESP SAAT RADIUS BERUBAH (DENGAN FALLBACK) ==========
     local function refreshESP()
-        if not radiusFolder then return end
+        if not radiusFolder then 
+            -- jika folder hilang, buat baru
+            radiusFolder = Instance.new("Folder")
+            radiusFolder.Name = "ParryESP"
+            radiusFolder.Parent = workspace
+        end
         local mainCircle = radiusFolder:FindFirstChild("MainRadius")
         local outerRing = radiusFolder:FindFirstChild("OuterRing")
-        if mainCircle then
-            mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+        if not mainCircle then
+            mainCircle = Instance.new("Part")
+            mainCircle.Name = "MainRadius"
+            mainCircle.Shape = Enum.PartType.Cylinder
+            mainCircle.Material = Enum.Material.Neon
+            mainCircle.Transparency = 0.92
+            mainCircle.Color = Color3.fromRGB(255,140,0)
+            mainCircle.Anchored = true
+            mainCircle.CanCollide = false
+            mainCircle.Parent = radiusFolder
         end
-        if outerRing then
-            outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)
+        if not outerRing then
+            outerRing = Instance.new("Part")
+            outerRing.Name = "OuterRing"
+            outerRing.Shape = Enum.PartType.Cylinder
+            outerRing.Material = Enum.Material.Neon
+            outerRing.Transparency = 0.45
+            outerRing.Anchored = true
+            outerRing.CanCollide = false
+            outerRing.Parent = radiusFolder
         end
+        -- update ukuran
+        mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+        outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)
     end
         
-    -- ========== MEMBUAT GUI SLIDER (tanpa toggle, rapi, bisa drag) ==========
+    -- ========== MEMBUAT GUI SLIDER ==========
     local function createConfigGUI()
         if parryConfigGui then parryConfigGui:Destroy() end
         
@@ -1887,7 +1910,6 @@ local function autoParryLoop()
         stroke.Transparency = 0.4
         stroke.Parent = frame
         
-        -- Header untuk drag
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 28)
         header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
@@ -1910,7 +1932,6 @@ local function autoParryLoop()
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Parent = header
         
-        -- Tombol close (X)
         local closeBtn = Instance.new("TextButton")
         closeBtn.Size = UDim2.new(0, 22, 0, 22)
         closeBtn.Position = UDim2.new(1, -28, 0.5, -11)
@@ -1927,7 +1948,7 @@ local function autoParryLoop()
             parryConfigGui = nil
         end)
         
-        -- Slider Radius (posisi Y disesuaikan)
+        -- Slider Radius
         local radLabel = Instance.new("TextLabel")
         radLabel.Size = UDim2.new(0.5, -10, 0, 20)
         radLabel.Position = UDim2.new(0, 10, 0, 36)
@@ -2105,7 +2126,6 @@ local function autoParryLoop()
             end
         end)
         
-        -- Inisialisasi posisi thumb
         task.wait(0.05)
         updateRadUI()
         updateCDUI()
@@ -2114,34 +2134,9 @@ local function autoParryLoop()
         
     -- ========== INISIALISASI GUI DAN ESP ==========
     parryConfigGui = createConfigGUI()
+    refreshESP()  -- pastikan ESP terbuat
     
-    if radiusFolder then radiusFolder:Destroy() end            
-    radiusFolder = Instance.new("Folder")            
-    radiusFolder.Name = "ParryESP"            
-    radiusFolder.Parent = workspace            
-        
-    local mainCircle = Instance.new("Part")            
-    mainCircle.Name = "MainRadius"            
-    mainCircle.Shape = Enum.PartType.Cylinder            
-    mainCircle.Material = Enum.Material.Neon            
-    mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
-    mainCircle.Transparency = 0.92            
-    mainCircle.Color = Color3.fromRGB(255,140,0)            
-    mainCircle.Anchored = true            
-    mainCircle.CanCollide = false            
-    mainCircle.Parent = radiusFolder            
-        
-    local outerRing = Instance.new("Part")            
-    outerRing.Name = "OuterRing"            
-    outerRing.Shape = Enum.PartType.Cylinder            
-    outerRing.Material = Enum.Material.Neon            
-    outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)            
-    outerRing.Transparency = 0.45            
-    outerRing.Anchored = true            
-    outerRing.CanCollide = false            
-    outerRing.Parent = radiusFolder            
-        
-    -- ========== FUNGSI DETEKSI (SAMA PERSIS SEPERTI ASLI) ==========
+    -- ========== FUNGSI DETEKSI (tidak berubah) ==========
     local function matchesCombatPath(obj, killerChar)
         local parts = {}
         local current = obj
@@ -2284,7 +2279,7 @@ local function autoParryLoop()
             table.insert(stateConnections, charConn)
         end
     end
-
+        
     local playerConn = Players.PlayerAdded:Connect(function(player)
         local charConn = player.CharacterAdded:Connect(function(char)
             task.wait(0.5)
@@ -2293,10 +2288,21 @@ local function autoParryLoop()
         table.insert(stateConnections, charConn)
     end)
     table.insert(stateConnections, playerConn)
-        
-    -- ========== FUNGSI PULSE (sama) ==========
+            
+    -- ========== FUNGSI PULSE (DIPERBAIKI) ==========
     local function createPulse()
-        if not localRootPart then return end
+        -- cari root part secara langsung
+        local rootPart = localRootPart
+        if not rootPart then
+            local char = localPlayer.Character
+            if char then
+                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            end
+        end
+        if not rootPart then return end
+        if not radiusFolder or not radiusFolder.Parent then
+            refreshESP()
+        end
         local pulse = Instance.new("Part")
         pulse.Shape = Enum.PartType.Cylinder
         pulse.Material = Enum.Material.Neon
@@ -2309,18 +2315,26 @@ local function autoParryLoop()
         task.spawn(function()
             local current = 1
             for _ = 1,35 do
-                if not pulse.Parent or not localRootPart then break end
+                if not pulse.Parent or not radiusFolder then break end
+                local currentRoot = localRootPart
+                if not currentRoot then
+                    local char = localPlayer.Character
+                    if char then
+                        currentRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    end
+                end
+                if not currentRoot then break end
                 current = current + 0.28
                 pulse.Size = Vector3.new(0.03, current, current)
                 pulse.Transparency = pulse.Transparency + 0.004
-                local footPos = localRootPart.Position - Vector3.new(0,3,0)
+                local footPos = currentRoot.Position - Vector3.new(0,3,0)
                 pulse.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
                 RunService.RenderStepped:Wait()
             end
             pulse:Destroy()
         end)
     end
-        
+
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
             combatStateConnected = false
@@ -2335,13 +2349,41 @@ local function autoParryLoop()
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             return
+        end
+        
+        -- Cari root part (update setiap frame, atasi cutscene)
+        local rootPart = localRootPart
+        if not rootPart then
+            local char = localPlayer.Character
+            if char then
+                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
             end
-            if not localRootPart then return end
+        end
+        if not rootPart then 
+            -- masih tidak ada, skip update posisi ESP tapi tetap jalankan pulse timer
+            pulseTick = pulseTick + dt * 2
+            rainbowTick = rainbowTick + dt * 0.5
+            if tick() - lastPulse >= 2 then
+                lastPulse = tick()
+                createPulse()
+            end
+                    return
+            end
+                    -- Pastikan radiusFolder dan komponen ESP ada (buat ulang jika hilang)
+        if not radiusFolder or not radiusFolder.Parent then
+            refreshESP()
+        end
+        local mainCircle = radiusFolder:FindFirstChild("MainRadius")
+        local outerRing = radiusFolder:FindFirstChild("OuterRing")
+        if not mainCircle or not outerRing then
+            mainCircle, outerRing = refreshESP()
+        end
+        if not mainCircle or not outerRing then return end
         
         pulseTick = pulseTick + dt * 2
         rainbowTick = rainbowTick + dt * 0.5
         
-        local footPos = localRootPart.Position - Vector3.new(0,3,0)
+        local footPos = rootPart.Position - Vector3.new(0,3,0)
         mainCircle.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
         outerRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
         mainCircle.Transparency = 0.91 + math.sin(pulseTick) * 0.01
@@ -2354,8 +2396,9 @@ local function autoParryLoop()
         end
     end)
         
-    print("[AutoParry] Ready with adjustable radius and cooldown GUI")
+    print("[AutoParry] Ready with adjustable radius, cooldown GUI, and stable ESP")
 end
+            
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

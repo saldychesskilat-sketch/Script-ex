@@ -5141,157 +5141,162 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
-local function createGridButton(parent, name, text, initialState, onChange)
+local featuresContent = nil
 
-    local button = Instance.new("TextButton")
-    button.Name = name
-    button.Size = UDim2.new(0,85,0,32)
+local function createFeatureContent()
 
-    button.Text = text .. (initialState and " [ON]" or " [OFF]")
-    button.TextSize = 9
-    button.Font = Enum.Font.GothamBold
-
-    button.TextColor3 =
-        initialState
-        and Color3.fromRGB(0,225,255)
-        or Color3.fromRGB(220,220,220)
-
-    button.BackgroundColor3 =
-        initialState
-        and Color3.fromRGB(12,28,46)
-        or Color3.fromRGB(8,18,32)
-
-    button.BackgroundTransparency = 0.05
-    button.BorderSizePixel = 0
-    button.AutoButtonColor = false
-    button.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0,8)
-    corner.Parent = button
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1.2
-    stroke.Transparency = 0.35
-
-    stroke.Color =
-        initialState
-        and Color3.fromRGB(0,200,255)
-        or Color3.fromRGB(70,120,160)
-
-    stroke.Parent = button
-
-    local function updateState(state)
-
-        button.Text = text .. (state and " [ON]" or " [OFF]")
-
-        button.BackgroundColor3 =
-            state
-            and Color3.fromRGB(12,28,46)
-            or Color3.fromRGB(8,18,32)
-
-        button.TextColor3 =
-            state
-            and Color3.fromRGB(0,225,255)
-            or Color3.fromRGB(220,220,220)
-
-        stroke.Color =
-            state
-            and Color3.fromRGB(0,200,255)
-            or Color3.fromRGB(70,120,160)
+    if featuresContent then
+        featuresContent:Destroy()
     end
-
-    button.MouseButton1Click:Connect(function()
-
-        local newState = not (config[name] or false)
-
-        if name == "autoWinEnabled" then
-            config.autoWinEnabled = newState
-            if newState then startAutoWin() else stopAutoWin() end
-
-        elseif name == "autoTaskEnabled" then
-            config.autoTaskEnabled = newState
-            if newState then startAutoTask() else stopAutoTask() end
-
-        elseif name == "espEnabled" then
-            config.espEnabled = newState
-            updateAllESP()
-
-        elseif name == "speedBoostEnabled" then
-            config.speedBoostEnabled = newState
-            if not newState then
-                if localHumanoid then
-                    localHumanoid.WalkSpeed = config.originalWalkSpeed
-                end
-            end
-
-        elseif name == "stealthEnabled" then
-            config.stealthEnabled = newState
-            if newState then startStealthMonitor() else stopStealthMonitor() end
-
-        elseif name == "godModeEnabled" then
-            config.godModeEnabled = newState
-            if newState then startGodMode() else stopGodMode() end
-
-        elseif name == "infiniteAmmoEnabled" then
-            config.infiniteAmmoEnabled = newState
-            if newState then startInfiniteAmmo() else stopInfiniteAmmo() end
-
-        elseif name == "shieldEnabled" then
-            config.shieldEnabled = newState
-            if newState then startShieldMonitor() else stopShieldMonitor() end
-
-        elseif name == "tpwalkEnabled" then
-            config.tpwalkEnabled = newState
-            if newState then startTpwalkMonitor() else stopTpwalkMonitor() end
-
-        elseif name == "noCollideEnabled" then
-            config.noCollideEnabled = newState
-            if newState then startNoCollideMonitor() else stopNoCollideMonitor() end
-
-        elseif name == "massKillEnabled" then
-            config.massKillEnabled = newState
-            if newState then startMassKillLoop() else stopMassKillLoop() end
-
-        elseif name == "autoGeneratorEnabled" then
-            config.autoGeneratorEnabled = newState
-            if newState then startAutoGeneratorLoop() else stopAutoGeneratorLoop() end
-
-        elseif name == "autoSkillCheckEnabled" then
-            config.autoSkillCheckEnabled = newState
-            if newState then startAutoSkillCheck() else stopAutoSkillCheck() end
-
-        elseif name == "autoAimEnabled" then
-            config.autoAimEnabled = newState
-            if newState then startAutoAim() else stopAutoAim() end
-
-        elseif name == "povMode" then
-            togglePOV()
-            return
-        end
-
-        updateState(newState)
-
-        if onChange then
-            onChange(newState)
-        end
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.06),
-            {Size = UDim2.new(0,82,0,30)}
-        ):Play()
-
-        task.wait(0.06)
-
-        TweenService:Create(
-            button,
-            TweenInfo.new(0.06),
-            {Size = UDim2.new(0,85,0,32)}
-        ):Play()
-    end)
-
-    return button
+    local button = Instance.new("TextButton")  
+    button.Name = name  
+    button.Size = UDim2.new(0,85,0,32)  
+  
+    button.Text = text .. (initialState and " [ON]" or " [OFF]")  
+    button.TextSize = 9  
+    button.Font = Enum.Font.GothamBold  
+  
+    button.TextColor3 =  
+        initialState  
+        and Color3.fromRGB(0,225,255)  
+        or Color3.fromRGB(220,220,220)  
+  
+    button.BackgroundColor3 =  
+        initialState  
+        and Color3.fromRGB(12,28,46)  
+        or Color3.fromRGB(8,18,32)  
+  
+    button.BackgroundTransparency = 0.05  
+    button.BorderSizePixel = 0  
+    button.AutoButtonColor = false  
+    button.Parent = parent  
+  
+    local corner = Instance.new("UICorner")  
+    corner.CornerRadius = UDim.new(0,8)  
+    corner.Parent = button  
+  
+    local stroke = Instance.new("UIStroke")  
+    stroke.Thickness = 1.2  
+    stroke.Transparency = 0.35  
+  
+    stroke.Color =  
+        initialState  
+        and Color3.fromRGB(0,200,255)  
+        or Color3.fromRGB(70,120,160)  
+  
+    stroke.Parent = button  
+  
+    local function updateState(state)  
+  
+        button.Text = text .. (state and " [ON]" or " [OFF]")  
+  
+        button.BackgroundColor3 =  
+            state  
+            and Color3.fromRGB(12,28,46)  
+            or Color3.fromRGB(8,18,32)  
+  
+        button.TextColor3 =  
+            state  
+            and Color3.fromRGB(0,225,255)  
+            or Color3.fromRGB(220,220,220)  
+  
+        stroke.Color =  
+            state  
+            and Color3.fromRGB(0,200,255)  
+            or Color3.fromRGB(70,120,160)  
+    end  
+  
+    button.MouseButton1Click:Connect(function()  
+  
+        local newState = not (config[name] or false)  
+  
+        if name == "autoWinEnabled" then  
+            config.autoWinEnabled = newState  
+            if newState then startAutoWin() else stopAutoWin() end  
+  
+        elseif name == "autoTaskEnabled" then  
+            config.autoTaskEnabled = newState  
+            if newState then startAutoTask() else stopAutoTask() end  
+  
+        elseif name == "espEnabled" then  
+            config.espEnabled = newState  
+            updateAllESP()  
+  
+        elseif name == "speedBoostEnabled" then  
+            config.speedBoostEnabled = newState  
+            if not newState then  
+                if localHumanoid then  
+                    localHumanoid.WalkSpeed = config.originalWalkSpeed  
+                end  
+            end  
+  
+        elseif name == "stealthEnabled" then  
+            config.stealthEnabled = newState  
+            if newState then startStealthMonitor() else stopStealthMonitor() end  
+  
+        elseif name == "godModeEnabled" then  
+            config.godModeEnabled = newState  
+            if newState then startGodMode() else stopGodMode() end  
+  
+        elseif name == "infiniteAmmoEnabled" then  
+            config.infiniteAmmoEnabled = newState  
+            if newState then startInfiniteAmmo() else stopInfiniteAmmo() end  
+  
+        elseif name == "shieldEnabled" then  
+            config.shieldEnabled = newState  
+            if newState then startShieldMonitor() else stopShieldMonitor() end  
+  
+        elseif name == "tpwalkEnabled" then  
+            config.tpwalkEnabled = newState  
+            if newState then startTpwalkMonitor() else stopTpwalkMonitor() end  
+  
+        elseif name == "noCollideEnabled" then  
+            config.noCollideEnabled = newState  
+            if newState then startNoCollideMonitor() else stopNoCollideMonitor() end  
+  
+        elseif name == "massKillEnabled" then  
+            config.massKillEnabled = newState  
+            if newState then startMassKillLoop() else stopMassKillLoop() end  
+  
+        elseif name == "autoGeneratorEnabled" then  
+            config.autoGeneratorEnabled = newState  
+            if newState then startAutoGeneratorLoop() else stopAutoGeneratorLoop() end  
+  
+        elseif name == "autoSkillCheckEnabled" then  
+            config.autoSkillCheckEnabled = newState  
+            if newState then startAutoSkillCheck() else stopAutoSkillCheck() end  
+  
+        elseif name == "autoAimEnabled" then  
+            config.autoAimEnabled = newState  
+            if newState then startAutoAim() else stopAutoAim() end  
+  
+        elseif name == "povMode" then  
+            togglePOV()  
+            return  
+        end  
+  
+        updateState(newState)  
+  
+        if onChange then  
+            onChange(newState)  
+        end  
+  
+        TweenService:Create(  
+            button,  
+            TweenInfo.new(0.06),  
+            {Size = UDim2.new(0,82,0,30)}  
+        ):Play()  
+  
+        task.wait(0.06)  
+  
+        TweenService:Create(  
+            button,  
+            TweenInfo.new(0.06),  
+            {Size = UDim2.new(0,85,0,32)}  
+        ):Play()  
+    end)  
+  
+    return button  
 end
 
 
@@ -5550,113 +5555,82 @@ end
         {name="autoAimEnabled", text="AUTO AIM"},  
         {name="povMode", text="POV"}  
     }  
-    for _, feat in ipairs(features) do  
-        local initialState = (feat.name ~= "restartScript") and config[feat.name] or false  
-        createGridButton(contentPanel, feat.name, feat.text, initialState)  
-    end 
-    homeItem.MouseButton1Click:Connect(function()
-    homeItem.TextColor3 = Color3.fromRGB(0,230,255)
-    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
-
-    for _, v in ipairs(contentPanel:GetChildren()) do
-        if v:IsA("TextButton") then
-            v.Visible = false
-        end
-    end
-
-    gridLayout.Parent = nil
-    createHomeContent()
-end)
-
-featuresItem.MouseButton1Click:Connect(function()
-    featuresItem.TextColor3 = Color3.fromRGB(0,230,255)
-    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-    if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
-
-    for _, v in ipairs(contentPanel:GetChildren()) do
-        if v:IsA("TextButton") then
-            v.Visible = true
-        end
-    end
-
-    gridLayout.Parent = contentPanel
-end)
-
-settingsItem.MouseButton1Click:Connect(function()
-    settingsItem.TextColor3 = Color3.fromRGB(0,230,255)
-    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-    if homeContent then homeContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
-
-    for _, v in ipairs(contentPanel:GetChildren()) do
-        if v:IsA("TextButton") then
-            v.Visible = false
-        end
-    end
-
-    gridLayout.Parent = nil
-    createSettingsContent()
-end)
-
-infoItem.MouseButton1Click:Connect(function()
-    infoItem.TextColor3 = Color3.fromRGB(0,230,255)
-    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-    if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
-
-    for _, v in ipairs(contentPanel:GetChildren()) do
-        if v:IsA("TextButton") then
-            v.Visible = false
-        end
-    end
-
-    gridLayout.Parent = nil
-    createInfoContent()
-end)
-
-aboutItem.MouseButton1Click:Connect(function()
-    aboutItem.TextColor3 = Color3.fromRGB(0,230,255)
-    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-    if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-
-    for _, v in ipairs(contentPanel:GetChildren()) do
-        if v:IsA("TextButton") then
-            v.Visible = false
-        end
-    end
-
-    gridLayout.Parent = nil
-    createAboutContent()
+        
+-- Navigation handlers          
+    homeItem.MouseButton1Click:Connect(function()        
+    homeItem.TextColor3=Color3.fromRGB(0,230,255)        
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)        
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)        
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)        
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)        
+        
+    if settingsContent then settingsContent:Destroy() end        
+    if infoContent then infoContent:Destroy() end        
+    if aboutContent then aboutContent:Destroy() end        
+        
+    gridLayout.Parent=nil        
+    createHomeContent()        
+end)        
+        
+featuresItem.MouseButton1Click:Connect(function()        
+    featuresItem.TextColor3=Color3.fromRGB(0,230,255)        
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)        
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)        
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)        
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)        
+        
+    if homeContent then homeContent:Destroy() end        
+    if settingsContent then settingsContent:Destroy() end        
+    if infoContent then infoContent:Destroy() end        
+    if aboutContent then aboutContent:Destroy() end        
+        
+    gridLayout.Parent=nil
+    createFeatureContent()
+end)        
+        
+settingsItem.MouseButton1Click:Connect(function()        
+    settingsItem.TextColor3=Color3.fromRGB(0,230,255)        
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)        
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)        
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)        
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)        
+        
+    if homeContent then homeContent:Destroy() end        
+    if infoContent then infoContent:Destroy() end        
+    if aboutContent then aboutContent:Destroy() end        
+        
+    gridLayout.Parent=nil        
+    createSettingsContent()        
+end)        
+        
+infoItem.MouseButton1Click:Connect(function()        
+    infoItem.TextColor3=Color3.fromRGB(0,230,255)        
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)        
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)        
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)        
+    aboutItem.TextColor3=Color3.fromRGB(200,200,200)        
+        
+    if homeContent then homeContent:Destroy() end        
+    if settingsContent then settingsContent:Destroy() end        
+    if aboutContent then aboutContent:Destroy() end        
+        
+    gridLayout.Parent=nil        
+    createInfoContent()        
+end)        
+        
+aboutItem.MouseButton1Click:Connect(function()        
+    aboutItem.TextColor3=Color3.fromRGB(0,230,255)        
+    homeItem.TextColor3=Color3.fromRGB(200,200,200)        
+    featuresItem.TextColor3=Color3.fromRGB(200,200,200)        
+    settingsItem.TextColor3=Color3.fromRGB(200,200,200)        
+    infoItem.TextColor3=Color3.fromRGB(200,200,200)        
+        
+    if homeContent then homeContent:Destroy() end        
+    if settingsContent then settingsContent:Destroy() end        
+    if infoContent then infoContent:Destroy() end        
+        
+    gridLayout.Parent=nil        
+    createAboutContent()        
 end)
   
     makeDraggable(mainFrame)  

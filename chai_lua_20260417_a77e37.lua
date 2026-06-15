@@ -1769,76 +1769,308 @@ local function getKillerDistance()
     end        
     return minDist        
 end        
-
-local combatHeartbeat = nil    
-local radiusFolder = nil    
-
-local function autoParryLoop()    
-    if combatStateConnected then return end    
-    combatStateConnected = true    
-
-    local DETECTION_RADIUS = 9   
-    local PARRY_COOLDOWN = 0.1    
-    local lastParry = 0    
-    local pulseTick = 0    
-    local lastPulse = 0    
-    local rainbowTick = 0    
-
-    -- ==========================================
-    -- TEMPAT ANDA MENAMBAHKAN PATH DETEKSI
-    -- ==========================================
-    -- Format: path relatif dari karakter killer (tanpa awalan "Character.")
-    -- Contoh: "Weapon.TheCureStaff.BasicAttack"
-    --         "HumanoidRootPart.FrenzySound"
-    --         "HumanoidRootPart.attackline_1"
-    --         "Torso.redlight" (jika ada)
-    --         "Killerost" (langsung di karakter)
-    local COMBAT_PATHS = {
-        "Character.Weapon.TheCureStaff.BasicAttack",
-        "Weapon.TheCureStaff.BasicAttack",
-        "Character.Weapon.bat.bat.BasicAttack",
-        "Character.Weapon.Right",
-        "Character.Weapon.bat.bat.BasicAttack",
-        "HumanoidRootPart.FrenzySound",
-        "HumanoidRootPart.SwingSound",
-        "HumanoidRootPart.attackline",
-        "HumanoidRootPart.stunline",
-        "HumanoidRootPart.WallHitSound",
-        "Character.Weapon.Right",
-        "Arm.knife",
-        "Killerost",
-        "Weapon.bat.bat.BasicAttack",
-        "Lookscriptkiller",
-        "Animations.StunAnimation",
-        "Animations.WipeMachete",
-        "sfx.attackline",
-        "Arm.Handle.Handle.BasicAttack",
-        "Character.Weapon.Chainsaw.Chainsaw.charge",
-        "Weapon.Right",
-        "Character.Weapon.Right",
-        "Arm.Knide.Main.BasicAttack",
-        "Arm.Machete.Main.BasicAttack",
-        "Character.Animations.WipeMachete"
-        -- Tambahkan sendiri di sini sesuai hasil scanner Anda
-    }
-    -- ==========================================
-
-    -- Keyword combat untuk sound & attribute (fallback)
-    local COMBAT_SOUNDS = {
-        "attackline", "swingsound", "stunline",
-        "parrysound", "frenzysound", "hitsound", "WallHitStun"
-    }
-    local COMBAT_ATTRIBUTES = {
-        "frenzy", "parry", "hookprogress", "hookcount"
-    }
-
-    local scannedObjects = {}    
-    local stateConnections = {}    
-    local lastParryPerPlayer = {}    
-
-    -- Helper: cek apakah suatu objek atau path-nya cocok dengan COMBAT_PATHS
+local combatHeartbeat = nil            
+local radiusFolder = nil            
+        
+local function autoParryLoop()            
+    if combatStateConnected then return end            
+    combatStateConnected = true            
+        
+    -- Variabel yang bisa diubah slider (default)
+    local DETECTION_RADIUS = 9           
+    local PARRY_COOLDOWN = 0.1  
+    
+    -- Variabel untuk GUI slider dan koneksinya
+    local parrySettingsGui = nil
+    local sliderConnections = {}   -- untuk cleanup nanti
+            
+    local lastParry = 0            
+    local pulseTick = 0            
+    local lastPulse = 0            
+    local rainbowTick = 0            
+        
+    -- ==========================================        
+    -- TEMPAT ANDA MENAMBAHKAN PATH DETEKSI        
+    -- ==========================================        
+    local COMBAT_PATHS = {        
+        "Character.Weapon.TheCureStaff.BasicAttack",        
+        "Weapon.TheCureStaff.BasicAttack",        
+        "Character.Weapon.bat.bat.BasicAttack",        
+        "Character.Weapon.Right",        
+        "HumanoidRootPart.FrenzySound",        
+        "HumanoidRootPart.SwingSound",        
+        "HumanoidRootPart.attackline",        
+        "HumanoidRootPart.stunline",        
+        "HumanoidRootPart.WallHitSound",        
+        "Arm.knife", "Killerost", "Lookscriptkiller",        
+        "Animations.StunAnimation", "Animations.WipeMachete",        
+        "sfx.attackline", "Arm.Handle.Handle.BasicAttack",        
+        "Character.Weapon.Chainsaw.Chainsaw.charge",        
+        "Arm.Knide.Main.BasicAttack", "Arm.Machete.Main.BasicAttack",        
+        "Character.Animations.WipeMachete"        
+    }        
+    -- ==========================================        
+        
+    local COMBAT_SOUNDS = {        
+        "attackline", "swingsound", "stunline",        
+        "parrysound", "frenzysound", "hitsound", "WallHitStun"        
+    }        
+    local COMBAT_ATTRIBUTES = {        
+        "frenzy", "parry", "hookprogress", "hookcount"        
+    }        
+        
+    local scannedObjects = {}            
+    local stateConnections = {}            
+    local lastParryPerPlayer = {}            
+        
+    -- ========== FUNGSI MEMBUAT ULANG ESP (saat radius berubah) ==========
+    local function recreateESP()
+        if radiusFolder then radiusFolder:Destroy() end
+        radiusFolder = Instance.new("Folder")
+        radiusFolder.Name = "ParryESP"
+        radiusFolder.Parent = workspace
+        
+        local mainCircle = Instance.new("Part")
+        mainCircle.Name = "MainRadius"
+        mainCircle.Shape = Enum.PartType.Cylinder
+        mainCircle.Material = Enum.Material.Neon
+        mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+        mainCircle.Transparency = 0.92
+        mainCircle.Color = Color3.fromRGB(255,140,0)
+        mainCircle.Anchored = true
+        mainCircle.CanCollide = false
+        mainCircle.Parent = radiusFolder
+        
+        local outerRing = Instance.new("Part")
+        outerRing.Name = "OuterRing"
+        outerRing.Shape = Enum.PartType.Cylinder
+        outerRing.Material = Enum.Material.Neon
+        outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)
+        outerRing.Transparency = 0.45
+        outerRing.Anchored = true
+        outerRing.CanCollide = false
+        outerRing.Parent = radiusFolder
+        
+        -- Simpan referensi untuk update di loop utama
+        radiusFolder.MainCircle = mainCircle
+        radiusFolder.OuterRing = outerRing
+    end
+    
+    -- ========== MEMBUAT GUI SLIDER ==========
+    local function createSettingsGUI()
+        if parrySettingsGui then parrySettingsGui:Destroy() end
+        
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "AutoParryConfig"
+        gui.ResetOnSpawn = false
+        gui.Parent = game.CoreGui
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 260, 0, 110)
+        frame.Position = UDim2.new(0.5, -130, 0.85, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0,180,255)
+        stroke.Transparency = 0.4
+        stroke.Parent = frame
+        
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1,0,0,28)
+        title.Text = "Auto Parry Settings"
+        title.TextColor3 = Color3.fromRGB(0,220,255)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 12
+        title.BackgroundTransparency = 1
+        title.Parent = frame
+        
+        -- Slider Radius
+        local radLabel = Instance.new("TextLabel")
+        radLabel.Size = UDim2.new(0.5, -10, 0, 20)
+        radLabel.Position = UDim2.new(0,10,0,32)
+        radLabel.BackgroundTransparency = 1
+        radLabel.Text = "Radius: " .. DETECTION_RADIUS
+        radLabel.TextColor3 = Color3.fromRGB(210,210,210)
+        radLabel.Font = Enum.Font.Gotham
+        radLabel.TextSize = 11
+        radLabel.Parent = frame
+        
+        local radBg = Instance.new("Frame")
+        radBg.Size = UDim2.new(0.45,0,0,4)
+        radBg.Position = UDim2.new(0.52,0,0.42,0)
+        radBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
+        radBg.BorderSizePixel = 0
+        radBg.Parent = frame
+        Instance.new("UICorner", radBg).CornerRadius = UDim.new(1,0)
+        
+        local radThumb = Instance.new("TextButton")
+        radThumb.Size = UDim2.new(0,12,0,12)
+        radThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
+        radThumb.AutoButtonColor = false
+        radThumb.Text = ""
+        radThumb.Parent = radBg
+        Instance.new("UICorner", radThumb).CornerRadius = UDim.new(1,0)
+        
+        -- Slider Cooldown
+        local cdLabel = Instance.new("TextLabel")
+        cdLabel.Size = UDim2.new(0.5, -10, 0, 20)
+        cdLabel.Position = UDim2.new(0,10,0,62)
+        cdLabel.BackgroundTransparency = 1
+        cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
+        cdLabel.TextColor3 = Color3.fromRGB(210,210,210)
+        cdLabel.Font = Enum.Font.Gotham
+        cdLabel.TextSize = 11
+        cdLabel.Parent = frame
+        
+        local cdBg = Instance.new("Frame")
+        cdBg.Size = UDim2.new(0.45,0,0,4)
+        cdBg.Position = UDim2.new(0.52,0,0.72,0)
+        cdBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
+        cdBg.BorderSizePixel = 0
+        cdBg.Parent = frame
+        Instance.new("UICorner", cdBg).CornerRadius = UDim.new(1,0)
+        
+        local cdThumb = Instance.new("TextButton")
+        cdThumb.Size = UDim2.new(0,12,0,12)
+        cdThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
+        cdThumb.AutoButtonColor = false
+        cdThumb.Text = ""
+        cdThumb.Parent = cdBg
+        Instance.new("UICorner", cdThumb).CornerRadius = UDim.new(1,0)
+        
+        -- Fungsi update thumb
+        local function updateRadUI()
+            local rel = (DETECTION_RADIUS - 1) / 19
+            local w = radBg.AbsoluteSize.X
+            local tw = radThumb.AbsoluteSize.X
+            if w > 0 then
+                local px = math.clamp(rel * w, tw/2, w - tw/2)
+                radThumb.Position = UDim2.new(0, px - tw/2, 0.5, -tw/2)
+            end
+            radLabel.Text = "Radius: " .. DETECTION_RADIUS
+        end
+        
+        local function updateCDUI()
+            local rel = (PARRY_COOLDOWN - 0.01) / 0.99
+            local w = cdBg.AbsoluteSize.X
+            local tw = cdThumb.AbsoluteSize.X
+            if w > 0 then
+                local px = math.clamp(rel * w, tw/2, w - tw/2)
+                cdThumb.Position = UDim2.new(0, px - tw/2, 0.5, -tw/2)
+            end
+            cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
+        end
+        
+        -- Drag radius
+        local draggingRad = false
+        local function onRadDrag(mouseX)
+            local bgX = radBg.AbsolutePosition.X
+            local bgW = radBg.AbsoluteSize.X
+            if bgW <= 0 then return end
+            local rel = math.clamp((mouseX - bgX) / bgW, 0, 1)
+            local newVal = math.floor(rel * 19 + 0.5) + 1
+            newVal = math.clamp(newVal, 1, 20)
+            if newVal ~= DETECTION_RADIUS then
+                DETECTION_RADIUS = newVal
+                updateRadUI()
+                recreateESP()   -- update visual lingkaran
+            end
+        end
+        radThumb.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingRad = true
+                onRadDrag(input.Position.X)
+            end
+        end)
+        radBg.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingRad = true
+                onRadDrag(input.Position.X)
+            end
+        end)
+        local radMoveConn = RunService.RenderStepped:Connect(function()
+            if draggingRad then
+                onRadDrag(UserInputService:GetMouseLocation().X)
+            end
+        end)
+        local radEndConn = UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingRad = false
+            end
+        end)
+        table.insert(sliderConnections, radMoveConn)
+        table.insert(sliderConnections, radEndConn)
+        
+        -- Drag cooldown
+        local draggingCD = false
+        local function onCDDrag(mouseX)
+            local bgX = cdBg.AbsolutePosition.X
+            local bgW = cdBg.AbsoluteSize.X
+            if bgW <= 0 then return end
+            local rel = math.clamp((mouseX - bgX) / bgW, 0, 1)
+            local newVal = 0.01 + rel * 0.99
+            newVal = math.floor(newVal * 100 + 0.5) / 100
+            if newVal ~= PARRY_COOLDOWN then
+                PARRY_COOLDOWN = newVal
+                updateCDUI()
+            end
+        end
+        cdThumb.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingCD = true
+                onCDDrag(input.Position.X)
+            end
+        end)
+        cdBg.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingCD = true
+                onCDDrag(input.Position.X)
+            end
+        end)
+        local cdMoveConn = RunService.RenderStepped:Connect(function()
+            if draggingCD then
+                onCDDrag(UserInputService:GetMouseLocation().X)
+            end
+        end)
+        local cdEndConn = UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingCD = false
+            end
+        end)
+        table.insert(sliderConnections, cdMoveConn)
+        table.insert(sliderConnections, cdEndConn)
+        
+        -- Tombol close (opsional)
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 18, 0, 18)
+        closeBtn.Position = UDim2.new(1, -24, 0, 5)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
+        closeBtn.Text = "X"
+        closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.TextSize = 11
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Parent = frame
+        Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0,4)
+        closeBtn.MouseButton1Click:Connect(function()
+            gui:Destroy()
+            parrySettingsGui = nil
+        end)
+        
+        task.wait(0.05)
+        updateRadUI()
+        updateCDUI()
+        return gui
+    end
+    
+    -- Buat GUI dan ESP awal
+    parrySettingsGui = createSettingsGUI()
+    recreateESP()
+    
+    -- ========== FUNGSI DETEKSI (tidak berubah, hanya menggunakan variabel DETECTION_RADIUS dan PARRY_COOLDOWN) ==========
     local function matchesCombatPath(obj, killerChar)
-        -- Dapatkan path relatif dari objek terhadap karakter killer
         local parts = {}
         local current = obj
         while current and current ~= killerChar do
@@ -1847,263 +2079,205 @@ local function autoParryLoop()
         end
         if not current then return false end
         local relPath = table.concat(parts, ".")
-        -- Cek apakah path dimulai dengan salah satu pola di COMBAT_PATHS
         for _, pattern in ipairs(COMBAT_PATHS) do
             if relPath:find(pattern, 1, true) or relPath == pattern then
                 return true
             end
-            -- Juga cek jika objek sendiri namanya cocok (misal "BasicAttack")
             if obj.Name == pattern or obj.Name:lower():find(pattern:lower()) then
                 return true
             end
         end
         return false
     end
-
-    local function getRoot(char)    
-        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")    
-    end    
-
-    local function isKiller(player)    
-        if not player or player == localPlayer then return false end    
-        if player.Team then    
-            local t = player.Team.Name:lower()    
-            if t:find("killer") or t:find("monster") or t:find("enemy") then    
-                return true    
-            end    
-        end    
-        local char = player.Character    
-        if char then    
-            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then    
-                return true    
-            end    
-            -- Cek path combat untuk menentukan killer (fallback)
+        
+    local function getRoot(char)
+        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    end
+        
+    local function isKiller(player)
+        if not player or player == localPlayer then return false end
+        if player.Team then
+            local t = player.Team.Name:lower()
+            if t:find("killer") or t:find("monster") or t:find("enemy") then return true end
+        end
+        local char = player.Character
+        if char then
+            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then return true end
             for _, obj in ipairs(char:GetDescendants()) do
-                if matchesCombatPath(obj, char) then
-                    return true
+                if matchesCombatPath(obj, char) then return true end
+            end
+        end
+        return false
+    end
+        
+    local function triggerParry(reason, player)
+        if tick() - lastParry < PARRY_COOLDOWN then return end
+        local lastP = lastParryPerPlayer[player] or 0
+        if tick() - lastP < PARRY_COOLDOWN then return end
+        local char = player.Character
+        if not char then return end
+        local root = getRoot(char)
+        if not root then return end
+        local dist = (localRootPart.Position - root.Position).Magnitude
+        if dist > DETECTION_RADIUS then return end
+        lastParry = tick()
+        lastParryPerPlayer[player] = tick()
+        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
+        pcall(function() fireParryRemote(player) end)
+    end
+        
+    local function hookAttributes(player, char)
+        local function onAttributeChanged(attrName)
+            return function()
+                if not config.infiniteAmmoEnabled then return end
+                local val = char:GetAttribute(attrName)
+                if attrName:lower() == "frenzy" and val == true then
+                    triggerParry("Attribute:Frenzy", player)
+                elseif attrName:lower() == "parry" and val == true then
+                    triggerParry("Attribute:Parry", player)
+                elseif attrName:lower() == "hookprogress" and type(val) == "number" and val > 0 then
+                    triggerParry("Attribute:hookprogress", player)
+                elseif attrName:lower() == "hookcount" and val and tonumber(val) and tonumber(val) > 0 then
+                    triggerParry("Attribute:HookCount", player)
                 end
             end
-        end    
-        return false    
-    end    
-
-    local function triggerParry(reason, player)    
-        if tick() - lastParry < PARRY_COOLDOWN then return end    
-        local lastP = lastParryPerPlayer[player] or 0    
-        if tick() - lastP < PARRY_COOLDOWN then return end    
-
-        local char = player.Character    
-        if not char then return end    
-        local root = getRoot(char)    
-        if not root then return end    
-
-        local dist = (localRootPart.Position - root.Position).Magnitude    
-        if dist > DETECTION_RADIUS then return end    
-
-        lastParry = tick()    
-        lastParryPerPlayer[player] = tick()    
-
-        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))    
-        pcall(function() fireParryRemote(player) end)    
-    end    
-
-    -- Deteksi perubahan attribute (tetap)
-    local function hookAttributes(player, char)    
-        local function onAttributeChanged(attrName)    
-            return function()    
-                if not config.infiniteAmmoEnabled then return end    
-                local val = char:GetAttribute(attrName)    
-                if attrName:lower() == "frenzy" and val == true then    
-                    triggerParry("Attribute:Frenzy", player)    
-                elseif attrName:lower() == "parry" and val == true then    
-                    triggerParry("Attribute:Parry", player)    
-                elseif attrName:lower() == "hookprogress" and type(val) == "number" and val > 0 then    
-                    triggerParry("Attribute:hookprogress", player)    
-                elseif attrName:lower() == "hookcount" and val and tonumber(val) and tonumber(val) > 0 then    
-                    triggerParry("Attribute:HookCount", player)    
-                end    
-            end    
-        end    
-
-        for _, attrName in ipairs(COMBAT_ATTRIBUTES) do    
-            if char:GetAttribute(attrName) ~= nil then    
-                local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))    
-                table.insert(stateConnections, conn)    
-            end    
-        end    
-    end    
-
-    -- Deteksi sound (tetap)
-    local function hookSound(sound, player)    
-        if scannedObjects[sound] then return end    
-        scannedObjects[sound] = true    
-        local conn = sound:GetPropertyChangedSignal("Playing"):Connect(function()    
-            if sound.Playing and config.infiniteAmmoEnabled then    
-                local sName = sound.Name:lower()    
-                for _, kw in ipairs(COMBAT_SOUNDS) do    
-                    if sName:find(kw) then    
-                        triggerParry("Sound:"..sound.Name, player)    
-                        break    
-                    end    
-                end    
-            end    
-        end)    
-        table.insert(stateConnections, conn)    
-    end    
-
-    -- Fungsi utama hook karakter killer
-    local function hookCharacter(player, char)    
-        if not isKiller(player) then return end    
-        print("[AutoParry] Hooked killer:", player.Name)    
-
-        hookAttributes(player, char)    
-
-        -- Scan semua objek yang sudah ada, cocokkan dengan COMBAT_PATHS
-        for _, obj in ipairs(char:GetDescendants()) do    
-            if obj:IsA("Sound") then    
-                hookSound(obj, player)    
-            end    
-            if matchesCombatPath(obj, char) then    
-                triggerParry("PathMatch:"..obj.Name, player)    
-            end    
-        end    
-
-        -- Pantau descendant baru
-        local addedConn = char.DescendantAdded:Connect(function(obj)    
-            if obj:IsA("Sound") then    
-                hookSound(obj, player)    
-                if obj.Playing then    
-                    triggerParry("NewSound:"..obj.Name, player)    
-                end    
-            end    
-            if matchesCombatPath(obj, char) then    
-                triggerParry("PathMatchNew:"..obj.Name, player)    
-            end    
-        end)    
-        table.insert(stateConnections, addedConn)    
-
-        -- Pantau attribute baru
-        local attrConn = char.AttributeChanged:Connect(function(attrName)    
-            local lowerAttr = attrName:lower()    
-            if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then    
-                local val = char:GetAttribute(attrName)    
-                if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then    
-                    triggerParry("AttributeChanged:"..attrName, player)    
-                end    
-            end    
-        end)    
-        table.insert(stateConnections, attrConn)    
-    end    
-
-    -- Hook existing players
-    for _, player in ipairs(Players:GetPlayers()) do    
-        if player ~= localPlayer and isKiller(player) then    
-            if player.Character then    
-                hookCharacter(player, player.Character)    
-            end    
-            local charConn = player.CharacterAdded:Connect(function(char)    
-                task.wait(0.5)    
-                hookCharacter(player, char)    
-            end)    
-            table.insert(stateConnections, charConn)    
-        end    
-    end    
-
-    -- Hook new players
-    local playerConn = Players.PlayerAdded:Connect(function(player)    
-        local charConn = player.CharacterAdded:Connect(function(char)    
-            task.wait(0.5)    
-            if isKiller(player) then    
-                hookCharacter(player, char)    
-            end    
-        end)    
-        table.insert(stateConnections, charConn)    
-    end)    
-    table.insert(stateConnections, playerConn)    
-
-    -- ========== VISUAL ESP (tidak berubah) ==========
-    if radiusFolder then radiusFolder:Destroy() end    
-    radiusFolder = Instance.new("Folder")    
-    radiusFolder.Name = "ParryESP"    
-    radiusFolder.Parent = workspace    
-
-    local mainCircle = Instance.new("Part")    
-    mainCircle.Name = "MainRadius"    
-    mainCircle.Shape = Enum.PartType.Cylinder    
-    mainCircle.Material = Enum.Material.Neon    
-    mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)    
-    mainCircle.Transparency = 0.92    
-    mainCircle.Color = Color3.fromRGB(255,140,0)    
-    mainCircle.Anchored = true    
-    mainCircle.CanCollide = false    
-    mainCircle.Parent = radiusFolder    
-
-    local outerRing = Instance.new("Part")    
-    outerRing.Name = "OuterRing"    
-    outerRing.Shape = Enum.PartType.Cylinder    
-    outerRing.Material = Enum.Material.Neon    
-    outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)    
-    outerRing.Transparency = 0.45    
-    outerRing.Anchored = true    
-    outerRing.CanCollide = false    
-    outerRing.Parent = radiusFolder    
-
-    local function createPulse()    
-        if not localRootPart then return end    
-        local pulse = Instance.new("Part")    
-        pulse.Shape = Enum.PartType.Cylinder    
-        pulse.Material = Enum.Material.Neon    
-        pulse.Color = Color3.fromRGB(255,170,0)    
-        pulse.Transparency = 0.78    
-        pulse.Anchored = true    
-        pulse.CanCollide = false    
-        pulse.Size = Vector3.new(0.03,1,1)    
-        pulse.Parent = radiusFolder    
-        task.spawn(function()    
-            local current = 1    
-            for _ = 1,35 do    
-                if not pulse.Parent or not localRootPart then break end    
-                current = current + 0.28    
-                pulse.Size = Vector3.new(0.03, current, current)    
-                pulse.Transparency = pulse.Transparency + 0.004    
-                local footPos = localRootPart.Position - Vector3.new(0,3,0)    
-                pulse.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))    
-                RunService.RenderStepped:Wait()    
-            end    
-            pulse:Destroy()    
-        end)    
-    end    
-
-    combatHeartbeat = RunService.RenderStepped:Connect(function(dt)    
-        if not config.infiniteAmmoEnabled then    
-            combatStateConnected = false    
-            if combatHeartbeat then combatHeartbeat:Disconnect(); combatHeartbeat = nil end    
-            for _, conn in ipairs(stateConnections) do    
-                pcall(function() conn:Disconnect() end)    
-            end    
-            stateConnections = {}    
-            if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end    
-            return    
-        end    
-        if not localRootPart then return end    
-
-        pulseTick = pulseTick + dt * 2    
-        rainbowTick = rainbowTick + dt * 0.5    
-
-        local footPos = localRootPart.Position - Vector3.new(0,3,0)    
-        mainCircle.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))    
-        outerRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))    
-        mainCircle.Transparency = 0.91 + math.sin(pulseTick) * 0.01    
-        outerRing.Transparency = 0.42 + math.sin(pulseTick) * 0.03    
-        outerRing.Color = Color3.fromHSV(rainbowTick % 1, 1, 1)    
-
-        if tick() - lastPulse >= 2 then    
-            lastPulse = tick()    
-            createPulse()    
-        end    
-    end)    
-
-    print("[AutoParry] Ready. Add combat paths to COMBAT_PATHS table as needed.")    
+        end
+        for _, attrName in ipairs(COMBAT_ATTRIBUTES) do
+            if char:GetAttribute(attrName) ~= nil then
+                local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))
+                table.insert(stateConnections, conn)
+            end
+        end
+    end
+        
+    local function hookSound(sound, player)
+        if scannedObjects[sound] then return end
+        scannedObjects[sound] = true
+        local conn = sound:GetPropertyChangedSignal("Playing"):Connect(function()
+            if sound.Playing and config.infiniteAmmoEnabled then
+                local sName = sound.Name:lower()
+                for _, kw in ipairs(COMBAT_SOUNDS) do
+                    if sName:find(kw) then
+                        triggerParry("Sound:"..sound.Name, player)
+                        break
+                    end
+                end
+            end
+        end)
+        table.insert(stateConnections, conn)
+    end
+        
+    local function hookCharacter(player, char)
+        if not isKiller(player) then return end
+        print("[AutoParry] Hooked killer:", player.Name)
+        hookAttributes(player, char)
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("Sound") then hookSound(obj, player) end
+            if matchesCombatPath(obj, char) then triggerParry("PathMatch:"..obj.Name, player) end
+        end
+        local addedConn = char.DescendantAdded:Connect(function(obj)
+            if obj:IsA("Sound") then
+                hookSound(obj, player)
+                if obj.Playing then triggerParry("NewSound:"..obj.Name, player) end
+            end
+            if matchesCombatPath(obj, char) then triggerParry("PathMatchNew:"..obj.Name, player) end
+        end)
+        table.insert(stateConnections, addedConn)
+        local attrConn = char.AttributeChanged:Connect(function(attrName)
+            local lowerAttr = attrName:lower()
+            if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
+                local val = char:GetAttribute(attrName)
+                if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then
+                    triggerParry("AttributeChanged:"..attrName, player)
+                end
+            end
+        end)
+        table.insert(stateConnections, attrConn)
+    end
+        
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and isKiller(player) then
+            if player.Character then hookCharacter(player, player.Character) end
+            local charConn = player.CharacterAdded:Connect(function(char)
+                task.wait(0.5)
+                hookCharacter(player, char)
+            end)
+            table.insert(stateConnections, charConn)
+        end
+    end
+        
+    local playerConn = Players.PlayerAdded:Connect(function(player)
+        local charConn = player.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            if isKiller(player) then hookCharacter(player, char) end
+        end)
+        table.insert(stateConnections, charConn)
+    end)
+    table.insert(stateConnections, playerConn)
+        
+    -- ========== MAIN LOOP ==========
+    local function createPulse()
+        if not localRootPart then return end
+        local pulse = Instance.new("Part")
+        pulse.Shape = Enum.PartType.Cylinder
+        pulse.Material = Enum.Material.Neon
+        pulse.Color = Color3.fromRGB(255,170,0)
+        pulse.Transparency = 0.78
+        pulse.Anchored = true
+        pulse.CanCollide = false
+        pulse.Size = Vector3.new(0.03,1,1)
+        pulse.Parent = radiusFolder
+        task.spawn(function()
+            local current = 1
+            for _ = 1,35 do
+                if not pulse.Parent or not localRootPart then break end
+                current = current + 0.28
+                pulse.Size = Vector3.new(0.03, current, current)
+                pulse.Transparency = pulse.Transparency + 0.004
+                local footPos = localRootPart.Position - Vector3.new(0,3,0)
+                pulse.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+                RunService.RenderStepped:Wait()
+            end
+            pulse:Destroy()
+        end)
+    end
+        
+    combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
+        if not config.infiniteAmmoEnabled then
+            combatStateConnected = false
+            if combatHeartbeat then combatHeartbeat:Disconnect(); combatHeartbeat = nil end
+            for _, conn in ipairs(stateConnections) do
+                pcall(function() conn:Disconnect() end)
+            end
+            for _, conn in ipairs(sliderConnections) do
+                pcall(function() conn:Disconnect() end)
+            end
+            stateConnections = {}
+            if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
+            if parrySettingsGui then parrySettingsGui:Destroy(); parrySettingsGui = nil end
+            return
+        end
+        if not localRootPart then return end
+        
+        pulseTick = pulseTick + dt * 2
+        rainbowTick = rainbowTick + dt * 0.5
+        
+        local footPos = localRootPart.Position - Vector3.new(0,3,0)
+        if radiusFolder and radiusFolder.MainCircle then
+            radiusFolder.MainCircle.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+            radiusFolder.OuterRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+            radiusFolder.MainCircle.Transparency = 0.91 + math.sin(pulseTick) * 0.01
+            radiusFolder.OuterRing.Transparency = 0.42 + math.sin(pulseTick) * 0.03
+            radiusFolder.OuterRing.Color = Color3.fromHSV(rainbowTick % 1, 1, 1)
+        end
+        
+        if tick() - lastPulse >= 2 then
+            lastPulse = tick()
+            createPulse()
+        end
+    end)
+        
+    print("[AutoParry] Ready with adjustable radius and cooldown GUI")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

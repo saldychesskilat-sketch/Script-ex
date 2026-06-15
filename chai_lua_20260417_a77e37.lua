@@ -5485,27 +5485,6 @@ end
     minimizeBtn.MouseButton1Click:Connect(minimizeGUI)  
     closeBtn.MouseButton1Click:Connect(minimizeGUI)  
   
-    sidebar = Instance.new("Frame")  
-    sidebar.Size = UDim2.new(0, 80, 1, -24)  
-    sidebar.Position = UDim2.new(0, 0, 0, 24)  
-    sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)  
-    sidebar.BackgroundTransparency = 0.2  
-    sidebar.BorderSizePixel = 0  
-    sidebar.Parent = mainFrame  
-    local sidebarCorner = Instance.new("UICorner")  
-    sidebarCorner.CornerRadius = UDim.new(0, 0)  
-    sidebarCorner.Parent = sidebar  
-    local sidebarList = Instance.new("Frame")  
-    sidebarList.Size = UDim2.new(1, 0, 0, 150)  
-    sidebarList.Position = UDim2.new(0, 0, 0.05, 0)  
-    sidebarList.BackgroundTransparency = 1  
-    sidebarList.Parent = sidebar  
-    local sidebarLayout = Instance.new("UIListLayout")  
-    sidebarLayout.Padding = UDim.new(0, 4)  
-    sidebarLayout.FillDirection = Enum.FillDirection.Vertical  
-    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
-    sidebarLayout.Parent = sidebarList  
-  
     local homeItem = createSidebarItem(sidebarList, "HOME", "", false)  
     local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", true)  
     local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)  

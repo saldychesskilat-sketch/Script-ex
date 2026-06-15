@@ -1847,6 +1847,7 @@ local function autoParryLoop()
     end
         
     -- ========== MEMBUAT GUI SLIDER (dengan drag & toggle) ==========
+        -- ========== MEMBUAT GUI SLIDER (tanpa toggle, bisa drag) ==========
     local function createConfigGUI()
         if parryConfigGui then parryConfigGui:Destroy() end
         
@@ -1890,20 +1891,6 @@ local function autoParryLoop()
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Parent = header
         
-        -- Tombol toggle hide/show (mata)
-        local toggleBtn = Instance.new("TextButton")
-        toggleBtn.Size = UDim2.new(0, 22, 0, 22)
-        toggleBtn.Position = UDim2.new(1, -56, 0.5, -11)
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-        toggleBtn.Text = "👁"
-        toggleBtn.TextColor3 = Color3.fromRGB(200,200,200)
-        toggleBtn.Font = Enum.Font.GothamBold
-        toggleBtn.TextSize = 12
-        toggleBtn.BorderSizePixel = 0
-        toggleBtn.AutoButtonColor = false
-        toggleBtn.Parent = header
-        Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 4)
-        
         -- Tombol close (X)
         local closeBtn = Instance.new("TextButton")
         closeBtn.Size = UDim2.new(0, 22, 0, 22)
@@ -1921,13 +1908,7 @@ local function autoParryLoop()
             parryConfigGui = nil
         end)
         
-        -- Konten frame (slider dan label) akan disembunyikan/ditampilkan oleh toggle
-        local contentFrame = Instance.new("Frame")
-        contentFrame.Size = UDim2.new(1, 0, 1, -28)
-        contentFrame.Position = UDim2.new(0, 0, 0, 28)
-        contentFrame.BackgroundTransparency = 1
-        contentFrame.Parent = frame
-        
+        -- Konten langsung di frame (tanpa contentFrame)
         -- Slider Radius
         local radLabel = Instance.new("TextLabel")
         radLabel.Size = UDim2.new(0.5, -10, 0, 20)
@@ -1937,14 +1918,14 @@ local function autoParryLoop()
         radLabel.TextColor3 = Color3.fromRGB(210,210,210)
         radLabel.Font = Enum.Font.Gotham
         radLabel.TextSize = 11
-        radLabel.Parent = contentFrame
+        radLabel.Parent = frame
         
         local radBg = Instance.new("Frame")
         radBg.Size = UDim2.new(0.45,0,0,4)
         radBg.Position = UDim2.new(0.52,0,0.18,0)
         radBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
         radBg.BorderSizePixel = 0
-        radBg.Parent = contentFrame
+        radBg.Parent = frame
         Instance.new("UICorner", radBg).CornerRadius = UDim.new(1,0)
         
         local radThumb = Instance.new("TextButton")
@@ -1964,14 +1945,14 @@ local function autoParryLoop()
         cdLabel.TextColor3 = Color3.fromRGB(210,210,210)
         cdLabel.Font = Enum.Font.Gotham
         cdLabel.TextSize = 11
-        cdLabel.Parent = contentFrame
+        cdLabel.Parent = frame
         
         local cdBg = Instance.new("Frame")
         cdBg.Size = UDim2.new(0.45,0,0,4)
         cdBg.Position = UDim2.new(0.52,0,0.48,0)
         cdBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
         cdBg.BorderSizePixel = 0
-        cdBg.Parent = contentFrame
+        cdBg.Parent = frame
         Instance.new("UICorner", cdBg).CornerRadius = UDim.new(1,0)
         
         local cdThumb = Instance.new("TextButton")
@@ -2106,14 +2087,7 @@ local function autoParryLoop()
             end
         end)
         
-        -- Toggle hide/show content
-        local contentVisible = true
-        toggleBtn.MouseButton1Click:Connect(function()
-            contentVisible = not contentVisible
-            contentFrame.Visible = contentVisible
-            toggleBtn.Text = contentVisible and "👁" or "👁‍🗨"
-        end)
-        
+        -- Inisialisasi posisi thumb
         task.wait(0.05)
         updateRadUI()
         updateCDUI()

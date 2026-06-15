@@ -5500,7 +5500,7 @@ end
     sidebarLayout.Parent = sidebarList  
   
     local homeItem = createSidebarItem(sidebarList, "HOME", "", false)  
-    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)  
+    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", true)  
     local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)  
     local infoItem = createSidebarItem(sidebarList, "INFO", "", false)  
     local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)  

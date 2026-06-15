@@ -5499,7 +5499,7 @@ end
     sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
     sidebarLayout.Parent = sidebarList  
   
-    local homeItem = createSidebarItem(sidebarList, "HOME", "", true)  
+    local homeItem = createSidebarItem(sidebarList, "HOME", "", false)  
     local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)  
     local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)  
     local infoItem = createSidebarItem(sidebarList, "INFO", "", false)  

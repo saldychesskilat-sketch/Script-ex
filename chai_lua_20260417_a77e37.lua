@@ -5544,7 +5544,8 @@ end
     aboutItem.TextColor3=Color3.fromRGB(200,200,200)        
         
     if settingsContent then settingsContent:Destroy() end        
-    if infoContent then infoContent:Destroy() end        
+    if infoContent then infoContent:Destroy() end
+    if featuresContent then featuresContent:Destroy() end
     if aboutContent then aboutContent:Destroy() end        
         
     gridLayout.Parent=nil        
@@ -5575,7 +5576,8 @@ settingsItem.MouseButton1Click:Connect(function()
     aboutItem.TextColor3=Color3.fromRGB(200,200,200)        
         
     if homeContent then homeContent:Destroy() end        
-    if infoContent then infoContent:Destroy() end        
+    if infoContent then infoContent:Destroy() end
+    if featuresContent then featuresContent:Destroy() end
     if aboutContent then aboutContent:Destroy() end        
         
     gridLayout.Parent=nil        
@@ -5590,7 +5592,8 @@ infoItem.MouseButton1Click:Connect(function()
     aboutItem.TextColor3=Color3.fromRGB(200,200,200)        
         
     if homeContent then homeContent:Destroy() end        
-    if settingsContent then settingsContent:Destroy() end        
+    if settingsContent then settingsContent:Destroy() end
+    if featuresContent then featuresContent:Destroy() end
     if aboutContent then aboutContent:Destroy() end        
         
     gridLayout.Parent=nil        
@@ -5605,7 +5608,8 @@ aboutItem.MouseButton1Click:Connect(function()
     infoItem.TextColor3=Color3.fromRGB(200,200,200)        
         
     if homeContent then homeContent:Destroy() end        
-    if settingsContent then settingsContent:Destroy() end        
+    if settingsContent then settingsContent:Destroy() end
+    if featuresContent then featuresContent:Destroy() end
     if infoContent then infoContent:Destroy() end        
         
     gridLayout.Parent=nil        

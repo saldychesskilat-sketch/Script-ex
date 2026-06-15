@@ -5482,7 +5482,7 @@ local function createGUI()
     minimizeBtn.MouseButton1Click:Connect(minimizeGUI)
     closeBtn.MouseButton1Click:Connect(minimizeGUI)
 
-    -- Sidebar
+    -- Sidebar (kiri) - kita buat manual tanpa UIListLayout
     local sidebar = Instance.new("Frame")
     sidebar.Size = UDim2.new(0, 80, 1, -24)
     sidebar.Position = UDim2.new(0, 0, 0, 24)
@@ -5494,28 +5494,81 @@ local function createGUI()
     sidebarCorner.CornerRadius = UDim.new(0, 0)
     sidebarCorner.Parent = sidebar
 
-    local sidebarList = Instance.new("Frame")
-    sidebarList.Size = UDim2.new(1, 0, 0, 150)
-    sidebarList.Position = UDim2.new(0, 0, 0.05, 0)
-    sidebarList.BackgroundTransparency = 1
-    sidebarList.Parent = sidebar
-    local sidebarLayout = Instance.new("UIListLayout")
-    sidebarLayout.Padding = UDim.new(0, 4)
-    sidebarLayout.FillDirection = Enum.FillDirection.Vertical
-    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    sidebarLayout.Parent = sidebarList
+    -- Tombol sidebar (manual)
+    local homeItem = Instance.new("TextButton")
+    homeItem.Size = UDim2.new(0, 70, 0, 30)
+    homeItem.Position = UDim2.new(0.5, -35, 0, 10)
+    homeItem.Text = "HOME"
+    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
+    homeItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    homeItem.BackgroundTransparency = 0.2
+    homeItem.BorderSizePixel = 0
+    homeItem.Font = Enum.Font.GothamBold
+    homeItem.TextSize = 11
+    homeItem.Parent = sidebar
+    local homeCorner = Instance.new("UICorner")
+    homeCorner.CornerRadius = UDim.new(0, 6)
+    homeCorner.Parent = homeItem
 
-    local homeItem = createSidebarItem(sidebarList, "HOME", "", false)
-    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)
-    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)
-    local infoItem = createSidebarItem(sidebarList, "INFO", "", false)
-    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)
+    local featuresItem = Instance.new("TextButton")
+    featuresItem.Size = UDim2.new(0, 70, 0, 30)
+    featuresItem.Position = UDim2.new(0.5, -35, 0, 50)
+    featuresItem.Text = "FEATURES"
+    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
+    featuresItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    featuresItem.BackgroundTransparency = 0.2
+    featuresItem.BorderSizePixel = 0
+    featuresItem.Font = Enum.Font.GothamBold
+    featuresItem.TextSize = 11
+    featuresItem.Parent = sidebar
+    local featuresCorner = Instance.new("UICorner")
+    featuresCorner.CornerRadius = UDim.new(0, 6)
+    featuresCorner.Parent = featuresItem
 
-    local sep = Instance.new("Frame")
-    sep.Size = UDim2.new(0.8, 0, 0, 1)
-    sep.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-    sep.BackgroundTransparency = 0.7
-    sep.Parent = sidebarList
+    local settingsItem = Instance.new("TextButton")
+    settingsItem.Size = UDim2.new(0, 70, 0, 30)
+    settingsItem.Position = UDim2.new(0.5, -35, 0, 90)
+    settingsItem.Text = "SETTINGS"
+    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
+    settingsItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    settingsItem.BackgroundTransparency = 0.2
+    settingsItem.BorderSizePixel = 0
+    settingsItem.Font = Enum.Font.GothamBold
+    settingsItem.TextSize = 11
+    settingsItem.Parent = sidebar
+    local settingsCorner = Instance.new("UICorner")
+    settingsCorner.CornerRadius = UDim.new(0, 6)
+    settingsCorner.Parent = settingsItem
+
+    local infoItem = Instance.new("TextButton")
+    infoItem.Size = UDim2.new(0, 70, 0, 30)
+    infoItem.Position = UDim2.new(0.5, -35, 0, 130)
+    infoItem.Text = "INFO"
+    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
+    infoItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    infoItem.BackgroundTransparency = 0.2
+    infoItem.BorderSizePixel = 0
+    infoItem.Font = Enum.Font.GothamBold
+    infoItem.TextSize = 11
+    infoItem.Parent = sidebar
+    local infoCorner = Instance.new("UICorner")
+    infoCorner.CornerRadius = UDim.new(0, 6)
+    infoCorner.Parent = infoItem
+
+    local aboutItem = Instance.new("TextButton")
+    aboutItem.Size = UDim2.new(0, 70, 0, 30)
+    aboutItem.Position = UDim2.new(0.5, -35, 0, 170)
+    aboutItem.Text = "ABOUT"
+    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+    aboutItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    aboutItem.BackgroundTransparency = 0.2
+    aboutItem.BorderSizePixel = 0
+    aboutItem.Font = Enum.Font.GothamBold
+    aboutItem.TextSize = 11
+    aboutItem.Parent = sidebar
+    local aboutCorner = Instance.new("UICorner")
+    aboutCorner.CornerRadius = UDim.new(0, 6)
+    aboutCorner.Parent = aboutItem
 
     -- Content Panel (area utama)
     contentPanel = Instance.new("Frame")
@@ -5524,7 +5577,7 @@ local function createGUI()
     contentPanel.BackgroundTransparency = 1
     contentPanel.Parent = mainFrame
 
-    -- Container untuk setiap tab (konten permanen)
+    -- Container untuk setiap tab
     local homeContainer = Instance.new("Frame")
     homeContainer.Size = UDim2.new(1, 0, 1, 0)
     homeContainer.BackgroundTransparency = 1
@@ -5555,7 +5608,7 @@ local function createGUI()
     aboutContainer.Visible = false
     aboutContainer.Parent = contentPanel
 
-    -- Fungsi untuk mengisi container tanpa mengubah fungsi asli (dengan redirect contentPanel sementara)
+    -- Fungsi untuk mengisi container dengan redirect contentPanel sementara
     local function fillContainer(container, fillFunction)
         local oldContentPanel = contentPanel
         contentPanel = container
@@ -5563,7 +5616,7 @@ local function createGUI()
         contentPanel = oldContentPanel
     end
 
-    -- Isi featuresContainer dengan tombol-tombol fitur (menggunakan UIGridLayout)
+    -- Isi featuresContainer dengan tombol-tombol fitur
     local function fillFeatures()
         local featureGrid = Instance.new("UIGridLayout")
         featureGrid.CellSize = UDim2.new(0, 85, 0, 32)
@@ -5597,27 +5650,14 @@ local function createGUI()
         end
     end
 
-    -- Isi container HOME, SETTINGS, INFO, ABOUT dengan fungsi yang sudah ada
-    fillContainer(homeContainer, function()
-        -- Pastikan tidak ada sisa gridLayout dari features
-        if gridLayout then
-            gridLayout.Parent = nil
-        end
-        createHomeContent()
-    end)
-    fillContainer(settingsContainer, function()
-        createSettingsContent()
-    end)
-    fillContainer(infoContainer, function()
-        createInfoContent()
-    end)
-    fillContainer(aboutContainer, function()
-        createAboutContent()
-    end)
-    -- Isi features
+    -- Isi container lainnya
+    fillContainer(homeContainer, createHomeContent)
+    fillContainer(settingsContainer, createSettingsContent)
+    fillContainer(infoContainer, createInfoContent)
+    fillContainer(aboutContainer, createAboutContent)
     fillFeatures()
 
-    -- Fungsi switch tab (hanya mengatur visibilitas container)
+    -- Fungsi switch tab
     local function switchTab(tab)
         homeContainer.Visible = false
         featuresContainer.Visible = false
@@ -5625,27 +5665,33 @@ local function createGUI()
         infoContainer.Visible = false
         aboutContainer.Visible = false
 
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+        -- Reset warna semua tombol sidebar
+        local buttons = {homeItem, featuresItem, settingsItem, infoItem, aboutItem}
+        for _, btn in ipairs(buttons) do
+            btn.TextColor3 = Color3.fromRGB(200,200,200)
+            btn.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+        end
 
         if tab == "HOME" then
             homeContainer.Visible = true
             homeItem.TextColor3 = Color3.fromRGB(0,230,255)
+            homeItem.BackgroundColor3 = Color3.fromRGB(18, 35, 55)
         elseif tab == "FEATURES" then
             featuresContainer.Visible = true
             featuresItem.TextColor3 = Color3.fromRGB(0,230,255)
+            featuresItem.BackgroundColor3 = Color3.fromRGB(18, 35, 55)
         elseif tab == "SETTINGS" then
             settingsContainer.Visible = true
             settingsItem.TextColor3 = Color3.fromRGB(0,230,255)
+            settingsItem.BackgroundColor3 = Color3.fromRGB(18, 35, 55)
         elseif tab == "INFO" then
             infoContainer.Visible = true
             infoItem.TextColor3 = Color3.fromRGB(0,230,255)
+            infoItem.BackgroundColor3 = Color3.fromRGB(18, 35, 55)
         elseif tab == "ABOUT" then
             aboutContainer.Visible = true
             aboutItem.TextColor3 = Color3.fromRGB(0,230,255)
+            aboutItem.BackgroundColor3 = Color3.fromRGB(18, 35, 55)
         end
     end
 
@@ -5656,7 +5702,7 @@ local function createGUI()
     infoItem.MouseButton1Click:Connect(function() switchTab("INFO") end)
     aboutItem.MouseButton1Click:Connect(function() switchTab("ABOUT") end)
 
-    -- Tab default: FEATURES
+    -- Default tab: FEATURES
     switchTab("FEATURES")
 
     makeDraggable(mainFrame)

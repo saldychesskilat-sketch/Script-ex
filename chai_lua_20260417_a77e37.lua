@@ -5293,6 +5293,8 @@ local function createGridButton(parent, name, text, initialState, onChange)
 
     return button
 end
+
+
 local function createSidebarItem(parent, text, icon, active)
 
     local button = Instance.new("TextButton")
@@ -5515,6 +5517,13 @@ end
     contentPanel.Position = UDim2.new(0, 85, 0, 28)  
     contentPanel.BackgroundTransparency = 1  
     contentPanel.Parent = mainFrame  
+  
+    -- Container khusus untuk features (agar bisa disembunyikan)  
+    local featuresContainer = Instance.new("Frame")  
+    featuresContainer.Size = UDim2.new(1, 0, 1, 0)  
+    featuresContainer.BackgroundTransparency = 1  
+    featuresContainer.Parent = contentPanel  
+  
     local gridLayout = Instance.new("UIGridLayout")  
     gridLayout.CellSize = UDim2.new(0, 80, 0, 32)  
     gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)  
@@ -5522,7 +5531,7 @@ end
     gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
     gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top  
     gridLayout.SortOrder = Enum.SortOrder.LayoutOrder  
-    gridLayout.Parent = contentPanel  
+    gridLayout.Parent = featuresContainer
   
     local features = {  
         {name="autoWinEnabled", text="AUTO WIN"},  

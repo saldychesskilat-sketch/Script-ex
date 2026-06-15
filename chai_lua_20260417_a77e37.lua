@@ -5141,8 +5141,7 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
-local featuresContent = nil
-
+local featuresContent
 local function createFeatureContent()
 
     if featuresContent then

@@ -1776,13 +1776,13 @@ local function autoParryLoop()
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    -- Variabel yang bisa diubah slider (default)
+    -- Variabel yang bisa diatur slider (default)
     local DETECTION_RADIUS = 9           
-    local PARRY_COOLDOWN = 0.1  
+    local PARRY_COOLDOWN = 0.1            
     
-    -- Variabel untuk GUI slider dan koneksinya
-    local parrySettingsGui = nil
-    local sliderConnections = {}   -- untuk cleanup nanti
+    -- Variabel untuk GUI dan koneksi slider
+    local parryConfigGui = nil
+    local sliderConnections = {}
             
     local lastParry = 0            
     local pulseTick = 0            
@@ -1797,16 +1797,26 @@ local function autoParryLoop()
         "Weapon.TheCureStaff.BasicAttack",        
         "Character.Weapon.bat.bat.BasicAttack",        
         "Character.Weapon.Right",        
+        "Character.Weapon.bat.bat.BasicAttack",        
         "HumanoidRootPart.FrenzySound",        
         "HumanoidRootPart.SwingSound",        
         "HumanoidRootPart.attackline",        
         "HumanoidRootPart.stunline",        
         "HumanoidRootPart.WallHitSound",        
-        "Arm.knife", "Killerost", "Lookscriptkiller",        
-        "Animations.StunAnimation", "Animations.WipeMachete",        
-        "sfx.attackline", "Arm.Handle.Handle.BasicAttack",        
+        "Character.Weapon.Right",        
+        "Arm.knife",        
+        "Killerost",        
+        "Weapon.bat.bat.BasicAttack",        
+        "Lookscriptkiller",        
+        "Animations.StunAnimation",        
+        "Animations.WipeMachete",        
+        "sfx.attackline",        
+        "Arm.Handle.Handle.BasicAttack",        
         "Character.Weapon.Chainsaw.Chainsaw.charge",        
-        "Arm.Knide.Main.BasicAttack", "Arm.Machete.Main.BasicAttack",        
+        "Weapon.Right",        
+        "Character.Weapon.Right",        
+        "Arm.Knide.Main.BasicAttack",        
+        "Arm.Machete.Main.BasicAttack",        
         "Character.Animations.WipeMachete"        
     }        
     -- ==========================================        
@@ -1823,42 +1833,22 @@ local function autoParryLoop()
     local stateConnections = {}            
     local lastParryPerPlayer = {}            
         
-    -- ========== FUNGSI MEMBUAT ULANG ESP (saat radius berubah) ==========
-    local function recreateESP()
-        if radiusFolder then radiusFolder:Destroy() end
-        radiusFolder = Instance.new("Folder")
-        radiusFolder.Name = "ParryESP"
-        radiusFolder.Parent = workspace
-        
-        local mainCircle = Instance.new("Part")
-        mainCircle.Name = "MainRadius"
-        mainCircle.Shape = Enum.PartType.Cylinder
-        mainCircle.Material = Enum.Material.Neon
-        mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-        mainCircle.Transparency = 0.92
-        mainCircle.Color = Color3.fromRGB(255,140,0)
-        mainCircle.Anchored = true
-        mainCircle.CanCollide = false
-        mainCircle.Parent = radiusFolder
-        
-        local outerRing = Instance.new("Part")
-        outerRing.Name = "OuterRing"
-        outerRing.Shape = Enum.PartType.Cylinder
-        outerRing.Material = Enum.Material.Neon
-        outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)
-        outerRing.Transparency = 0.45
-        outerRing.Anchored = true
-        outerRing.CanCollide = false
-        outerRing.Parent = radiusFolder
-        
-        -- Simpan referensi untuk update di loop utama
-        radiusFolder.MainCircle = mainCircle
-        radiusFolder.OuterRing = outerRing
+    -- ========== FUNGSI MEMBUAT ULANG ESP SAAT RADIUS BERUBAH ==========
+    local function refreshESP()
+        if not radiusFolder then return end
+        local mainCircle = radiusFolder:FindFirstChild("MainRadius")
+        local outerRing = radiusFolder:FindFirstChild("OuterRing")
+        if mainCircle then
+            mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+        end
+        if outerRing then
+            outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)
+        end
     end
-    
+        
     -- ========== MEMBUAT GUI SLIDER ==========
-    local function createSettingsGUI()
-        if parrySettingsGui then parrySettingsGui:Destroy() end
+    local function createConfigGUI()
+        if parryConfigGui then parryConfigGui:Destroy() end
         
         local gui = Instance.new("ScreenGui")
         gui.Name = "AutoParryConfig"
@@ -1940,7 +1930,7 @@ local function autoParryLoop()
         cdThumb.Parent = cdBg
         Instance.new("UICorner", cdThumb).CornerRadius = UDim.new(1,0)
         
-        -- Fungsi update thumb
+        -- Update thumb position
         local function updateRadUI()
             local rel = (DETECTION_RADIUS - 1) / 19
             local w = radBg.AbsoluteSize.X
@@ -1963,7 +1953,7 @@ local function autoParryLoop()
             cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
         end
         
-        -- Drag radius
+        -- Drag Radius
         local draggingRad = false
         local function onRadDrag(mouseX)
             local bgX = radBg.AbsolutePosition.X
@@ -1975,7 +1965,7 @@ local function autoParryLoop()
             if newVal ~= DETECTION_RADIUS then
                 DETECTION_RADIUS = newVal
                 updateRadUI()
-                recreateESP()   -- update visual lingkaran
+                refreshESP()
             end
         end
         radThumb.InputBegan:Connect(function(input)
@@ -1990,20 +1980,20 @@ local function autoParryLoop()
                 onRadDrag(input.Position.X)
             end
         end)
-        local radMoveConn = RunService.RenderStepped:Connect(function()
+        local radMove = RunService.RenderStepped:Connect(function()
             if draggingRad then
                 onRadDrag(UserInputService:GetMouseLocation().X)
             end
         end)
-        local radEndConn = UserInputService.InputEnded:Connect(function(input)
+        local radEnd = UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingRad = false
             end
         end)
-        table.insert(sliderConnections, radMoveConn)
-        table.insert(sliderConnections, radEndConn)
+        table.insert(sliderConnections, radMove)
+        table.insert(sliderConnections, radEnd)
         
-        -- Drag cooldown
+        -- Drag Cooldown
         local draggingCD = false
         local function onCDDrag(mouseX)
             local bgX = cdBg.AbsolutePosition.X
@@ -2029,20 +2019,20 @@ local function autoParryLoop()
                 onCDDrag(input.Position.X)
             end
         end)
-        local cdMoveConn = RunService.RenderStepped:Connect(function()
+        local cdMove = RunService.RenderStepped:Connect(function()
             if draggingCD then
                 onCDDrag(UserInputService:GetMouseLocation().X)
             end
         end)
-        local cdEndConn = UserInputService.InputEnded:Connect(function(input)
+        local cdEnd = UserInputService.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingCD = false
             end
         end)
-        table.insert(sliderConnections, cdMoveConn)
-        table.insert(sliderConnections, cdEndConn)
+        table.insert(sliderConnections, cdMove)
+        table.insert(sliderConnections, cdEnd)
         
-        -- Tombol close (opsional)
+        -- Tombol close
         local closeBtn = Instance.new("TextButton")
         closeBtn.Size = UDim2.new(0, 18, 0, 18)
         closeBtn.Position = UDim2.new(1, -24, 0, 5)
@@ -2056,7 +2046,7 @@ local function autoParryLoop()
         Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0,4)
         closeBtn.MouseButton1Click:Connect(function()
             gui:Destroy()
-            parrySettingsGui = nil
+            parryConfigGui = nil
         end)
         
         task.wait(0.05)
@@ -2064,12 +2054,38 @@ local function autoParryLoop()
         updateCDUI()
         return gui
     end
+        
+    -- ========== INISIALISASI GUI DAN ESP ==========
+    parryConfigGui = createConfigGUI()
     
-    -- Buat GUI dan ESP awal
-    parrySettingsGui = createSettingsGUI()
-    recreateESP()
-    
-    -- ========== FUNGSI DETEKSI (tidak berubah, hanya menggunakan variabel DETECTION_RADIUS dan PARRY_COOLDOWN) ==========
+    -- Hapus ESP lama jika ada, buat baru
+    if radiusFolder then radiusFolder:Destroy() end            
+    radiusFolder = Instance.new("Folder")            
+    radiusFolder.Name = "ParryESP"            
+    radiusFolder.Parent = workspace            
+        
+    local mainCircle = Instance.new("Part")            
+    mainCircle.Name = "MainRadius"            
+    mainCircle.Shape = Enum.PartType.Cylinder            
+    mainCircle.Material = Enum.Material.Neon            
+    mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
+    mainCircle.Transparency = 0.92            
+    mainCircle.Color = Color3.fromRGB(255,140,0)            
+    mainCircle.Anchored = true            
+    mainCircle.CanCollide = false            
+    mainCircle.Parent = radiusFolder            
+        
+    local outerRing = Instance.new("Part")            
+    outerRing.Name = "OuterRing"            
+    outerRing.Shape = Enum.PartType.Cylinder            
+    outerRing.Material = Enum.Material.Neon            
+    outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)            
+    outerRing.Transparency = 0.45            
+    outerRing.Anchored = true            
+    outerRing.CanCollide = false            
+    outerRing.Parent = radiusFolder            
+        
+    -- ========== FUNGSI DETEKSI (SAMA PERSIS SEPERTI ASLI) ==========
     local function matchesCombatPath(obj, killerChar)
         local parts = {}
         local current = obj
@@ -2098,13 +2114,19 @@ local function autoParryLoop()
         if not player or player == localPlayer then return false end
         if player.Team then
             local t = player.Team.Name:lower()
-            if t:find("killer") or t:find("monster") or t:find("enemy") then return true end
+            if t:find("killer") or t:find("monster") or t:find("enemy") then
+                return true
+            end
         end
         local char = player.Character
         if char then
-            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then return true end
+            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then
+                return true
+            end
             for _, obj in ipairs(char:GetDescendants()) do
-                if matchesCombatPath(obj, char) then return true end
+                if matchesCombatPath(obj, char) then
+                    return true
+                end
             end
         end
         return false
@@ -2195,6 +2217,7 @@ local function autoParryLoop()
         table.insert(stateConnections, attrConn)
     end
         
+    -- Hook existing players
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and isKiller(player) then
             if player.Character then hookCharacter(player, player.Character) end
@@ -2215,7 +2238,7 @@ local function autoParryLoop()
     end)
     table.insert(stateConnections, playerConn)
         
-    -- ========== MAIN LOOP ==========
+    -- ========== FUNGSI PULSE (sama) ==========
     local function createPulse()
         if not localRootPart then return end
         local pulse = Instance.new("Part")
@@ -2254,7 +2277,7 @@ local function autoParryLoop()
             end
             stateConnections = {}
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
-            if parrySettingsGui then parrySettingsGui:Destroy(); parrySettingsGui = nil end
+            if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             return
         end
         if not localRootPart then return end
@@ -2263,13 +2286,11 @@ local function autoParryLoop()
         rainbowTick = rainbowTick + dt * 0.5
         
         local footPos = localRootPart.Position - Vector3.new(0,3,0)
-        if radiusFolder and radiusFolder.MainCircle then
-            radiusFolder.MainCircle.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
-            radiusFolder.OuterRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
-            radiusFolder.MainCircle.Transparency = 0.91 + math.sin(pulseTick) * 0.01
-            radiusFolder.OuterRing.Transparency = 0.42 + math.sin(pulseTick) * 0.03
-            radiusFolder.OuterRing.Color = Color3.fromHSV(rainbowTick % 1, 1, 1)
-        end
+        mainCircle.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+        outerRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+        mainCircle.Transparency = 0.91 + math.sin(pulseTick) * 0.01
+        outerRing.Transparency = 0.42 + math.sin(pulseTick) * 0.03
+        outerRing.Color = Color3.fromHSV(rainbowTick % 1, 1, 1)
         
         if tick() - lastPulse >= 2 then
             lastPulse = tick()
@@ -2279,6 +2300,7 @@ local function autoParryLoop()
         
     print("[AutoParry] Ready with adjustable radius and cooldown GUI")
 end
+         
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

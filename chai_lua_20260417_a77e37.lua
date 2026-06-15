@@ -5687,7 +5687,7 @@ end)
     mainFrame.BackgroundTransparency = 0.3  
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()  
     -- Sinkronkan tampilan: panggil event HOME secara manual setelah GUI jadi  
-    homeItem.MouseButton1Click:Fire()  
+    featuresItem.MouseButton1Click:Fire()
 end
             
  

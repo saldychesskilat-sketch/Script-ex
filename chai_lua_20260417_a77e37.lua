@@ -5554,6 +5554,13 @@ end
         local initialState = (feat.name ~= "restartScript") and config[feat.name] or false  
         createGridButton(contentPanel, feat.name, feat.text, initialState)  
     end 
+local function setFeatureButtonsVisible(state)
+    for _, v in ipairs(contentPanel:GetChildren()) do
+        if v:IsA("TextButton") then
+            v.Visible = state
+        end
+    end
+end
 
 -- Navigation handlers  
     homeItem.MouseButton1Click:Connect(function()
@@ -5568,11 +5575,7 @@ end
     if aboutContent then aboutContent:Destroy() end
 
     gridLayout.Parent = nil
-        for _, v in ipairs(contentPanel:GetChildren()) do
-    if v:IsA("TextButton") then
-        v.Visible = false
-    end
-        end
+    setFeatureButtonsVisible(false)
     createHomeContent()
 end)
 
@@ -5588,6 +5591,7 @@ featuresItem.MouseButton1Click:Connect(function()
     if infoContent then infoContent:Destroy() end
     if aboutContent then aboutContent:Destroy() end
 
+    setFeatureButtonsVisible(true)
     gridLayout.Parent=contentPanel
 end)
 
@@ -5603,11 +5607,7 @@ settingsItem.MouseButton1Click:Connect(function()
     if aboutContent then aboutContent:Destroy() end
 
     gridLayout.Parent = nil
-        for _, v in ipairs(contentPanel:GetChildren()) do
-    if v:IsA("TextButton") then
-        v.Visible = false
-    end
-        end
+    setFeatureButtonsVisible(false)
     createSettingsContent()
 end)
 
@@ -5623,11 +5623,7 @@ infoItem.MouseButton1Click:Connect(function()
     if aboutContent then aboutContent:Destroy() end
 
     gridLayout.Parent = nil
-        for _, v in ipairs(contentPanel:GetChildren()) do
-    if v:IsA("TextButton") then
-        v.Visible = false
-    end
-        end
+    setFeatureButtonsVisible(false)
     createInfoContent()
 end)
 
@@ -5643,11 +5639,7 @@ aboutItem.MouseButton1Click:Connect(function()
     if infoContent then infoContent:Destroy() end
 
     gridLayout.Parent = nil
-        for _, v in ipairs(contentPanel:GetChildren()) do
-    if v:IsA("TextButton") then
-        v.Visible = false
-    end
-        end
+    setFeatureButtonsVisible(false)
     createAboutContent()
 end)
   

@@ -5141,9 +5141,8 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
-local featuresContent
+local featuresContent = nil
 local function createFeatureContent()
-
     if featuresContent then
         featuresContent:Destroy()
     end
@@ -5532,7 +5531,11 @@ end
         {name="autoSkillCheckEnabled", text="SKILL CHECK"},  
         {name="autoAimEnabled", text="AUTO AIM"},  
         {name="povMode", text="POV"}  
-    }  
+    }
+    for _, feat in ipairs(features) do  
+        local initialState = (feat.name ~= "restartScript") and config[feat.name] or false  
+        createGridButton(contentPanel, feat.name, feat.text, initialState)  
+    end  
         
 -- Navigation handlers          
     homeItem.MouseButton1Click:Connect(function()        
@@ -5670,8 +5673,6 @@ end)
   
     mainFrame.BackgroundTransparency = 0.3  
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()  
-    -- Sinkronkan tampilan: panggil event HOME secara manual setelah GUI jadi  
-    featuresItem.MouseButton1Click:Fire()
 end
             
  

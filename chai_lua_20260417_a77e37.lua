@@ -1798,7 +1798,7 @@ local function autoParryLoop()
         
     -- Variabel yang bisa diatur slider (default)
     local DETECTION_RADIUS = 9           
-    local PARRY_COOLDOWN = 0.1            
+    local PARRY_COOLDOWN = 0.01            
     
     -- Variabel untuk GUI dan koneksi slider
     local parryConfigGui = nil

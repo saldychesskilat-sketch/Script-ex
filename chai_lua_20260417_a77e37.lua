@@ -1846,7 +1846,7 @@ local function autoParryLoop()
         end
     end
         
-    -- ========== MEMBUAT GUI SLIDER ==========
+    -- ========== MEMBUAT GUI SLIDER (dengan drag & toggle) ==========
     local function createConfigGUI()
         if parryConfigGui then parryConfigGui:Destroy() end
         
@@ -1857,7 +1857,7 @@ local function autoParryLoop()
         
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(0, 260, 0, 110)
-        frame.Position = UDim2.new(0.5, -130, 0.85, 0)
+        frame.Position = UDim2.new(0.5, -130, 0.5, -55)  -- tengah layar
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BorderSizePixel = 0
         frame.Parent = gui
@@ -1867,32 +1867,84 @@ local function autoParryLoop()
         stroke.Transparency = 0.4
         stroke.Parent = frame
         
+        -- Header untuk drag
+        local header = Instance.new("Frame")
+        header.Size = UDim2.new(1, 0, 0, 28)
+        header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
+        header.BorderSizePixel = 0
+        header.Parent = frame
+        Instance.new("UICorner", header).CornerRadius = UDim.new(0, 8)
+        local headerStroke = Instance.new("UIStroke")
+        headerStroke.Color = Color3.fromRGB(0,180,255)
+        headerStroke.Transparency = 0.5
+        headerStroke.Parent = header
+        
         local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1,0,0,28)
+        title.Size = UDim2.new(0.7, 0, 1, 0)
+        title.Position = UDim2.new(0, 10, 0, 0)
+        title.BackgroundTransparency = 1
         title.Text = "Auto Parry Settings"
         title.TextColor3 = Color3.fromRGB(0,220,255)
         title.Font = Enum.Font.GothamBold
         title.TextSize = 12
-        title.BackgroundTransparency = 1
-        title.Parent = frame
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Parent = header
+        
+        -- Tombol toggle hide/show (mata)
+        local toggleBtn = Instance.new("TextButton")
+        toggleBtn.Size = UDim2.new(0, 22, 0, 22)
+        toggleBtn.Position = UDim2.new(1, -56, 0.5, -11)
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        toggleBtn.Text = "👁"
+        toggleBtn.TextColor3 = Color3.fromRGB(200,200,200)
+        toggleBtn.Font = Enum.Font.GothamBold
+        toggleBtn.TextSize = 12
+        toggleBtn.BorderSizePixel = 0
+        toggleBtn.AutoButtonColor = false
+        toggleBtn.Parent = header
+        Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 4)
+        
+        -- Tombol close (X)
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 22, 0, 22)
+        closeBtn.Position = UDim2.new(1, -28, 0.5, -11)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
+        closeBtn.Text = "X"
+        closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.TextSize = 12
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Parent = header
+        Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+        closeBtn.MouseButton1Click:Connect(function()
+            gui:Destroy()
+            parryConfigGui = nil
+        end)
+        
+        -- Konten frame (slider dan label) akan disembunyikan/ditampilkan oleh toggle
+        local contentFrame = Instance.new("Frame")
+        contentFrame.Size = UDim2.new(1, 0, 1, -28)
+        contentFrame.Position = UDim2.new(0, 0, 0, 28)
+        contentFrame.BackgroundTransparency = 1
+        contentFrame.Parent = frame
         
         -- Slider Radius
         local radLabel = Instance.new("TextLabel")
         radLabel.Size = UDim2.new(0.5, -10, 0, 20)
-        radLabel.Position = UDim2.new(0,10,0,32)
+        radLabel.Position = UDim2.new(0,10,0,8)
         radLabel.BackgroundTransparency = 1
         radLabel.Text = "Radius: " .. DETECTION_RADIUS
         radLabel.TextColor3 = Color3.fromRGB(210,210,210)
         radLabel.Font = Enum.Font.Gotham
         radLabel.TextSize = 11
-        radLabel.Parent = frame
+        radLabel.Parent = contentFrame
         
         local radBg = Instance.new("Frame")
         radBg.Size = UDim2.new(0.45,0,0,4)
-        radBg.Position = UDim2.new(0.52,0,0.42,0)
+        radBg.Position = UDim2.new(0.52,0,0.18,0)
         radBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
         radBg.BorderSizePixel = 0
-        radBg.Parent = frame
+        radBg.Parent = contentFrame
         Instance.new("UICorner", radBg).CornerRadius = UDim.new(1,0)
         
         local radThumb = Instance.new("TextButton")
@@ -1906,20 +1958,20 @@ local function autoParryLoop()
         -- Slider Cooldown
         local cdLabel = Instance.new("TextLabel")
         cdLabel.Size = UDim2.new(0.5, -10, 0, 20)
-        cdLabel.Position = UDim2.new(0,10,0,62)
+        cdLabel.Position = UDim2.new(0,10,0,38)
         cdLabel.BackgroundTransparency = 1
         cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
         cdLabel.TextColor3 = Color3.fromRGB(210,210,210)
         cdLabel.Font = Enum.Font.Gotham
         cdLabel.TextSize = 11
-        cdLabel.Parent = frame
+        cdLabel.Parent = contentFrame
         
         local cdBg = Instance.new("Frame")
         cdBg.Size = UDim2.new(0.45,0,0,4)
-        cdBg.Position = UDim2.new(0.52,0,0.72,0)
+        cdBg.Position = UDim2.new(0.52,0,0.48,0)
         cdBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
         cdBg.BorderSizePixel = 0
-        cdBg.Parent = frame
+        cdBg.Parent = contentFrame
         Instance.new("UICorner", cdBg).CornerRadius = UDim.new(1,0)
         
         local cdThumb = Instance.new("TextButton")
@@ -1930,7 +1982,7 @@ local function autoParryLoop()
         cdThumb.Parent = cdBg
         Instance.new("UICorner", cdThumb).CornerRadius = UDim.new(1,0)
         
-        -- Update thumb position
+        -- Update thumb position functions
         local function updateRadUI()
             local rel = (DETECTION_RADIUS - 1) / 19
             local w = radBg.AbsoluteSize.X
@@ -2032,21 +2084,34 @@ local function autoParryLoop()
         table.insert(sliderConnections, cdMove)
         table.insert(sliderConnections, cdEnd)
         
-        -- Tombol close
-        local closeBtn = Instance.new("TextButton")
-        closeBtn.Size = UDim2.new(0, 18, 0, 18)
-        closeBtn.Position = UDim2.new(1, -24, 0, 5)
-        closeBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
-        closeBtn.Text = "X"
-        closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
-        closeBtn.Font = Enum.Font.GothamBold
-        closeBtn.TextSize = 11
-        closeBtn.BorderSizePixel = 0
-        closeBtn.Parent = frame
-        Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0,4)
-        closeBtn.MouseButton1Click:Connect(function()
-            gui:Destroy()
-            parryConfigGui = nil
+        -- Drag untuk memindahkan frame
+        local draggingFrame = false
+        local dragStartPos, frameStartPos
+        header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingFrame = true
+                dragStartPos = input.Position
+                frameStartPos = frame.Position
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if draggingFrame and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStartPos
+                frame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
+            end
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingFrame = false
+            end
+        end)
+        
+        -- Toggle hide/show content
+        local contentVisible = true
+        toggleBtn.MouseButton1Click:Connect(function()
+            contentVisible = not contentVisible
+            contentFrame.Visible = contentVisible
+            toggleBtn.Text = contentVisible and "👁" or "👁‍🗨"
         end)
         
         task.wait(0.05)
@@ -2058,7 +2123,6 @@ local function autoParryLoop()
     -- ========== INISIALISASI GUI DAN ESP ==========
     parryConfigGui = createConfigGUI()
     
-    -- Hapus ESP lama jika ada, buat baru
     if radiusFolder then radiusFolder:Destroy() end            
     radiusFolder = Instance.new("Folder")            
     radiusFolder.Name = "ParryESP"            
@@ -2228,7 +2292,7 @@ local function autoParryLoop()
             table.insert(stateConnections, charConn)
         end
     end
-        
+
     local playerConn = Players.PlayerAdded:Connect(function(player)
         local charConn = player.CharacterAdded:Connect(function(char)
             task.wait(0.5)
@@ -2279,8 +2343,8 @@ local function autoParryLoop()
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             return
-        end
-        if not localRootPart then return end
+            end
+            if not localRootPart then return end
         
         pulseTick = pulseTick + dt * 2
         rainbowTick = rainbowTick + dt * 0.5
@@ -2300,7 +2364,6 @@ local function autoParryLoop()
         
     print("[AutoParry] Ready with adjustable radius and cooldown GUI")
 end
-         
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

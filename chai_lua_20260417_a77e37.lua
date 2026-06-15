@@ -1837,7 +1837,13 @@ local function autoParryLoop()
         "Character.Weapon.Right",        
         "Arm.Knide.Main.BasicAttack",        
         "Arm.Machete.Main.BasicAttack",        
-        "Character.Animations.WipeMachete"        
+        "Character.Animations.WipeMachete",
+        "Arm.Machete.pCube4_knife_0",
+        "Character.Animations.WipeMachete",
+        "Character.Animations.WipeMachetefr",
+        "Character.Animations.Frenzyend",
+        "Character.Killerost",
+        "Character.Weapon.Right Arm.Machete",
     }        
     -- ==========================================        
         

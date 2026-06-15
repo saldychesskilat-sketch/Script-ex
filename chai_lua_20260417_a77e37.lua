@@ -5512,26 +5512,26 @@ end
     sep.BackgroundTransparency = 0.7  
     sep.Parent = sidebarList  
   
-    contentPanel = Instance.new("Frame")  
-    contentPanel.Size = UDim2.new(1, -90, 1, -30)  
-    contentPanel.Position = UDim2.new(0, 85, 0, 28)  
-    contentPanel.BackgroundTransparency = 1  
-    contentPanel.Parent = mainFrame  
-  
-    -- Container khusus untuk features (agar bisa disembunyikan)  
-    local featuresContainer = Instance.new("Frame")  
-    featuresContainer.Size = UDim2.new(1, 0, 1, 0)  
-    featuresContainer.BackgroundTransparency = 1  
-    featuresContainer.Parent = contentPanel  
-  
-    local gridLayout = Instance.new("UIGridLayout")  
-    gridLayout.CellSize = UDim2.new(0, 80, 0, 32)  
-    gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)  
-    gridLayout.FillDirection = Enum.FillDirection.Horizontal  
-    gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
-    gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top  
-    gridLayout.SortOrder = Enum.SortOrder.LayoutOrder  
-    gridLayout.Parent = featuresContainer
+    sidebar = Instance.new("Frame")  
+    sidebar.Size = UDim2.new(0, 80, 1, -24)  
+    sidebar.Position = UDim2.new(0, 0, 0, 24)  
+    sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)  
+    sidebar.BackgroundTransparency = 0.2  
+    sidebar.BorderSizePixel = 0  
+    sidebar.Parent = mainFrame  
+    local sidebarCorner = Instance.new("UICorner")  
+    sidebarCorner.CornerRadius = UDim.new(0, 0)  
+    sidebarCorner.Parent = sidebar  
+    local sidebarList = Instance.new("Frame")  
+    sidebarList.Size = UDim2.new(1, 0, 0, 150)  
+    sidebarList.Position = UDim2.new(0, 0, 0.05, 0)  
+    sidebarList.BackgroundTransparency = 1  
+    sidebarList.Parent = sidebar  
+    local sidebarLayout = Instance.new("UIListLayout")  
+    sidebarLayout.Padding = UDim.new(0, 4)  
+    sidebarLayout.FillDirection = Enum.FillDirection.Vertical  
+    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
+    sidebarLayout.Parent = sidebarList
   
     local features = {  
         {name="autoWinEnabled", text="AUTO WIN"},  

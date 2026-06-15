@@ -5714,20 +5714,6 @@ end)
   
     mainFrame.BackgroundTransparency = 0.3  
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()  
-    local function OpenFeatures()
-    featuresItem.TextColor3 = Color3.fromRGB(0,230,255)
-    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-    if homeContent then homeContent:Destroy() end
-    if settingsContent then settingsContent:Destroy() end
-    if infoContent then infoContent:Destroy() end
-    if aboutContent then aboutContent:Destroy() end
-
-    gridLayout.Parent = contentPanel
-end
     -- Sinkronkan tampilan: panggil event HOME secara manual setelah GUI jadi  
     featuresItem.MouseButton1Click:Fire()
 end

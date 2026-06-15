@@ -1608,13 +1608,13 @@ end
 -- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry        
 -- ============================================================================        
         
--- Cache remote event parry        
 local cachedParryRemote = nil        
-        
--- Cari remote event "parry" di path yang benar        
+local cachedParryResultRemote = nil  -- tambahan untuk menyimpan remote result
+
+-- Cari remote event "parry" dan "parryResult" di path yang benar        
 local function findParryRemoteEvent()        
     if cachedParryRemote and cachedParryRemote.Parent then        
-        return cachedParryRemote        
+        return cachedParryRemote, cachedParryResultRemote        
     end        
             
     -- Coba akses langsung melalui path yang diketahui        
@@ -1624,11 +1624,15 @@ local function findParryRemoteEvent()
         if parryRemote then        
             parryRemote = parryRemote:FindFirstChild("Parrying Dagger")        
             if parryRemote then        
-                parryRemote = parryRemote:FindFirstChild("parry")        
-                if parryRemote and parryRemote:IsA("RemoteEvent") then        
-                    cachedParryRemote = parryRemote        
-                    print("[AutoParry] Found parry remote event at correct path")        
-                    return parryRemote        
+                local parry = parryRemote:FindFirstChild("parry")        
+                local parryResult = parryRemote:FindFirstChild("parryResult")        
+                if parry and parry:IsA("RemoteEvent") then        
+                    cachedParryRemote = parry        
+                    if parryResult and parryResult:IsA("RemoteEvent") then        
+                        cachedParryResultRemote = parryResult        
+                    end        
+                    print("[AutoParry] Found parry and parryResult remote events at correct path")        
+                    return cachedParryRemote, cachedParryResultRemote        
                 end        
             end        
         end        
@@ -1638,12 +1642,20 @@ local function findParryRemoteEvent()
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do        
         if obj:IsA("RemoteEvent") and obj.Name == "parry" then        
             cachedParryRemote = obj        
-            print("[AutoParry] Found parry remote event via scan:", obj.Name)        
-            return obj        
+            -- cari parryResult di parent yang sama        
+            local parent = obj.Parent        
+            if parent then        
+                local parryResult = parent:FindFirstChild("parryResult")        
+                if parryResult and parryResult:IsA("RemoteEvent") then        
+                    cachedParryResultRemote = parryResult        
+                end        
+            end        
+            print("[AutoParry] Found parry remote event via scan, parryResult found:", cachedParryResultRemote ~= nil)        
+            return cachedParryRemote, cachedParryResultRemote        
         end        
     end        
             
-    return nil        
+    return nil, nil        
 end        
         
 -- Cari item Parrying Dagger di inventory player (Backpack atau Character)        
@@ -1667,9 +1679,9 @@ local function getParryingDaggerTool()
     return nil        
 end        
         
--- Kirim remote event parry dengan argumen yang benar        
+-- Kirim remote event parry dengan argumen yang benar (serta parryResult)        
 local function fireParryRemote(targetPlayer)        
-    local remote = findParryRemoteEvent()        
+    local remote, resultRemote = findParryRemoteEvent()        
     if not remote then        
         print("[AutoParry] Parry remote not found!")        
         return false        
@@ -1703,10 +1715,13 @@ local function fireParryRemote(targetPlayer)
         pcall(function()        
             if #args == 0 then        
                 remote:FireServer()        
+                if resultRemote then resultRemote:FireServer() end        
             elseif #args == 1 then        
                 remote:FireServer(args[1])        
+                if resultRemote then resultRemote:FireServer(args[1]) end        
             elseif #args == 2 then        
                 remote:FireServer(args[1], args[2])        
+                if resultRemote then resultRemote:FireServer(args[1], args[2]) end        
             end        
         end)        
         success = true        
@@ -1717,7 +1732,7 @@ end
         
 -- Fallback: fire multiple times untuk bypass cooldown        
 local function fallbackParry()        
-    local remote = findParryRemoteEvent()        
+    local remote, resultRemote = findParryRemoteEvent()        
     if not remote then return false end        
             
     for i = 1, 3 do        
@@ -1725,11 +1740,16 @@ local function fallbackParry()
             remote:FireServer()        
             remote:FireServer("Parrying Dagger")        
             remote:FireServer("parry")        
+            if resultRemote then        
+                resultRemote:FireServer()        
+                resultRemote:FireServer("Parrying Dagger")        
+                resultRemote:FireServer("parryResult")        
+            end        
         end)        
         task.wait(0.01)        
     end        
     return true        
-end        
+end
         
 -- ============================================================================        
 -- AUTO PARRY MAIN LOOP        

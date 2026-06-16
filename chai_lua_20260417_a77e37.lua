@@ -2190,19 +2190,40 @@ local function autoParryLoop()
     end
         
     local function triggerParry(reason, player)
-        if tick() - lastParry < PARRY_COOLDOWN then return end
-        local lastP = lastParryPerPlayer[player] or 0
-        if tick() - lastP < PARRY_COOLDOWN then return end
-        local char = player.Character
-        if not char then return end
-        local root = getRoot(char)
-        if not root then return end
-        local dist = (localRootPart.Position - root.Position).Magnitude
-        if dist > DETECTION_RADIUS then return end
-        lastParry = tick()
-        lastParryPerPlayer[player] = tick()
-        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
-        pcall(function() fireParryRemote(player) end)
+    if tick() - lastParry < PARRY_COOLDOWN then return end
+    local lastP = lastParryPerPlayer[player] or 0
+    if tick() - lastP < PARRY_COOLDOWN then return end
+    local char = player.Character
+    if not char then return end
+    local root = getRoot(char)
+    if not root then return end
+    local dist = (localRootPart.Position - root.Position).Magnitude
+    if dist > DETECTION_RADIUS then return end
+
+    -- ===== STUN PLAYER LOKAL SELAMA 1 DETIK =====
+    if localHumanoid then
+        -- Simpan kecepatan asli
+        local originalSpeed = localHumanoid.WalkSpeed
+        -- Hentikan gerakan
+        localHumanoid.WalkSpeed = 0
+        -- Opsional: matikan kemampuan lompat agar benar-benar diam
+        local originalJump = localHumanoid.JumpPower
+        localHumanoid.JumpPower = 0
+
+        -- Kembalikan setelah 1 detik (tanpa menghalangi eksekusi lain)
+        task.spawn(function()
+            task.wait(1)
+            if localHumanoid then
+                localHumanoid.WalkSpeed = originalSpeed
+                localHumanoid.JumpPower = originalJump
+            end
+        end)
+    end
+
+    lastParry = tick()
+    lastParryPerPlayer[player] = tick()
+    print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
+    pcall(function() fireParryRemote(player) end)
     end
         
     local function hookAttributes(player, char)

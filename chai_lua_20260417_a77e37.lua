@@ -5881,7 +5881,6 @@ local function init()
     ensureGUIPersistent()
     startAllSystems()
     restoreFeatureStates()
-    lock()
 end
 
 task.wait(1)

@@ -180,6 +180,358 @@ local function lockCameraTo(targetPos)
 end
 
 -- ============================================================================
+-- FITUR LOCK TARGET (MANDIRI) - SEMUA DALAM SATU FUNGSI
+-- ============================================================================
+local function createLockGUI()
+    -- ===== KONFIGURASI =====
+    local REMOTE_EVENT_PATH = "ReplicatedStorage.LockRemote"   -- sesuaikan
+    local LOCK_DURATION = 1
+    local JARAK_3D_DEKAT = 20
+    local JARAK_SUMBU_MAKS = 0.15
+
+    -- ===== SERVICES =====
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local GuiService = game:GetService("GuiService")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
+    local CoreGui = game:GetService("CoreGui")
+    local Workspace = game:GetService("Workspace")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+    local localPlayer = Players.LocalPlayer
+
+    -- ===== STATE (lokal) =====
+    local targetMode = "survivor"   -- "survivor" atau "killer"
+    local lockGui = nil
+    local isLockGuiVisible = false
+
+    -- ===== HELPER: Root part lokal =====
+    local function getLocalRoot()
+        if localPlayer and localPlayer.Character then
+            return localPlayer.Character:FindFirstChild("HumanoidRootPart") or localPlayer.Character:FindFirstChild("Torso")
+        end
+        return nil
+    end
+
+    -- ===== DETEKSI KILLER =====
+    local function isPlayerKiller(player)
+        if player.Team then
+            local teamName = player.Team.Name:lower()
+            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                return true
+            end
+        end
+        local char = player.Character
+        if char then
+            local tool = char:FindFirstChildWhichIsA("Tool")
+            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- ===== CARI TARGET =====
+    local function getTargetByMode(mode)
+        local root = getLocalRoot()
+        if not root then return nil end
+        local localPos = root.Position
+        local camera = Workspace.CurrentCamera
+
+        if mode == "killer" then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= localPlayer then
+                    local char = player.Character
+                    if char then
+                        local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                        if targetRoot and isPlayerKiller(player) then
+                            return player
+                        end
+                    end
+                end
+            end
+            return nil
+        end
+
+        -- mode == "survivor"
+        local bestTarget = nil
+        local bestScore = math.huge
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                local char = player.Character
+                if char then
+                    local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    if targetRoot and not isPlayerKiller(player) then
+                        local screenPos, onScreen = camera:WorldToViewportPoint(targetRoot.Position)
+                        if onScreen then
+                            local viewportSize = camera.ViewportSize
+                            local normX = screenPos.X / viewportSize.X
+                            local normY = screenPos.Y / viewportSize.Y
+                            local distCenter = math.sqrt((normX - 0.5)^2 + (normY - 0.5)^2)
+                            local dist3D = (localPos - targetRoot.Position).Magnitude
+
+                            local accept = false
+                            if dist3D <= JARAK_3D_DEKAT then
+                                if distCenter <= JARAK_SUMBU_MAKS then
+                                    accept = true
+                                end
+                            else
+                                if distCenter <= JARAK_SUMBU_MAKS then
+                                    accept = true
+                                end
+                            end
+
+                            if accept and distCenter < bestScore then
+                                bestScore = distCenter
+                                bestTarget = player
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return bestTarget
+    end
+
+    -- ===== LOCK CAMERA =====
+    local function lockCameraToTarget(targetPlayer)
+        if not targetPlayer or not targetPlayer.Character then return end
+        local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart") or targetPlayer.Character:FindFirstChild("Torso")
+        if not targetRoot then return end
+
+        local camera = Workspace.CurrentCamera
+        local originalCFrame = camera.CFrame
+
+        local startTime = tick()
+        while tick() - startTime < LOCK_DURATION do
+            if not targetPlayer.Character or not targetRoot.Parent then break end
+            local offset = targetRoot.CFrame.LookVector * -3 + Vector3.new(0, 2, 0)
+            local targetPos = targetRoot.Position + offset
+            camera.CFrame = CFrame.lookAt(targetPos, targetRoot.Position)
+            task.wait()
+        end
+
+        camera.CFrame = originalCFrame
+    end
+
+    -- ===== FUNGSI UTAMA LOCK =====
+    local function doLock()
+        local target = getTargetByMode(targetMode)
+        if target then
+            lockCameraToTarget(target)
+            print("[Lock] Locked onto", target.Name)
+        else
+            print("[Lock] No valid target found")
+        end
+    end
+
+    -- ===== EKSPOR KE GLOBAL =====
+    _G.lock = doLock   -- panggil dengan `lock()` dari mana saja
+
+    -- ===== FUNGSI TOGGLE GUI =====
+    function _G.toggleLockGUI()
+        if not lockGui then
+            createLockGUI()  -- panggil ulang untuk membuat GUI jika belum ada
+        else
+            lockGui.Visible = not lockGui.Visible
+            isLockGuiVisible = lockGui.Visible
+        end
+    end
+
+    -- ===== BUAT / BUAT ULANG GUI =====
+    if lockGui then lockGui:Destroy() end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "LockTargetGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = CoreGui
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 200, 0, 170)
+    mainFrame.Position = UDim2.new(0.5, -100, 0.5, -85)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+    mainFrame.BackgroundTransparency = 0.1
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = mainFrame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 230, 255)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0.4
+    stroke.Parent = mainFrame
+
+    -- Title bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 24)
+    titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
+    titleBar.BackgroundTransparency = 0.2
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 8)
+    titleCorner.Parent = titleBar
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
+    titleLabel.Text = "LOCK TARGET"
+    titleLabel.TextColor3 = Color3.fromRGB(0, 230, 255)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 12
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBar
+
+    -- Close / toggle button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 22, 0, 22)
+    closeBtn.Position = UDim2.new(1, -26, 0, 1)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+    closeBtn.BackgroundTransparency = 0.2
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.Parent = titleBar
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 3)
+    closeCorner.Parent = closeBtn
+
+    -- Tombol pilih survivor
+    local survBtn = Instance.new("TextButton")
+    survBtn.Size = UDim2.new(0.4, 0, 0, 25)
+    survBtn.Position = UDim2.new(0.05, 0, 0.3, 0)
+    survBtn.Text = "SURVIVOR"
+    survBtn.BackgroundColor3 = targetMode == "survivor" and Color3.fromRGB(40,5,5) or Color3.fromRGB(15,0,2)
+    survBtn.TextColor3 = targetMode == "survivor" and Color3.fromRGB(0,230,255) or Color3.fromRGB(200,200,200)
+    survBtn.Font = Enum.Font.GothamBold
+    survBtn.TextSize = 10
+    survBtn.BorderSizePixel = 0
+    survBtn.Parent = mainFrame
+    local survCorner = Instance.new("UICorner")
+    survCorner.CornerRadius = UDim.new(0,4)
+    survCorner.Parent = survBtn
+
+    -- Tombol pilih killer
+    local killBtn = Instance.new("TextButton")
+    killBtn.Size = UDim2.new(0.4, 0, 0, 25)
+    killBtn.Position = UDim2.new(0.55, 0, 0.3, 0)
+    killBtn.Text = "KILLER"
+    killBtn.BackgroundColor3 = targetMode == "killer" and Color3.fromRGB(40,5,5) or Color3.fromRGB(15,0,2)
+    killBtn.TextColor3 = targetMode == "killer" and Color3.fromRGB(0,230,255) or Color3.fromRGB(200,200,200)
+    killBtn.Font = Enum.Font.GothamBold
+    killBtn.TextSize = 10
+    killBtn.BorderSizePixel = 0
+    killBtn.Parent = mainFrame
+    local killCorner = Instance.new("UICorner")
+    killCorner.CornerRadius = UDim.new(0,4)
+    killCorner.Parent = killBtn
+
+    local function updateButtons()
+        survBtn.BackgroundColor3 = targetMode == "survivor" and Color3.fromRGB(40,5,5) or Color3.fromRGB(15,0,2)
+        survBtn.TextColor3 = targetMode == "survivor" and Color3.fromRGB(0,230,255) or Color3.fromRGB(200,200,200)
+        killBtn.BackgroundColor3 = targetMode == "killer" and Color3.fromRGB(40,5,5) or Color3.fromRGB(15,0,2)
+        killBtn.TextColor3 = targetMode == "killer" and Color3.fromRGB(0,230,255) or Color3.fromRGB(200,200,200)
+    end
+
+    survBtn.MouseButton1Click:Connect(function()
+        targetMode = "survivor"
+        updateButtons()
+        updateStatus()
+    end)
+    killBtn.MouseButton1Click:Connect(function()
+        targetMode = "killer"
+        updateButtons()
+        updateStatus()
+    end)
+
+    -- Tombol LOCK
+    local lockBtn = Instance.new("TextButton")
+    lockBtn.Size = UDim2.new(0.8, 0, 0, 30)
+    lockBtn.Position = UDim2.new(0.1, 0, 0.6, 0)
+    lockBtn.Text = "🔒 LOCK"
+    lockBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+    lockBtn.TextColor3 = Color3.fromRGB(200,200,200)
+    lockBtn.Font = Enum.Font.GothamBold
+    lockBtn.TextSize = 12
+    lockBtn.BorderSizePixel = 0
+    lockBtn.Parent = mainFrame
+    local lockCorner = Instance.new("UICorner")
+    lockCorner.CornerRadius = UDim.new(0,4)
+    lockCorner.Parent = lockBtn
+
+    lockBtn.MouseButton1Click:Connect(function()
+        doLock()
+    end)
+
+    -- Status label
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, -10, 0, 16)
+    statusLabel.Position = UDim2.new(0.05, 0, 0.85, 0)
+    statusLabel.Text = "Mode: " .. string.upper(targetMode)
+    statusLabel.TextColor3 = Color3.fromRGB(150,150,200)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 9
+    statusLabel.Parent = mainFrame
+
+    local function updateStatus()
+        statusLabel.Text = "Mode: " .. string.upper(targetMode)
+    end
+
+    -- ===== DRAGGABLE =====
+    local dragging = false
+    local dragStart, startPos
+    mainFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+        end
+    end)
+    mainFrame.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                          startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    mainFrame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    -- ===== TOGGLE GUI =====
+    closeBtn.MouseButton1Click:Connect(function()
+        screenGui.Visible = not screenGui.Visible
+        isLockGuiVisible = screenGui.Visible
+    end)
+
+    lockGui = screenGui
+    isLockGuiVisible = true
+
+    -- ===== LISTENER REMOTE EVENT =====
+    local remoteEvent = ReplicatedStorage:FindFirstChild(REMOTE_EVENT_PATH:match("[^%.]+$")) or ReplicatedStorage:WaitForChild(REMOTE_EVENT_PATH:match("[^%.]+$"), 5)
+    if remoteEvent and remoteEvent:IsA("RemoteEvent") then
+        remoteEvent.OnClientEvent:Connect(function()
+            doLock()
+        end)
+        print("[Lock] RemoteEvent connected")
+    else
+        warn("[Lock] RemoteEvent not found at path:", REMOTE_EVENT_PATH)
+    end
+
+    print("[Lock] Feature loaded. Use _G.lock() to lock, _G.toggleLockGUI() to toggle GUI.")
+end
+
+-- ============================================================================
 -- UTILITY 
 -- ============================================================================
 -- FEATURE 1: AUTO WIN (TELEPORT TO FININSHLINE - FIXED)
@@ -5932,7 +6284,8 @@ local function init()
     createPermanentTeleportButton()
     ensureGUIPersistent()
     startAllSystems()
-    restoreFeatureStates()
+    restoreFeatureStates()-- ===== PANGGIL SEKALI UNTUK INISIALISASI =====
+    createLockGUI()
 end
 
 task.wait(1)

@@ -180,40 +180,24 @@ local function lockCameraTo(targetPos)
 end
 
 -- ============================================================================
--- FITUR LOCK TARGET (MANDIRI) - SEMUA DALAM SATU FUNGSI
+-- FITUR LOCK TARGET (TERINTEGRASI DENGAN SCRIPT UTAMA)
 -- ============================================================================
-local function createLockGUI()
+local function lock()
+    -- Cegah inisialisasi ganda
+    if _G.__lockInitialized then return end
+    _G.__lockInitialized = true
+
     -- ===== KONFIGURASI =====
     local REMOTE_EVENT_PATH = "ReplicatedStorage.LockRemote"   -- sesuaikan
     local LOCK_DURATION = 1
     local JARAK_3D_DEKAT = 20
     local JARAK_SUMBU_MAKS = 0.15
 
-    -- ===== SERVICES =====
-    local Players = game:GetService("Players")
-    local UserInputService = game:GetService("UserInputService")
-    local GuiService = game:GetService("GuiService")
-    local VirtualInputManager = game:GetService("VirtualInputManager")
-    local CoreGui = game:GetService("CoreGui")
-    local Workspace = game:GetService("Workspace")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-    local localPlayer = Players.LocalPlayer
-
-    -- ===== STATE (lokal) =====
+    -- ===== STATE =====
     local targetMode = "survivor"   -- "survivor" atau "killer"
     local lockGui = nil
-    local isLockGuiVisible = false
 
-    -- ===== HELPER: Root part lokal =====
-    local function getLocalRoot()
-        if localPlayer and localPlayer.Character then
-            return localPlayer.Character:FindFirstChild("HumanoidRootPart") or localPlayer.Character:FindFirstChild("Torso")
-        end
-        return nil
-    end
-
-    -- ===== DETEKSI KILLER =====
+    -- ===== FUNGSI DETEKSI KILLER =====
     local function isPlayerKiller(player)
         if player.Team then
             local teamName = player.Team.Name:lower()
@@ -233,10 +217,9 @@ local function createLockGUI()
 
     -- ===== CARI TARGET =====
     local function getTargetByMode(mode)
-        local root = getLocalRoot()
+        local root = localRootPart
         if not root then return nil end
         local localPos = root.Position
-        local camera = Workspace.CurrentCamera
 
         if mode == "killer" then
             for _, player in ipairs(Players:GetPlayers()) do
@@ -256,6 +239,7 @@ local function createLockGUI()
         -- mode == "survivor"
         local bestTarget = nil
         local bestScore = math.huge
+        local camera = workspace.CurrentCamera
 
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= localPlayer then
@@ -273,13 +257,9 @@ local function createLockGUI()
 
                             local accept = false
                             if dist3D <= JARAK_3D_DEKAT then
-                                if distCenter <= JARAK_SUMBU_MAKS then
-                                    accept = true
-                                end
+                                if distCenter <= JARAK_SUMBU_MAKS then accept = true end
                             else
-                                if distCenter <= JARAK_SUMBU_MAKS then
-                                    accept = true
-                                end
+                                if distCenter <= JARAK_SUMBU_MAKS then accept = true end
                             end
 
                             if accept and distCenter < bestScore then
@@ -300,7 +280,7 @@ local function createLockGUI()
         local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart") or targetPlayer.Character:FindFirstChild("Torso")
         if not targetRoot then return end
 
-        local camera = Workspace.CurrentCamera
+        local camera = workspace.CurrentCamera
         local originalCFrame = camera.CFrame
 
         local startTime = tick()
@@ -329,27 +309,15 @@ local function createLockGUI()
     -- ===== EKSPOR KE GLOBAL =====
     _G.lock = doLock   -- panggil dengan `lock()` dari mana saja
 
-    -- ===== FUNGSI TOGGLE GUI =====
-    function _G.toggleLockGUI()
-        if not lockGui then
-            createLockGUI()  -- panggil ulang untuk membuat GUI jika belum ada
-        else
-            lockGui.Visible = not lockGui.Visible
-            isLockGuiVisible = lockGui.Visible
-        end
-    end
-
-    -- ===== BUAT / BUAT ULANG GUI =====
-    if lockGui then lockGui:Destroy() end
-
+    -- ===== BUAT GUI =====
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "LockTargetGUI"
     screenGui.ResetOnSpawn = false
     screenGui.Parent = CoreGui
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 200, 0, 170)
-    mainFrame.Position = UDim2.new(0.5, -100, 0.5, -85)
+    mainFrame.Size = UDim2.new(0, 200, 0, 150)
+    mainFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
     mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
     mainFrame.BackgroundTransparency = 0.1
     mainFrame.BorderSizePixel = 0
@@ -365,7 +333,7 @@ local function createLockGUI()
     stroke.Transparency = 0.4
     stroke.Parent = mainFrame
 
-    -- Title bar
+    -- Title bar (tanpa tombol close)
     local titleBar = Instance.new("Frame")
     titleBar.Size = UDim2.new(1, 0, 0, 24)
     titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
@@ -377,7 +345,7 @@ local function createLockGUI()
     titleCorner.Parent = titleBar
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    titleLabel.Size = UDim2.new(1, 0, 1, 0)
     titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
     titleLabel.Text = "LOCK TARGET"
     titleLabel.TextColor3 = Color3.fromRGB(0, 230, 255)
@@ -386,22 +354,6 @@ local function createLockGUI()
     titleLabel.TextSize = 12
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Parent = titleBar
-
-    -- Close / toggle button
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 22, 0, 22)
-    closeBtn.Position = UDim2.new(1, -26, 0, 1)
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
-    closeBtn.BackgroundTransparency = 0.2
-    closeBtn.BorderSizePixel = 0
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 14
-    closeBtn.Parent = titleBar
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 3)
-    closeCorner.Parent = closeBtn
 
     -- Tombol pilih survivor
     local survBtn = Instance.new("TextButton")
@@ -508,17 +460,10 @@ local function createLockGUI()
         end
     end)
 
-    -- ===== TOGGLE GUI =====
-    closeBtn.MouseButton1Click:Connect(function()
-        screenGui.Visible = not screenGui.Visible
-        isLockGuiVisible = screenGui.Visible
-    end)
-
     lockGui = screenGui
-    isLockGuiVisible = true
 
     -- ===== LISTENER REMOTE EVENT =====
-    local remoteEvent = ReplicatedStorage:FindFirstChild(REMOTE_EVENT_PATH:match("[^%.]+$")) or ReplicatedStorage:WaitForChild(REMOTE_EVENT_PATH:match("[^%.]+$"), 5)
+    local remoteEvent = ReplicatedStorage:FindFirstChild(REMOTE_EVENT_PATH:match("[^%.]+$"))
     if remoteEvent and remoteEvent:IsA("RemoteEvent") then
         remoteEvent.OnClientEvent:Connect(function()
             doLock()
@@ -528,7 +473,7 @@ local function createLockGUI()
         warn("[Lock] RemoteEvent not found at path:", REMOTE_EVENT_PATH)
     end
 
-    print("[Lock] Feature loaded. Use _G.lock() to lock, _G.toggleLockGUI() to toggle GUI.")
+    print("[Lock] Feature loaded. Use _G.lock() to lock.")
 end
 
 -- ============================================================================
@@ -6284,8 +6229,8 @@ local function init()
     createPermanentTeleportButton()
     ensureGUIPersistent()
     startAllSystems()
-    restoreFeatureStates()-- ===== PANGGIL SEKALI UNTUK INISIALISASI =====
-    createLockGUI()
+    restoreFeatureStates()
+    lock()
 end
 
 task.wait(1)

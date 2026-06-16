@@ -4169,7 +4169,7 @@ local function createInfoContent()
     communityTitle.Text="📱 OFFICIAL SOCIAL"
     communityTitle.TextColor3=Color3.fromRGB(0,220,255)
     communityTitle.Font=Enum.Font.GothamBold
-    communityTitle.TextSize=2
+    communityTitle.TextSize=10
     communityTitle.TextXAlignment=Enum.TextXAlignment.Left
     communityTitle.Parent=communityCard
 
@@ -4321,7 +4321,7 @@ local function createInfoContent()
     noteText.Text="script comes from the cyberheroes community "
     noteText.TextColor3=Color3.fromRGB(180,180,180)
     noteText.Font=Enum.Font.Gotham
-    noteText.TextSize=5
+    noteText.TextSize=10
     noteText.TextWrapped=true
     noteText.TextXAlignment=Enum.TextXAlignment.Left
     noteText.TextYAlignment=Enum.TextYAlignment.Top
@@ -4496,7 +4496,7 @@ local function createAboutContent()
     speedDesc.Text = "CFrame-based movement (permanent)"
     speedDesc.TextColor3 = Color3.fromRGB(160,160,160)
     speedDesc.Font = Enum.Font.Gotham
-    speedDesc.TextSize = 10
+    speedDesc.TextSize = 8
     speedDesc.TextXAlignment = Enum.TextXAlignment.Left
     speedDesc.Parent = speedCard
 
@@ -4561,7 +4561,7 @@ local function createAboutContent()
     toggleDesc.Text = "CFrame teleport walk (bypass speed limit)"
     toggleDesc.TextColor3 = Color3.fromRGB(160,160,160)
     toggleDesc.Font = Enum.Font.Gotham
-    toggleDesc.TextSize = 10
+    toggleDesc.TextSize = 8
     toggleDesc.TextXAlignment = Enum.TextXAlignment.Left
     toggleDesc.Parent = toggleCard
 
@@ -5151,7 +5151,7 @@ local function createGridButton(parent, name, text, initialState, onChange)
     button.Size = UDim2.new(0,85,0,32)  
   
     button.Text = text .. (initialState and " [ON]" or " [OFF]")  
-    button.TextSize = 12  
+    button.TextSize = 6  
     button.Font = Enum.Font.GothamBold  
   
     button.TextColor3 =  
@@ -5304,7 +5304,7 @@ local function createSidebarItem(parent, text, icon, active)
     button.Size = UDim2.new(1,0,0,30)
 
     button.Text = "   " .. icon .. "   " .. text
-    button.TextSize = 5
+    button.TextSize = 10
     button.Font = Enum.Font.GothamBold
 
     button.TextXAlignment = Enum.TextXAlignment.Left

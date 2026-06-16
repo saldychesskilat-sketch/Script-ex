@@ -3437,6 +3437,59 @@ local function teleportToNearestSurvivor()
 end
 
 
+-- ============================================================================
+-- FEATURE 16: TELEPORT TO NEAREST SURVIVOR (unchanged)
+-- ============================================================================
+local function getNearestSurvivor()
+    local nearest = nil
+    local minDist = math.huge
+    if not localRootPart then return nil end
+    local localPos = localRootPart.Position
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local isKiller = false
+                if player.Team then
+                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
+                end
+                if not isKiller then
+                    local tool = char:FindFirstChildWhichIsA("Tool")
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                        isKiller = true
+                    end
+                end
+                if not isKiller then
+                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    if root then
+                        local dist = (localPos - root.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            nearest = player
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function teleportToNearestSurvivor()
+    if not localRootPart then return end
+    local targetPlayer = getNearestSurvivor()
+    if targetPlayer and targetPlayer.Character then
+        local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart") or targetPlayer.Character:FindFirstChild("Torso")
+        if targetRoot then
+            localRootPart.CFrame = targetRoot.CFrame + Vector3.new(0, 2, 0)
+            print("[Teleport] Teleported to survivor: " .. targetPlayer.Name)
+        else
+            print("[Teleport] Target has no root part")
+        end
+    else
+        print("[Teleport] No survivor found nearby")
+    end
+end
 -- ============================================================================  
 -- FEATURE 17: MODERN GUI (UPGRADED - MINIMIZE TO FLOATING BAR + INFO TAB)  
 -- ============================================================================  

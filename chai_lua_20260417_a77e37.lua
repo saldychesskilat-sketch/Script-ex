@@ -4792,7 +4792,7 @@ local function createSettingsContent()
         btn.BackgroundColor3 = color
         btn.TextColor3 = textColor or Color3.fromRGB(255,255,255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 12
+        btn.TextSize = 9
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
         btn.Parent = colorHolder

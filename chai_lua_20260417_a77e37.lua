@@ -1844,6 +1844,11 @@ local function autoParryLoop()
         "Character.Animations.Frenzyend",
         "Character.Killerost",
         "Character.Weapon.Right Arm.Machete",
+        "Character.Spear2.Spear2.Hitbox",
+        "Arm.Swing",
+        "Character.HumanoidRootPart.attack",
+        "Character.sfx.attack",
+        "Character.sfx.attackline"
     }        
     -- ==========================================        
         
@@ -5173,7 +5178,7 @@ local function createGridButton(parent, name, text, initialState, onChange)
     button.Size = UDim2.new(0,85,0,32)  
   
     button.Text = text .. (initialState and " [ON]" or " [OFF]")  
-    button.TextSize = 12 
+    button.TextSize = 10 
     button.Font = Enum.Font.GothamBold  
   
     button.TextColor3 =  

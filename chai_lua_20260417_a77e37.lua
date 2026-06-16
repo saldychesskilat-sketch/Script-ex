@@ -5142,9 +5142,10 @@ end
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
 local function createGridButton(parent, name, text, initialState, onChange)  
-    if featuresContent then
-        featuresContent:Destroy()
-    end
+    if featuresContainer then  
+            featuresContainer:Destroy()  
+            featuresContainer = nil  
+    end  
     local button = Instance.new("TextButton")  
     button.Name = name  
     button.Size = UDim2.new(0,85,0,32)  
@@ -5555,7 +5556,11 @@ local function createGUI()
         settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
         infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
         aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
+
+        if featuresContainer then  
+            featuresContainer:Destroy()  
+            featuresContainer = nil  
+        end  
         if settingsContent then settingsContent:Destroy() end  
         if infoContent then infoContent:Destroy() end  
         if aboutContent then aboutContent:Destroy() end  
@@ -5570,7 +5575,7 @@ local function createGUI()
         settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
         infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
         aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
+
         if homeContent then homeContent:Destroy() end  
         if settingsContent then settingsContent:Destroy() end  
         if infoContent then infoContent:Destroy() end  
@@ -5585,7 +5590,11 @@ local function createGUI()
         featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
         infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
         aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
+
+        if featuresContainer then  
+            featuresContainer:Destroy()  
+            featuresContainer = nil  
+        end  
         if homeContent then homeContent:Destroy() end  
         if infoContent then infoContent:Destroy() end  
         if aboutContent then aboutContent:Destroy() end  
@@ -5600,7 +5609,11 @@ local function createGUI()
         featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
         settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
         aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
+
+        if featuresContainer then  
+            featuresContainer:Destroy()  
+            featuresContainer = nil  
+        end  
         if homeContent then homeContent:Destroy() end  
         if settingsContent then settingsContent:Destroy() end  
         if aboutContent then aboutContent:Destroy() end  
@@ -5615,7 +5628,11 @@ local function createGUI()
         featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
         settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
         infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
+
+        if featuresContainer then  
+            featuresContainer:Destroy()  
+            featuresContainer = nil  
+        end  
         if homeContent then homeContent:Destroy() end  
         if settingsContent then settingsContent:Destroy() end  
         if infoContent then infoContent:Destroy() end  

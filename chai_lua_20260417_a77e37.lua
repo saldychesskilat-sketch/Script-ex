@@ -4792,7 +4792,7 @@ local function createSettingsContent()
         btn.BackgroundColor3 = color
         btn.TextColor3 = textColor or Color3.fromRGB(255,255,255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 9
+        btn.TextSize = 5
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
         btn.Parent = colorHolder
@@ -5151,7 +5151,7 @@ local function createGridButton(parent, name, text, initialState, onChange)
     button.Size = UDim2.new(0,85,0,32)  
   
     button.Text = text .. (initialState and " [ON]" or " [OFF]")  
-    button.TextSize = 6  
+    button.TextSize = 12  
     button.Font = Enum.Font.GothamBold  
   
     button.TextColor3 =  

@@ -3579,7 +3579,7 @@ local function createHomeContent()
     title.Text = "KEMI HUB"
     title.TextColor3 = Color3.fromRGB(0,225,255)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 9
+    title.TextSize = 14
     title.TextWrapped = true
     title.TextTruncate = Enum.TextTruncate.AtEnd
     title.TextXAlignment = Enum.TextXAlignment.Left
@@ -3592,7 +3592,7 @@ local function createHomeContent()
     desc.Text = "script by kemi"
     desc.TextColor3 = Color3.fromRGB(210,210,210)
     desc.Font = Enum.Font.Gotham
-    desc.TextSize = 6
+    desc.TextSize = 12
     desc.TextWrapped = true
     desc.TextXAlignment = Enum.TextXAlignment.Left
     desc.TextYAlignment = Enum.TextYAlignment.Top
@@ -3618,7 +3618,7 @@ local function createHomeContent()
     infoTitle.Text = "SYSTEM INFORMATION"
     infoTitle.TextColor3 = Color3.fromRGB(0,220,255)
     infoTitle.Font = Enum.Font.GothamBold
-    infoTitle.TextSize = 10
+    infoTitle.TextSize = 14
     infoTitle.TextXAlignment = Enum.TextXAlignment.Left
     infoTitle.Parent = infoCard
 
@@ -3632,7 +3632,7 @@ local function createHomeContent()
     infoText.TextYAlignment = Enum.TextYAlignment.Top
     infoText.ClipsDescendants = true
     infoText.Font = Enum.Font.Gotham
-    infoText.TextSize = 5
+    infoText.TextSize = 10
     infoText.TextColor3 = Color3.fromRGB(225,225,225)
     infoText.Text = [[
 <b>STATUS</b>
@@ -3666,7 +3666,7 @@ Kemi Studio
     crossTitle.Text = "🎯 CROSSHAIR SETTINGS"
     crossTitle.TextColor3 = Color3.fromRGB(0,220,255)
     crossTitle.Font = Enum.Font.GothamBold
-    crossTitle.TextSize = 10
+    crossTitle.TextSize = 14
     crossTitle.TextXAlignment = Enum.TextXAlignment.Left
     crossTitle.Parent = crosshairCard
 
@@ -3677,7 +3677,7 @@ Kemi Studio
     crossDesc.Text = "Customize crosshair position and style."
     crossDesc.TextColor3 = Color3.fromRGB(180,180,180)
     crossDesc.Font = Enum.Font.Gotham
-    crossDesc.TextSize = 5
+    crossDesc.TextSize = 10
     crossDesc.TextWrapped = true
     crossDesc.TextXAlignment = Enum.TextXAlignment.Left
     crossDesc.TextYAlignment = Enum.TextYAlignment.Top
@@ -3696,7 +3696,7 @@ Kemi Studio
     labelX.Text = "Position X"
     labelX.TextColor3 = Color3.fromRGB(220,220,220)
     labelX.Font = Enum.Font.GothamBold
-    labelX.TextSize = 5
+    labelX.TextSize = 10
     labelX.TextXAlignment = Enum.TextXAlignment.Left
     labelX.Parent = sliderXHolder
 
@@ -3707,7 +3707,7 @@ Kemi Studio
     valueX.Text = tostring(crosshairState.posX)
     valueX.TextColor3 = Color3.fromRGB(0,220,255)
     valueX.Font = Enum.Font.GothamBold
-    valueX.TextSize = 5
+    valueX.TextSize = 10
     valueX.TextXAlignment = Enum.TextXAlignment.Left
     valueX.Parent = sliderXHolder
 
@@ -3741,7 +3741,7 @@ Kemi Studio
     labelY.Text = "Position Y"
     labelY.TextColor3 = Color3.fromRGB(220,220,220)
     labelY.Font = Enum.Font.GothamBold
-    labelY.TextSize = 5
+    labelY.TextSize = 10
     labelY.TextXAlignment = Enum.TextXAlignment.Left
     labelY.Parent = sliderYHolder
 
@@ -3752,7 +3752,7 @@ Kemi Studio
     valueY.Text = tostring(crosshairState.posY)
     valueY.TextColor3 = Color3.fromRGB(0,220,255)
     valueY.Font = Enum.Font.GothamBold
-    valueY.TextSize = 5
+    valueY.TextSize = 10
     valueY.TextXAlignment = Enum.TextXAlignment.Left
     valueY.Parent = sliderYHolder
 
@@ -3813,7 +3813,7 @@ Kemi Studio
     toggleButton.Text = crosshairState.enabled and "CROSSHAIR ENABLED" or "CROSSHAIR DISABLED"
     toggleButton.TextColor3 = crosshairState.enabled and Color3.fromRGB(255,255,255) or Color3.fromRGB(220,220,220)
     toggleButton.Font = Enum.Font.GothamBold
-    toggleButton.TextSize = 6
+    toggleButton.TextSize = 12
     toggleButton.BorderSizePixel = 0
     toggleButton.AutoButtonColor = false
     toggleButton.Parent = crosshairCard
@@ -4131,7 +4131,7 @@ local function createInfoContent()
     title.Text="🌐 COMMUNITY & INFORMATION"
     title.TextColor3=Color3.fromRGB(0,220,255)
     title.Font=Enum.Font.GothamBold
-    title.TextSize=9
+    title.TextSize=14
     title.TextWrapped=true
     title.TextXAlignment=Enum.TextXAlignment.Left
     title.Parent=header
@@ -4143,7 +4143,7 @@ local function createInfoContent()
     desc.Text="Join our official community platforms and access script information, updates and announcements."
     desc.TextColor3=Color3.fromRGB(210,210,210)
     desc.Font=Enum.Font.Gotham
-    desc.TextSize=5
+    desc.TextSize=10
     desc.TextWrapped=true
     desc.TextXAlignment=Enum.TextXAlignment.Left
     desc.TextYAlignment=Enum.TextYAlignment.Top
@@ -4169,7 +4169,7 @@ local function createInfoContent()
     communityTitle.Text="📱 OFFICIAL SOCIAL"
     communityTitle.TextColor3=Color3.fromRGB(0,220,255)
     communityTitle.Font=Enum.Font.GothamBold
-    communityTitle.TextSize=5
+    communityTitle.TextSize=2
     communityTitle.TextXAlignment=Enum.TextXAlignment.Left
     communityTitle.Parent=communityCard
 
@@ -4196,7 +4196,7 @@ local function createInfoContent()
     discordText.Text="Discord Server"
     discordText.TextColor3=Color3.fromRGB(220,220,220)
     discordText.Font=Enum.Font.GothamBold
-    discordText.TextSize=5
+    discordText.TextSize=12
     discordText.TextXAlignment=Enum.TextXAlignment.Left
     discordText.Parent=discordFrame
 
@@ -4485,7 +4485,7 @@ local function createAboutContent()
     speedTitle.Text = "MOVEMENT SPEED"
     speedTitle.TextColor3 = Color3.fromRGB(0,220,255)
     speedTitle.Font = Enum.Font.GothamBold
-    speedTitle.TextSize = 5
+    speedTitle.TextSize = 14
     speedTitle.TextXAlignment = Enum.TextXAlignment.Left
     speedTitle.Parent = speedCard
 
@@ -4496,7 +4496,7 @@ local function createAboutContent()
     speedDesc.Text = "CFrame-based movement (permanent)"
     speedDesc.TextColor3 = Color3.fromRGB(160,160,160)
     speedDesc.Font = Enum.Font.Gotham
-    speedDesc.TextSize = 5
+    speedDesc.TextSize = 10
     speedDesc.TextXAlignment = Enum.TextXAlignment.Left
     speedDesc.Parent = speedCard
 
@@ -4507,7 +4507,7 @@ local function createAboutContent()
     speedValueLabel.Text = string.format("%.1f", currentSpeed)
     speedValueLabel.TextColor3 = Color3.fromRGB(0,220,255)
     speedValueLabel.Font = Enum.Font.GothamBold
-    speedValueLabel.TextSize = 5
+    speedValueLabel.TextSize = 10
     speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
     speedValueLabel.Parent = speedCard
 
@@ -4550,7 +4550,7 @@ local function createAboutContent()
     toggleTitle.Text = "ENABLE TP WALK"
     toggleTitle.TextColor3 = Color3.fromRGB(0,220,255)
     toggleTitle.Font = Enum.Font.GothamBold
-    toggleTitle.TextSize = 5
+    toggleTitle.TextSize = 10
     toggleTitle.TextXAlignment = Enum.TextXAlignment.Left
     toggleTitle.Parent = toggleCard
 
@@ -4561,7 +4561,7 @@ local function createAboutContent()
     toggleDesc.Text = "CFrame teleport walk (bypass speed limit)"
     toggleDesc.TextColor3 = Color3.fromRGB(160,160,160)
     toggleDesc.Font = Enum.Font.Gotham
-    toggleDesc.TextSize = 5
+    toggleDesc.TextSize = 10
     toggleDesc.TextXAlignment = Enum.TextXAlignment.Left
     toggleDesc.Parent = toggleCard
 
@@ -4754,7 +4754,7 @@ local function createSettingsContent()
     colorLabel.TextColor3 = Color3.fromRGB(0,220,255)
     colorLabel.BackgroundTransparency = 1
     colorLabel.Font = Enum.Font.GothamBold
-    colorLabel.TextSize = 6
+    colorLabel.TextSize = 12
     colorLabel.TextXAlignment = Enum.TextXAlignment.Left
     colorLabel.Parent = themeCard
 
@@ -4765,7 +4765,7 @@ local function createSettingsContent()
     desc.Text = "Customize the interface accent color."
     desc.TextColor3 = Color3.fromRGB(180,180,180)
     desc.Font = Enum.Font.Gotham
-    desc.TextSize = 5
+    desc.TextSize = 12
     desc.TextWrapped = true
     desc.TextXAlignment = Enum.TextXAlignment.Left
     desc.Parent = themeCard
@@ -4792,7 +4792,7 @@ local function createSettingsContent()
         btn.BackgroundColor3 = color
         btn.TextColor3 = textColor or Color3.fromRGB(255,255,255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 5
+        btn.TextSize = 12
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
         btn.Parent = colorHolder
@@ -4878,7 +4878,7 @@ local function createSettingsContent()
     reportTitle.Text = "📩 REPORT"
     reportTitle.TextColor3 = Color3.fromRGB(0,220,255)
     reportTitle.Font = Enum.Font.GothamBold
-    reportTitle.TextSize = 6
+    reportTitle.TextSize = 12
     reportTitle.TextXAlignment = Enum.TextXAlignment.Left
     reportTitle.Parent = reportCard
 
@@ -4889,7 +4889,7 @@ local function createSettingsContent()
     reportDesc.Text = "Send bug reports or interface feedback."
     reportDesc.TextColor3 = Color3.fromRGB(180,180,180)
     reportDesc.Font = Enum.Font.Gotham
-    reportDesc.TextSize = 5
+    reportDesc.TextSize = 10
     reportDesc.TextWrapped = true
     reportDesc.TextXAlignment = Enum.TextXAlignment.Left
     reportDesc.Parent = reportCard
@@ -5151,7 +5151,7 @@ local function createGridButton(parent, name, text, initialState, onChange)
     button.Size = UDim2.new(0,85,0,32)  
   
     button.Text = text .. (initialState and " [ON]" or " [OFF]")  
-    button.TextSize = 5  
+    button.TextSize = 12  
     button.Font = Enum.Font.GothamBold  
   
     button.TextColor3 =  
@@ -5363,7 +5363,7 @@ local function createPermanentTeleportButton()
     teleportButton.BackgroundColor3 = Color3.fromRGB(40, 5, 5)  
     teleportButton.BackgroundTransparency = 0.2  
     teleportButton.TextColor3 = Color3.fromRGB(0, 230, 255)  
-    teleportButton.TextSize = 6  
+    teleportButton.TextSize = 12  
     teleportButton.Font = Enum.Font.GothamBold  
     teleportButton.BorderSizePixel = 0  
     teleportButton.Parent = teleportButtonGui  
@@ -5423,7 +5423,7 @@ local function createGUI()
     title.TextColor3 = config.guiThemeColor  
     title.BackgroundTransparency = 1  
     title.Font = Enum.Font.GothamBold  
-    title.TextSize = 6  
+    title.TextSize = 12  
     title.TextXAlignment = Enum.TextXAlignment.Left  
     title.Parent = titleBar  
     local versionLabel = Instance.new("TextLabel")  
@@ -5433,7 +5433,7 @@ local function createGUI()
     versionLabel.TextColor3 = Color3.fromRGB(150, 150, 200)  
     versionLabel.BackgroundTransparency = 1  
     versionLabel.Font = Enum.Font.Gotham  
-    versionLabel.TextSize = 9  
+    versionLabel.TextSize = 12  
     versionLabel.TextXAlignment = Enum.TextXAlignment.Left  
     versionLabel.Parent = titleBar  
   
@@ -5446,7 +5446,7 @@ local function createGUI()
     minimizeBtn.BackgroundTransparency = 0.2  
     minimizeBtn.BorderSizePixel = 0  
     minimizeBtn.Font = Enum.Font.GothamBold  
-    minimizeBtn.TextSize = 6
+    minimizeBtn.TextSize = 10
     minimizeBtn.Parent = titleBar  
     local minCorner = Instance.new("UICorner")  
     minCorner.CornerRadius = UDim.new(0, 3)  
@@ -5460,7 +5460,7 @@ local function createGUI()
     closeBtn.BackgroundTransparency = 0.2  
     closeBtn.BorderSizePixel = 0  
     closeBtn.Font = Enum.Font.GothamBold  
-    closeBtn.TextSize = 6  
+    closeBtn.TextSize = 10  
     closeBtn.Parent = titleBar  
     local closeCorner = Instance.new("UICorner")  
     closeCorner.CornerRadius = UDim.new(0, 3)  
@@ -5660,7 +5660,7 @@ local function createGUI()
     statusLabel.TextColor3 = config.guiThemeColor  
     statusLabel.BackgroundTransparency = 1  
     statusLabel.Font = Enum.Font.GothamBold  
-    statusLabel.TextSize = 4  
+    statusLabel.TextSize = 10  
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left  
     statusLabel.Parent = statusBar  
     local led = Instance.new("Frame")  

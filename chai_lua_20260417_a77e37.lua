@@ -4273,7 +4273,7 @@ local function createInfoContent()
     infoTitle.Text="SCRIPT INFORMATION"
     infoTitle.TextColor3=Color3.fromRGB(0,220,255)
     infoTitle.Font=Enum.Font.GothamBold
-    infoTitle.TextSize=5
+    infoTitle.TextSize=14
     infoTitle.TextXAlignment=Enum.TextXAlignment.Left
     infoTitle.Parent=infoCard
 
@@ -4286,7 +4286,7 @@ local function createInfoContent()
     body.TextXAlignment=Enum.TextXAlignment.Left
     body.TextYAlignment=Enum.TextYAlignment.Top
     body.Font=Enum.Font.Gotham
-    body.TextSize=5
+    body.TextSize=10
     body.TextColor3=Color3.fromRGB(220,220,220)
     body.Text=[[
 <b>KEMI HUB v10.1</b>

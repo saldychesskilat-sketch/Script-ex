@@ -1848,7 +1848,9 @@ local function autoParryLoop()
         "Arm.Swing",
         "Character.HumanoidRootPart.attack",
         "Character.sfx.attack",
-        "Character.sfx.attackline"
+        "Character.sfx.attackline",
+        "Arm.Knife.Main.Plane.001_Blade",
+        "Character.Killerost",
     }        
     -- ==========================================        
         

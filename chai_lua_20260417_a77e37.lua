@@ -5141,8 +5141,7 @@ end
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
 -- ============================================================================  
-local featuresContent = nil
-local function createFeatureContent()
+local function createGridButton(parent, name, text, initialState, onChange)  
     if featuresContent then
         featuresContent:Destroy()
     end
@@ -5382,338 +5381,307 @@ end
 -- ============================================================================  
 -- MAIN GUI (dengan minimize ke floating bar)  
 -- ============================================================================  
-local function createGUI()
-    if screenGui then screenGui:Destroy() end
-    screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "CyberHeroes_GUI"
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = CoreGui
-    screenGui.ResetOnSpawn = false
-
-    -- Main Frame
-    mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainWindow"
-    mainFrame.Size = UDim2.new(0, 360, 0, 240)
-    mainFrame.Position = UDim2.new(0.5, -180, 0.5, -120)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
-    mainFrame.BackgroundTransparency = 0.1
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = screenGui
-    local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 8)
-    mainCorner.Parent = mainFrame
-    mainStroke = Instance.new("UIStroke")
-    mainStroke.Color = config.guiThemeColor
-    mainStroke.Thickness = 1.5
-    mainStroke.Transparency = 0.4
-    mainStroke.Parent = mainFrame
-
-    -- Title Bar
-    local titleBar = Instance.new("Frame")
-    titleBar.Size = UDim2.new(1, 0, 0, 24)
-    titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)
-    titleBar.BackgroundTransparency = 0.2
-    titleBar.BorderSizePixel = 0
-    titleBar.Parent = mainFrame
-    local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 8)
-    titleCorner.Parent = titleBar
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(0.5, 0, 1, 0)
-    title.Position = UDim2.new(0.02, 0, 0, 0)
-    title.Text = "CYBERHEROES script by kemi"
-    title.TextColor3 = config.guiThemeColor
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 12
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = titleBar
-    local versionLabel = Instance.new("TextLabel")
-    versionLabel.Size = UDim2.new(0.3, 0, 1, 0)
-    versionLabel.Position = UDim2.new(0.55, 0, 0, 0)
-    versionLabel.Text = "Build 10.1"
-    versionLabel.TextColor3 = Color3.fromRGB(150, 150, 200)
-    versionLabel.BackgroundTransparency = 1
-    versionLabel.Font = Enum.Font.Gotham
-    versionLabel.TextSize = 9
-    versionLabel.TextXAlignment = Enum.TextXAlignment.Left
-    versionLabel.Parent = titleBar
-
-    -- Minimize and Close buttons
-    local minimizeBtn = Instance.new("TextButton")
-    minimizeBtn.Size = UDim2.new(0, 22, 0, 22)
-    minimizeBtn.Position = UDim2.new(1, -50, 0, 1)
-    minimizeBtn.Text = "−"
-    minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
-    minimizeBtn.BackgroundTransparency = 0.2
-    minimizeBtn.BorderSizePixel = 0
-    minimizeBtn.Font = Enum.Font.GothamBold
-    minimizeBtn.TextSize = 18
-    minimizeBtn.Parent = titleBar
-    local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 3)
-    minCorner.Parent = minimizeBtn
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.new(0, 22, 0, 22)
-    closeBtn.Position = UDim2.new(1, -26, 0, 1)
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
-    closeBtn.BackgroundTransparency = 0.2
-    closeBtn.BorderSizePixel = 0
-    closeBtn.Font = Enum.Font.GothamBold
-    closeBtn.TextSize = 14
-    closeBtn.Parent = titleBar
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(0, 3)
-    closeCorner.Parent = closeBtn
-
-    local function minimizeGUI()
-        config.guiVisible = false
-        if mainFrame then mainFrame.Visible = false end
-        if floatingBar then
-            pcall(function() floatingBar:Destroy() end)
-            floatingBar = nil
-        end
-        createFloatingBar()
-        isFloatingVisible = true
-    end
-    minimizeBtn.MouseButton1Click:Connect(minimizeGUI)
-    closeBtn.MouseButton1Click:Connect(minimizeGUI)
-
-    -- Sidebar (menggunakan createSidebarItem)
-    local sidebar = Instance.new("Frame")
-    sidebar.Size = UDim2.new(0, 80, 1, -24)
-    sidebar.Position = UDim2.new(0, 0, 0, 24)
-    sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
-    sidebar.BackgroundTransparency = 0.2
-    sidebar.BorderSizePixel = 0
-    sidebar.Parent = mainFrame
-    local sidebarCorner = Instance.new("UICorner")
-    sidebarCorner.CornerRadius = UDim.new(0, 0)
-    sidebarCorner.Parent = sidebar
-
-    -- Container untuk sidebar items (menggunakan UIListLayout)
-    local sidebarList = Instance.new("Frame")
-    sidebarList.Size = UDim2.new(1, 0, 0, 200)
-    sidebarList.Position = UDim2.new(0, 0, 0.05, 0)
-    sidebarList.BackgroundTransparency = 1
-    sidebarList.Parent = sidebar
-    local sidebarLayout = Instance.new("UIListLayout")
-    sidebarLayout.Padding = UDim.new(0, 4)
-    sidebarLayout.FillDirection = Enum.FillDirection.Vertical
-    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    sidebarLayout.Parent = sidebarList
-
-    -- Buat semua sidebar item (semua false dulu, aktif akan diatur saat switch tab)
-    local homeItem = createSidebarItem(sidebarList, "HOME", "", false)
-    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)
-    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)
-    local infoItem = createSidebarItem(sidebarList, "INFO", "", false)
-    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)
-
-    -- Content Panel (area utama)
-    contentPanel = Instance.new("Frame")
-    contentPanel.Size = UDim2.new(1, -90, 1, -30)
-    contentPanel.Position = UDim2.new(0, 85, 0, 28)
-    contentPanel.BackgroundTransparency = 1
-    contentPanel.Parent = mainFrame
-
-    -- Variabel untuk menyimpan konten yang sedang aktif (agar bisa dihancurkan saat pindah tab)
-    homeContent = nil
-    featuresContent = nil
-    settingsContent = nil
-    infoContent = nil
-    aboutContent = nil
-
-    -- Fungsi untuk menghancurkan semua konten (agar tidak menumpuk)
-    local function clearAllContents()
-        if homeContent then homeContent:Destroy() end
-        if featuresContent then featuresContent:Destroy() end
-        if settingsContent then settingsContent:Destroy() end
-        if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
-        homeContent = nil
-        featuresContent = nil
-        settingsContent = nil
-        infoContent = nil
-        aboutContent = nil
-    end
-
-    -- Fungsi untuk membuat konten FEATURES (tombol-tombol fitur)
-    local function createFeatureContent()
-        featuresContent = Instance.new("Frame")
-        featuresContent.Size = UDim2.new(1, 0, 1, 0)
-        featuresContent.BackgroundTransparency = 1
-        featuresContent.Parent = contentPanel
-
-        -- Grid layout untuk tombol fitur
-        local featureGrid = Instance.new("UIGridLayout")
-        featureGrid.CellSize = UDim2.new(0, 85, 0, 32)
-        featureGrid.CellPadding = UDim2.new(0, 4, 0, 4)
-        featureGrid.FillDirection = Enum.FillDirection.Horizontal
-        featureGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        featureGrid.VerticalAlignment = Enum.VerticalAlignment.Top
-        featureGrid.SortOrder = Enum.SortOrder.LayoutOrder
-        featureGrid.Parent = featuresContent
-
-        -- Daftar fitur (sesuai dengan yang ada di config)
-        local features = {
-            {name="autoWinEnabled", text="AUTO WIN"},
-            {name="autoTaskEnabled", text="AUTO TASK"},
-            {name="espEnabled", text="ESP"},
-            {name="speedBoostEnabled", text="SPEED BOOST"},
-            {name="stealthEnabled", text="STEALTH"},
-            {name="godModeEnabled", text="GOD MODE"},
-            {name="infiniteAmmoEnabled", text="Dagger"},
-            {name="shieldEnabled", text="SHIELD"},
-            {name="tpwalkEnabled", text="TPWALK"},
-            {name="noCollideEnabled", text="NO COLLIDE"},
-            {name="massKillEnabled", text="MASS KILL"},
-            {name="autoGeneratorEnabled", text="AUTO GEN"},
-            {name="autoSkillCheckEnabled", text="SKILL CHECK"},
-            {name="autoAimEnabled", text="AUTO AIM"},
-            {name="povMode", text="POV"}
-        }
-
-        for _, feat in ipairs(features) do
-            local initialState = config[feat.name] or false
-            createGridButton(featuresContent, feat.name, feat.text, initialState)
-        end
-    end
-
-    -- Fungsi untuk mengganti tab (menghancurkan konten lama dan membuat yang baru)
-    local function switchTab(tabName)
-        clearAllContents()
-
-        -- Reset tampilan semua sidebar item (warna, stroke)
-        local items = {homeItem, featuresItem, settingsItem, infoItem, aboutItem}
-        for _, item in ipairs(items) do
-            item.TextColor3 = Color3.fromRGB(210, 210, 210)
-            item.BackgroundColor3 = Color3.fromRGB(8, 18, 32)
-            local stroke = item:FindFirstChild("UIStroke")
-            if stroke then
-                stroke.Color = Color3.fromRGB(60, 100, 140)
-                stroke.Transparency = 0.55
-            end
-        end
-
-        -- Aktifkan tab yang dipilih
-        if tabName == "HOME" then
-            homeItem.TextColor3 = Color3.fromRGB(0, 225, 255)
-            homeItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
-            local stroke = homeItem:FindFirstChild("UIStroke")
-            if stroke then
-                stroke.Color = Color3.fromRGB(0, 200, 255)
-                stroke.Transparency = 0.25
-            end
-            createHomeContent() -- asumsikan fungsi ini sudah ada dan menggunakan contentPanel global
-        elseif tabName == "FEATURES" then
-            featuresItem.TextColor3 = Color3.fromRGB(0, 225, 255)
-            featuresItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
-            local stroke = featuresItem:FindFirstChild("UIStroke")
-            if stroke then
-                stroke.Color = Color3.fromRGB(0, 200, 255)
-                stroke.Transparency = 0.25
-            end
-            createFeatureContent()
-        elseif tabName == "SETTINGS" then
-            settingsItem.TextColor3 = Color3.fromRGB(0, 225, 255)
-            settingsItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
-            local stroke = settingsItem:FindFirstChild("UIStroke")
-            if stroke then
-                stroke.Color = Color3.fromRGB(0, 200, 255)
-                stroke.Transparency = 0.25
-            end
-            createSettingsContent() -- asumsikan fungsi ini sudah ada
-        elseif tabName == "INFO" then
-            infoItem.TextColor3 = Color3.fromRGB(0, 225, 255)
-            infoItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
-            local stroke = infoItem:FindFirstChild("UIStroke")
-            if stroke then
-                stroke.Color = Color3.fromRGB(0, 200, 255)
-                stroke.Transparency = 0.25
-            end
-            createInfoContent() -- asumsikan fungsi ini sudah ada
-        elseif tabName == "ABOUT" then
-            aboutItem.TextColor3 = Color3.fromRGB(0, 225, 255)
-            aboutItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
-            local stroke = aboutItem:FindFirstChild("UIStroke")
-            if stroke then
-                stroke.Color = Color3.fromRGB(0, 200, 255)
-                stroke.Transparency = 0.25
-            end
-            createAboutContent() -- asumsikan fungsi ini sudah ada
-        end
-    end
-
-    -- Koneksi tombol sidebar
-    homeItem.MouseButton1Click:Connect(function() switchTab("HOME") end)
-    featuresItem.MouseButton1Click:Connect(function() switchTab("FEATURES") end)
-    settingsItem.MouseButton1Click:Connect(function() switchTab("SETTINGS") end)
-    infoItem.MouseButton1Click:Connect(function() switchTab("INFO") end)
-    aboutItem.MouseButton1Click:Connect(function() switchTab("ABOUT") end)
-
-    -- Tampilkan tab FEATURES secara default
-    switchTab("FEATURES")
-
-    makeDraggable(mainFrame)
-
-    -- Status bar (sama seperti sebelumnya)
-    local statusBar = Instance.new("Frame")
-    statusBar.Size = UDim2.new(1, 0, 0, 18)
-    statusBar.Position = UDim2.new(0, 0, 1, -18)
-    statusBar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)
-    statusBar.BackgroundTransparency = 0.2
-    statusBar.BorderSizePixel = 0
-    statusBar.Parent = mainFrame
-    local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 4)
-    statusCorner.Parent = statusBar
-    statusLabel = Instance.new("TextLabel")
-    statusLabel.Size = UDim2.new(1, -10, 1, 0)
-    statusLabel.Position = UDim2.new(0, 5, 0, 0)
-    statusLabel.Text = "SYSTEM READY"
-    statusLabel.TextColor3 = config.guiThemeColor
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Font = Enum.Font.GothamBold
-    statusLabel.TextSize = 8
-    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-    statusLabel.Parent = statusBar
-    local led = Instance.new("Frame")
-    led.Size = UDim2.new(0, 5, 0, 5)
-    led.Position = UDim2.new(1, -10, 0.5, -2.5)
-    led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    led.BackgroundTransparency = 0.2
-    led.BorderSizePixel = 0
-    led.Parent = statusBar
-    local ledCorner = Instance.new("UICorner")
-    ledCorner.CornerRadius = UDim.new(1, 0)
-    ledCorner.Parent = led
-
-    task.spawn(function()
-        while screenGui and screenGui.Parent do
-            local activeCount = (config.autoWinEnabled and 1 or 0) + (config.autoTaskEnabled and 1 or 0) + (config.espEnabled and 1 or 0) +
-                                (config.speedBoostEnabled and 1 or 0) + (config.stealthEnabled and 1 or 0) + (config.godModeEnabled and 1 or 0) +
-                                (config.infiniteAmmoEnabled and 1 or 0) + (config.shieldEnabled and 1 or 0) + (config.tpwalkEnabled and 1 or 0) +
-                                (config.noCollideEnabled and 1 or 0) + (config.massKillEnabled and 1 or 0) + (config.autoGeneratorEnabled and 1 or 0) +
-                                (config.autoSkillCheckEnabled and 1 or 0) + (config.autoAimEnabled and 1 or 0)
-            if activeCount > 0 then
-                statusLabel.Text = "ACTIVE: " .. activeCount .. " modules"
-                statusLabel.TextColor3 = config.guiThemeColor
-                led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-            else
-                statusLabel.Text = "STANDBY"
-                statusLabel.TextColor3 = Color3.fromRGB(150, 50, 50)
-                led.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-            end
-            task.wait(1)
-        end
-    end)
-
-    mainFrame.BackgroundTransparency = 0.3
-    TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
+local function createGUI()  
+    if screenGui then screenGui:Destroy() end  
+    screenGui = Instance.new("ScreenGui")  
+    screenGui.Name = "CyberHeroes_GUI"  
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling  
+    screenGui.Parent = CoreGui  
+    screenGui.ResetOnSpawn = false  
+  
+    mainFrame = Instance.new("Frame")  
+    mainFrame.Name = "MainWindow"  
+    mainFrame.Size = UDim2.new(0, 360, 0, 240)  
+    mainFrame.Position = UDim2.new(0.5, -180, 0.5, -120)  
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)  
+    mainFrame.BackgroundTransparency = 0.1  
+    mainFrame.BorderSizePixel = 0  
+    mainFrame.Parent = screenGui  
+    local mainCorner = Instance.new("UICorner")  
+    mainCorner.CornerRadius = UDim.new(0, 8)  
+    mainCorner.Parent = mainFrame  
+    mainStroke = Instance.new("UIStroke")  
+    mainStroke.Color = config.guiThemeColor  
+    mainStroke.Thickness = 1.5  
+    mainStroke.Transparency = 0.4  
+    mainStroke.Parent = mainFrame  
+  
+    local titleBar = Instance.new("Frame")  
+    titleBar.Size = UDim2.new(1, 0, 0, 24)  
+    titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)  
+    titleBar.BackgroundTransparency = 0.2  
+    titleBar.BorderSizePixel = 0  
+    titleBar.Parent = mainFrame  
+    local titleCorner = Instance.new("UICorner")  
+    titleCorner.CornerRadius = UDim.new(0, 8)  
+    titleCorner.Parent = titleBar  
+    local title = Instance.new("TextLabel")  
+    title.Size = UDim2.new(0.5, 0, 1, 0)  
+    title.Position = UDim2.new(0.02, 0, 0, 0)  
+    title.Text = "CYBERHEROES script by kemi"  
+    title.TextColor3 = config.guiThemeColor  
+    title.BackgroundTransparency = 1  
+    title.Font = Enum.Font.GothamBold  
+    title.TextSize = 12  
+    title.TextXAlignment = Enum.TextXAlignment.Left  
+    title.Parent = titleBar  
+    local versionLabel = Instance.new("TextLabel")  
+    versionLabel.Size = UDim2.new(0.3, 0, 1, 0)  
+    versionLabel.Position = UDim2.new(0.55, 0, 0, 0)  
+    versionLabel.Text = "Build 10.1"  
+    versionLabel.TextColor3 = Color3.fromRGB(150, 150, 200)  
+    versionLabel.BackgroundTransparency = 1  
+    versionLabel.Font = Enum.Font.Gotham  
+    versionLabel.TextSize = 9  
+    versionLabel.TextXAlignment = Enum.TextXAlignment.Left  
+    versionLabel.Parent = titleBar  
+  
+    local minimizeBtn = Instance.new("TextButton")  
+    minimizeBtn.Size = UDim2.new(0, 22, 0, 22)  
+    minimizeBtn.Position = UDim2.new(1, -50, 0, 1)  
+    minimizeBtn.Text = "−"  
+    minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)  
+    minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)  
+    minimizeBtn.BackgroundTransparency = 0.2  
+    minimizeBtn.BorderSizePixel = 0  
+    minimizeBtn.Font = Enum.Font.GothamBold  
+    minimizeBtn.TextSize = 18  
+    minimizeBtn.Parent = titleBar  
+    local minCorner = Instance.new("UICorner")  
+    minCorner.CornerRadius = UDim.new(0, 3)  
+    minCorner.Parent = minimizeBtn  
+    local closeBtn = Instance.new("TextButton")  
+    closeBtn.Size = UDim2.new(0, 22, 0, 22)  
+    closeBtn.Position = UDim2.new(1, -26, 0, 1)  
+    closeBtn.Text = "✕"  
+    closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)  
+    closeBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)  
+    closeBtn.BackgroundTransparency = 0.2  
+    closeBtn.BorderSizePixel = 0  
+    closeBtn.Font = Enum.Font.GothamBold  
+    closeBtn.TextSize = 14  
+    closeBtn.Parent = titleBar  
+    local closeCorner = Instance.new("UICorner")  
+    closeCorner.CornerRadius = UDim.new(0, 3)  
+    closeCorner.Parent = closeBtn  
+  
+    -- Fungsi minimize: sembunyikan mainFrame, tampilkan floating bar  
+    local function minimizeGUI()  
+        config.guiVisible = false  
+        if mainFrame then mainFrame.Visible = false end  
+        if floatingBar then  
+            pcall(function() floatingBar:Destroy() end)  
+            floatingBar = nil  
+        end  
+        createFloatingBar()  
+        isFloatingVisible = true  
+    end  
+  
+    minimizeBtn.MouseButton1Click:Connect(minimizeGUI)  
+    closeBtn.MouseButton1Click:Connect(minimizeGUI)  
+  
+    sidebar = Instance.new("Frame")  
+    sidebar.Size = UDim2.new(0, 80, 1, -24)  
+    sidebar.Position = UDim2.new(0, 0, 0, 24)  
+    sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)  
+    sidebar.BackgroundTransparency = 0.2  
+    sidebar.BorderSizePixel = 0  
+    sidebar.Parent = mainFrame  
+    local sidebarCorner = Instance.new("UICorner")  
+    sidebarCorner.CornerRadius = UDim.new(0, 0)  
+    sidebarCorner.Parent = sidebar  
+    local sidebarList = Instance.new("Frame")  
+    sidebarList.Size = UDim2.new(1, 0, 0, 150)  
+    sidebarList.Position = UDim2.new(0, 0, 0.05, 0)  
+    sidebarList.BackgroundTransparency = 1  
+    sidebarList.Parent = sidebar  
+    local sidebarLayout = Instance.new("UIListLayout")  
+    sidebarLayout.Padding = UDim.new(0, 4)  
+    sidebarLayout.FillDirection = Enum.FillDirection.Vertical  
+    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
+    sidebarLayout.Parent = sidebarList  
+  
+    local homeItem = createSidebarItem(sidebarList, "HOME", "", false)   -- awal false dulu  
+    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)  
+    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)  
+    local infoItem = createSidebarItem(sidebarList, "INFO", "", false)  
+    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)  
+    local sep = Instance.new("Frame")  
+    sep.Size = UDim2.new(0.8, 0, 0, 1)  
+    sep.BackgroundColor3 = Color3.fromRGB(0, 200, 255)  
+    sep.BackgroundTransparency = 0.7  
+    sep.Parent = sidebarList  
+  
+    contentPanel = Instance.new("Frame")  
+    contentPanel.Size = UDim2.new(1, -90, 1, -30)  
+    contentPanel.Position = UDim2.new(0, 85, 0, 28)  
+    contentPanel.BackgroundTransparency = 1  
+    contentPanel.Parent = mainFrame  
+    local gridLayout = Instance.new("UIGridLayout")  
+    gridLayout.CellSize = UDim2.new(0, 80, 0, 32)  
+    gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)  
+    gridLayout.FillDirection = Enum.FillDirection.Horizontal  
+    gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
+    gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top  
+    gridLayout.SortOrder = Enum.SortOrder.LayoutOrder  
+    gridLayout.Parent = contentPanel  
+  
+    local features = {  
+        {name="autoWinEnabled", text="AUTO WIN"},  
+        {name="autoTaskEnabled", text="AUTO TASK"},  
+        {name="espEnabled", text="ESP"},  
+        {name="speedBoostEnabled", text="SPEED BOOST"},  
+        {name="stealthEnabled", text="STEALTH"},  
+        {name="godModeEnabled", text="GOD MODE"},  
+        {name="infiniteAmmoEnabled", text="Dagger"},  
+        {name="shieldEnabled", text="SHIELD"},  
+        {name="tpwalkEnabled", text="TPWALK"},  
+        {name="noCollideEnabled", text="NO COLLIDE"},  
+        {name="massKillEnabled", text="MASS KILL"},  
+        {name="autoGeneratorEnabled", text="AUTO GEN"},  
+        {name="autoSkillCheckEnabled", text="SKILL CHECK"},  
+        {name="autoAimEnabled", text="AUTO AIM"},  
+        {name="povMode", text="POV"}  
+    }  
+    for _, feat in ipairs(features) do  
+        local initialState = (feat.name ~= "restartScript") and config[feat.name] or false  
+        createGridButton(contentPanel, feat.name, feat.text, initialState)  
+    end  
+  
+    -- Navigation handlers  
+    homeItem.MouseButton1Click:Connect(function()  
+        homeItem.TextColor3 = Color3.fromRGB(0,230,255)  
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
+  
+        if settingsContent then settingsContent:Destroy() end  
+        if infoContent then infoContent:Destroy() end  
+        if aboutContent then aboutContent:Destroy() end  
+  
+        gridLayout.Parent = nil  
+        createHomeContent()  
+    end)  
+  
+    featuresItem.MouseButton1Click:Connect(function()  
+        featuresItem.TextColor3 = Color3.fromRGB(0,230,255)  
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
+  
+        if homeContent then homeContent:Destroy() end  
+        if settingsContent then settingsContent:Destroy() end  
+        if infoContent then infoContent:Destroy() end  
+        if aboutContent then aboutContent:Destroy() end  
+  
+        gridLayout.Parent = contentPanel  
+    end)  
+  
+    settingsItem.MouseButton1Click:Connect(function()  
+        settingsItem.TextColor3 = Color3.fromRGB(0,230,255)  
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
+  
+        if homeContent then homeContent:Destroy() end  
+        if infoContent then infoContent:Destroy() end  
+        if aboutContent then aboutContent:Destroy() end  
+  
+        gridLayout.Parent = nil  
+        createSettingsContent()  
+    end)  
+  
+    infoItem.MouseButton1Click:Connect(function()  
+        infoItem.TextColor3 = Color3.fromRGB(0,230,255)  
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
+  
+        if homeContent then homeContent:Destroy() end  
+        if settingsContent then settingsContent:Destroy() end  
+        if aboutContent then aboutContent:Destroy() end  
+  
+        gridLayout.Parent = nil  
+        createInfoContent()  
+    end)  
+  
+    aboutItem.MouseButton1Click:Connect(function()  
+        aboutItem.TextColor3 = Color3.fromRGB(0,230,255)  
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
+  
+        if homeContent then homeContent:Destroy() end  
+        if settingsContent then settingsContent:Destroy() end  
+        if infoContent then infoContent:Destroy() end  
+  
+        gridLayout.Parent = nil  
+        createAboutContent()  
+    end)  
+  
+    makeDraggable(mainFrame)  
+  
+    local statusBar = Instance.new("Frame")  
+    statusBar.Size = UDim2.new(1, 0, 0, 18)  
+    statusBar.Position = UDim2.new(0, 0, 1, -18)  
+    statusBar.BackgroundColor3 = Color3.fromRGB(15, 0, 2)  
+    statusBar.BackgroundTransparency = 0.2  
+    statusBar.BorderSizePixel = 0  
+    statusBar.Parent = mainFrame  
+    local statusCorner = Instance.new("UICorner")  
+    statusCorner.CornerRadius = UDim.new(0, 4)  
+    statusCorner.Parent = statusBar  
+    statusLabel = Instance.new("TextLabel")  
+    statusLabel.Size = UDim2.new(1, -10, 1, 0)  
+    statusLabel.Position = UDim2.new(0, 5, 0, 0)  
+    statusLabel.Text = "SYSTEM READY"  
+    statusLabel.TextColor3 = config.guiThemeColor  
+    statusLabel.BackgroundTransparency = 1  
+    statusLabel.Font = Enum.Font.GothamBold  
+    statusLabel.TextSize = 8  
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left  
+    statusLabel.Parent = statusBar  
+    local led = Instance.new("Frame")  
+    led.Size = UDim2.new(0, 5, 0, 5)  
+    led.Position = UDim2.new(1, -10, 0.5, -2.5)  
+    led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)  
+    led.BackgroundTransparency = 0.2  
+    led.BorderSizePixel = 0  
+    led.Parent = statusBar  
+    local ledCorner = Instance.new("UICorner")  
+    ledCorner.CornerRadius = UDim.new(1, 0)  
+    ledCorner.Parent = led  
+  
+    task.spawn(function()  
+        while screenGui and screenGui.Parent do  
+            local activeCount = (config.autoWinEnabled and 1 or 0) + (config.autoTaskEnabled and 1 or 0) + (config.espEnabled and 1 or 0) +  
+                                (config.speedBoostEnabled and 1 or 0) + (config.stealthEnabled and 1 or 0) + (config.godModeEnabled and 1 or 0) +  
+                                (config.infiniteAmmoEnabled and 1 or 0) + (config.shieldEnabled and 1 or 0) + (config.tpwalkEnabled and 1 or 0) +  
+                                (config.noCollideEnabled and 1 or 0) + (config.massKillEnabled and 1 or 0) + (config.autoGeneratorEnabled and 1 or 0) +  
+                                (config.autoSkillCheckEnabled and 1 or 0) + (config.autoAimEnabled and 1 or 0)  
+            if activeCount > 0 then  
+                statusLabel.Text = "ACTIVE: " .. activeCount .. " modules"  
+                statusLabel.TextColor3 = config.guiThemeColor  
+                led.BackgroundColor3 = Color3.fromRGB(0, 255, 0)  
+            else  
+                statusLabel.Text = "STANDBY"  
+                statusLabel.TextColor3 = Color3.fromRGB(150, 50, 50)  
+                led.BackgroundColor3 = Color3.fromRGB(255, 0, 0)  
+            end  
+            task.wait(1)  
+        end  
+    end)  
+  
+    mainFrame.BackgroundTransparency = 0.3  
+    TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()  
+  
+    -- Sinkronisasi: aktifkan tampilan HOME secara default  
+    homeItem.MouseButton1Click:Fire()  
 end
 -- ============================================================================
 -- RESTORE FEATURE STATES FUNCTION (LENGKAP)

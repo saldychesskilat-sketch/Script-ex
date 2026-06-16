@@ -5151,7 +5151,7 @@ local function createGridButton(parent, name, text, initialState, onChange)
     button.Size = UDim2.new(0,85,0,32)  
   
     button.Text = text .. (initialState and " [ON]" or " [OFF]")  
-    button.TextSize = 12  
+    button.TextSize = 7  
     button.Font = Enum.Font.GothamBold  
   
     button.TextColor3 =  

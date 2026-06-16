@@ -3793,7 +3793,7 @@ Kemi Studio
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(255,255,255)
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 6
+        btn.TextSize = 10
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
         btn.Parent = buttonHolder
@@ -5304,7 +5304,7 @@ local function createSidebarItem(parent, text, icon, active)
     button.Size = UDim2.new(1,0,0,30)
 
     button.Text = "   " .. icon .. "   " .. text
-    button.TextSize = 10
+    button.TextSize = 5
     button.Font = Enum.Font.GothamBold
 
     button.TextXAlignment = Enum.TextXAlignment.Left
@@ -5363,7 +5363,7 @@ local function createPermanentTeleportButton()
     teleportButton.BackgroundColor3 = Color3.fromRGB(40, 5, 5)  
     teleportButton.BackgroundTransparency = 0.2  
     teleportButton.TextColor3 = Color3.fromRGB(0, 230, 255)  
-    teleportButton.TextSize = 14  
+    teleportButton.TextSize = 6  
     teleportButton.Font = Enum.Font.GothamBold  
     teleportButton.BorderSizePixel = 0  
     teleportButton.Parent = teleportButtonGui  
@@ -5423,7 +5423,7 @@ local function createGUI()
     title.TextColor3 = config.guiThemeColor  
     title.BackgroundTransparency = 1  
     title.Font = Enum.Font.GothamBold  
-    title.TextSize = 12  
+    title.TextSize = 6  
     title.TextXAlignment = Enum.TextXAlignment.Left  
     title.Parent = titleBar  
     local versionLabel = Instance.new("TextLabel")  
@@ -5446,7 +5446,7 @@ local function createGUI()
     minimizeBtn.BackgroundTransparency = 0.2  
     minimizeBtn.BorderSizePixel = 0  
     minimizeBtn.Font = Enum.Font.GothamBold  
-    minimizeBtn.TextSize = 18  
+    minimizeBtn.TextSize = 6
     minimizeBtn.Parent = titleBar  
     local minCorner = Instance.new("UICorner")  
     minCorner.CornerRadius = UDim.new(0, 3)  
@@ -5460,7 +5460,7 @@ local function createGUI()
     closeBtn.BackgroundTransparency = 0.2  
     closeBtn.BorderSizePixel = 0  
     closeBtn.Font = Enum.Font.GothamBold  
-    closeBtn.TextSize = 14  
+    closeBtn.TextSize = 6  
     closeBtn.Parent = titleBar  
     local closeCorner = Instance.new("UICorner")  
     closeCorner.CornerRadius = UDim.new(0, 3)  
@@ -5660,7 +5660,7 @@ local function createGUI()
     statusLabel.TextColor3 = config.guiThemeColor  
     statusLabel.BackgroundTransparency = 1  
     statusLabel.Font = Enum.Font.GothamBold  
-    statusLabel.TextSize = 8  
+    statusLabel.TextSize = 4  
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left  
     statusLabel.Parent = statusBar  
     local led = Instance.new("Frame")  

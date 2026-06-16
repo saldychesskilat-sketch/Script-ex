@@ -5482,7 +5482,7 @@ local function createGUI()
     minimizeBtn.MouseButton1Click:Connect(minimizeGUI)
     closeBtn.MouseButton1Click:Connect(minimizeGUI)
 
-    -- Sidebar (manual)
+    -- Sidebar (menggunakan createSidebarItem)
     local sidebar = Instance.new("Frame")
     sidebar.Size = UDim2.new(0, 80, 1, -24)
     sidebar.Position = UDim2.new(0, 0, 0, 24)
@@ -5494,81 +5494,24 @@ local function createGUI()
     sidebarCorner.CornerRadius = UDim.new(0, 0)
     sidebarCorner.Parent = sidebar
 
-    -- Tombol sidebar
-    local homeItem = Instance.new("TextButton")
-    homeItem.Size = UDim2.new(0, 70, 0, 30)
-    homeItem.Position = UDim2.new(0.5, -35, 0, 10)
-    homeItem.Text = "HOME"
-    homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-    homeItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-    homeItem.BackgroundTransparency = 0.2
-    homeItem.BorderSizePixel = 0
-    homeItem.Font = Enum.Font.GothamBold
-    homeItem.TextSize = 11
-    homeItem.Parent = sidebar
-    local homeCorner = Instance.new("UICorner")
-    homeCorner.CornerRadius = UDim.new(0, 6)
-    homeCorner.Parent = homeItem
+    -- Container untuk sidebar items (menggunakan UIListLayout)
+    local sidebarList = Instance.new("Frame")
+    sidebarList.Size = UDim2.new(1, 0, 0, 200)
+    sidebarList.Position = UDim2.new(0, 0, 0.05, 0)
+    sidebarList.BackgroundTransparency = 1
+    sidebarList.Parent = sidebar
+    local sidebarLayout = Instance.new("UIListLayout")
+    sidebarLayout.Padding = UDim.new(0, 4)
+    sidebarLayout.FillDirection = Enum.FillDirection.Vertical
+    sidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    sidebarLayout.Parent = sidebarList
 
-    local featuresItem = Instance.new("TextButton")
-    featuresItem.Size = UDim2.new(0, 70, 0, 30)
-    featuresItem.Position = UDim2.new(0.5, -35, 0, 50)
-    featuresItem.Text = "FEATURES"
-    featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-    featuresItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-    featuresItem.BackgroundTransparency = 0.2
-    featuresItem.BorderSizePixel = 0
-    featuresItem.Font = Enum.Font.GothamBold
-    featuresItem.TextSize = 11
-    featuresItem.Parent = sidebar
-    local featuresCorner = Instance.new("UICorner")
-    featuresCorner.CornerRadius = UDim.new(0, 6)
-    featuresCorner.Parent = featuresItem
-
-    local settingsItem = Instance.new("TextButton")
-    settingsItem.Size = UDim2.new(0, 70, 0, 30)
-    settingsItem.Position = UDim2.new(0.5, -35, 0, 90)
-    settingsItem.Text = "SETTINGS"
-    settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-    settingsItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-    settingsItem.BackgroundTransparency = 0.2
-    settingsItem.BorderSizePixel = 0
-    settingsItem.Font = Enum.Font.GothamBold
-    settingsItem.TextSize = 11
-    settingsItem.Parent = sidebar
-    local settingsCorner = Instance.new("UICorner")
-    settingsCorner.CornerRadius = UDim.new(0, 6)
-    settingsCorner.Parent = settingsItem
-
-    local infoItem = Instance.new("TextButton")
-    infoItem.Size = UDim2.new(0, 70, 0, 30)
-    infoItem.Position = UDim2.new(0.5, -35, 0, 130)
-    infoItem.Text = "INFO"
-    infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-    infoItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-    infoItem.BackgroundTransparency = 0.2
-    infoItem.BorderSizePixel = 0
-    infoItem.Font = Enum.Font.GothamBold
-    infoItem.TextSize = 11
-    infoItem.Parent = sidebar
-    local infoCorner = Instance.new("UICorner")
-    infoCorner.CornerRadius = UDim.new(0, 6)
-    infoCorner.Parent = infoItem
-
-    local aboutItem = Instance.new("TextButton")
-    aboutItem.Size = UDim2.new(0, 70, 0, 30)
-    aboutItem.Position = UDim2.new(0.5, -35, 0, 170)
-    aboutItem.Text = "ABOUT"
-    aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-    aboutItem.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-    aboutItem.BackgroundTransparency = 0.2
-    aboutItem.BorderSizePixel = 0
-    aboutItem.Font = Enum.Font.GothamBold
-    aboutItem.TextSize = 11
-    aboutItem.Parent = sidebar
-    local aboutCorner = Instance.new("UICorner")
-    aboutCorner.CornerRadius = UDim.new(0, 6)
-    aboutCorner.Parent = aboutItem
+    -- Buat semua sidebar item (semua false dulu, aktif akan diatur saat switch tab)
+    local homeItem = createSidebarItem(sidebarList, "HOME", "", false)
+    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)
+    local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)
+    local infoItem = createSidebarItem(sidebarList, "INFO", "", false)
+    local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)
 
     -- Content Panel (area utama)
     contentPanel = Instance.new("Frame")
@@ -5577,14 +5520,14 @@ local function createGUI()
     contentPanel.BackgroundTransparency = 1
     contentPanel.Parent = mainFrame
 
-    -- Variabel untuk menampung konten yang dibuat (global di script)
+    -- Variabel untuk menyimpan konten yang sedang aktif (agar bisa dihancurkan saat pindah tab)
     homeContent = nil
     featuresContent = nil
     settingsContent = nil
     infoContent = nil
     aboutContent = nil
 
-    -- Fungsi untuk menghapus semua konten sebelum beralih
+    -- Fungsi untuk menghancurkan semua konten (agar tidak menumpuk)
     local function clearAllContents()
         if homeContent then homeContent:Destroy() end
         if featuresContent then featuresContent:Destroy() end
@@ -5605,6 +5548,7 @@ local function createGUI()
         featuresContent.BackgroundTransparency = 1
         featuresContent.Parent = contentPanel
 
+        -- Grid layout untuk tombol fitur
         local featureGrid = Instance.new("UIGridLayout")
         featureGrid.CellSize = UDim2.new(0, 85, 0, 32)
         featureGrid.CellPadding = UDim2.new(0, 4, 0, 4)
@@ -5614,6 +5558,7 @@ local function createGUI()
         featureGrid.SortOrder = Enum.SortOrder.LayoutOrder
         featureGrid.Parent = featuresContent
 
+        -- Daftar fitur (sesuai dengan yang ada di config)
         local features = {
             {name="autoWinEnabled", text="AUTO WIN"},
             {name="autoTaskEnabled", text="AUTO TASK"},
@@ -5631,74 +5576,91 @@ local function createGUI()
             {name="autoAimEnabled", text="AUTO AIM"},
             {name="povMode", text="POV"}
         }
+
         for _, feat in ipairs(features) do
             local initialState = config[feat.name] or false
             createGridButton(featuresContent, feat.name, feat.text, initialState)
         end
     end
 
-    -- Tombol sidebar events
-    homeItem.MouseButton1Click:Connect(function()
-        homeItem.TextColor3 = Color3.fromRGB(0,230,255)
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-
+    -- Fungsi untuk mengganti tab (menghancurkan konten lama dan membuat yang baru)
+    local function switchTab(tabName)
         clearAllContents()
-        createHomeContent() -- asumsikan fungsi ini sudah ada dan menggunakan contentPanel global
-    end)
 
-    featuresItem.MouseButton1Click:Connect(function()
-        featuresItem.TextColor3 = Color3.fromRGB(0,230,255)
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+        -- Reset tampilan semua sidebar item (warna, stroke)
+        local items = {homeItem, featuresItem, settingsItem, infoItem, aboutItem}
+        for _, item in ipairs(items) do
+            item.TextColor3 = Color3.fromRGB(210, 210, 210)
+            item.BackgroundColor3 = Color3.fromRGB(8, 18, 32)
+            local stroke = item:FindFirstChild("UIStroke")
+            if stroke then
+                stroke.Color = Color3.fromRGB(60, 100, 140)
+                stroke.Transparency = 0.55
+            end
+        end
 
-        clearAllContents()
-        createFeatureContent()
-    end)
+        -- Aktifkan tab yang dipilih
+        if tabName == "HOME" then
+            homeItem.TextColor3 = Color3.fromRGB(0, 225, 255)
+            homeItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
+            local stroke = homeItem:FindFirstChild("UIStroke")
+            if stroke then
+                stroke.Color = Color3.fromRGB(0, 200, 255)
+                stroke.Transparency = 0.25
+            end
+            createHomeContent() -- asumsikan fungsi ini sudah ada dan menggunakan contentPanel global
+        elseif tabName == "FEATURES" then
+            featuresItem.TextColor3 = Color3.fromRGB(0, 225, 255)
+            featuresItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
+            local stroke = featuresItem:FindFirstChild("UIStroke")
+            if stroke then
+                stroke.Color = Color3.fromRGB(0, 200, 255)
+                stroke.Transparency = 0.25
+            end
+            createFeatureContent()
+        elseif tabName == "SETTINGS" then
+            settingsItem.TextColor3 = Color3.fromRGB(0, 225, 255)
+            settingsItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
+            local stroke = settingsItem:FindFirstChild("UIStroke")
+            if stroke then
+                stroke.Color = Color3.fromRGB(0, 200, 255)
+                stroke.Transparency = 0.25
+            end
+            createSettingsContent() -- asumsikan fungsi ini sudah ada
+        elseif tabName == "INFO" then
+            infoItem.TextColor3 = Color3.fromRGB(0, 225, 255)
+            infoItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
+            local stroke = infoItem:FindFirstChild("UIStroke")
+            if stroke then
+                stroke.Color = Color3.fromRGB(0, 200, 255)
+                stroke.Transparency = 0.25
+            end
+            createInfoContent() -- asumsikan fungsi ini sudah ada
+        elseif tabName == "ABOUT" then
+            aboutItem.TextColor3 = Color3.fromRGB(0, 225, 255)
+            aboutItem.BackgroundColor3 = Color3.fromRGB(12, 30, 50)
+            local stroke = aboutItem:FindFirstChild("UIStroke")
+            if stroke then
+                stroke.Color = Color3.fromRGB(0, 200, 255)
+                stroke.Transparency = 0.25
+            end
+            createAboutContent() -- asumsikan fungsi ini sudah ada
+        end
+    end
 
-    settingsItem.MouseButton1Click:Connect(function()
-        settingsItem.TextColor3 = Color3.fromRGB(0,230,255)
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+    -- Koneksi tombol sidebar
+    homeItem.MouseButton1Click:Connect(function() switchTab("HOME") end)
+    featuresItem.MouseButton1Click:Connect(function() switchTab("FEATURES") end)
+    settingsItem.MouseButton1Click:Connect(function() switchTab("SETTINGS") end)
+    infoItem.MouseButton1Click:Connect(function() switchTab("INFO") end)
+    aboutItem.MouseButton1Click:Connect(function() switchTab("ABOUT") end)
 
-        clearAllContents()
-        createSettingsContent() -- asumsikan fungsi ini sudah ada
-    end)
-
-    infoItem.MouseButton1Click:Connect(function()
-        infoItem.TextColor3 = Color3.fromRGB(0,230,255)
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-        clearAllContents()
-        createInfoContent() -- asumsikan fungsi ini sudah ada
-    end)
-
-    aboutItem.MouseButton1Click:Connect(function()
-        aboutItem.TextColor3 = Color3.fromRGB(0,230,255)
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
-
-        clearAllContents()
-        createAboutContent() -- asumsikan fungsi ini sudah ada
-    end)
-
-    -- Tampilkan default tab FEATURES
-    featuresItem.MouseButton1Click:Fire()
+    -- Tampilkan tab FEATURES secara default
+    switchTab("FEATURES")
 
     makeDraggable(mainFrame)
 
-    -- Status bar
+    -- Status bar (sama seperti sebelumnya)
     local statusBar = Instance.new("Frame")
     statusBar.Size = UDim2.new(1, 0, 0, 18)
     statusBar.Position = UDim2.new(0, 0, 1, -18)
@@ -5753,7 +5715,6 @@ local function createGUI()
     mainFrame.BackgroundTransparency = 0.3
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
 end
-
 -- ============================================================================
 -- RESTORE FEATURE STATES FUNCTION (LENGKAP)
 -- ============================================================================

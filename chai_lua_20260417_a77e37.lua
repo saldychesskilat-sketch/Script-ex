@@ -2196,30 +2196,28 @@ local function autoParryLoop()
     local dist = (localRootPart.Position - root.Position).Magnitude
     if dist > DETECTION_RADIUS then return end
 
-    -- ===== STUN PLAYER LOKAL SELAMA 1 DETIK =====
+    -- ===== TRIGGER PARRY (dulu) =====
+    lastParry = tick()
+    lastParryPerPlayer[player] = tick()
+    print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
+    pcall(function() fireParryRemote(player) end)
+
+    -- ===== STUN PLAYER LOKAL (setelah parry) =====
     if localHumanoid then
-        -- Simpan kecepatan asli
         local originalSpeed = localHumanoid.WalkSpeed
-        -- Hentikan gerakan
         localHumanoid.WalkSpeed = 0
-        -- Opsional: matikan kemampuan lompat agar benar-benar diam
+        -- Opsional: matikan lompat agar benar-benar diam
         local originalJump = localHumanoid.JumpPower
         localHumanoid.JumpPower = 0
 
-        -- Kembalikan setelah 1 detik (tanpa menghalangi eksekusi lain)
         task.spawn(function()
-            task.wait(1)
+            task.wait(1)  -- durasi stun 1 detik
             if localHumanoid then
                 localHumanoid.WalkSpeed = originalSpeed
                 localHumanoid.JumpPower = originalJump
             end
         end)
     end
-
-    lastParry = tick()
-    lastParryPerPlayer[player] = tick()
-    print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
-    pcall(function() fireParryRemote(player) end)
     end
         
     local function hookAttributes(player, char)

@@ -2187,36 +2187,65 @@ local function autoParryLoop()
         
     local function triggerParry(reason, player)
     if tick() - lastParry < PARRY_COOLDOWN then return end
+
     local lastP = lastParryPerPlayer[player] or 0
     if tick() - lastP < PARRY_COOLDOWN then return end
+
     local char = player.Character
     if not char then return end
+
     local root = getRoot(char)
     if not root then return end
+
     local dist = (localRootPart.Position - root.Position).Magnitude
     if dist > DETECTION_RADIUS then return end
 
-    -- ===== TRIGGER PARRY (dulu) =====
+    -- ===== TRIGGER PARRY =====
     lastParry = tick()
     lastParryPerPlayer[player] = tick()
-    print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
-    pcall(function() fireParryRemote(player) end)
 
-    -- ===== STUN PLAYER LOKAL (setelah parry) =====
+    print(
+        "[AutoParry] Triggered by",
+        reason,
+        "from",
+        player.Name,
+        "dist=",
+        math.floor(dist)
+    )
+
+    pcall(function()
+        fireParryRemote(player)
+    end)
+
+    -- ===== PLAY PARRY ANIMATION DEVELOPER =====
     if localHumanoid then
-        local originalSpeed = localHumanoid.WalkSpeed
-        localHumanoid.WalkSpeed = 0
-        -- Opsional: matikan lompat agar benar-benar diam
-        local originalJump = localHumanoid.JumpPower
-        localHumanoid.JumpPower = 0
+        local animator = localHumanoid:FindFirstChildOfClass("Animator")
 
-        task.spawn(function()
-            task.wait(1)  -- durasi stun 1 detik
-            if localHumanoid then
-                localHumanoid.WalkSpeed = originalSpeed
-                localHumanoid.JumpPower = originalJump
-            end
-        end)
+        if animator then
+            local anim = Instance.new("Animation")
+            anim.AnimationId = "rbxassetid://97915871372697"
+
+            local track = animator:LoadAnimation(anim)
+            track.Priority = Enum.AnimationPriority.Action
+
+            local oldRotate = localHumanoid.AutoRotate
+            localHumanoid.AutoRotate = false
+
+            track:Play()
+
+            task.spawn(function()
+                task.wait(0.8)
+
+                if localHumanoid and localHumanoid.Parent then
+                    localHumanoid.AutoRotate = oldRotate
+                end
+
+                pcall(function()
+                    track:Stop()
+                    anim:Destroy()
+                end)
+            end)
+        end
     end
     end
         

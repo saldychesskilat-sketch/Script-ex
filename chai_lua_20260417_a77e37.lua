@@ -2234,7 +2234,6 @@ local function autoParryLoop()
             track:Play()
 
             task.spawn(function()
-                task.wait(0.8)
 
                 if localHumanoid and localHumanoid.Parent then
                     localHumanoid.AutoRotate = oldRotate

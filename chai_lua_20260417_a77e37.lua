@@ -2185,7 +2185,7 @@ local function autoParryLoop()
         return false
     end
     
-    Local fuction triggerParry(reason, player)    
+    Local function triggerParry(reason, player)    
     if tick() - lastParry < PARRY_COOLDOWN then return end    
     local lastP = lastParryPerPlayer[player] or 0    
     if tick() - lastP < PARRY_COOLDOWN then return end    

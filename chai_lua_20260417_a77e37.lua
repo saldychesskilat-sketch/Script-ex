@@ -1824,7 +1824,6 @@ local function autoParryLoop()
     "HumanoidRootPart.Arm.knife",
     "HumanoidRootPart.Killerost",
     "HumanoidRootPart.Lookscriptkiller",
-    "HumanoidRootPart.Animations.StunAnimation",
     "HumanoidRootPart.Animations.WipeMachete",
     "HumanoidRootPart.sfx.attackline",
     "HumanoidRootPart.Arm.Handle.Handle.BasicAttack",
@@ -1839,6 +1838,7 @@ local function autoParryLoop()
     "HumanoidRootPart.Arm.Swing",
     "HumanoidRootPart.attack",
     "HumanoidRootPart.sfx.attack",
+    "HumanoidRootPart.Character.Animations.WipeMachete",
     "HumanoidRootPart.Arm.Knife.Main.Plane.001_Blade",
     }
     -- ==========================================        

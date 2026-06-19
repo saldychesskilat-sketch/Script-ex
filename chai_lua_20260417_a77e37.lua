@@ -2195,24 +2195,10 @@ local function autoParryLoop()
     if not root then return end
     local dist = (localRootPart.Position - root.Position).Magnitude
     if dist > DETECTION_RADIUS then return end
-
-    -- ===== TRIGGER PARRY (dulu) =====
     lastParry = tick()
     lastParryPerPlayer[player] = tick()
     print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
     pcall(function() fireParryRemote(player) end)
-
-    -- ===== STUN PLAYER LOKAL (setelah parry) =====
-    if localHumanoid then
-        local animator = localHumanoid:FindFirstChildOfClass("Animator")
-        if animator then
-            local anim = Instance.new("Animation")
-            anim.AnimationId = "rbxassetid://97915871372697"
-            local track = animator:LoadAnimation(anim)
-            track.Priority = Enum.AnimationPriority.Action
-            track:Play()
-        end
-    end
     end
         
     local function hookAttributes(player, char)

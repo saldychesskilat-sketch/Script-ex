@@ -1851,9 +1851,39 @@ local function autoParryLoop()
         "frenzy", "parry", "hookprogress", "hookcount"        
     }        
         
+    -- Whitelist nama objek yang benar-benar menandakan serangan (bukan idle)
+    local ATTACK_OBJECTS = {
+        ["BasicAttack"] = true,
+        ["attackline"] = true,
+        ["stunline"] = true,
+        ["Swing"] = true,
+        ["charge"] = true,
+        ["attack"] = true,
+        ["FrenzySound"] = true,
+        ["SwingSound"] = true,
+        ["WallHitSound"] = true,
+        ["HitSound"] = true,
+        ["Frenzy"] = true, -- attribute
+        ["Parry"] = true, -- attribute
+        ["HookProgress"] = true,
+        ["HookCount"] = true,
+    }
+        
     local scannedObjects = {}            
     local stateConnections = {}            
     local lastParryPerPlayer = {}            
+        
+    -- Cache animation track (satu kali)
+    local parryTrack = nil
+    local function getParryTrack(animator)
+        if parryTrack then return parryTrack end
+        if not animator then return nil end
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://97915871372697"
+        parryTrack = animator:LoadAnimation(anim)
+        parryTrack.Priority = Enum.AnimationPriority.Action
+        return parryTrack
+    end
         
     -- ========== FUNGSI MEMBUAT ULANG ESP ==========
     local function refreshESP()
@@ -2016,7 +2046,7 @@ local function autoParryLoop()
         end
         
         local function updateCDUI()
-            local rel = PARRY_COOLDOWN / 1.0  -- 0..1
+            local rel = PARRY_COOLDOWN / 1.0
             local w = cdBg.AbsoluteSize.X
             local tw = cdThumb.AbsoluteSize.X
             if w > 0 then
@@ -2073,8 +2103,8 @@ local function autoParryLoop()
             local bgW = cdBg.AbsoluteSize.X
             if bgW <= 0 then return end
             local rel = math.clamp((mouseX - bgX) / bgW, 0, 1)
-            local newVal = rel  -- langsung 0..1
-            newVal = math.floor(newVal * 1000 + 0.5) / 1000  -- step 0.001
+            local newVal = rel
+            newVal = math.floor(newVal * 1000 + 0.5) / 1000
             if newVal ~= PARRY_COOLDOWN then
                 PARRY_COOLDOWN = newVal
                 updateCDUI()
@@ -2184,7 +2214,7 @@ local function autoParryLoop()
         return false
     end
     
-    -- ===== TRIGGER PARRY (dengan cooldown lebih presisi) =====
+    -- ===== TRIGGER PARRY =====
     local function triggerParry(reason, player)
         if tick() - lastParry < PARRY_COOLDOWN then return end
         local lastP = lastParryPerPlayer[player] or 0
@@ -2201,19 +2231,19 @@ local function autoParryLoop()
         print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
         pcall(function() fireParryRemote(player) end)
 
-        -- Stun animasi (opsional)
+        -- Play parry animation (cached)
         if localHumanoid then
             local animator = localHumanoid:FindFirstChildOfClass("Animator")
             if animator then
-                local anim = Instance.new("Animation")
-                anim.AnimationId = "rbxassetid://97915871372697"
-                local track = animator:LoadAnimation(anim)
-                track.Priority = Enum.AnimationPriority.Action
-                track:Play()
+                local track = getParryTrack(animator)
+                if track then
+                    track:Play()
+                end
             end
         end
     end
         
+    -- === HOOK FUNCTIONS (Event‑Based) ==========
     local function hookAttributes(player, char)
         local function onAttributeChanged(attrName)
             return function()
@@ -2230,14 +2260,14 @@ local function autoParryLoop()
                 end
             end
         end
+        -- Pasang signal tanpa pengecekan nil
         for _, attrName in ipairs(COMBAT_ATTRIBUTES) do
-            if char:GetAttribute(attrName) ~= nil then
-                local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))
-                table.insert(stateConnections, conn)
-            end
+            local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))
+            table.insert(stateConnections, conn)
         end
     end
         
+    -- Hook sound
     local function hookSound(sound, player)
         if scannedObjects[sound] then return end
         scannedObjects[sound] = true
@@ -2255,50 +2285,51 @@ local function autoParryLoop()
         table.insert(stateConnections, conn)
     end
         
+    -- Hook karakter killer
     local function hookCharacter(player, char)
         if not isKiller(player) then return end
         print("[AutoParry] Hooked killer:", player.Name)
+        
+        -- Attribute (tanpa pengecekan nil)
         hookAttributes(player, char)
+        
+        -- Scan existing sound
         for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("Sound") then hookSound(obj, player) end
-            if matchesCombatPath(obj, char) then triggerParry("PathMatch:"..obj.Name, player) end
+            if obj:IsA("Sound") then
+                hookSound(obj, player)
+            end
         end
+        
+        -- DescendantAdded
         local addedConn = char.DescendantAdded:Connect(function(obj)
             if obj:IsA("Sound") then
                 hookSound(obj, player)
-                if obj.Playing then triggerParry("NewSound:"..obj.Name, player) end
-            end
-            if matchesCombatPath(obj, char) then triggerParry("PathMatchNew:"..obj.Name, player) end
-        end)
-        table.insert(stateConnections, addedConn)
-        local attrConn = char.AttributeChanged:Connect(function(attrName)
-            local lowerAttr = attrName:lower()
-            if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
-                local val = char:GetAttribute(attrName)
-                if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then
-                    triggerParry("AttributeChanged:"..attrName, player)
+                if obj.Playing then
+                    local sName = obj.Name:lower()
+                    for _, kw in ipairs(COMBAT_SOUNDS) do
+                        if sName:find(kw) then
+                            triggerParry("NewSound:"..obj.Name, player)
+                            break
+                        end
+                    end
                 end
             end
-        end)
-        table.insert(stateConnections, attrConn)
-    end
-        
-    local function hookCharacter(player, char)
-        if not isKiller(player) then return end
-        print("[AutoParry] Hooked killer:", player.Name)
-        hookAttributes(player, char)
-        for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("Sound") then hookSound(obj, player) end
-            if matchesCombatPath(obj, char) then triggerParry("PathMatch:"..obj.Name, player) end
-        end
-        local addedConn = char.DescendantAdded:Connect(function(obj)
-            if obj:IsA("Sound") then
-                hookSound(obj, player)
-                if obj.Playing then triggerParry("NewSound:"..obj.Name, player) end
+            -- Hanya trigger jika objek berada dalam ATTACK_OBJECTS (bukan idle)
+            if matchesCombatPath(obj, char) and ATTACK_OBJECTS[obj.Name] then
+                triggerParry("PathMatchNew:"..obj.Name, player)
             end
-            if matchesCombatPath(obj, char) then triggerParry("PathMatchNew:"..obj.Name, player) end
         end)
         table.insert(stateConnections, addedConn)
+        
+        -- DescendantRemoving (deteksi penghilangan objek)
+        local removingConn = char.DescendantRemoving:Connect(function(obj)
+            if matchesCombatPath(obj, char) and ATTACK_OBJECTS[obj.Name] then
+                triggerParry("PathRemoved:"..obj.Name, player)
+            end
+        end)
+        table.insert(stateConnections, removingConn)
+        
+        -- AttributeChanged tambahan (untuk jaga-jaga)
         local attrConn = char.AttributeChanged:Connect(function(attrName)
             local lowerAttr = attrName:lower()
             if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
@@ -2331,7 +2362,7 @@ local function autoParryLoop()
         table.insert(stateConnections, charConn)
     end)
     table.insert(stateConnections, playerConn)
-            
+    
     -- ========== PULSE ==========
     local function createPulse()
         local rootPart = localRootPart
@@ -2374,12 +2405,8 @@ local function autoParryLoop()
             pulse:Destroy()
         end)
     end
-        
-    -- ========== POLLING CERDAS (hanya trigger saat ada perubahan) ==========
-    local playerScanState = {}  -- menyimpan state terakhir per player
-    local scanAccum = 0
-    local scanInterval = 0.03   -- scan setiap 30ms
 
+    -- ========== MAIN LOOP (HANYA UNTUK ESP, TANPA POLLING) ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
             combatStateConnected = false
@@ -2391,12 +2418,12 @@ local function autoParryLoop()
                 pcall(function() conn:Disconnect() end)
             end
             stateConnections = {}
+            table.clear(scannedObjects)   -- bersihkan scannedObjects
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             return
         end
         
-        -- Cari root part
         local rootPart = localRootPart
         if not rootPart then
             local char = localPlayer.Character
@@ -2414,7 +2441,6 @@ local function autoParryLoop()
             return
         end
         
-        -- Pastikan ESP ada
         if not radiusFolder or not radiusFolder.Parent then refreshESP() end
         local mainCircle = radiusFolder:FindFirstChild("MainRadius")
         local outerRing = radiusFolder:FindFirstChild("OuterRing")
@@ -2439,101 +2465,11 @@ local function autoParryLoop()
             lastPulse = tick()
             createPulse()
         end
-        
-        -- ===== POLLING DENGAN PERBANDINGAN STATE =====
-        scanAccum = scanAccum + dt
-        if scanAccum >= scanInterval then
-            scanAccum = 0
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer and isKiller(player) then
-                    local char = player.Character
-                    if char then
-                        local root = getRoot(char)
-                        if root then
-                            local dist = (rootPart.Position - root.Position).Magnitude
-                            if dist <= DETECTION_RADIUS then
-                                -- Ambil state sebelumnya
-                                local prevState = playerScanState[player]
-                                local currentPaths = {}
-                                local currentSounds = {}
-                                local currentAttrs = {}
-                                
-                                -- Kumpulkan data saat ini
-                                for _, obj in ipairs(char:GetDescendants()) do
-                                    if matchesCombatPath(obj, char) then
-                                        currentPaths[obj] = true
-                                    end
-                                    if obj:IsA("Sound") and obj.Playing then
-                                        currentSounds[obj] = true
-                                    end
-                                end
-                                for _, attrName in ipairs(COMBAT_ATTRIBUTES) do
-                                    local val = char:GetAttribute(attrName)
-                                    if val ~= nil then
-                                        currentAttrs[attrName] = val
-                                    end
-                                end
-                                
-                                -- Bandingkan dengan state sebelumnya
-                                if prevState then
-                                    -- Objek baru yang combat
-                                    for obj, _ in pairs(currentPaths) do
-                                        if not prevState.paths[obj] then
-                                            triggerParry("PollNewPath:"..obj.Name, player)
-                                        end
-                                    end
-                                    -- Sound baru yang playing
-                                    for obj, _ in pairs(currentSounds) do
-                                        if not prevState.sounds[obj] then
-                                            triggerParry("PollNewSound:"..obj.Name, player)
-                                        end
-                                    end
-                                    -- Attribute yang berubah ke nilai combat
-                                    for attrName, val in pairs(currentAttrs) do
-                                        local oldVal = prevState.attrs[attrName]
-                                        if oldVal == nil or oldVal ~= val then
-                                            if (attrName == "frenzy" and val == true) or
-                                               (attrName == "parry" and val == true) or
-                                               (attrName == "hookprogress" and type(val) == "number" and val > 0) or
-                                               (attrName == "hookcount" and val and tonumber(val) and tonumber(val) > 0) then
-                                                triggerParry("PollAttrChange:"..attrName, player)
-                                            end
-                                        end
-                                    end
-                                else
-                                    -- Pertama kali scan player ini: trigger untuk semua yang sudah ada (agar tidak kelewatan)
-                                    for obj, _ in pairs(currentPaths) do
-                                        triggerParry("PollInitPath:"..obj.Name, player)
-                                    end
-                                    for obj, _ in pairs(currentSounds) do
-                                        triggerParry("PollInitSound:"..obj.Name, player)
-                                    end
-                                    for attrName, val in pairs(currentAttrs) do
-                                        if (attrName == "frenzy" and val == true) or
-                                           (attrName == "parry" and val == true) or
-                                           (attrName == "hookprogress" and type(val) == "number" and val > 0) or
-                                           (attrName == "hookcount" and val and tonumber(val) and tonumber(val) > 0) then
-                                            triggerParry("PollInitAttr:"..attrName, player)
-                                        end
-                                    end
-                                end
-                                
-                                -- Simpan state saat ini
-                                playerScanState[player] = {
-                                    paths = currentPaths,
-                                    sounds = currentSounds,
-                                    attrs = currentAttrs
-                                }
-                            end
-                        end
-                    end
-                end
-            end
-        end
     end)
         
-    print("[AutoParry] Enhanced with change-detection polling (0.03s) and 0.001s cooldown step")
+    print("[AutoParry] Event‑based detection: DescendantAdded + Sound.Playing + AttributeChanged. Responsive & accurate.")
 end
+
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

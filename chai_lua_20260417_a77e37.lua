@@ -2374,10 +2374,11 @@ local function autoParryLoop()
             pulse:Destroy()
         end)
     end
-
-    -- ========== MAIN LOOP (dengan polling aktif) ==========
+        
+    -- ========== POLLING CERDAS (hanya trigger saat ada perubahan) ==========
+    local playerScanState = {}  -- menyimpan state terakhir per player
     local scanAccum = 0
-    local scanInterval = 0.03  -- scan setiap 30ms
+    local scanInterval = 0.03   -- scan setiap 30ms
 
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
@@ -2414,9 +2415,7 @@ local function autoParryLoop()
         end
         
         -- Pastikan ESP ada
-        if not radiusFolder or not radiusFolder.Parent then
-            refreshESP()
-        end
+        if not radiusFolder or not radiusFolder.Parent then refreshESP() end
         local mainCircle = radiusFolder:FindFirstChild("MainRadius")
         local outerRing = radiusFolder:FindFirstChild("OuterRing")
         if not mainCircle or not outerRing then
@@ -2424,7 +2423,7 @@ local function autoParryLoop()
             mainCircle = radiusFolder:FindFirstChild("MainRadius")
             outerRing = radiusFolder:FindFirstChild("OuterRing")
             if not mainCircle or not outerRing then return end
-            end
+        end
         
         pulseTick = pulseTick + dt * 2
         rainbowTick = rainbowTick + dt * 0.5
@@ -2441,11 +2440,10 @@ local function autoParryLoop()
             createPulse()
         end
         
-        -- ===== POLLING AKTIF (setiap 0.03 detik) =====
+        -- ===== POLLING DENGAN PERBANDINGAN STATE =====
         scanAccum = scanAccum + dt
         if scanAccum >= scanInterval then
             scanAccum = 0
-            -- Scan semua killer dalam radius
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer and isKiller(player) then
                     local char = player.Character
@@ -2454,32 +2452,78 @@ local function autoParryLoop()
                         if root then
                             local dist = (rootPart.Position - root.Position).Magnitude
                             if dist <= DETECTION_RADIUS then
-                                -- Cek path
+                                -- Ambil state sebelumnya
+                                local prevState = playerScanState[player]
+                                local currentPaths = {}
+                                local currentSounds = {}
+                                local currentAttrs = {}
+                                
+                                -- Kumpulkan data saat ini
                                 for _, obj in ipairs(char:GetDescendants()) do
                                     if matchesCombatPath(obj, char) then
-                                        triggerParry("PollPath:"..obj.Name, player)
+                                        currentPaths[obj] = true
                                     end
                                     if obj:IsA("Sound") and obj.Playing then
-                                        local sName = obj.Name:lower()
-                                        for _, kw in ipairs(COMBAT_SOUNDS) do
-                                            if sName:find(kw) then
-                                                triggerParry("PollSound:"..obj.Name, player)
-                                                break
+                                        currentSounds[obj] = true
+                                    end
+                                end
+                                for _, attrName in ipairs(COMBAT_ATTRIBUTES) do
+                                    local val = char:GetAttribute(attrName)
+                                    if val ~= nil then
+                                        currentAttrs[attrName] = val
+                                    end
+                                end
+                                
+                                -- Bandingkan dengan state sebelumnya
+                                if prevState then
+                                    -- Objek baru yang combat
+                                    for obj, _ in pairs(currentPaths) do
+                                        if not prevState.paths[obj] then
+                                            triggerParry("PollNewPath:"..obj.Name, player)
+                                        end
+                                    end
+                                    -- Sound baru yang playing
+                                    for obj, _ in pairs(currentSounds) do
+                                        if not prevState.sounds[obj] then
+                                            triggerParry("PollNewSound:"..obj.Name, player)
+                                        end
+                                    end
+                                    -- Attribute yang berubah ke nilai combat
+                                    for attrName, val in pairs(currentAttrs) do
+                                        local oldVal = prevState.attrs[attrName]
+                                        if oldVal == nil or oldVal ~= val then
+                                            if (attrName == "frenzy" and val == true) or
+                                               (attrName == "parry" and val == true) or
+                                               (attrName == "hookprogress" and type(val) == "number" and val > 0) or
+                                               (attrName == "hookcount" and val and tonumber(val) and tonumber(val) > 0) then
+                                                triggerParry("PollAttrChange:"..attrName, player)
                                             end
                                         end
                                     end
-                                end
-                                -- Cek attribute
-                                for _, attrName in ipairs(COMBAT_ATTRIBUTES) do
-                                    local val = char:GetAttribute(attrName)
-                                    if attrName == "frenzy" and val == true then
-                                        triggerParry("PollAttr:Frenzy", player)
-                                    elseif attrName == "parry" and val == true then
-                                        triggerParry("PollAttr:Parry", player)
-                                    elseif attrName == "hookprogress" and type(val) == "number" and val > 0 then
-                                        triggerParry("PollAttr:HookProgress", player)
+                                else
+                                    -- Pertama kali scan player ini: trigger untuk semua yang sudah ada (agar tidak kelewatan)
+                                    for obj, _ in pairs(currentPaths) do
+                                        triggerParry("PollInitPath:"..obj.Name, player)
+                                    end
+                                    for obj, _ in pairs(currentSounds) do
+                                        triggerParry("PollInitSound:"..obj.Name, player)
+                                    end
+                                    for attrName, val in pairs(currentAttrs) do
+                                        if (attrName == "frenzy" and val == true) or
+                                           (attrName == "parry" and val == true) or
+                                           (attrName == "hookprogress" and type(val) == "number" and val > 0) or
+                                           (attrName == "hookcount" and val and tonumber(val) and tonumber(val) > 0) then
+                                            triggerParry("PollInitAttr:"..attrName, player)
+                                        end
                                     end
                                 end
+                                
+                                -- Simpan state saat ini
+                                playerScanState[player] = {
+                                    paths = currentPaths,
+                                    sounds = currentSounds,
+                                    attrs = currentAttrs
+                                }
                             end
                         end
                     end
@@ -2488,7 +2532,7 @@ local function autoParryLoop()
         end
     end)
         
-    print("[AutoParry] Enhanced with active polling (0.03s interval) and 0.001s cooldown step")
+    print("[AutoParry] Enhanced with change-detection polling (0.03s) and 0.001s cooldown step")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

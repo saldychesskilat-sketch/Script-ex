@@ -1812,6 +1812,7 @@ local function autoParryLoop()
     -- TEMPAT ANDA MENAMBAHKAN PATH DETEKSI        
     -- ==========================================        
     local COMBAT_PATHS = {
+    -- Versi asli
     "HumanoidRootPart.Weapon.TheCureStaff.BasicAttack",
     "HumanoidRootPart.Weapon.bat.bat.BasicAttack",
     "HumanoidRootPart.Weapon.Right",
@@ -1837,8 +1838,36 @@ local function autoParryLoop()
     "HumanoidRootPart.Arm.Swing",
     "HumanoidRootPart.attack",
     "HumanoidRootPart.sfx.attack",
-    "HumanoidRootPart.Character.Animations.WipeMachete",
     "HumanoidRootPart.Arm.Knife.Main.Plane.001_Blade",
+
+    -- Versi dengan Character setelah HumanoidRootPart
+    "HumanoidRootPart.Character.Weapon.TheCureStaff.BasicAttack",
+    "HumanoidRootPart.Character.Weapon.bat.bat.BasicAttack",
+    "HumanoidRootPart.Character.Weapon.Right",
+    "HumanoidRootPart.Character.FrenzySound",
+    "HumanoidRootPart.Character.SwingSound",
+    "HumanoidRootPart.Character.attackline",
+    "HumanoidRootPart.Character.stunline",
+    "HumanoidRootPart.Character.WallHitSound",
+    "HumanoidRootPart.Character.Arm.knife",
+    "HumanoidRootPart.Character.Killerost",
+    "HumanoidRootPart.Character.Lookscriptkiller",
+    "HumanoidRootPart.Character.Animations.WipeMachete",
+    "HumanoidRootPart.Character.sfx.attackline",
+    "HumanoidRootPart.Character.Arm.Handle.Handle.BasicAttack",
+    "HumanoidRootPart.Character.Weapon.Chainsaw.Chainsaw.charge",
+    "HumanoidRootPart.Character.Arm.Knide.Main.BasicAttack",
+    "HumanoidRootPart.Character.Arm.Machete.Main.BasicAttack",
+    "HumanoidRootPart.Character.Arm.Machete.pCube4_knife_0",
+    "HumanoidRootPart.Character.Animations.WipeMachetefr",
+    "HumanoidRootPart.Character.Animations.Frenzyend",
+    "HumanoidRootPart.Character.Weapon.Right Arm.Machete",
+    "HumanoidRootPart.Character.Spear2.Spear2.Hitbox",
+    "HumanoidRootPart.Character.Arm.Swing",
+    "HumanoidRootPart.Character.attack",
+    "HumanoidRootPart.Character.sfx.attack",
+    "HumanoidRootPart.Character.Animations.WipeMachete",
+    "HumanoidRootPart.Character.Arm.Knife.Main.Plane.001_Blade",
     }
     -- ==========================================        
         

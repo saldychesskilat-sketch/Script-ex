@@ -1609,73 +1609,109 @@ end
 -- ============================================================================        
         
 -- ============================================
--- FUNGSI PARRY VIA GUI BUTTON (SPAM + VIRTUALINPUT)
+-- PARRY VIA GUI BUTTON (BRUTE FORCE CEPAT)
 -- ============================================
 
--- Cari folder Controls dan tombol yang mungkin untuk parry
-local function getParryButtons()
-    local playerGui = localPlayer:FindFirstChild("PlayerGui")
-    if not playerGui then return {} end
-    local survivorMob = playerGui:FindFirstChild("Survivor-mob")
-    if not survivorMob then return {} end
-    local controls = survivorMob:FindFirstChild("Controls")
-    if not controls then return {} end
-    local buttons = {}
-    local possibleNames = {"action", "putdown", "sprint", "crouch"}
-    for _, name in ipairs(possibleNames) do
-        local btn = controls:FindFirstChild(name)
-        if btn and btn:IsA("TextButton") then
-            table.insert(buttons, btn)
-        end
-    end
-    return buttons
+local TouchID = 54321  -- ID untuk touch event
+
+-- Fungsi untuk mendapatkan posisi tengah tombol
+local function getButtonCenter(button)
+    local p = button.AbsolutePosition
+    local s = button.AbsoluteSize
+    if s.X == 0 or s.Y == 0 then return nil, nil end
+    return p.X + s.X/2, p.Y + s.Y/2
 end
 
--- Fungsi untuk menekan tombol dengan berbagai metode dan spam
-local function pressButtonWithSpam(button, spamCount)
-    spamCount = spamCount or 6
-    local methods = {
-        function() pcall(function() button:FireClick() end) end,
-        function() pcall(function() button:Activate() end) end,
-        function()
-            local vim = game:GetService("VirtualInputManager")
-            local pos = button.AbsolutePosition
-            local size = button.AbsoluteSize
-            if size.X == 0 or size.Y == 0 then return end
-            local cx = pos.X + size.X/2
-            local cy = pos.Y + size.Y/2
-            pcall(function()
-                vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
-                task.wait(0.02)
-                vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
-            end)
-        end,
-        function() pcall(function() button.MouseButton1Click:Fire() end) end,
-    }
-    for i = 1, spamCount do
-        for _, method in ipairs(methods) do
-            method()
-            task.wait(0.01) -- jeda kecil antar metode
-        end
-        task.wait(0.02) -- jeda antar spam
-    end
-end
-
--- Modifikasi fireParryRemote (gunakan GUI + spam)
+-- Fungsi utama parry via GUI (semua metode, spam cepat)
 local function fireParryRemote(targetPlayer)
-    local buttons = getParryButtons()
-    if #buttons == 0 then
-        -- fallback ke remote event jika tombol tidak ditemukan
-        return fallbackParry()
+    -- Cari folder Controls
+    local playerGui = localPlayer:FindFirstChild("PlayerGui")
+    local buttons = {}
+    if playerGui then
+        local survivorMob = playerGui:FindFirstChild("Survivor-mob")
+        if survivorMob then
+            local controls = survivorMob:FindFirstChild("Controls")
+            if controls then
+                local possibleNames = {"action", "putdown", "sprint", "crouch"}
+                for _, name in ipairs(possibleNames) do
+                    local btn = controls:FindFirstChild(name)
+                    if btn and btn:IsA("TextButton") then
+                        table.insert(buttons, btn)
+                    end
+                end
+            end
+        end
     end
-    -- Tekan semua tombol yang mungkin dengan spam
-    for _, btn in ipairs(buttons) do
-        pressButtonWithSpam(btn, 6)
+
+    -- Jika tombol ditemukan, lakukan brute force semua metode
+    if #buttons > 0 then
+        local vim = game:GetService("VirtualInputManager")
+        local guiService = game:GetService("GuiService")
+
+        for _ = 1, 6 do  -- spam 6 kali
+            for _, btn in ipairs(buttons) do
+                -- Metode 1: FireClick
+                pcall(function() btn:FireClick() end)
+
+                -- Metode 2: Activate
+                pcall(function() btn:Activate() end)
+
+                -- Metode 3: ClickSignal (MouseButton1Click)
+                pcall(function() btn.MouseButton1Click:Fire() end)
+
+                -- Metode 4: Mouse1 event (VirtualInputManager)
+                pcall(function()
+                    local cx, cy = getButtonCenter(btn)
+                    if cx and cy then
+                        vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
+                        vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
+                    end
+                end)
+
+                -- Metode 5: TouchEvent (mirip skillcheck generator)
+                pcall(function()
+                    local cx, cy = getButtonCenter(btn)
+                    if cx and cy then
+                        local inset = guiService:GetGuiInset()
+                        vim:SendTouchEvent(TouchID, 0, cx + inset.X, cy + inset.Y)
+                        vim:SendTouchEvent(TouchID, 2, cx + inset.X, cy + inset.Y)
+                    end
+                end)
+
+                -- Metode 6: Cari RemoteEvent di tombol atau parent, lalu FireServer
+                pcall(function()
+                    local remote = nil
+                    for _, child in ipairs(btn:GetChildren()) do
+                        if child:IsA("RemoteEvent") then
+                            remote = child
+                            break
+                        end
+                    end
+                    if not remote and btn.Parent then
+                        for _, child in ipairs(btn.Parent:GetChildren()) do
+                            if child:IsA("RemoteEvent") then
+                                remote = child
+                                break
+                            end
+                        end
+                    end
+                    if remote then
+                        remote:FireServer()
+                        -- Coba juga dengan argumen umum
+                        remote:FireServer("Parrying Dagger")
+                        remote:FireServer("parry")
+                    end
+                end)
+            end
+        end
+        return true
     end
-    return true
+
+    -- Jika tombol tidak ditemukan, fallback ke RemoteEvent
+    return fallbackParry()
 end
 
--- Fallback tetap menggunakan RemoteEvent (jika tombol tidak ada)
+-- Fallback RemoteEvent (tetap dipertahankan)
 local function fallbackParry()
     local remote, resultRemote = findParryRemoteEvent()
     if not remote then return false end
@@ -1690,21 +1726,9 @@ local function fallbackParry()
                 resultRemote:FireServer("parryResult")
             end
         end)
-        task.wait(0.01)
+        -- Tanpa task.wait agar cepat, tapi jika perlu bisa dikomentari
     end
     return true
-end
-
--- (Opsional) Jika ingin spesifik tombol tertentu, misal crouch:
-local function getSpecificParryButton(name)
-    name = name or "crouch"
-    local playerGui = localPlayer:FindFirstChild("PlayerGui")
-    if not playerGui then return nil end
-    local survivorMob = playerGui:FindFirstChild("Survivor-mob")
-    if not survivorMob then return nil end
-    local controls = survivorMob:FindFirstChild("Controls")
-    if not controls then return nil end
-    return controls:FindFirstChild(name)
 end
         
 -- ============================================================================        

@@ -1754,7 +1754,7 @@ end
 -- ============================================================================        
 -- AUTO PARRY MAIN LOOP        
 -- ============================================================================                
-```local lastParrytime = 0
+local lastParrytime = 0
 
 local function getKillerDistance()        
     if not localRootPart then return math.huge end        

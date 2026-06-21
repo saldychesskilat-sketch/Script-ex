@@ -1796,7 +1796,7 @@ local function autoParryLoop()
     combatStateConnected = true            
         
     -- Variabel yang bisa diatur slider (default)
-    local DETECTION_RADIUS = 9           
+    local DETECTION_RADIUS = 10           
     local PARRY_COOLDOWN = 0.01            
     
     -- Variabel untuk GUI dan koneksi slider
@@ -2126,7 +2126,7 @@ local function autoParryLoop()
                 draggingFrame = false
             end
         end)
-        
+        task.wait(1)
         updateRadUI()
         updateCDUI()
         return gui

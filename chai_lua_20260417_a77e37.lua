@@ -1754,7 +1754,7 @@ end
 -- ============================================================================        
 -- AUTO PARRY MAIN LOOP        
 -- ============================================================================                
-local lastParrytime = 0
+```local lastParrytime = 0
 
 local function getKillerDistance()        
     if not localRootPart then return math.huge end        
@@ -1809,40 +1809,39 @@ local function autoParryLoop()
     local rainbowTick = 0            
         
     -- ==========================================        
-    -- COMBAT PATHS (PRIORITAS UTAMA)        
+    -- TEMPAT ANDA MENAMBAHKAN PATH DETEKSI        
     -- ==========================================        
     local COMBAT_PATHS = {
-        "HumanoidRootPart.Weapon.TheCureStaff.BasicAttack",
-        "HumanoidRootPart.Weapon.bat.bat.BasicAttack",
-        "HumanoidRootPart.Weapon.Right",
-        "HumanoidRootPart.FrenzySound",
-        "HumanoidRootPart.SwingSound",
-        "HumanoidRootPart.attackline",
-        "HumanoidRootPart.stunline",
-        "HumanoidRootPart.WallHitSound",
-        "HumanoidRootPart.Arm.knife",
-        "HumanoidRootPart.Killerost",
-        "HumanoidRootPart.Lookscriptkiller",
-        "HumanoidRootPart.Animations.WipeMachete",
-        "HumanoidRootPart.sfx.attackline",
-        "HumanoidRootPart.Arm.Handle.Handle.BasicAttack",
-        "HumanoidRootPart.Weapon.Chainsaw.Chainsaw.charge",
-        "HumanoidRootPart.Arm.Knide.Main.BasicAttack",
-        "HumanoidRootPart.Arm.Machete.Main.BasicAttack",
-        "HumanoidRootPart.Arm.Machete.pCube4_knife_0",
-        "HumanoidRootPart.Animations.WipeMachetefr",
-        "HumanoidRootPart.Animations.Frenzyend",
-        "HumanoidRootPart.Weapon.Right Arm.Machete",
-        "HumanoidRootPart.Spear2.Spear2.Hitbox",
-        "HumanoidRootPart.Arm.Swing",
-        "HumanoidRootPart.attack",
-        "HumanoidRootPart.sfx.attack",
-        "HumanoidRootPart.Character.Animations.WipeMachete",
-        "HumanoidRootPart.Arm.Knife.Main.Plane.001_Blade",
+    "HumanoidRootPart.Weapon.TheCureStaff.BasicAttack",
+    "HumanoidRootPart.Weapon.bat.bat.BasicAttack",
+    "HumanoidRootPart.Weapon.Right",
+    "HumanoidRootPart.FrenzySound",
+    "HumanoidRootPart.SwingSound",
+    "HumanoidRootPart.attackline",
+    "HumanoidRootPart.stunline",
+    "HumanoidRootPart.WallHitSound",
+    "HumanoidRootPart.Arm.knife",
+    "HumanoidRootPart.Killerost",
+    "HumanoidRootPart.Lookscriptkiller",
+    "HumanoidRootPart.Animations.WipeMachete",
+    "HumanoidRootPart.sfx.attackline",
+    "HumanoidRootPart.Arm.Handle.Handle.BasicAttack",
+    "HumanoidRootPart.Weapon.Chainsaw.Chainsaw.charge",
+    "HumanoidRootPart.Arm.Knide.Main.BasicAttack",
+    "HumanoidRootPart.Arm.Machete.Main.BasicAttack",
+    "HumanoidRootPart.Arm.Machete.pCube4_knife_0",
+    "HumanoidRootPart.Animations.WipeMachetefr",
+    "HumanoidRootPart.Animations.Frenzyend",
+    "HumanoidRootPart.Weapon.Right Arm.Machete",
+    "HumanoidRootPart.Spear2.Spear2.Hitbox",
+    "HumanoidRootPart.Arm.Swing",
+    "HumanoidRootPart.attack",
+    "HumanoidRootPart.sfx.attack",
+    "HumanoidRootPart.Character.Animations.WipeMachete",
+    "HumanoidRootPart.Arm.Knife.Main.Plane.001_Blade",
     }
     -- ==========================================        
         
-    -- FALLBACK: COMBAT SOUNDS & ATTRIBUTES        
     local COMBAT_SOUNDS = {        
         "attackline", "swingsound", "stunline",        
         "parrysound", "frenzysound", "hitsound", "WallHitStun"        
@@ -1855,9 +1854,10 @@ local function autoParryLoop()
     local stateConnections = {}            
     local lastParryPerPlayer = {}            
         
-    -- ========== ESP REFRESH ==========
+    -- ========== FUNGSI MEMBUAT ULANG ESP SAAT RADIUS BERUBAH (DENGAN FALLBACK) ==========
     local function refreshESP()
         if not radiusFolder then 
+            -- jika folder hilang, buat baru
             radiusFolder = Instance.new("Folder")
             radiusFolder.Name = "ParryESP"
             radiusFolder.Parent = workspace
@@ -1885,18 +1885,20 @@ local function autoParryLoop()
             outerRing.CanCollide = false
             outerRing.Parent = radiusFolder
         end
+        -- update ukuran
         mainCircle.Size = Vector3.new(0.04, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
         outerRing.Size = Vector3.new(0.03, (DETECTION_RADIUS*2)+0.22, (DETECTION_RADIUS*2)+0.22)
-        return mainCircle, outerRing
     end
         
-    -- ========== GUI SLIDER ==========
+    -- ========== MEMBUAT GUI SLIDER ==========
     local function createConfigGUI()
         if parryConfigGui then parryConfigGui:Destroy() end
+        
         local gui = Instance.new("ScreenGui")
         gui.Name = "AutoParryConfig"
         gui.ResetOnSpawn = false
         gui.Parent = game.CoreGui
+        
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(0, 260, 0, 100)
         frame.Position = UDim2.new(0.5, -130, 0.5, -50)
@@ -1908,6 +1910,7 @@ local function autoParryLoop()
         stroke.Color = Color3.fromRGB(0,180,255)
         stroke.Transparency = 0.4
         stroke.Parent = frame
+        
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 28)
         header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
@@ -1918,6 +1921,7 @@ local function autoParryLoop()
         headerStroke.Color = Color3.fromRGB(0,180,255)
         headerStroke.Transparency = 0.5
         headerStroke.Parent = header
+        
         local title = Instance.new("TextLabel")
         title.Size = UDim2.new(0.7, 0, 1, 0)
         title.Position = UDim2.new(0, 10, 0, 0)
@@ -1928,6 +1932,7 @@ local function autoParryLoop()
         title.TextSize = 12
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Parent = header
+        
         local closeBtn = Instance.new("TextButton")
         closeBtn.Size = UDim2.new(0, 22, 0, 22)
         closeBtn.Position = UDim2.new(1, -28, 0.5, -11)
@@ -1943,6 +1948,7 @@ local function autoParryLoop()
             gui:Destroy()
             parryConfigGui = nil
         end)
+        
         -- Slider Radius
         local radLabel = Instance.new("TextLabel")
         radLabel.Size = UDim2.new(0.5, -10, 0, 20)
@@ -1953,6 +1959,7 @@ local function autoParryLoop()
         radLabel.Font = Enum.Font.Gotham
         radLabel.TextSize = 11
         radLabel.Parent = frame
+        
         local radBg = Instance.new("Frame")
         radBg.Size = UDim2.new(0.45, 0, 0, 4)
         radBg.Position = UDim2.new(0.52, 0, 0.46, 0)
@@ -1960,6 +1967,7 @@ local function autoParryLoop()
         radBg.BorderSizePixel = 0
         radBg.Parent = frame
         Instance.new("UICorner", radBg).CornerRadius = UDim.new(1,0)
+        
         local radThumb = Instance.new("TextButton")
         radThumb.Size = UDim2.new(0,12,0,12)
         radThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
@@ -1967,6 +1975,7 @@ local function autoParryLoop()
         radThumb.Text = ""
         radThumb.Parent = radBg
         Instance.new("UICorner", radThumb).CornerRadius = UDim.new(1,0)
+        
         -- Slider Cooldown
         local cdLabel = Instance.new("TextLabel")
         cdLabel.Size = UDim2.new(0.5, -10, 0, 20)
@@ -1977,6 +1986,7 @@ local function autoParryLoop()
         cdLabel.Font = Enum.Font.Gotham
         cdLabel.TextSize = 11
         cdLabel.Parent = frame
+        
         local cdBg = Instance.new("Frame")
         cdBg.Size = UDim2.new(0.45, 0, 0, 4)
         cdBg.Position = UDim2.new(0.52, 0, 0.76, 0)
@@ -1984,6 +1994,7 @@ local function autoParryLoop()
         cdBg.BorderSizePixel = 0
         cdBg.Parent = frame
         Instance.new("UICorner", cdBg).CornerRadius = UDim.new(1,0)
+        
         local cdThumb = Instance.new("TextButton")
         cdThumb.Size = UDim2.new(0,12,0,12)
         cdThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
@@ -1991,6 +2002,7 @@ local function autoParryLoop()
         cdThumb.Text = ""
         cdThumb.Parent = cdBg
         Instance.new("UICorner", cdThumb).CornerRadius = UDim.new(1,0)
+        
         -- Update functions
         local function updateRadUI()
             local rel = (DETECTION_RADIUS - 1) / 19
@@ -2002,6 +2014,7 @@ local function autoParryLoop()
             end
             radLabel.Text = "Radius: " .. DETECTION_RADIUS
         end
+        
         local function updateCDUI()
             local rel = (PARRY_COOLDOWN - 0.01) / 0.99
             local w = cdBg.AbsoluteSize.X
@@ -2012,6 +2025,7 @@ local function autoParryLoop()
             end
             cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
         end
+        
         -- Drag Radius
         local draggingRad = false
         local function onRadDrag(mouseX)
@@ -2051,6 +2065,7 @@ local function autoParryLoop()
         end)
         table.insert(sliderConnections, radMove)
         table.insert(sliderConnections, radEnd)
+        
         -- Drag Cooldown
         local draggingCD = false
         local function onCDDrag(mouseX)
@@ -2089,6 +2104,7 @@ local function autoParryLoop()
         end)
         table.insert(sliderConnections, cdMove)
         table.insert(sliderConnections, cdEnd)
+        
         -- Drag untuk memindahkan frame
         local draggingFrame = false
         local dragStartPos, frameStartPos
@@ -2110,17 +2126,17 @@ local function autoParryLoop()
                 draggingFrame = false
             end
         end)
-        task.wait(0.05)
+        
         updateRadUI()
         updateCDUI()
         return gui
     end
         
-    -- ========== INISIALISASI ==========
+    -- ========== INISIALISASI GUI DAN ESP ==========
     parryConfigGui = createConfigGUI()
-    refreshESP()
+    refreshESP()  -- pastikan ESP terbuat
     
-    -- ========== FUNGSI DETEKSI (OPTIMASI KECEPATAN) ==========
+    -- ========== FUNGSI DETEKSI (tidak berubah) ==========
     local function matchesCombatPath(obj, killerChar)
         local parts = {}
         local current = obj
@@ -2168,35 +2184,35 @@ local function autoParryLoop()
     end
     
     local function triggerParry(reason, player)
-        if tick() - lastParry < PARRY_COOLDOWN then return end
-        local lastP = lastParryPerPlayer[player] or 0
-        if tick() - lastP < PARRY_COOLDOWN then return end
-        local char = player.Character
-        if not char then return end
-        local root = getRoot(char)
-        if not root then return end
-        local dist = (localRootPart.Position - root.Position).Magnitude
-        if dist > DETECTION_RADIUS then return end
+    if tick() - lastParry < PARRY_COOLDOWN then return end
+    local lastP = lastParryPerPlayer[player] or 0
+    if tick() - lastP < PARRY_COOLDOWN then return end
+    local char = player.Character
+    if not char then return end
+    local root = getRoot(char)
+    if not root then return end
+    local dist = (localRootPart.Position - root.Position).Magnitude
+    if dist > DETECTION_RADIUS then return end
 
-        lastParry = tick()
-        lastParryPerPlayer[player] = tick()
-        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
-        pcall(function() fireParryRemote(player) end)
+    -- ===== TRIGGER PARRY (dulu) =====
+    lastParry = tick()
+    lastParryPerPlayer[player] = tick()
+    print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
+    pcall(function() fireParryRemote(player) end)
 
-        -- Stun animation (optional)
-        if localHumanoid then
-            local animator = localHumanoid:FindFirstChildOfClass("Animator")
-            if animator then
-                local anim = Instance.new("Animation")
-                anim.AnimationId = "rbxassetid://97915871372697"
-                local track = animator:LoadAnimation(anim)
-                track.Priority = Enum.AnimationPriority.Action
-                track:Play()
-            end
+    -- ===== STUN PLAYER LOKAL (setelah parry) =====
+    if localHumanoid then
+        local animator = localHumanoid:FindFirstChildOfClass("Animator")
+        if animator then
+            local anim = Instance.new("Animation")
+            anim.AnimationId = "rbxassetid://97915871372697"
+            local track = animator:LoadAnimation(anim)
+            track.Priority = Enum.AnimationPriority.Action
+            track:Play()
         end
     end
+    end
         
-    -- ========== HOOK FUNCTIONS (FALLBACK) ==========
     local function hookAttributes(player, char)
         local function onAttributeChanged(attrName)
             return function()
@@ -2238,39 +2254,22 @@ local function autoParryLoop()
         table.insert(stateConnections, conn)
     end
         
-    -- ========== HOOK CHARACTER (PRIORITAS PATH) ==========
     local function hookCharacter(player, char)
         if not isKiller(player) then return end
         print("[AutoParry] Hooked killer:", player.Name)
-        
-        -- Fallback: hook attribute & sound (nantinya)
         hookAttributes(player, char)
-        
-        -- Scan objek yang sudah ada (termasuk path)
         for _, obj in ipairs(char:GetDescendants()) do
             if obj:IsA("Sound") then hookSound(obj, player) end
-            if matchesCombatPath(obj, char) then
-                triggerParry("PathMatch:"..obj.Name, player)
-            end
+            if matchesCombatPath(obj, char) then triggerParry("PathMatch:"..obj.Name, player) end
         end
-        
-        -- PRIORITAS UTAMA: pantau objek baru -> langsung trigger
         local addedConn = char.DescendantAdded:Connect(function(obj)
-            -- Cek path dulu (cepat)
-            if matchesCombatPath(obj, char) then
-                triggerParry("PathMatchNew:"..obj.Name, player)
-            end
-            -- Fallback: jika objek adalah Sound, pasang hook (untuk deteksi playing)
             if obj:IsA("Sound") then
                 hookSound(obj, player)
-                if obj.Playing then
-                    triggerParry("NewSound:"..obj.Name, player)
-                end
+                if obj.Playing then triggerParry("NewSound:"..obj.Name, player) end
             end
+            if matchesCombatPath(obj, char) then triggerParry("PathMatchNew:"..obj.Name, player) end
         end)
         table.insert(stateConnections, addedConn)
-        
-        -- Fallback: atribut berubah
         local attrConn = char.AttributeChanged:Connect(function(attrName)
             local lowerAttr = attrName:lower()
             if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
@@ -2283,14 +2282,11 @@ local function autoParryLoop()
         table.insert(stateConnections, attrConn)
     end
         
-    -- ========== HOOK PLAYERS (TANPA PENUNDAAN) ==========
+    -- Hook existing players
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and isKiller(player) then
-            if player.Character then
-                hookCharacter(player, player.Character)
-            end
+            if player.Character then hookCharacter(player, player.Character) end
             local charConn = player.CharacterAdded:Connect(function(char)
-                -- Hilangkan task.wait(0.5) agar lebih cepat
                 hookCharacter(player, char)
             end)
             table.insert(stateConnections, charConn)
@@ -2299,17 +2295,15 @@ local function autoParryLoop()
         
     local playerConn = Players.PlayerAdded:Connect(function(player)
         local charConn = player.CharacterAdded:Connect(function(char)
-            -- Hilangkan penundaan
-            if isKiller(player) then
-                hookCharacter(player, char)
-            end
+            if isKiller(player) then hookCharacter(player, char) end
         end)
         table.insert(stateConnections, charConn)
     end)
     table.insert(stateConnections, playerConn)
-        
-    -- ========== ESP & PULSE (STABIL) ==========
+            
+    -- ========== FUNGSI PULSE (DIPERBAIKI) ==========
     local function createPulse()
+        -- cari root part secara langsung
         local rootPart = localRootPart
         if not rootPart then
             local char = localPlayer.Character
@@ -2369,7 +2363,7 @@ local function autoParryLoop()
             return
         end
         
-        -- Cari root part
+        -- Cari root part (update setiap frame, atasi cutscene)
         local rootPart = localRootPart
         if not rootPart then
             local char = localPlayer.Character
@@ -2378,25 +2372,23 @@ local function autoParryLoop()
             end
         end
         if not rootPart then 
+            -- masih tidak ada, skip update posisi ESP tapi tetap jalankan pulse timer
             pulseTick = pulseTick + dt * 2
             rainbowTick = rainbowTick + dt * 0.5
             if tick() - lastPulse >= 2 then
                 lastPulse = tick()
                 createPulse()
             end
-            return
-        end
-        
-        -- Pastikan ESP ada
+                    return
+            end
+                    -- Pastikan radiusFolder dan komponen ESP ada (buat ulang jika hilang)
         if not radiusFolder or not radiusFolder.Parent then
             refreshESP()
         end
         local mainCircle = radiusFolder:FindFirstChild("MainRadius")
         local outerRing = radiusFolder:FindFirstChild("OuterRing")
         if not mainCircle or not outerRing then
-            refreshESP()
-            mainCircle = radiusFolder:FindFirstChild("MainRadius")
-            outerRing = radiusFolder:FindFirstChild("OuterRing")
+            mainCircle, outerRing = refreshESP()
         end
         if not mainCircle or not outerRing then return end
         
@@ -2416,9 +2408,8 @@ local function autoParryLoop()
         end
     end)
         
-    print("[AutoParry] Ready with prioritized COMBAT_PATHS (fast response)")
+    print("[AutoParry] Ready with adjustable radius, cooldown GUI, and stable ESP")
 end
-
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

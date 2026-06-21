@@ -1712,102 +1712,53 @@ local function autoParryLoop()
     local rainbowTick = 0            
         
     -- ==========================================        
-    -- COMBAT PATHS (SATU-SATUNYA SUMBER DETEKSI)        
+    -- COMBAT PATHS (PRIORITAS UTAMA)        
     -- ==========================================        
     local COMBAT_PATHS = {
-    -- Versi asli
-    "HumanoidRootPart.Weapon.TheCureStaff.BasicAttack",
-    "HumanoidRootPart.Weapon.bat.bat.BasicAttack",
-    "HumanoidRootPart.Weapon.Right",
-    "HumanoidRootPart.FrenzySound",
-    "HumanoidRootPart.SwingSound",
-    "HumanoidRootPart.attackline",
-    "HumanoidRootPart.stunline",
-    "HumanoidRootPart.WallHitSound",
-    "HumanoidRootPart.Arm.knife",
-    "HumanoidRootPart.Killerost",
-    "HumanoidRootPart.Lookscriptkiller",
-    "HumanoidRootPart.Animations.WipeMachete",
-    "HumanoidRootPart.sfx.attackline",
-    "HumanoidRootPart.Arm.Handle.Handle.BasicAttack",
-    "HumanoidRootPart.Weapon.Chainsaw.Chainsaw.charge",
-    "HumanoidRootPart.Arm.Knide.Main.BasicAttack",
-    "HumanoidRootPart.Arm.Machete.Main.BasicAttack",
-    "HumanoidRootPart.Arm.Machete.pCube4_knife_0",
-    "HumanoidRootPart.Animations.WipeMachetefr",
-    "HumanoidRootPart.Animations.Frenzyend",
-    "HumanoidRootPart.Weapon.Right Arm.Machete",
-    "HumanoidRootPart.Spear2.Spear2.Hitbox",
-    "HumanoidRootPart.Arm.Swing",
-    "HumanoidRootPart.attack",
-    "HumanoidRootPart.sfx.attack",
-    "HumanoidRootPart.Arm.Knife.Main.Plane.001_Blade",
-
-    -- Versi dengan Character setelah HumanoidRootPart
-    "HumanoidRootPart.Character.Weapon.TheCureStaff.BasicAttack",
-    "HumanoidRootPart.Character.Weapon.bat.bat.BasicAttack",
-    "HumanoidRootPart.Character.Weapon.Right",
-    "HumanoidRootPart.Character.FrenzySound",
-    "HumanoidRootPart.Character.SwingSound",
-    "HumanoidRootPart.Character.attackline",
-    "HumanoidRootPart.Character.stunline",
-    "HumanoidRootPart.Character.WallHitSound",
-    "HumanoidRootPart.Character.Arm.knife",
-    "HumanoidRootPart.Character.Killerost",
-    "HumanoidRootPart.Character.Lookscriptkiller",
-    "HumanoidRootPart.Character.Animations.WipeMachete",
-    "HumanoidRootPart.Character.sfx.attackline",
-    "HumanoidRootPart.Character.Arm.Handle.Handle.BasicAttack",
-    "HumanoidRootPart.Character.Weapon.Chainsaw.Chainsaw.charge",
-    "HumanoidRootPart.Character.Arm.Knide.Main.BasicAttack",
-    "HumanoidRootPart.Character.Arm.Machete.Main.BasicAttack",
-    "HumanoidRootPart.Character.Arm.Machete.pCube4_knife_0",
-    "HumanoidRootPart.Character.Animations.WipeMachetefr",
-    "HumanoidRootPart.Character.Animations.Frenzyend",
-    "HumanoidRootPart.Character.Weapon.Right Arm.Machete",
-    "HumanoidRootPart.Character.Spear2.Spear2.Hitbox",
-    "HumanoidRootPart.Character.Arm.Swing",
-    "HumanoidRootPart.Character.attack",
-    "HumanoidRootPart.Character.sfx.attack",
-    "HumanoidRootPart.Character.Animations.WipeMachete",
-    "HumanoidRootPart.Character.Arm.Knife.Main.Plane.001_Blade",
-
-    -- Versi 3: dimulai dari Character
-    "Character.Weapon.TheCureStaff.BasicAttack",
-    "Character.Weapon.bat.bat.BasicAttack",
-    "Character.Weapon.Right",
-    "Character.FrenzySound",
-    "Character.SwingSound",
-    "Character.attackline",
-    "Character.stunline",
-    "Character.WallHitSound",
-    "Character.Arm.knife",
-    "Character.Killerost",
-    "Character.Lookscriptkiller",
-    "Character.Animations.WipeMachete",
-    "Character.sfx.attackline",
-    "Character.Arm.Handle.Handle.BasicAttack",
-    "Character.Weapon.Chainsaw.Chainsaw.charge",
-    "Character.Arm.Knide.Main.BasicAttack",
-    "Character.Arm.Machete.Main.BasicAttack",
-    "Character.Arm.Machete.pCube4_knife_0",
-    "Character.Animations.WipeMachetefr",
-    "Character.Animations.Frenzyend",
-    "Character.Weapon.Right Arm.Machete",
-    "Character.Spear2.Spear2.Hitbox",
-    "Character.Arm.Swing",
-    "Character.attack",
-    "Character.sfx.attack",
-    "Character.Animations.WipeMachete",
-    "Character.Arm.Knife.Main.Plane.001_Blade",
+        "HumanoidRootPart.Weapon.TheCureStaff.BasicAttack",
+        "HumanoidRootPart.Weapon.bat.bat.BasicAttack",
+        "HumanoidRootPart.Weapon.Right",
+        "HumanoidRootPart.FrenzySound",
+        "HumanoidRootPart.SwingSound",
+        "HumanoidRootPart.attackline",
+        "HumanoidRootPart.stunline",
+        "HumanoidRootPart.WallHitSound",
+        "HumanoidRootPart.Arm.knife",
+        "HumanoidRootPart.Killerost",
+        "HumanoidRootPart.Lookscriptkiller",
+        "HumanoidRootPart.Animations.WipeMachete",
+        "HumanoidRootPart.sfx.attackline",
+        "HumanoidRootPart.Arm.Handle.Handle.BasicAttack",
+        "HumanoidRootPart.Weapon.Chainsaw.Chainsaw.charge",
+        "HumanoidRootPart.Arm.Knide.Main.BasicAttack",
+        "HumanoidRootPart.Arm.Machete.Main.BasicAttack",
+        "HumanoidRootPart.Arm.Machete.pCube4_knife_0",
+        "HumanoidRootPart.Animations.WipeMachetefr",
+        "HumanoidRootPart.Animations.Frenzyend",
+        "HumanoidRootPart.Weapon.Right Arm.Machete",
+        "HumanoidRootPart.Spear2.Spear2.Hitbox",
+        "HumanoidRootPart.Arm.Swing",
+        "HumanoidRootPart.attack",
+        "HumanoidRootPart.sfx.attack",
+        "HumanoidRootPart.Character.Animations.WipeMachete",
+        "HumanoidRootPart.Arm.Knife.Main.Plane.001_Blade",
     }
     -- ==========================================        
+        
+    -- FALLBACK: COMBAT SOUNDS & ATTRIBUTES        
+    local COMBAT_SOUNDS = {        
+        "attackline", "swingsound", "stunline",        
+        "parrysound", "frenzysound", "hitsound", "WallHitStun"        
+    }        
+    local COMBAT_ATTRIBUTES = {        
+        "frenzy", "parry", "hookprogress", "hookcount"        
+    }        
         
     local scannedObjects = {}            
     local stateConnections = {}            
     local lastParryPerPlayer = {}            
         
-    -- ========== FUNGSI MEMBUAT ULANG ESP ==========
+    -- ========== ESP REFRESH ==========
     local function refreshESP()
         if not radiusFolder then 
             radiusFolder = Instance.new("Folder")
@@ -1842,7 +1793,7 @@ local function autoParryLoop()
         return mainCircle, outerRing
     end
         
-    -- ========== GUI SLIDER (sama) ==========
+    -- ========== GUI SLIDER ==========
     local function createConfigGUI()
         if parryConfigGui then parryConfigGui:Destroy() end
         local gui = Instance.new("ScreenGui")
@@ -2068,11 +2019,11 @@ local function autoParryLoop()
         return gui
     end
         
-    -- ========== INISIALISASI GUI DAN ESP ==========
+    -- ========== INISIALISASI ==========
     parryConfigGui = createConfigGUI()
     refreshESP()
     
-    -- ========== FUNGSI DETEKSI (HANYA COMBAT PATHS) ==========
+    -- ========== FUNGSI DETEKSI (OPTIMASI KECEPATAN) ==========
     local function matchesCombatPath(obj, killerChar)
         local parts = {}
         local current = obj
@@ -2107,7 +2058,7 @@ local function autoParryLoop()
         end
         local char = player.Character
         if char then
-            if char:GetAttribute("weapon") ~= nil or char:FindFirstChild("knife") then
+            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then
                 return true
             end
             for _, obj in ipairs(char:GetDescendants()) do
@@ -2119,9 +2070,10 @@ local function autoParryLoop()
         return false
     end
     
-    local parryLocked = false
     local function triggerParry(reason, player)
-        if parryLocked then return end
+        if tick() - lastParry < PARRY_COOLDOWN then return end
+        local lastP = lastParryPerPlayer[player] or 0
+        if tick() - lastP < PARRY_COOLDOWN then return end
         local char = player.Character
         if not char then return end
         local root = getRoot(char)
@@ -2129,38 +2081,97 @@ local function autoParryLoop()
         local dist = (localRootPart.Position - root.Position).Magnitude
         if dist > DETECTION_RADIUS then return end
 
-        -- Eksekusi parry
-        print("[AutoParry]", reason, "from", player.Name, "dist=", math.floor(dist))
-        pcall(function()
-            fireParryRemote(targetPlayer)
-        end)
-
-        -- Aktifkan cooldown
-        parryLocked = true
-        task.delay(PARRY_COOLDOWN, function()
-            parryLocked = false
-        end)
+        lastParry = tick()
+        lastParryPerPlayer[player] = tick()
+        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
+        pcall(function() fireParryRemote(player) end)
     end
         
-    -- ========== HOOK CHARACTER (HANYA COMBAT PATHS) ==========
+    -- ========== HOOK FUNCTIONS (FALLBACK) ==========
+    local function hookAttributes(player, char)
+        local function onAttributeChanged(attrName)
+            return function()
+                if not config.infiniteAmmoEnabled then return end
+                local val = char:GetAttribute(attrName)
+                if attrName:lower() == "frenzy" and val == true then
+                    triggerParry("Attribute:Frenzy", player)
+                elseif attrName:lower() == "parry" and val == true then
+                    triggerParry("Attribute:Parry", player)
+                elseif attrName:lower() == "hookprogress" and type(val) == "number" and val > 0 then
+                    triggerParry("Attribute:hookprogress", player)
+                elseif attrName:lower() == "hookcount" and val and tonumber(val) and tonumber(val) > 0 then
+                    triggerParry("Attribute:HookCount", player)
+                end
+            end
+        end
+        for _, attrName in ipairs(COMBAT_ATTRIBUTES) do
+            if char:GetAttribute(attrName) ~= nil then
+                local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))
+                table.insert(stateConnections, conn)
+            end
+        end
+    end
+        
+    local function hookSound(sound, player)
+        if scannedObjects[sound] then return end
+        scannedObjects[sound] = true
+        local conn = sound:GetPropertyChangedSignal("Playing"):Connect(function()
+            if sound.Playing and config.infiniteAmmoEnabled then
+                local sName = sound.Name:lower()
+                for _, kw in ipairs(COMBAT_SOUNDS) do
+                    if sName:find(kw) then
+                        triggerParry("Sound:"..sound.Name, player)
+                        break
+                    end
+                end
+            end
+        end)
+        table.insert(stateConnections, conn)
+    end
+        
+    -- ========== HOOK CHARACTER (PRIORITAS PATH) ==========
     local function hookCharacter(player, char)
         if not isKiller(player) then return end
         print("[AutoParry] Hooked killer:", player.Name)
         
-        -- Scan objek yang sudah ada dan langsung trigger jika match
+        -- Fallback: hook attribute & sound (nantinya)
+        hookAttributes(player, char)
+        
+        -- Scan objek yang sudah ada (termasuk path)
         for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("Sound") then hookSound(obj, player) end
             if matchesCombatPath(obj, char) then
                 triggerParry("PathMatch:"..obj.Name, player)
             end
         end
         
-        -- Pantau objek baru (ini yang paling cepat)
+                -- PRIORITAS UTAMA: pantau objek baru -> langsung trigger
         local addedConn = char.DescendantAdded:Connect(function(obj)
+            -- Cek path dulu (cepat)
             if matchesCombatPath(obj, char) then
                 triggerParry("PathMatchNew:"..obj.Name, player)
             end
+            -- Fallback: jika objek adalah Sound, pasang hook (untuk deteksi playing)
+            if obj:IsA("Sound") then
+                hookSound(obj, player)
+                if obj.Playing then
+                    triggerParry("NewSound:"..obj.Name, player)
+                end
+            end
         end)
         table.insert(stateConnections, addedConn)
+        
+        -- Fallback: atribut berubah
+        local attrConn = char.AttributeChanged:Connect(function(attrName)
+            local lowerAttr = attrName:lower()
+            if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
+                local val = char:GetAttribute(attrName)
+                if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then
+                    triggerParry("AttributeChanged:"..attrName, player)
+                end
+            end
+        end)
+        table.insert(stateConnections, attrConn)
     end
         
     -- ========== HOOK PLAYERS (TANPA PENUNDAAN) ==========
@@ -2170,7 +2181,8 @@ local function autoParryLoop()
                 hookCharacter(player, player.Character)
             end
             local charConn = player.CharacterAdded:Connect(function(char)
-                hookCharacter(player, char) -- tanpa task.wait
+                -- Hilangkan task.wait(0.5) agar lebih cepat
+                hookCharacter(player, char)
             end)
             table.insert(stateConnections, charConn)
         end
@@ -2178,15 +2190,16 @@ local function autoParryLoop()
         
     local playerConn = Players.PlayerAdded:Connect(function(player)
         local charConn = player.CharacterAdded:Connect(function(char)
+            -- Hilangkan penundaan
             if isKiller(player) then
-                hookCharacter(player, char) -- tanpa task.wait
+                hookCharacter(player, char)
             end
         end)
         table.insert(stateConnections, charConn)
     end)
     table.insert(stateConnections, playerConn)
-            
-    -- ========== FUNGSI PULSE (sama seperti sebelumnya) ==========
+        
+    -- ========== ESP & PULSE (STABIL) ==========
     local function createPulse()
         local rootPart = localRootPart
         if not rootPart then
@@ -2247,6 +2260,7 @@ local function autoParryLoop()
             return
         end
         
+        -- Cari root part
         local rootPart = localRootPart
         if not rootPart then
             local char = localPlayer.Character
@@ -2264,6 +2278,7 @@ local function autoParryLoop()
             return
         end
         
+        -- Pastikan ESP ada
         if not radiusFolder or not radiusFolder.Parent then
             refreshESP()
         end
@@ -2292,8 +2307,9 @@ local function autoParryLoop()
         end
     end)
         
-    print("[AutoParry] Ready (COMBAT_PATHS only, ultra-fast detection)")
+    print("[AutoParry] Ready with prioritized COMBAT_PATHS (fast response)")
 end
+
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

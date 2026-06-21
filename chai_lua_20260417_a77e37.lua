@@ -1607,130 +1607,53 @@ end
 -- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - USING CORRECT REMOTE EVENT)        
 -- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry        
 -- ============================================================================        
-        
 -- ============================================
--- PARRY VIA GUI BUTTON (BRUTE FORCE CEPAT)
+-- PARRY VIA ACTION BUTTON (DOUBLE-CLICK MOUSE1)
 -- ============================================
 
-local TouchID = 54321  -- ID untuk touch event
-
--- Fungsi untuk mendapatkan posisi tengah tombol
-local function getButtonCenter(button)
-    local p = button.AbsolutePosition
-    local s = button.AbsoluteSize
-    if s.X == 0 or s.Y == 0 then return nil, nil end
-    return p.X + s.X/2, p.Y + s.Y/2
-end
-
--- Fungsi utama parry via GUI (semua metode, spam cepat)
-local function fireParryRemote(targetPlayer)
-    -- Cari folder Controls
+-- Cari tombol "action" di PlayerGui.Survivor-mob.Controls
+local function findActionButton()
     local playerGui = localPlayer:FindFirstChild("PlayerGui")
-    local buttons = {}
-    if playerGui then
-        local survivorMob = playerGui:FindFirstChild("Survivor-mob")
-        if survivorMob then
-            local controls = survivorMob:FindFirstChild("Controls")
-            if controls then
-                local possibleNames = {"action", "putdown", "sprint", "crouch"}
-                for _, name in ipairs(possibleNames) do
-                    local btn = controls:FindFirstChild(name)
-                    if btn and btn:IsA("TextButton") then
-                        table.insert(buttons, btn)
-                    end
-                end
-            end
-        end
-    end
-
-    -- Jika tombol ditemukan, lakukan brute force semua metode
-    if #buttons > 0 then
-        local vim = game:GetService("VirtualInputManager")
-        local guiService = game:GetService("GuiService")
-
-        for _ = 1, 6 do  -- spam 6 kali
-            for _, btn in ipairs(buttons) do
-                -- Metode 1: FireClick
-                pcall(function() btn:FireClick() end)
-
-                -- Metode 2: Activate
-                pcall(function() btn:Activate() end)
-
-                -- Metode 3: ClickSignal (MouseButton1Click)
-                pcall(function() btn.MouseButton1Click:Fire() end)
-
-                -- Metode 4: Mouse1 event (VirtualInputManager)
-                pcall(function()
-                    local cx, cy = getButtonCenter(btn)
-                    if cx and cy then
-                        vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
-                        vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
-                    end
-                end)
-
-                -- Metode 5: TouchEvent (mirip skillcheck generator)
-                pcall(function()
-                    local cx, cy = getButtonCenter(btn)
-                    if cx and cy then
-                        local inset = guiService:GetGuiInset()
-                        vim:SendTouchEvent(TouchID, 0, cx + inset.X, cy + inset.Y)
-                        vim:SendTouchEvent(TouchID, 2, cx + inset.X, cy + inset.Y)
-                    end
-                end)
-
-                -- Metode 6: Cari RemoteEvent di tombol atau parent, lalu FireServer
-                pcall(function()
-                    local remote = nil
-                    for _, child in ipairs(btn:GetChildren()) do
-                        if child:IsA("RemoteEvent") then
-                            remote = child
-                            break
-                        end
-                    end
-                    if not remote and btn.Parent then
-                        for _, child in ipairs(btn.Parent:GetChildren()) do
-                            if child:IsA("RemoteEvent") then
-                                remote = child
-                                break
-                            end
-                        end
-                    end
-                    if remote then
-                        remote:FireServer()
-                        -- Coba juga dengan argumen umum
-                        remote:FireServer("Parrying Dagger")
-                        remote:FireServer("parry")
-                    end
-                end)
-            end
-        end
-        return true
-    end
-
-    -- Jika tombol tidak ditemukan, fallback ke RemoteEvent
-    return fallbackParry()
+    if not playerGui then return nil end
+    local survivorMob = playerGui:FindFirstChild("Survivor-mob")
+    if not survivorMob then return nil end
+    local controls = survivorMob:FindFirstChild("Controls")
+    if not controls then return nil end
+    return controls:FindFirstChild("action")
 end
 
--- Fallback RemoteEvent (tetap dipertahankan)
-local function fallbackParry()
-    local remote, resultRemote = findParryRemoteEvent()
-    if not remote then return false end
-    for i = 1, 3 do
+-- Fungsi utama parry: double-click cepat pada tombol action
+local function fireParryRemote(targetPlayer)
+    local button = findActionButton()
+    if not button then
+        return false
+    end
+
+    -- Dapatkan posisi tengah tombol
+    local pos = button.AbsolutePosition
+    local size = button.AbsoluteSize
+    if size.X == 0 or size.Y == 0 then
+        return false
+    end
+    local cx = pos.X + size.X/2
+    local cy = pos.Y + size.Y/2
+
+    local vim = game:GetService("VirtualInputManager")
+    -- Double-click cepat (2x klik dengan jeda minimal 0.01)
+    for i = 1, 2 do
         pcall(function()
-            remote:FireServer()
-            remote:FireServer("Parrying Dagger")
-            remote:FireServer("parry")
-            if resultRemote then
-                resultRemote:FireServer()
-                resultRemote:FireServer("Parrying Dagger")
-                resultRemote:FireServer("parryResult")
-            end
+            vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
+            task.wait(0.01)
+            vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
         end)
-        -- Tanpa task.wait agar cepat, tapi jika perlu bisa dikomentari
+        if i == 1 then
+            task.wait(0.01) -- jeda antar klik
+        end
     end
     return true
 end
-        
+
+-- (Hapus semua fungsi lama: TouchID, ActionPath, GetActionTarget, TriggerGUIAction, spamParryButton, fallbackParry)
 -- ============================================================================        
 -- AUTO PARRY MAIN LOOP        
 -- ============================================================================                

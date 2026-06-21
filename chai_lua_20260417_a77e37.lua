@@ -2107,7 +2107,7 @@ local function autoParryLoop()
         end
         local char = player.Character
         if char then
-            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then
+            if char:GetAttribute("weapon") ~= nil or char:FindFirstChild("knife") then
                 return true
             end
             for _, obj in ipairs(char:GetDescendants()) do
@@ -2132,7 +2132,7 @@ local function autoParryLoop()
         -- Eksekusi parry
         print("[AutoParry]", reason, "from", player.Name, "dist=", math.floor(dist))
         pcall(function()
-            fireParryRemote(player)
+            fireParryRemote(targetPlayer)
         end)
 
         -- Aktifkan cooldown

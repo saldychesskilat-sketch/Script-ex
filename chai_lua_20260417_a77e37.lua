@@ -1608,147 +1608,103 @@ end
 -- Berdasarkan hasil scanning: ReplicatedStorage.Remotes.Items.Parrying Dagger.parry        
 -- ============================================================================        
         
-local cachedParryRemote = nil        
-local cachedParryResultRemote = nil  -- tambahan untuk menyimpan remote result
+-- ============================================
+-- FUNGSI PARRY VIA GUI BUTTON (SPAM + VIRTUALINPUT)
+-- ============================================
 
--- Cari remote event "parry" dan "parryResult" di path yang benar        
-local function findParryRemoteEvent()        
-    if cachedParryRemote and cachedParryRemote.Parent then        
-        return cachedParryRemote, cachedParryResultRemote        
-    end        
-            
-    -- Coba akses langsung melalui path yang diketahui        
-    local parryRemote = ReplicatedStorage:FindFirstChild("Remotes")        
-    if parryRemote then        
-        parryRemote = parryRemote:FindFirstChild("Items")        
-        if parryRemote then        
-            parryRemote = parryRemote:FindFirstChild("Parrying Dagger")        
-            if parryRemote then        
-                local parry = parryRemote:FindFirstChild("parry")        
-                local parryResult = parryRemote:FindFirstChild("parryResult")        
-                if parry and parry:IsA("RemoteEvent") then        
-                    cachedParryRemote = parry        
-                    if parryResult and parryResult:IsA("RemoteEvent") then        
-                        cachedParryResultRemote = parryResult        
-                    end        
-                    print("[AutoParry] Found parry and parryResult remote events at correct path")        
-                    return cachedParryRemote, cachedParryResultRemote        
-                end        
-            end        
-        end        
+-- Cari folder Controls dan tombol yang mungkin untuk parry
+local function getParryButtons()
+    local playerGui = localPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return {} end
+    local survivorMob = playerGui:FindFirstChild("Survivor-mob")
+    if not survivorMob then return {} end
+    local controls = survivorMob:FindFirstChild("Controls")
+    if not controls then return {} end
+    local buttons = {}
+    local possibleNames = {"action", "putdown", "sprint", "crouch"}
+    for _, name in ipairs(possibleNames) do
+        local btn = controls:FindFirstChild(name)
+        if btn and btn:IsA("TextButton") then
+            table.insert(buttons, btn)
+        end
     end
-            
-    -- Fallback: scan semua RemoteEvent di ReplicatedStorage        
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do        
-        if obj:IsA("RemoteEvent") and obj.Name == "parry" then        
-            cachedParryRemote = obj        
-            -- cari parryResult di parent yang sama        
-            local parent = obj.Parent        
-            if parent then        
-                local parryResult = parent:FindFirstChild("parryResult")        
-                if parryResult and parryResult:IsA("RemoteEvent") then        
-                    cachedParryResultRemote = parryResult        
-                end        
-            end        
-            print("[AutoParry] Found parry remote event via scan, parryResult found:", cachedParryResultRemote ~= nil)        
-            return cachedParryRemote, cachedParryResultRemote        
-        end        
-    end        
-            
-    return nil, nil        
-end        
-        
--- Cari item Parrying Dagger di inventory player (Backpack atau Character)        
-local function getParryingDaggerTool()        
-    local backpack = localPlayer:FindFirstChild("Backpack")        
-    local character = localPlayer.Character        
-    if backpack then        
-        for _, tool in ipairs(backpack:GetChildren()) do        
-            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then        
-                return tool        
-            end        
-        end        
-    end        
-    if character then        
-        for _, tool in ipairs(character:GetChildren()) do        
-            if tool:IsA("Tool") and (tool.Name == "Parrying Dagger" or tool.Name == "Blade") then        
-                return tool        
-            end        
-        end        
-    end        
-    return nil        
-end        
-        
--- Kirim remote event parry dengan argumen yang benar (serta parryResult)        
-local function fireParryRemote(targetPlayer)        
-    local remote, resultRemote = findParryRemoteEvent()        
-    if not remote then        
-        print("[AutoParry] Parry remote not found!")        
-        return false        
-    end        
-            
-    local dagger = getParryingDaggerTool()        
-            
-    -- Variasi argumen yang mungkin diterima (urutan prioritas)        
-    local argsVariants = {        
-        {dagger},                     -- objek tool (jika ada)        
-        {"Parrying Dagger"},          -- string nama item        
-        {"parry"},        
-        {"parryResult"},        
-        {dagger, targetPlayer},       -- tool + target        
-        {"Parrying Dagger", targetPlayer},        
-        {}                            -- tanpa argumen        
-    }        
-            
-    -- Jika tidak punya dagger, hapus varian yang menggunakan objek tool        
-    if not dagger then        
-        for i = #argsVariants, 1, -1 do        
-            local args = argsVariants[i]        
-            if #args > 0 and type(args[1]) == "userdata" then        
-                table.remove(argsVariants, i)        
-            end        
-        end        
-    end        
-            
-    local success = false        
-    for _, args in ipairs(argsVariants) do        
-        pcall(function()        
-            if #args == 0 then        
-                remote:FireServer()        
-                if resultRemote then resultRemote:FireServer() end        
-            elseif #args == 1 then        
-                remote:FireServer(args[1])        
-                if resultRemote then resultRemote:FireServer(args[1]) end        
-            elseif #args == 2 then        
-                remote:FireServer(args[1], args[2])        
-                if resultRemote then resultRemote:FireServer(args[1], args[2]) end        
-            end        
-        end)        
-        success = true        
-    end        
-            
-    return success        
-end        
-        
--- Fallback: fire multiple times untuk bypass cooldown        
-local function fallbackParry()        
-    local remote, resultRemote = findParryRemoteEvent()        
-    if not remote then return false end        
-            
-    for i = 1, 3 do        
-        pcall(function()        
-            remote:FireServer()        
-            remote:FireServer("Parrying Dagger")        
-            remote:FireServer("parry")        
-            if resultRemote then        
-                resultRemote:FireServer()        
-                resultRemote:FireServer("Parrying Dagger")        
-                resultRemote:FireServer("parryResult")        
-            end        
-        end)        
-        task.wait(0.01)        
-    end        
-    return true        
+    return buttons
+end
+
+-- Fungsi untuk menekan tombol dengan berbagai metode dan spam
+local function pressButtonWithSpam(button, spamCount)
+    spamCount = spamCount or 6
+    local methods = {
+        function() pcall(function() button:FireClick() end) end,
+        function() pcall(function() button:Activate() end) end,
+        function()
+            local vim = game:GetService("VirtualInputManager")
+            local pos = button.AbsolutePosition
+            local size = button.AbsoluteSize
+            if size.X == 0 or size.Y == 0 then return end
+            local cx = pos.X + size.X/2
+            local cy = pos.Y + size.Y/2
+            pcall(function()
+                vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
+                task.wait(0.02)
+                vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
+            end)
+        end,
+        function() pcall(function() button.MouseButton1Click:Fire() end) end,
+    }
+    for i = 1, spamCount do
+        for _, method in ipairs(methods) do
+            method()
+            task.wait(0.01) -- jeda kecil antar metode
+        end
+        task.wait(0.02) -- jeda antar spam
+    end
+end
+
+-- Modifikasi fireParryRemote (gunakan GUI + spam)
+local function fireParryRemote(targetPlayer)
+    local buttons = getParryButtons()
+    if #buttons == 0 then
+        -- fallback ke remote event jika tombol tidak ditemukan
+        return fallbackParry()
+    end
+    -- Tekan semua tombol yang mungkin dengan spam
+    for _, btn in ipairs(buttons) do
+        pressButtonWithSpam(btn, 6)
+    end
+    return true
+end
+
+-- Fallback tetap menggunakan RemoteEvent (jika tombol tidak ada)
+local function fallbackParry()
+    local remote, resultRemote = findParryRemoteEvent()
+    if not remote then return false end
+    for i = 1, 3 do
+        pcall(function()
+            remote:FireServer()
+            remote:FireServer("Parrying Dagger")
+            remote:FireServer("parry")
+            if resultRemote then
+                resultRemote:FireServer()
+                resultRemote:FireServer("Parrying Dagger")
+                resultRemote:FireServer("parryResult")
+            end
+        end)
+        task.wait(0.01)
+    end
+    return true
+end
+
+-- (Opsional) Jika ingin spesifik tombol tertentu, misal crouch:
+local function getSpecificParryButton(name)
+    name = name or "crouch"
+    local playerGui = localPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return nil end
+    local survivorMob = playerGui:FindFirstChild("Survivor-mob")
+    if not survivorMob then return nil end
+    local controls = survivorMob:FindFirstChild("Controls")
+    if not controls then return nil end
+    return controls:FindFirstChild(name)
 end
         
 -- ============================================================================        
@@ -2212,72 +2168,30 @@ local function autoParryLoop()
     end
     
     local parryLocked = false
-
     local function triggerParry(reason, player)
-    if parryLocked then
-        return
-    end
+    -- Cooldown check
+    if parryLocked then return end
 
+    -- Validasi karakter dan jarak
     local char = player.Character
     if not char then return end
 
     local root = getRoot(char)
     if not root then return end
 
-    local dist = (localRootPart.Position-root.Position).Magnitude
+    local dist = (localRootPart.Position - root.Position).Magnitude
     if dist > DETECTION_RADIUS then return end
 
-    -- langsung parry
-    print(reason)
+    -- Eksekusi parry
+    print("[AutoParry]", reason, "from", player.Name, "dist=", math.floor(dist))
     pcall(function()
         fireParryRemote(player)
     end)
 
+    -- Aktifkan cooldown setelah parry
     parryLocked = true
-
-    -- animasi
-    if localHumanoid then
-        local animator=localHumanoid:FindFirstChildOfClass("Animator")
-        if animator then
-            local anim=Instance.new("Animation")
-            anim.AnimationId="rbxassetid://97915871372697"
-            local track=animator:LoadAnimation(anim)
-            track.Priority=Enum.AnimationPriority.Action
-            track:Play()
-        end
-    end
-
-    -- freeze 1 detik
-    task.spawn(function()
-
-        local oldWalkSpeed=localHumanoid.WalkSpeed
-        local oldJumpPower=localHumanoid.JumpPower
-
-        local start=tick()
-
-        while tick()-start<1 do
-
-            -- refresh terus karena server bisa reset
-            if localHumanoid then
-                localHumanoid.WalkSpeed=0
-                localHumanoid.JumpPower=0
-
-                if localRootPart then
-                    localRootPart.AssemblyLinearVelocity=Vector3.zero
-                end
-            end
-
-            RunService.Heartbeat:Wait()
-        end
-
-        if localHumanoid then
-            localHumanoid.WalkSpeed=oldWalkSpeed
-            localHumanoid.JumpPower=oldJumpPower
-        end
-
-        task.wait(PARRY_COOLDOWN)
-        parryLocked=false
-
+    task.delay(PARRY_COOLDOWN, function()
+        parryLocked = false
     end)
     end
         

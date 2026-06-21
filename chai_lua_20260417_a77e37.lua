@@ -1842,9 +1842,8 @@ local function autoParryLoop()
     }
     -- ==========================================        
         
-    local COMBAT_SOUNDS = {        
-        "attackline", "swingsound", "stunline",        
-        "parrysound", "frenzysound", "hitsound", "WallHitStun"        
+    local COMBAT_SOUNDS = {                
+        "parrysound"        
     }        
     local COMBAT_ATTRIBUTES = {        
         "frenzy", "parry", "hookprogress", "hookcount"        

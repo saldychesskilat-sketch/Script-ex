@@ -1623,7 +1623,7 @@ local function findActionButton()
 end
 
 -- Fungsi utama parry: double-click cepat pada tombol action
-local function fireParryRemote(targetPlayer)
+local function fireParryRemote(Player)
     local button = findActionButton()
     if not button then
         return false

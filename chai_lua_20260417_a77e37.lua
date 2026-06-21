@@ -2211,34 +2211,74 @@ local function autoParryLoop()
         return false
     end
     
+    local parryLocked = false
+
     local function triggerParry(reason, player)
-    if tick() - lastParry < PARRY_COOLDOWN then return end
-    local lastP = lastParryPerPlayer[player] or 0
-    if tick() - lastP < PARRY_COOLDOWN then return end
+    if parryLocked then
+        return
+    end
+
     local char = player.Character
     if not char then return end
+
     local root = getRoot(char)
     if not root then return end
-    local dist = (localRootPart.Position - root.Position).Magnitude
+
+    local dist = (localRootPart.Position-root.Position).Magnitude
     if dist > DETECTION_RADIUS then return end
 
-    -- ===== TRIGGER PARRY (dulu) =====
-    lastParry = tick()
-    lastParryPerPlayer[player] = tick()
-    print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
-    pcall(function() fireParryRemote(player) end)
+    -- langsung parry
+    print(reason)
+    pcall(function()
+        fireParryRemote(player)
+    end)
 
-    -- ===== STUN PLAYER LOKAL (setelah parry) =====
+    parryLocked = true
+
+    -- animasi
     if localHumanoid then
-        local animator = localHumanoid:FindFirstChildOfClass("Animator")
+        local animator=localHumanoid:FindFirstChildOfClass("Animator")
         if animator then
-            local anim = Instance.new("Animation")
-            anim.AnimationId = "rbxassetid://97915871372697"
-            local track = animator:LoadAnimation(anim)
-            track.Priority = Enum.AnimationPriority.Action
+            local anim=Instance.new("Animation")
+            anim.AnimationId="rbxassetid://97915871372697"
+            local track=animator:LoadAnimation(anim)
+            track.Priority=Enum.AnimationPriority.Action
             track:Play()
         end
     end
+
+    -- freeze 1 detik
+    task.spawn(function()
+
+        local oldWalkSpeed=localHumanoid.WalkSpeed
+        local oldJumpPower=localHumanoid.JumpPower
+
+        local start=tick()
+
+        while tick()-start<1 do
+
+            -- refresh terus karena server bisa reset
+            if localHumanoid then
+                localHumanoid.WalkSpeed=0
+                localHumanoid.JumpPower=0
+
+                if localRootPart then
+                    localRootPart.AssemblyLinearVelocity=Vector3.zero
+                end
+            end
+
+            RunService.Heartbeat:Wait()
+        end
+
+        if localHumanoid then
+            localHumanoid.WalkSpeed=oldWalkSpeed
+            localHumanoid.JumpPower=oldJumpPower
+        end
+
+        task.wait(PARRY_COOLDOWN)
+        parryLocked=false
+
+    end)
     end
         
     local function hookAttributes(player, char)

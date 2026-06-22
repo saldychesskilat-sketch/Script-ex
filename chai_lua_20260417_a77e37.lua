@@ -1822,6 +1822,19 @@ local function autoParryLoop()
     "Arm.Knife.Main.Plane.001_Blade",
     "Character.Weapon.Right",
     "attackline",
+    "Character.Weapon.Right Arm.Machete.Main.BasicAttack",
+    "Character.Animations.WipeMachete",
+    "Character.Animations.WipeMachetefr",
+    "Character.Animations.Frenzyend",
+    "Character.Animations.StunAnimation",
+    "Character.Animations.WallHitStun",
+    "Character.sfx.hit",
+    "Character.sfx.stun",
+    "Character.sfx.frenzy",
+    "Character.sfx.frenzyidle",
+    "Character.Killerost",
+    "Character.Lookscriptkiller",
+    "Character.Powers",
     }
     -- ==========================================        
         

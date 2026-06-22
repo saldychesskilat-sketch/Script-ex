@@ -2124,6 +2124,273 @@ local function autoParryLoop()
         return false
     end
         
+    local function getRoot(char)
+        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    end
+        
+    local function isKiller(player)
+        if not player or player == localPlayer then return false end
+        if player.Team then
+            local t = player.Team.Name:lower()
+            if t:find("killer") or t:find("monster") or t:find("enemy") then
+                return true
+            end
+        end
+        local char = player.Character
+        if char then
+            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then
+                return true
+            end
+            for _, obj in ipairs(char:GetDescendants()) do
+                if matchesCombatPath(obj, char) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+    
+    local function triggerParry(reason, player)
+        if tick() - lastParry < PARRY_COOLDOWN then return end
+        local lastP = lastParryPerPlayer[player] or 0
+        if tick() - lastP < PARRY_COOLDOWN then return end
+        local char = player.Character
+        if not char then return end
+        local root = getRoot(char)
+        if not root then return end
+        local dist = (localRootPart.Position - root.Position).Magnitude
+        if dist > DETECTION_RADIUS then return end
+
+        lastParry = tick()
+        lastParryPerPlayer[player] = tick()
+        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
+        pcall(function() fireParryRemote(player) end)
+    end
+        
+    -- ========== HOOK FUNCTIONS (FALLBACK) ==========
+    local function hookAttributes(player, char)
+        local function onAttributeChanged(attrName)
+            return function()
+                if not config.infiniteAmmoEnabled then return end
+                local val = char:GetAttribute(attrName)
+                if attrName:lower() == "frenzy" and val == true then
+                    triggerParry("Attribute:Frenzy", player)
+                elseif attrName:lower() == "parry" and val == true then
+                    triggerParry("Attribute:Parry", player)
+                elseif attrName:lower() == "hookprogress" and type(val) == "number" and val > 0 then
+                    triggerParry("Attribute:hookprogress", player)
+                elseif attrName:lower() == "hookcount" and val and tonumber(val) and tonumber(val) > 0 then
+                    triggerParry("Attribute:HookCount", player)
+                end
+            end
+        end
+        for _, attrName in ipairs(COMBAT_ATTRIBUTES) do
+            if char:GetAttribute(attrName) ~= nil then
+                local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))
+                table.insert(stateConnections, conn)
+            end
+        end
+    end
+        
+    local function hookSound(sound, player)
+        if scannedObjects[sound] then return end
+        scannedObjects[sound] = true
+        local conn = sound:GetPropertyChangedSignal("Playing"):Connect(function()
+            if sound.Playing and config.infiniteAmmoEnabled then
+                local sName = sound.Name:lower()
+                for _, kw in ipairs(COMBAT_SOUNDS) do
+                    if sName:find(kw) then
+                        triggerParry("Sound:"..sound.Name, player)
+                        break
+                    end
+                end
+            end
+        end)
+        table.insert(stateConnections, conn)
+    end
+        
+    -- ========== HOOK CHARACTER (PRIORITAS PATH) ==========
+    local function hookCharacter(player, char)
+        if not isKiller(player) then return end
+        print("[AutoParry] Hooked killer:", player.Name)
+        
+        -- Fallback: hook attribute & sound (nantinya)
+        hookAttributes(player, char)
+        
+        -- Scan objek yang sudah ada (termasuk path)
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("Sound") then hookSound(obj, player) end
+            if matchesCombatPath(obj, char) then
+                triggerParry("PathMatch:"..obj.Name, player)
+            end
+        end
+        
+                -- PRIORITAS UTAMA: pantau objek baru -> langsung trigger
+        local addedConn = char.DescendantAdded:Connect(function(obj)
+            -- Cek path dulu (cepat)
+            if matchesCombatPath(obj, char) then
+                triggerParry("PathMatchNew:"..obj.Name, player)
+            end
+            -- Fallback: jika objek adalah Sound, pasang hook (untuk deteksi playing)
+            if obj:IsA("Sound") then
+                hookSound(obj, player)
+                if obj.Playing then
+                    triggerParry("NewSound:"..obj.Name, player)
+                end
+            end
+        end)
+        table.insert(stateConnections, addedConn)
+        
+        -- Fallback: atribut berubah
+        local attrConn = char.AttributeChanged:Connect(function(attrName)
+            local lowerAttr = attrName:lower()
+            if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
+                local val = char:GetAttribute(attrName)
+                if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then
+                    triggerParry("AttributeChanged:"..attrName, player)
+                end
+            end
+        end)
+        table.insert(stateConnections, attrConn)
+    end
+        
+    -- ========== HOOK PLAYERS (TANPA PENUNDAAN) ==========
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and isKiller(player) then
+            if player.Character then
+                hookCharacter(player, player.Character)
+            end
+            local charConn = player.CharacterAdded:Connect(function(char)
+                -- Hilangkan task.wait(0.5) agar lebih cepat
+                hookCharacter(player, char)
+            end)
+            table.insert(stateConnections, charConn)
+        end
+    end
+        
+    local playerConn = Players.PlayerAdded:Connect(function(player)
+        local charConn = player.CharacterAdded:Connect(function(char)
+            -- Hilangkan penundaan
+            if isKiller(player) then
+                hookCharacter(player, char)
+            end
+        end)
+        table.insert(stateConnections, charConn)
+    end)
+    table.insert(stateConnections, playerConn)
+        
+    -- ========== ESP & PULSE (STABIL) ==========
+    local function createPulse()
+        local rootPart = localRootPart
+        if not rootPart then
+            local char = localPlayer.Character
+            if char then
+                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            end
+        end
+        if not rootPart then return end
+        if not radiusFolder or not radiusFolder.Parent then
+            refreshESP()
+        end
+        local pulse = Instance.new("Part")
+        pulse.Shape = Enum.PartType.Cylinder
+        pulse.Material = Enum.Material.Neon
+        pulse.Color = Color3.fromRGB(255,170,0)
+        pulse.Transparency = 0.78
+        pulse.Anchored = true
+        pulse.CanCollide = false
+        pulse.Size = Vector3.new(0.03,1,1)
+        pulse.Parent = radiusFolder
+        task.spawn(function()
+            local current = 1
+            for _ = 1,35 do
+                if not pulse.Parent or not radiusFolder then break end
+                local currentRoot = localRootPart
+                if not currentRoot then
+                    local char = localPlayer.Character
+                    if char then
+                        currentRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                    end
+                end
+                if not currentRoot then break end
+                current = current + 0.28
+                pulse.Size = Vector3.new(0.03, current, current)
+                pulse.Transparency = pulse.Transparency + 0.004
+                local footPos = currentRoot.Position - Vector3.new(0,3,0)
+                pulse.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+                RunService.RenderStepped:Wait()
+            end
+            pulse:Destroy()
+        end)
+    end
+
+    combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
+        if not config.infiniteAmmoEnabled then
+            combatStateConnected = false
+            if combatHeartbeat then combatHeartbeat:Disconnect(); combatHeartbeat = nil end
+            for _, conn in ipairs(stateConnections) do
+                pcall(function() conn:Disconnect() end)
+            end
+            for _, conn in ipairs(sliderConnections) do
+                pcall(function() conn:Disconnect() end)
+            end
+            stateConnections = {}
+            if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
+            if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
+            return
+        end
+        
+        -- Cari root part
+        local rootPart = localRootPart
+        if not rootPart then
+            local char = localPlayer.Character
+            if char then
+                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            end
+        end
+        if not rootPart then 
+            pulseTick = pulseTick + dt * 2
+            rainbowTick = rainbowTick + dt * 0.5
+            if tick() - lastPulse >= 2 then
+                lastPulse = tick()
+                createPulse()
+            end
+            return
+        end
+        
+        -- Pastikan ESP ada
+        if not radiusFolder or not radiusFolder.Parent then
+            refreshESP()
+        end
+        local mainCircle = radiusFolder:FindFirstChild("MainRadius")
+        local outerRing = radiusFolder:FindFirstChild("OuterRing")
+        if not mainCircle or not outerRing then
+            refreshESP()
+            mainCircle = radiusFolder:FindFirstChild("MainRadius")
+            outerRing = radiusFolder:FindFirstChild("OuterRing")
+        end
+        if not mainCircle or not outerRing then return end
+        
+        pulseTick = pulseTick + dt * 2
+        rainbowTick = rainbowTick + dt * 0.5
+        
+        local footPos = rootPart.Position - Vector3.new(0,3,0)
+        mainCircle.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+        outerRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0,0,math.rad(90))
+        mainCircle.Transparency = 0.91 + math.sin(pulseTick) * 0.01
+        outerRing.Transparency = 0.42 + math.sin(pulseTick) * 0.03
+        outerRing.Color = Color3.fromHSV(rainbowTick % 1, 1, 1)
+        
+        if tick() - lastPulse >= 2 then
+            lastPulse = tick()
+            createPulse()
+        end
+    end)
+        
+    print("[AutoParry] Ready with prioritized COMBAT_PATHS (fast response)")
+end
+
+        
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

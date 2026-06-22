@@ -1666,6 +1666,23 @@ local function autoParryLoop()
     local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti            
     local stateConnections = {}            
         
+    -- ==========================================        
+    -- COMBAT ANIMATIONS (hasil scanner)        
+    -- ==========================================        
+    local COMBAT_ANIMATIONS = {
+    "rbxassetid://110355011987939",
+    "rbxassetid://774628192837462",
+    "rbxassetid://928374655612873",
+    }
+    -- ==========================================        
+        
+    local function isCombatAnimation(animId)        
+        for _, id in ipairs(COMBAT_ANIMATIONS) do        
+            if animId == id then return true end        
+        end        
+        return false        
+    end        
+            
     -- ========== FUNGSI PEMBANTU ==========            
     local function getRoot(char)            
         return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")            
@@ -1688,24 +1705,50 @@ local function autoParryLoop()
     local function hookCharacter(player, char)            
         if not isKiller(player) then return end            
         
-        -- Daftar nama arm yang mungkin            
-        local armNames = {"Right Arm", "Left Arm", "Light Arm", "Arm"}            
-        for _, armName in ipairs(armNames) do            
-            local arm = char:FindFirstChild(armName, true)  -- true untuk mencari di seluruh turunan            
-            if arm then            
-                local conn = arm.ChildAdded:Connect(function(obj)            
-                    -- Cek jarak sebelum trigger            
-                    local root = getRoot(char)            
-                    if root and localRootPart then            
-                        local dist = (localRootPart.Position - root.Position).Magnitude            
-                        if dist <= DETECTION_RADIUS then            
-                            pcall(function() fireParryRemote(player) end)            
-                        end            
-                    end            
-                end)            
-                table.insert(stateConnections, conn)            
-            end            
-        end            
+        -- === PRIORITAS 1: Animasi ===        
+        local humanoid = char:FindFirstChildOfClass("Humanoid")        
+        if humanoid then        
+            local animator = humanoid:FindFirstChildOfClass("Animator")        
+            if not animator then        
+                animator = humanoid:WaitForChild("Animator", 1)        
+            end        
+            if animator then        
+                local animConn = animator.AnimationPlayed:Connect(function(track)        
+                    local anim = track.Animation        
+                    if anim then        
+                        local animId = anim.AnimationId        
+                        if isCombatAnimation(animId) then        
+                            local root = getRoot(char)        
+                            if root and localRootPart then        
+                                local dist = (localRootPart.Position - root.Position).Magnitude        
+                                if dist <= DETECTION_RADIUS then        
+                                    pcall(function() fireParryRemote(player) end)        
+                                end        
+                            end        
+                        end        
+                    end        
+                end)        
+                table.insert(stateConnections, animConn)        
+            end        
+        end        
+            
+        -- === PRIORITAS 2: Arm.ChildAdded ===        
+        local armNames = {"Right Arm", "Left Arm", "Light Arm", "Arm"}        
+        for _, armName in ipairs(armNames) do        
+            local arm = char:FindFirstChild(armName, true)        
+            if arm then        
+                local conn = arm.ChildAdded:Connect(function(obj)        
+                    local root = getRoot(char)        
+                    if root and localRootPart then        
+                        local dist = (localRootPart.Position - root.Position).Magnitude        
+                        if dist <= DETECTION_RADIUS then        
+                            pcall(function() fireParryRemote(player) end)        
+                        end        
+                    end        
+                end)        
+                table.insert(stateConnections, conn)        
+            end        
+        end        
     end            
         
     -- ========== HOOK PLAYERS ==========            
@@ -1777,9 +1820,8 @@ local function autoParryLoop()
         end            
     end)            
         
-    print("[AutoParry] Hooked to Arm.ChildAdded (fastest)")            
+    print("[AutoParry] Hooked to AnimationPlayed + Arm.ChildAdded")            
 end
-
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

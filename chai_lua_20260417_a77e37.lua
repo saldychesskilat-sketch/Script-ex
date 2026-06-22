@@ -1690,53 +1690,35 @@ local function getKillerDistance()
     end        
     return minDist        
 end        
- local combatHeartbeat = nil            
+
+local combatHeartbeat = nil            
 local radiusFolder = nil            
         
 local function autoParryLoop()            
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    -- Variabel yang bisa diatur slider (default)
-    local DETECTION_RADIUS = 10           
+    -- Konfigurasi (dari slider)
+    local DETECTION_RADIUS = 9           
     local PARRY_COOLDOWN = 0.01            
     
-    -- Variabel untuk GUI dan koneksi slider
-    local parryConfigGui = nil
-    local sliderConnections = {}
-            
+    -- Variabel
     local lastParry = 0            
     local lastParryPerPlayer = {}            
-    local scannedObjects = {}            
     local stateConnections = {}            
-        
-    -- ========== DETEKSI PATH (FOKUS: SOUND DI ARM) ==========
-    local function matchesCombatPath(obj, killerChar)
-        -- Prioritas utama: Sound dengan parent Right/Left/Light Arm
+    local sliderConnections = {}  -- untuk cleanup
+            
+    -- ========== DETEKSI PATH (HANYA SOUND DI ARM) ==========
+    local function matchesArmSound(obj)
         if obj:IsA("Sound") then
             local parent = obj.Parent
             if parent then
                 local pName = parent.Name
-                if pName == "Right Arm" or pName == "Left Arm" or pName == "Light Arm" or pName == "Arm" then
+                if pName == "Right Arm" or pName == "Left Arm" or pName == "Light Arm" then
                     return true
                 end
             end
         end
-        
-        -- Fallback: nama objek mengandung keyword
-        local objName = obj.Name:lower()
-        local keywords = {"basicattack", "wipemachete", "frenzy", "attackline", "swing", "hit", "stun", "parry", "wipe", "slash", "lunge"}
-        for _, kw in ipairs(keywords) do
-            if objName:find(kw) then
-                return true
-            end
-        end
-        
-        -- Fallback: objek tertentu
-        if obj.Name == "Killerost" or obj.Name == "Lookscriptkiller" or obj.Name == "BasicAttack" then
-            return true
-        end
-        
         return false
     end
         
@@ -1757,8 +1739,9 @@ local function autoParryLoop()
             if char:FindFirstChild("Killerost") or char:FindFirstChild("Lookscriptkiller") then
                 return true
             end
+            -- Cek apakah ada Sound di Arm (identifikasi awal)
             for _, obj in ipairs(char:GetDescendants()) do
-                if matchesCombatPath(obj, char) then
+                if matchesArmSound(obj) then
                     return true
                 end
             end
@@ -1783,70 +1766,15 @@ local function autoParryLoop()
         pcall(function() fireParryRemote(player) end)
     end
         
-    -- ========== HOOK FUNCTIONS (HANYA SOUND) ==========
-    local function hookSound(sound, player)
-        if scannedObjects[sound] then return end
-        scannedObjects[sound] = true
-        local conn = sound:GetPropertyChangedSignal("Playing"):Connect(function()
-            if sound.Playing and config.infiniteAmmoEnabled then
-                local parent = sound.Parent
-                if parent and (parent.Name == "Right Arm" or parent.Name == "Left Arm" or parent.Name == "Light Arm") then
-                    triggerParry("SoundPlaying:"..sound.Name, player)
-                else
-                    local sName = sound.Name:lower()
-                    if sName:find("attack") or sName:find("swing") or sName:find("hit") or sName:find("frenzy") then
-                        triggerParry("Sound:"..sound.Name, player)
-                    end
-                end
-            end
-        end)
-        table.insert(stateConnections, conn)
-    end
-        
     -- ========== HOOK CHARACTER (PRIORITAS UTAMA: SOUND DI ARM) ==========
     local function hookCharacter(player, char)
         if not isKiller(player) then return end
         print("[AutoParry] Hooked killer:", player.Name)
         
-        -- Scan existing sounds
-        for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("Sound") then
-                hookSound(obj, player)
-                if obj.Playing then
-                    local parent = obj.Parent
-                    if parent and (parent.Name == "Right Arm" or parent.Name == "Left Arm" or parent.Name == "Light Arm") then
-                        triggerParry("ExistingArmSound:"..obj.Name, player)
-                    end
-                end
-            end
-            if matchesCombatPath(obj, char) then
-                triggerParry("PathMatch:"..obj.Name, player)
-            end
-        end
-        
-        -- Pantau object baru
+        -- Pantau object baru -> langsung trigger jika Sound di Arm
         local addedConn = char.DescendantAdded:Connect(function(obj)
-            if obj:IsA("Sound") then
-                local parent = obj.Parent
-                if parent then
-                    local pName = parent.Name
-                    if pName == "Right Arm" or pName == "Left Arm" or pName == "Light Arm" then
-                        triggerParry("ArmSound:"..obj.Name, player)
-                        hookSound(obj, player)
-                        return
-                    end
-                end
-            end
-            
-            if matchesCombatPath(obj, char) then
-                triggerParry("PathMatchNew:"..obj.Name, player)
-            end
-            
-            if obj:IsA("Sound") then
-                hookSound(obj, player)
-                if obj.Playing then
-                    triggerParry("NewSound:"..obj.Name, player)
-                end
+            if matchesArmSound(obj) then
+                triggerParry("ArmSound:"..obj.Name, player)
             end
         end)
         table.insert(stateConnections, addedConn)
@@ -1875,7 +1803,7 @@ local function autoParryLoop()
     end)
     table.insert(stateConnections, playerConn)
     
-    -- ========== ESP SEDERHANA (LINGKARAN MERAH, UKURAN DINAMIS) ==========
+    -- ========== ESP (LINGKARAN MERAH, UKURAN DINAMIS) ==========
     local function refreshESP()
         if not radiusFolder then
             radiusFolder = Instance.new("Folder")
@@ -1894,11 +1822,10 @@ local function autoParryLoop()
             espRing.CanCollide = false
             espRing.Parent = radiusFolder
         end
-        espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+        espRing.Size = Vector3.new(0.20, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
         return espRing
     end
     
-    -- Buat ESP awal
     local espRing = refreshESP()
     
     -- ========== GUI SLIDER (MUNCUL SAAT FITUR AKTIF) ==========
@@ -2131,7 +2058,7 @@ local function autoParryLoop()
     parryConfigGui = createConfigGUI()
     refreshESP()
     
-    -- ========== MAIN LOOP (UPDATE ESP + DETEKSI KECEPATAN KILLER) ==========
+    -- ========== MAIN LOOP (UPDATE ESP SAJA) ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
             combatStateConnected = false
@@ -2160,32 +2087,10 @@ local function autoParryLoop()
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
         end
-        
-        -- ===== DETEKSI KECEPATAN KILLER (2x lebih sensitif) =====
-        local speedThreshold = 60  -- bisa disesuaikan
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer and isKiller(player) then
-                local char = player.Character
-                if char then
-                    local root = getRoot(char)
-                    if root then
-                        local dist = (rootPart.Position - root.Position).Magnitude
-                        if dist <= DETECTION_RADIUS then
-                            local vel = root.AssemblyLinearVelocity
-                            local speed = vel.Magnitude
-                            if speed > speedThreshold then
-                                triggerParry("SpeedKill:"..player.Name, player)
-                            end
-                        end
-                    end
-                end
-            end
-        end
     end)
         
-    print("[AutoParry] Ready with ArmSound + Speed detection & adjustable ESP")
+    print("[AutoParry] Ready with ArmSound detection only (no fallback)")
 end
-   
 
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

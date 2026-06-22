@@ -1692,25 +1692,275 @@ local function getKillerDistance()
 end        
 local combatHeartbeat = nil            
 local radiusFolder = nil            
-        
+local parryConfigGui = nil
+local sliderConnections = {}
+
+-- Variabel yang akan diubah slider (dideklarasikan di luar agar bisa diakses)
+DETECTION_RADIUS = 9           
+PARRY_COOLDOWN = 0.01
+
+-- ========== FUNGSI REFRESH ESP ==========
+local function refreshESP()
+    if not radiusFolder then
+        radiusFolder = Instance.new("Folder")
+        radiusFolder.Name = "ParryESP"
+        radiusFolder.Parent = workspace
+    end
+    local espRing = radiusFolder:FindFirstChild("RadiusRing")
+    if not espRing then
+        espRing = Instance.new("Part")
+        espRing.Name = "RadiusRing"
+        espRing.Shape = Enum.PartType.Cylinder
+        espRing.Material = Enum.Material.SmoothPlastic
+        espRing.Color = Color3.fromRGB(255, 0, 0)
+        espRing.Transparency = 0.6
+        espRing.Anchored = true
+        espRing.CanCollide = false
+        espRing.Parent = radiusFolder
+    end
+    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+    return espRing
+end
+
+-- ========== GUI SLIDER ==========
+local function createConfigGUI()
+    if parryConfigGui then parryConfigGui:Destroy() end
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "AutoParryConfig"
+    gui.ResetOnSpawn = false
+    gui.Parent = game.CoreGui
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 260, 0, 100)
+    frame.Position = UDim2.new(0.5, -130, 0.5, -50)
+    frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0,180,255)
+    stroke.Transparency = 0.4
+    stroke.Parent = frame
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 28)
+    header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
+    header.BorderSizePixel = 0
+    header.Parent = frame
+    Instance.new("UICorner", header).CornerRadius = UDim.new(0, 8)
+    local headerStroke = Instance.new("UIStroke")
+    headerStroke.Color = Color3.fromRGB(0,180,255)
+    headerStroke.Transparency = 0.5
+    headerStroke.Parent = header
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(0.7, 0, 1, 0)
+    title.Position = UDim2.new(0, 10, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "Auto Parry Settings"
+    title.TextColor3 = Color3.fromRGB(0,220,255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 12
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = header
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 22, 0, 22)
+    closeBtn.Position = UDim2.new(1, -28, 0.5, -11)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 12
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Parent = header
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+        parryConfigGui = nil
+    end)
+    -- Slider Radius
+    local radLabel = Instance.new("TextLabel")
+    radLabel.Size = UDim2.new(0.5, -10, 0, 20)
+    radLabel.Position = UDim2.new(0, 10, 0, 36)
+    radLabel.BackgroundTransparency = 1
+    radLabel.Text = "Radius: " .. DETECTION_RADIUS
+    radLabel.TextColor3 = Color3.fromRGB(210,210,210)
+    radLabel.Font = Enum.Font.Gotham
+    radLabel.TextSize = 11
+    radLabel.Parent = frame
+    local radBg = Instance.new("Frame")
+    radBg.Size = UDim2.new(0.45, 0, 0, 4)
+    radBg.Position = UDim2.new(0.52, 0, 0.46, 0)
+    radBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
+    radBg.BorderSizePixel = 0
+    radBg.Parent = frame
+    Instance.new("UICorner", radBg).CornerRadius = UDim.new(1,0)
+    local radThumb = Instance.new("TextButton")
+    radThumb.Size = UDim2.new(0,12,0,12)
+    radThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
+    radThumb.AutoButtonColor = false
+    radThumb.Text = ""
+    radThumb.Parent = radBg
+    Instance.new("UICorner", radThumb).CornerRadius = UDim.new(1,0)
+    -- Slider Cooldown
+    local cdLabel = Instance.new("TextLabel")
+    cdLabel.Size = UDim2.new(0.5, -10, 0, 20)
+    cdLabel.Position = UDim2.new(0, 10, 0, 66)
+    cdLabel.BackgroundTransparency = 1
+    cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
+    cdLabel.TextColor3 = Color3.fromRGB(210,210,210)
+    cdLabel.Font = Enum.Font.Gotham
+    cdLabel.TextSize = 11
+    cdLabel.Parent = frame
+    local cdBg = Instance.new("Frame")
+    cdBg.Size = UDim2.new(0.45, 0, 0, 4)
+    cdBg.Position = UDim2.new(0.52, 0, 0.76, 0)
+    cdBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
+    cdBg.BorderSizePixel = 0
+    cdBg.Parent = frame
+    Instance.new("UICorner", cdBg).CornerRadius = UDim.new(1,0)
+    local cdThumb = Instance.new("TextButton")
+    cdThumb.Size = UDim2.new(0,12,0,12)
+    cdThumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
+    cdThumb.AutoButtonColor = false
+    cdThumb.Text = ""
+    cdThumb.Parent = cdBg
+    Instance.new("UICorner", cdThumb).CornerRadius = UDim.new(1,0)
+    -- Update functions
+    local function updateRadUI()
+        local rel = (DETECTION_RADIUS - 1) / 19
+        local w = radBg.AbsoluteSize.X
+        local tw = radThumb.AbsoluteSize.X
+        if w > 0 then
+            local px = math.clamp(rel * w, tw/2, w - tw/2)
+            radThumb.Position = UDim2.new(0, px - tw/2, 0.5, -tw/2)
+        end
+        radLabel.Text = "Radius: " .. DETECTION_RADIUS
+    end
+    local function updateCDUI()
+        local rel = (PARRY_COOLDOWN - 0.01) / 0.99
+        local w = cdBg.AbsoluteSize.X
+        local tw = cdThumb.AbsoluteSize.X
+        if w > 0 then
+            local px = math.clamp(rel * w, tw/2, w - tw/2)
+            cdThumb.Position = UDim2.new(0, px - tw/2, 0.5, -tw/2)
+        end
+        cdLabel.Text = "Reaction: " .. string.format("%.2f", PARRY_COOLDOWN) .. "s"
+    end
+    -- Drag Radius
+    local draggingRad = false
+    local function onRadDrag(mouseX)
+        local bgX = radBg.AbsolutePosition.X
+        local bgW = radBg.AbsoluteSize.X
+        if bgW <= 0 then return end
+        local rel = math.clamp((mouseX - bgX) / bgW, 0, 1)
+        local newVal = math.floor(rel * 19 + 0.5) + 1
+        newVal = math.clamp(newVal, 1, 20)
+        if newVal ~= DETECTION_RADIUS then
+            DETECTION_RADIUS = newVal
+            updateRadUI()
+            refreshESP()
+        end
+    end
+    radThumb.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingRad = true
+            onRadDrag(input.Position.X)
+        end
+    end)
+    radBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingRad = true
+            onRadDrag(input.Position.X)
+        end
+    end)
+    local radMove = RunService.RenderStepped:Connect(function()
+        if draggingRad then
+            onRadDrag(UserInputService:GetMouseLocation().X)
+        end
+    end)
+    local radEnd = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingRad = false
+        end
+    end)
+    table.insert(sliderConnections, radMove)
+    table.insert(sliderConnections, radEnd)
+    -- Drag Cooldown
+    local draggingCD = false
+    local function onCDDrag(mouseX)
+        local bgX = cdBg.AbsolutePosition.X
+        local bgW = cdBg.AbsoluteSize.X
+        if bgW <= 0 then return end
+        local rel = math.clamp((mouseX - bgX) / bgW, 0, 1)
+        local newVal = 0.01 + rel * 0.99
+        newVal = math.floor(newVal * 100 + 0.5) / 100
+        if newVal ~= PARRY_COOLDOWN then
+            PARRY_COOLDOWN = newVal
+            updateCDUI()
+        end
+    end
+    cdThumb.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingCD = true
+            onCDDrag(input.Position.X)
+        end
+    end)
+    cdBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingCD = true
+            onCDDrag(input.Position.X)
+        end
+    end)
+    local cdMove = RunService.RenderStepped:Connect(function()
+        if draggingCD then
+            onCDDrag(UserInputService:GetMouseLocation().X)
+        end
+    end)
+    local cdEnd = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingCD = false
+        end
+    end)
+    table.insert(sliderConnections, cdMove)
+    table.insert(sliderConnections, cdEnd)
+    -- Drag untuk memindahkan frame
+    local draggingFrame = false
+    local dragStartPos, frameStartPos
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingFrame = true
+            dragStartPos = input.Position
+            frameStartPos = frame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if draggingFrame and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStartPos
+            frame.Position = UDim2.new(frameStartPos.X.Scale, frameStartPos.X.Offset + delta.X, frameStartPos.Y.Scale, frameStartPos.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            draggingFrame = false
+        end
+    end)
+    task.wait(0)
+    updateRadUI()
+    updateCDUI()
+    return gui
+end
+
+-- ========== AUTO PARRY LOOP ==========
 local function autoParryLoop()            
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    -- Konfigurasi dasar (bisa diubah manual di sini)
-    local DETECTION_RADIUS = 9           
-    local PARRY_COOLDOWN = 0.01            
-    
     -- Variabel untuk deteksi
     local lastParry = 0            
     local lastParryPerPlayer = {}            
     local scannedObjects = {}            
     local stateConnections = {}            
-    local sliderConnections = {}  -- placeholder, tidak digunakan
             
     -- ========== DETEKSI PATH (SANGAT SEDERHANA) ==========
     local function matchesCombatPath(obj, killerChar)
-        -- 1. Jika objek adalah Sound dan parentnya adalah Right/Left/Light Arm
         if obj:IsA("Sound") then
             local parent = obj.Parent
             if parent then
@@ -1721,7 +1971,6 @@ local function autoParryLoop()
             end
         end
         
-        -- 2. Fallback: nama objek mengandung keyword serangan
         local objName = obj.Name:lower()
         local keywords = {"basicattack", "wipemachete", "frenzy", "attackline", "swing", "hit", "stun", "parry", "wipe", "slash", "lunge"}
         for _, kw in ipairs(keywords) do
@@ -1730,7 +1979,6 @@ local function autoParryLoop()
             end
         end
         
-        -- 3. Path fallback (cocokkan nama saja)
         if obj.Name == "Killerost" or obj.Name == "Lookscriptkiller" or obj.Name == "BasicAttack" then
             return true
         end
@@ -1908,24 +2156,11 @@ local function autoParryLoop()
     end)
     table.insert(stateConnections, playerConn)
     
-    -- ========== ESP SEDERHANA (LINGKARAN MERAH, TANPA EFEK) ==========
-    if radiusFolder then radiusFolder:Destroy() end
-    radiusFolder = Instance.new("Folder")
-    radiusFolder.Name = "ParryESP"
-    radiusFolder.Parent = workspace
+    -- ========== ESP (refresh dan ambil ring) ==========
+    refreshESP()
+    local espRing = radiusFolder:FindFirstChild("RadiusRing")
     
-    local espRing = Instance.new("Part")
-    espRing.Name = "RadiusRing"
-    espRing.Shape = Enum.PartType.Cylinder
-    espRing.Material = Enum.Material.SmoothPlastic
-    espRing.Color = Color3.fromRGB(255, 0, 0)
-    espRing.Transparency = 0.6
-    espRing.Anchored = true
-    espRing.CanCollide = false
-    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-    espRing.Parent = radiusFolder
-    
-    -- ========== MAIN LOOP (UPDATE ESP SAJA) ==========
+    -- ========== MAIN LOOP ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
             combatStateConnected = false
@@ -1945,14 +2180,35 @@ local function autoParryLoop()
                 rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
             end
         end
-        if rootPart then
+        if rootPart and espRing then
             local footPos = rootPart.Position - Vector3.new(0, 3, 0)
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
         end
+        
+        -- ===== DETEKSI KECEPATAN KILLER (2x lebih sensitif) =====
+        local speedThreshold = 20  -- 2x lebih sensitif dari default (biasanya 10-15)
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer and isKiller(player) then
+                local char = player.Character
+                if char then
+                    local root = getRoot(char)
+                    if root then
+                        local dist = (rootPart.Position - root.Position).Magnitude
+                        if dist <= DETECTION_RADIUS then
+                            local vel = root.AssemblyLinearVelocity
+                            local speed = vel.Magnitude
+                            if speed > speedThreshold then
+                                triggerParry("SpeedKill:"..player.Name, player)
+                            end
+                        end
+                    end
+                end
+            end
+        end
     end)
         
-    print("[AutoParry] Ready with ArmSound detection + simple red ESP")
+    print("[AutoParry] Ready with ArmSound + Speed detection & adjustable ESP")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

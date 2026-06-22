@@ -1663,160 +1663,121 @@ local function autoParryLoop()
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    -- Konfigurasi dasar (dapat diubah via slider)
-    local DETECTION_RADIUS = 10           
-    -- PARRY_COOLDOWN dihapus, tidak perlu
-            
-    -- Variabel deteksi
+    local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti            
     local stateConnections = {}            
-    local sliderConnections = {}  -- placeholder, tidak digunakan
-            
-    -- ========== FUNGSI PEMBANTU ==========
-    local function getRoot(char)
-        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-    end
         
-    local function isKiller(player)
-        if not player or player == localPlayer then return false end
-        if player.Team then
-            local t = player.Team.Name:lower()
-            if t:find("killer") or t:find("monster") or t:find("enemy") then
-                return true
-            end
-        end
-        local char = player.Character
-        if char then
-            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then
-                return true
-            end
-        end
-        return false
-    end
+    -- ========== FUNGSI PEMBANTU ==========            
+    local function getRoot(char)            
+        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")            
+    end            
         
-    -- ========== FUNGSI CEK ARM ==========
-    local function isUnderArm(obj, char)
-        local current = obj
-        while current and current ~= char do
-            local name = current.Name
-            if name == "Right Arm" or name == "Left Arm" or name == "Light Arm" or name == "Arm" then
-                return true
-            end
-            current = current.Parent
-        end
-        return false
-    end
+    local function isKiller(player)            
+        if not player or player == localPlayer then return false end            
+        if player.Team then            
+            local t = player.Team.Name:lower()            
+            if t:find("killer") or t:find("monster") or t:find("enemy") then return true end            
+        end            
+        local char = player.Character            
+        if char then            
+            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then return true end            
+        end            
+        return false            
+    end            
         
-    -- ========== HOOK CHARACTER ==========
-    local function hookCharacter(player, char)
-        if not isKiller(player) then return end
-        print("[AutoParry] Hooked killer:", player.Name)
+    -- ========== HOOK KARAKTER ==========            
+    local function hookCharacter(player, char)            
+        if not isKiller(player) then return end            
         
-        local addedConn = char.DescendantAdded:Connect(function(obj)
-            if isUnderArm(obj, char) then
-                local root = getRoot(char)
-                if root and localRootPart then
-                    local dist = (localRootPart.Position - root.Position).Magnitude
-                    if dist <= DETECTION_RADIUS then
-                        pcall(function() fireParryRemote(player) end)
-                    end
-                end
-            end
-        end)
-        table.insert(stateConnections, addedConn)
+        -- Daftar nama arm yang mungkin            
+        local armNames = {"Right Arm", "Left Arm", "Light Arm", "Arm"}            
+        for _, armName in ipairs(armNames) do            
+            local arm = char:FindFirstChild(armName, true)  -- true untuk mencari di seluruh turunan            
+            if arm then            
+                local conn = arm.ChildAdded:Connect(function(obj)            
+                    -- Cek jarak sebelum trigger            
+                    local root = getRoot(char)            
+                    if root and localRootPart then            
+                        local dist = (localRootPart.Position - root.Position).Magnitude            
+                        if dist <= DETECTION_RADIUS then            
+                            pcall(function() fireParryRemote(player) end)            
+                        end            
+                    end            
+                end)            
+                table.insert(stateConnections, conn)            
+            end            
+        end            
+    end            
         
-        -- Fallback attribute (opsional)
-        local attrConn = char.AttributeChanged:Connect(function(attrName)
-            local lowerAttr = attrName:lower()
-            if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
-                local val = char:GetAttribute(attrName)
-                if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then
-                    local root = getRoot(char)
-                    if root and localRootPart then
-                        local dist = (localRootPart.Position - root.Position).Magnitude
-                        if dist <= DETECTION_RADIUS then
-                            pcall(function() fireParryRemote(player) end)
-                        end
-                    end
-                end
-            end
-        end)
-        table.insert(stateConnections, attrConn)
-    end
+    -- ========== HOOK PLAYERS ==========            
+    for _, player in ipairs(Players:GetPlayers()) do            
+        if player ~= localPlayer and isKiller(player) then            
+            if player.Character then hookCharacter(player, player.Character) end            
+            local charConn = player.CharacterAdded:Connect(function(char)            
+                hookCharacter(player, char)            
+            end)            
+            table.insert(stateConnections, charConn)            
+        end            
+    end            
         
-    -- ========== HOOK PLAYERS ==========
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and isKiller(player) then
-            if player.Character then
-                hookCharacter(player, player.Character)
-            end
-            local charConn = player.CharacterAdded:Connect(function(char)
-                hookCharacter(player, char)
-            end)
-            table.insert(stateConnections, charConn)
-        end
-    end
+    local playerConn = Players.PlayerAdded:Connect(function(player)            
+        local charConn = player.CharacterAdded:Connect(function(char)            
+            if isKiller(player) then hookCharacter(player, char) end            
+        end)            
+        table.insert(stateConnections, charConn)            
+    end)            
+    table.insert(stateConnections, playerConn)            
         
-    local playerConn = Players.PlayerAdded:Connect(function(player)
-        local charConn = player.CharacterAdded:Connect(function(char)
-            if isKiller(player) then
-                hookCharacter(player, char)
-            end
-        end)
-        table.insert(stateConnections, charConn)
-    end)
-    table.insert(stateConnections, playerConn)
-    
-    -- ========== ESP SEDERHANA ==========
-    if radiusFolder then radiusFolder:Destroy() end
-    radiusFolder = Instance.new("Folder")
-    radiusFolder.Name = "ParryESP"
-    radiusFolder.Parent = workspace
-    
-    local espRing = Instance.new("Part")
-    espRing.Name = "RadiusRing"
-    espRing.Shape = Enum.PartType.Cylinder
-    espRing.Material = Enum.Material.SmoothPlastic
-    espRing.Color = Color3.fromRGB(255, 0, 0)
-    espRing.Transparency = 0.6
-    espRing.Anchored = true
-    espRing.CanCollide = false
-    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-    espRing.Parent = radiusFolder
-    
-    local function refreshESP()
-        if espRing then
-            espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-        end
-    end
-    
-    -- ========== MAIN LOOP ==========
-    combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
-        if not config.infiniteAmmoEnabled then
-            combatStateConnected = false
-            if combatHeartbeat then combatHeartbeat:Disconnect(); combatHeartbeat = nil end
-            for _, conn in ipairs(stateConnections) do
-                pcall(function() conn:Disconnect() end)
-            end
-            stateConnections = {}
-            if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
-            return
-        end
+    -- ========== ESP SEDERHANA ==========            
+    if radiusFolder then radiusFolder:Destroy() end            
+    radiusFolder = Instance.new("Folder")            
+    radiusFolder.Name = "ParryESP"            
+    radiusFolder.Parent = workspace            
         
-        local rootPart = localRootPart
-        if not rootPart then
-            local char = localPlayer.Character
-            if char then
-                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-            end
-        end
-        if rootPart then
-            local footPos = rootPart.Position - Vector3.new(0, 3, 0)
-            espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
-            espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-        end
-    end)
+    local espRing = Instance.new("Part")            
+    espRing.Name = "RadiusRing"            
+    espRing.Shape = Enum.PartType.Cylinder            
+    espRing.Material = Enum.Material.SmoothPlastic            
+    espRing.Color = Color3.fromRGB(255, 0, 0)            
+    espRing.Transparency = 0.6            
+    espRing.Anchored = true            
+    espRing.CanCollide = false            
+    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
+    espRing.Parent = radiusFolder            
         
-    print("[AutoParry] Ready with instant ArmDescendant detection (no cooldown, fast)")
+    local function refreshESP()            
+        if espRing then            
+            espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
+        end            
+    end            
+        
+    -- ========== MAIN LOOP (UPDATE ESP) ==========            
+    combatHeartbeat = RunService.RenderStepped:Connect(function(dt)            
+        if not config.infiniteAmmoEnabled then            
+            combatStateConnected = false            
+            if combatHeartbeat then combatHeartbeat:Disconnect(); combatHeartbeat = nil end            
+            for _, conn in ipairs(stateConnections) do            
+                pcall(function() conn:Disconnect() end)            
+            end            
+            stateConnections = {}            
+            if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end            
+            return            
+        end            
+        
+        local rootPart = localRootPart            
+        if not rootPart then            
+            local char = localPlayer.Character            
+            if char then            
+                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")            
+            end            
+        end            
+        if rootPart then            
+            local footPos = rootPart.Position - Vector3.new(0, 3, 0)            
+            espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))            
+            espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
+        end            
+    end)            
+        
+    print("[AutoParry] Hooked to Arm.ChildAdded (fastest)")            
 end
 
 -- ============================================================================        

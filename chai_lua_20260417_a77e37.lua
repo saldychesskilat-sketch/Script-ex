@@ -1656,41 +1656,6 @@ end
 -- ============================================================================        
 -- AUTO PARRY MAIN LOOP        
 -- ============================================================================                
-local lastParrytime = 0
-
-local function getKillerDistance()        
-    if not localRootPart then return math.huge end        
-    local localPos = localRootPart.Position        
-    local minDist = math.huge        
-    for _, player in ipairs(Players:GetPlayers()) do        
-        if player ~= localPlayer then        
-            local char = player.Character        
-            if char then        
-                local isKiller = false        
-                if player.Team then        
-                    isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))        
-                end        
-                if not isKiller then        
-                    local tool = char:FindFirstChildWhichIsA("Tool")        
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then        
-                        isKiller = true        
-                    end        
-                end        
-                if isKiller then        
-                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")        
-                    if root then        
-                        local dist = (localPos - root.Position).Magnitude        
-                        if dist < minDist then        
-                            minDist = dist        
-                        end        
-                    end        
-                end        
-            end        
-        end        
-    end        
-    return minDist        
-end        
-
 local combatHeartbeat = nil            
 local radiusFolder = nil            
         
@@ -1698,47 +1663,15 @@ local function autoParryLoop()
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    -- Konfigurasi dasar (bisa diubah manual di sini)
+    -- Konfigurasi dasar (dapat diubah via slider)
     local DETECTION_RADIUS = 10           
-    local PARRY_COOLDOWN = 0.01            
-    
-    -- Variabel untuk deteksi
-    local lastParry = 0            
-    local lastParryPerPlayer = {}            
-    local scannedObjects = {}            
+    -- PARRY_COOLDOWN dihapus, tidak perlu
+            
+    -- Variabel deteksi
     local stateConnections = {}            
     local sliderConnections = {}  -- placeholder, tidak digunakan
             
-    -- ========== DETEKSI PATH (SANGAT SEDERHANA) ==========
-    local function matchesCombatPath(obj, killerChar)
-        -- 1. Jika objek adalah Sound dan parentnya adalah Right/Left/Light Arm
-        if obj:IsA("Sound") then
-            local parent = obj.Parent
-            if parent then
-                local pName = parent.Name
-                if pName == "Right Arm" or pName == "Left Arm" or pName == "Light Arm" or pName == "Arm" then
-                    return true
-                end
-            end
-        end
-        
-        -- 2. Fallback: nama objek mengandung keyword serangan
-        local objName = obj.Name:lower()
-        local keywords = {"basicattack", "wipemachete", "frenzy", "attackline", "swing", "hit", "stun", "parry", "wipe", "slash", "lunge"}
-        for _, kw in ipairs(keywords) do
-            if objName:find(kw) then
-                return true
-            end
-        end
-        
-        -- 3. Path fallback (cocokkan nama saja)
-        if obj.Name == "Killerost" or obj.Name == "Lookscriptkiller" or obj.Name == "BasicAttack" then
-            return true
-        end
-        
-        return false
-    end
-        
+    -- ========== FUNGSI PEMBANTU ==========
     local function getRoot(char)
         return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
     end
@@ -1756,137 +1689,61 @@ local function autoParryLoop()
             if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then
                 return true
             end
-            for _, obj in ipairs(char:GetDescendants()) do
-                if matchesCombatPath(obj, char) then
-                    return true
-                end
-            end
         end
         return false
     end
-    
-    local function triggerParry(reason, player)
-        if tick() - lastParry < PARRY_COOLDOWN then return end
-        local lastP = lastParryPerPlayer[player] or 0
-        if tick() - lastP < PARRY_COOLDOWN then return end
-        local char = player.Character
-        if not char then return end
-        local root = getRoot(char)
-        if not root then return end
-        local dist = (localRootPart.Position - root.Position).Magnitude
-        if dist > DETECTION_RADIUS then return end
-
-        lastParry = tick()
-        lastParryPerPlayer[player] = tick()
-        print("[AutoParry] Triggered by", reason, "from", player.Name, "dist=", math.floor(dist))
-        pcall(function() fireParryRemote(player) end)
-    end
         
-    -- ========== HOOK FUNCTIONS (FALLBACK) ==========
-    local function hookAttributes(player, char)
-        local function onAttributeChanged(attrName)
-            return function()
-                if not config.infiniteAmmoEnabled then return end
-                local val = char:GetAttribute(attrName)
-                if attrName:lower() == "frenzy" and val == true then
-                    triggerParry("Attribute:Frenzy", player)
-                elseif attrName:lower() == "parry" and val == true then
-                    triggerParry("Attribute:Parry", player)
-                elseif attrName:lower() == "hookprogress" and type(val) == "number" and val > 0 then
-                    triggerParry("Attribute:hookprogress", player)
-                elseif attrName:lower() == "hookcount" and val and tonumber(val) and tonumber(val) > 0 then
-                    triggerParry("Attribute:HookCount", player)
-                end
+    -- ========== FUNGSI CEK ARM ==========
+    local function isUnderArm(obj, char)
+        local current = obj
+        while current and current ~= char do
+            local name = current.Name
+            if name == "Right Arm" or name == "Left Arm" or name == "Light Arm" or name == "Arm" then
+                return true
             end
+            current = current.Parent
         end
-        for _, attrName in ipairs({"frenzy", "parry", "hookprogress", "hookcount"}) do
-            if char:GetAttribute(attrName) ~= nil then
-                local conn = char:GetAttributeChangedSignal(attrName):Connect(onAttributeChanged(attrName))
-                table.insert(stateConnections, conn)
-            end
-        end
+        return false
     end
         
-    local function hookSound(sound, player)
-        if scannedObjects[sound] then return end
-        scannedObjects[sound] = true
-        local conn = sound:GetPropertyChangedSignal("Playing"):Connect(function()
-            if sound.Playing and config.infiniteAmmoEnabled then
-                local parent = sound.Parent
-                if parent and (parent.Name == "Right Arm" or parent.Name == "Left Arm" or parent.Name == "Light Arm") then
-                    triggerParry("SoundPlaying:"..sound.Name, player)
-                else
-                    local sName = sound.Name:lower()
-                    if sName:find("attack") or sName:find("swing") or sName:find("hit") or sName:find("frenzy") then
-                        triggerParry("Sound:"..sound.Name, player)
-                    end
-                end
-            end
-        end)
-        table.insert(stateConnections, conn)
-    end
-        
-    -- ========== HOOK CHARACTER (PRIORITAS UTAMA: SOUND DI ARM) ==========
+    -- ========== HOOK CHARACTER ==========
     local function hookCharacter(player, char)
         if not isKiller(player) then return end
         print("[AutoParry] Hooked killer:", player.Name)
         
-        hookAttributes(player, char)
-        
-        for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("Sound") then
-                hookSound(obj, player)
-                if obj.Playing then
-                    local parent = obj.Parent
-                    if parent and (parent.Name == "Right Arm" or parent.Name == "Left Arm" or parent.Name == "Light Arm") then
-                        triggerParry("ExistingArmSound:"..obj.Name, player)
-                    end
-                end
-            end
-            if matchesCombatPath(obj, char) then
-                triggerParry("PathMatch:"..obj.Name, player)
-            end
-        end
-        
         local addedConn = char.DescendantAdded:Connect(function(obj)
-            if obj:IsA("Sound") then
-                local parent = obj.Parent
-                if parent then
-                    local pName = parent.Name
-                    if pName == "Right Arm" or pName == "Left Arm" or pName == "Light Arm" then
-                        triggerParry("ArmSound:"..obj.Name, player)
-                        hookSound(obj, player)
-                        return
+            if isUnderArm(obj, char) then
+                local root = getRoot(char)
+                if root and localRootPart then
+                    local dist = (localRootPart.Position - root.Position).Magnitude
+                    if dist <= DETECTION_RADIUS then
+                        pcall(function() fireParryRemote(player) end)
                     end
-                end
-            end
-            
-            if matchesCombatPath(obj, char) then
-                triggerParry("PathMatchNew:"..obj.Name, player)
-            end
-            
-            if obj:IsA("Sound") then
-                hookSound(obj, player)
-                if obj.Playing then
-                    triggerParry("NewSound:"..obj.Name, player)
                 end
             end
         end)
         table.insert(stateConnections, addedConn)
         
+        -- Fallback attribute (opsional)
         local attrConn = char.AttributeChanged:Connect(function(attrName)
             local lowerAttr = attrName:lower()
             if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then
                 local val = char:GetAttribute(attrName)
                 if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then
-                    triggerParry("AttributeChanged:"..attrName, player)
+                    local root = getRoot(char)
+                    if root and localRootPart then
+                        local dist = (localRootPart.Position - root.Position).Magnitude
+                        if dist <= DETECTION_RADIUS then
+                            pcall(function() fireParryRemote(player) end)
+                        end
+                    end
                 end
             end
         end)
         table.insert(stateConnections, attrConn)
     end
         
-    -- ========== HOOK PLAYERS (TANPA PENUNDAAN) ==========
+    -- ========== HOOK PLAYERS ==========
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and isKiller(player) then
             if player.Character then
@@ -1909,7 +1766,7 @@ local function autoParryLoop()
     end)
     table.insert(stateConnections, playerConn)
     
-    -- ========== ESP SEDERHANA (LINGKARAN MERAH, TANPA EFEK) ==========
+    -- ========== ESP SEDERHANA ==========
     if radiusFolder then radiusFolder:Destroy() end
     radiusFolder = Instance.new("Folder")
     radiusFolder.Name = "ParryESP"
@@ -1926,7 +1783,13 @@ local function autoParryLoop()
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
     espRing.Parent = radiusFolder
     
-    -- ========== MAIN LOOP (UPDATE ESP SAJA) ==========
+    local function refreshESP()
+        if espRing then
+            espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+        end
+    end
+    
+    -- ========== MAIN LOOP ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
             combatStateConnected = false
@@ -1953,8 +1816,9 @@ local function autoParryLoop()
         end
     end)
         
-    print("[AutoParry] Ready with ArmSound detection + simple red ESP")
+    print("[AutoParry] Ready with instant ArmDescendant detection (no cooldown, fast)")
 end
+
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

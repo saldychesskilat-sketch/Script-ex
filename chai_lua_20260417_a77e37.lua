@@ -1725,7 +1725,7 @@ local function autoParryLoop()
         
         -- Fallback: nama objek mengandung keyword
         local objName = obj.Name:lower()
-        local keywords = {"basicattack", "wipemachete", "frenzy", "attackline", "swing", "hit", "stun", "parry", "wipe", "slash", "lunge", "weapon"}
+        local keywords = {"basicattack", "wipemachete", "frenzy", "attackline", "swing", "hit", "stun", "parry", "wipe", "slash", "lunge"}
         for _, kw in ipairs(keywords) do
             if objName:find(kw) then
                 return true
@@ -1733,7 +1733,7 @@ local function autoParryLoop()
         end
         
         -- Fallback: objek tertentu
-        if obj.Name == "Killerost" or obj.Name == "Lookscriptkiller" or obj.Name == "BasicAttack" or obj.Name == "Attack" then
+        if obj.Name == "Killerost" or obj.Name == "Lookscriptkiller" or obj.Name == "BasicAttack" then
             return true
         end
         
@@ -1794,7 +1794,7 @@ local function autoParryLoop()
                     triggerParry("SoundPlaying:"..sound.Name, player)
                 else
                     local sName = sound.Name:lower()
-                    if sName:find("attack") or sName:find("swing") or sName:find("hit") or sName:find("frenzy") or sName:find("Machete") or sName:find("Sound") then
+                    if sName:find("attack") or sName:find("swing") or sName:find("hit") or sName:find("frenzy") then
                         triggerParry("Sound:"..sound.Name, player)
                     end
                 end
@@ -2162,7 +2162,7 @@ local function autoParryLoop()
         end
         
         -- ===== DETEKSI KECEPATAN KILLER (2x lebih sensitif) =====
-        local speedThreshold = 20  -- bisa disesuaikan
+        local speedThreshold = 60  -- bisa disesuaikan
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= localPlayer and isKiller(player) then
                 local char = player.Character

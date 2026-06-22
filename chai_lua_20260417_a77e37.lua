@@ -1733,7 +1733,7 @@ local function autoParryLoop()
         end
         
         -- Fallback: objek tertentu
-        if obj.Name == "Killerost" or obj.Name == "Lookscriptkiller" or obj.Name == "BasicAttack" then
+        if obj.Name == "Killerost" or obj.Name == "Lookscriptkiller" or obj.Name == "BasicAttack" or obj.Name == "Attack" then
             return true
         end
         
@@ -1794,7 +1794,7 @@ local function autoParryLoop()
                     triggerParry("SoundPlaying:"..sound.Name, player)
                 else
                     local sName = sound.Name:lower()
-                    if sName:find("attack") or sName:find("swing") or sName:find("hit") or sName:find("frenzy") then
+                    if sName:find("attack") or sName:find("swing") or sName:find("hit") or sName:find("frenzy") or sName:find("Machete") or sName:find("Sound") then
                         triggerParry("Sound:"..sound.Name, player)
                     end
                 end

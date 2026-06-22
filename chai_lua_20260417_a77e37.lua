@@ -1703,7 +1703,7 @@ local function autoParryLoop()
     combatStateConnected = true
 
     -- lebih kecil
-    local DETECTION_RADIUS = 8
+    local DETECTION_RADIUS = 9
 
     -- 60x/detik scanner
     local SCAN_RATE = 1 / 60

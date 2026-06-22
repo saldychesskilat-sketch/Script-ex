@@ -1698,7 +1698,7 @@ local function autoParryLoop()
     combatStateConnected = true            
         
     -- Variabel yang bisa diatur slider (default)
-    local DETECTION_RADIUS = 9           
+    local DETECTION_RADIUS = 10           
     local PARRY_COOLDOWN = 0.01            
     
     -- Variabel untuk GUI dan koneksi slider
@@ -1725,7 +1725,7 @@ local function autoParryLoop()
         
         -- Fallback: nama objek mengandung keyword
         local objName = obj.Name:lower()
-        local keywords = {"basicattack", "wipemachete", "frenzy", "attackline", "swing", "hit", "stun", "parry", "wipe", "slash", "lunge"}
+        local keywords = {"basicattack", "wipemachete", "frenzy", "attackline", "swing", "hit", "stun", "parry", "wipe", "slash", "lunge", "weapon"}
         for _, kw in ipairs(keywords) do
             if objName:find(kw) then
                 return true

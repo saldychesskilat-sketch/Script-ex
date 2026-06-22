@@ -1835,6 +1835,20 @@ local function autoParryLoop()
     "Character.Killerost",
     "Character.Lookscriptkiller",
     "Character.Powers",
+    "Arm.Sound",
+    "Arm.Swing",
+    "Arm.Luge",
+    "Arm.Machete",
+    "Arm.knife",
+    "Arm.attack",
+    "Arm.hit",
+    "Arm.BasicAttack",
+    "Arm.stun",
+    "Arm.Handle.Handle.BasicAttack",
+    "Arm.Knide.Main.BasicAttack",
+    "Arm.Knife.Main.Plane.001_Blade",
+    "Arm.Machete.Main.BasicAttack",
+    "Arm.Machete.pCube4_knife_0",
     }
     -- ==========================================        
         

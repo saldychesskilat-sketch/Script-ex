@@ -1820,6 +1820,8 @@ local function autoParryLoop()
     "attack",
     "sfx.attack",
     "Arm.Knife.Main.Plane.001_Blade",
+    "Character.Weapon.Right",
+    "attackline",
     }
     -- ==========================================        
         
@@ -2091,7 +2093,7 @@ local function autoParryLoop()
                 draggingFrame = false
             end
         end)
-        task.wait(0.05)
+        task.wait(0)
         updateRadUI()
         updateCDUI()
         return gui

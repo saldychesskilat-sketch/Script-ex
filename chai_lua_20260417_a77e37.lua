@@ -1717,7 +1717,7 @@ local function autoParryLoop()
         hookedPlayers[player] = true
             
         -- 1. ChildAdded di setiap Arm (paling cepat)            
-        local armNames = {"Right Arm", "Left Arm", "Light Arm"}            
+        local armNames = {"Right Arm", "Left Arm", "Light Arm", "Animations"}            
         for _, armName in ipairs(armNames) do            
             local arm = char:FindFirstChild(armName, true)  -- true untuk mencari di seluruh turunan            
             if arm then            

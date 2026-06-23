@@ -1769,27 +1769,19 @@ local function autoParryLoop()
     end            
         
     -- ========== HOOK PLAYERS (AUTO RELOAD SAAT RESPAWN) ==========            
-    local function attachToPlayer(player)            
-        if player == localPlayer then return end            
-        if not isKiller(player) then return end            
-        if player.Character then            
-            hookCharacter(player, player.Character)            
-        end            
-        local charConn = player.CharacterAdded:Connect(function(char)            
-            hookedPlayers[player] = false  -- reset hook status saat respawn            
-            hookCharacter(player, char)            
-        end)            
-        table.insert(stateConnections, charConn)            
+    local function attachToPlayer(player)
+    if player == localPlayer then return end
+    if not isKiller(player) then return end
+    if player.Character then
+        hookCharacter(player, player.Character)
     end
-            
-    for _, player in ipairs(Players:GetPlayers()) do            
-        attachToPlayer(player)            
-    end            
-        
-    local playerConn = Players.PlayerAdded:Connect(function(player)            
-        attachToPlayer(player)            
-    end)            
-    table.insert(stateConnections, playerConn)            
+    local charConn = player.CharacterAdded:Connect(function(char)
+        -- Hapus hook lama dengan memutus koneksi lama (stateConnections sudah di-clear saat loop baru)
+        -- Tapi kita cukup pasang ulang hook di karakter baru
+        hookCharacter(player, char)
+    end)
+    table.insert(stateConnections, charConn)
+    end
         
     -- ========== WATCHDOG: Periksa ulang setiap 3 detik ==========            
     local lastCheck = 0            
@@ -1852,7 +1844,7 @@ local function autoParryLoop()
         end            
         if rootPart then            
             -- Naikkan posisi ESP 1 stud dari kaki (agar tidak terlalu ke tanah)            
-            local footPos = rootPart.Position - Vector3.new(0, 0.6, 0)            
+            local footPos = rootPart.Position - Vector3.new(0, 2, 0)            
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))            
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
         end            

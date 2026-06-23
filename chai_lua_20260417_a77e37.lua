@@ -1835,7 +1835,7 @@ local function autoParryLoop()
     espRing.Shape = Enum.PartType.Cylinder            
     espRing.Material = Enum.Material.Neon  -- NEON agar terang            
     espRing.Color = Color3.fromRGB(255, 50, 50)  -- Merah terang            
-    espRing.Transparency = 0.4  -- lebih terang            
+    espRing.Transparency = 0.8 -- lebih terang            
     espRing.Anchored = true            
     espRing.CanCollide = false            
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
@@ -1844,7 +1844,7 @@ local function autoParryLoop()
     -- Tambahkan PointLight untuk efek cahaya terang            
     local ringLight = Instance.new("PointLight")            
     ringLight.Color = Color3.fromRGB(255, 50, 50)            
-    ringLight.Brightness = 2            
+    ringLight.Brightness = 3            
     ringLight.Range = DETECTION_RADIUS * 1.5            
     ringLight.Parent = espRing            
         

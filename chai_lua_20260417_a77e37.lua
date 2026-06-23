@@ -1612,6 +1612,24 @@ end
 -- ============================================
 
 -- Cari tombol "action" di PlayerGui.Survivor-mob.Controls
+-- ============================================
+-- PARRY VIA REMOTE EVENT + ACTION BUTTON
+-- ============================================
+
+-- Cari RemoteEvent parry
+local function findParryRemote()
+    local path = game:GetService("ReplicatedStorage")
+    path = path and path:FindFirstChild("Remotes")
+    path = path and path:FindFirstChild("Items")
+    path = path and path:FindFirstChild("Parrying Dagger")
+    path = path and path:FindFirstChild("parry")
+    if path and path:IsA("RemoteEvent") then
+        return path
+    end
+    return nil
+end
+
+-- Cari tombol action
 local function findActionButton()
     local playerGui = localPlayer:FindFirstChild("PlayerGui")
     if not playerGui then return nil end
@@ -1622,33 +1640,39 @@ local function findActionButton()
     return controls:FindFirstChild("action")
 end
 
--- Fungsi utama parry: double-click cepat pada tombol action
-local function fireParryRemote(Player)
-    local button = findActionButton()
-    if not button then
-        return false
-    end
-
-    -- Dapatkan posisi tengah tombol
-    local pos = button.AbsolutePosition
-    local size = button.AbsoluteSize
-    if size.X == 0 or size.Y == 0 then
-        return false
-    end
-    local cx = pos.X + size.X/2
-    local cy = pos.Y + size.Y/2
-
-    local vim = game:GetService("VirtualInputManager")
-    -- Double-click cepat (2x klik dengan jeda minimal 0.01)
-    for i = 1, 2 do
+-- Fungsi utama: remote event dulu, lalu action button
+local function fireParryRemote(targetPlayer)
+    local remote = findParryRemote()
+    if remote then
         pcall(function()
-            vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
-            vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
+            remote:FireServer()
+            -- Coba berbagai argumen jika diperlukan
+            remote:FireServer("parry")
+            remote:FireServer("Parrying Dagger")
         end)
-        if i == 1 then
-            task.wait(0) -- jeda antar klik
+    end
+
+    -- Trigger tombol action untuk efek visual & cooldown
+    local button = findActionButton()
+    if button then
+        local pos = button.AbsolutePosition
+        local size = button.AbsoluteSize
+        if size.X > 0 and size.Y > 0 then
+            local cx = pos.X + size.X/2
+            local cy = pos.Y + size.Y/2
+            local vim = game:GetService("VirtualInputManager")
+            -- Double-click cepat (2x klik)
+            for i = 1, 2 do
+                pcall(function()
+                    vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
+                    task.wait(0)
+                    vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
+                end)
+                if i == 1 then task.wait(0) end
+            end
         end
     end
+
     return true
 end
 

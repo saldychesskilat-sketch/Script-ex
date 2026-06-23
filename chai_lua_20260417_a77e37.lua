@@ -1682,16 +1682,14 @@ end
 -- ============================================================================                
 local combatHeartbeat = nil            
 local radiusFolder = nil            
-local parryWatchdog = nil  -- watchdog untuk reload saat status berubah
         
 local function autoParryLoop()            
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti            
+    local DETECTION_RADIUS = 10  -- bisa diatur via slider nanti            
     local stateConnections = {}            
-    local currentTeam = nil  -- untuk track perubahan team
-            
+        
     -- ========== FUNGSI PEMBANTU ==========            
     local function getRoot(char)            
         return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")            
@@ -1766,6 +1764,7 @@ local function autoParryLoop()
         table.insert(stateConnections, attrConn)            
     end            
         
+    -- ========== HOOK PLAYERS (AUTO RELOAD SAAT RESPAWN) ==========            
     for _, player in ipairs(Players:GetPlayers()) do            
         if player ~= localPlayer and isKiller(player) then            
             if player.Character then hookCharacter(player, player.Character) end            
@@ -1784,36 +1783,7 @@ local function autoParryLoop()
     end)            
     table.insert(stateConnections, playerConn)            
         
-    -- ========== WATCHDOG PERUBAHAN STATUS PLAYER LOKAL ==========            
-    local function onTeamChanged()            
-        local newTeam = localPlayer.Team and localPlayer.Team.Name or "None"            
-        if newTeam ~= currentTeam then            
-            currentTeam = newTeam            
-            print("[AutoParry] Team changed to", currentTeam, "- Reloading hooks")            
-            reloadAllHooks()            
-        end            
-    end            
-        
-    -- Pantau perubahan team (Survivor/Spectator/Killer)            
-    if localPlayer.Team then            
-        currentTeam = localPlayer.Team.Name            
-        localPlayer.Team:GetPropertyChangedSignal("Name"):Connect(onTeamChanged)            
-    end            
-        
-    -- Pantau jika Team belum ada (misal di lobby)            
-    local teamWatchConn = localPlayer:GetPropertyChangedSignal("Team"):Connect(function()            
-        if localPlayer.Team then            
-            currentTeam = localPlayer.Team.Name            
-            localPlayer.Team:GetPropertyChangedSignal("Name"):Connect(onTeamChanged)            
-            teamWatchConn:Disconnect()            
-            reloadAllHooks()            
-        end            
-    end)            
-        
-    -- ========== HOOK PLAYERS AWAL ==========            
-    reloadAllHooks()            
-        
-    -- ========== ESP DENGAN EFEK CAHAYA TERANG ==========            
+    -- ========== ESP DENGAN POSISI LEBIH TINGGI ==========            
     if radiusFolder then radiusFolder:Destroy() end            
     radiusFolder = Instance.new("Folder")            
     radiusFolder.Name = "ParryESP"            
@@ -1822,25 +1792,17 @@ local function autoParryLoop()
     local espRing = Instance.new("Part")            
     espRing.Name = "RadiusRing"            
     espRing.Shape = Enum.PartType.Cylinder            
-    espRing.Material = Enum.Material.Neon  -- NEON agar terang            
-    espRing.Color = Color3.fromRGB(255, 50, 50)  -- Merah terang            
-    espRing.Transparency = 0.8 -- lebih terang            
+    espRing.Material = Enum.Material.SmoothPlastic            
+    espRing.Color = Color3.fromRGB(255, 0, 0)            
+    espRing.Transparency = 0.8            
     espRing.Anchored = true            
     espRing.CanCollide = false            
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
     espRing.Parent = radiusFolder            
         
-    -- Tambahkan PointLight untuk efek cahaya terang            
-    local ringLight = Instance.new("PointLight")            
-    ringLight.Color = Color3.fromRGB(255, 50, 50)            
-    ringLight.Brightness = 3            
-    ringLight.Range = DETECTION_RADIUS * 1.5            
-    ringLight.Parent = espRing            
-        
     local function refreshESP()            
         if espRing then            
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
-            if ringLight then ringLight.Range = DETECTION_RADIUS * 1.5 end            
         end            
     end            
         
@@ -1865,14 +1827,14 @@ local function autoParryLoop()
             end            
         end            
         if rootPart then            
+            -- Naikkan posisi ESP 2 stud dari kaki (agar tidak terlalu ke tanah)            
             local footPos = rootPart.Position - Vector3.new(0, 1, 0)  -- lebih tinggi dari sebelumnya (3 -> 1)            
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))            
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
-            if ringLight then ringLight.Range = DETECTION_RADIUS * 1.5 end            
         end            
     end)            
         
-    print("[AutoParry] Triple detection + status watchdog (auto-reload on team change) with bright neon ESP")            
+    print("[AutoParry] Triple detection (Arm.ChildAdded + sfx/action + Attribute) with raised ESP")            
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

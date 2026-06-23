@@ -1682,7 +1682,8 @@ end
 -- ============================================================================                
 local combatHeartbeat = nil            
 local radiusFolder = nil            
-        
+local currentStatus = nil  -- track status player lokal
+            
 local function autoParryLoop()            
     if combatStateConnected then return end            
     combatStateConnected = true            
@@ -1690,7 +1691,7 @@ local function autoParryLoop()
     local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti            
     local stateConnections = {}            
     local hookedPlayers = {}  -- track player yang sudah di-hook
-            
+        
     -- ========== FUNGSI PEMBANTU ==========            
     local function getRoot(char)            
         return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")            
@@ -1707,7 +1708,7 @@ local function autoParryLoop()
             if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then return true end            
         end            
         return false            
-    end            
+    end        
         
     -- ========== HOOK KARAKTER (TRIPLE DETEKSI) ==========            
     local function hookCharacter(player, char)            
@@ -1719,7 +1720,7 @@ local function autoParryLoop()
         -- 1. ChildAdded di setiap Arm (paling cepat)            
         local armNames = {"Right Arm", "Left Arm", "Light Arm"}            
         for _, armName in ipairs(armNames) do            
-            local arm = char:FindFirstChild(armName, true)  -- true untuk mencari di seluruh turunan            
+            local arm = char:FindFirstChild(armName, true)            
             if arm then            
                 local conn = arm.ChildAdded:Connect(function(obj)            
                     local root = getRoot(char)            
@@ -1768,34 +1769,75 @@ local function autoParryLoop()
         table.insert(stateConnections, attrConn)            
     end            
         
-    -- ========== HOOK PLAYERS (AUTO RELOAD SAAT RESPAWN) ==========            
-    local function attachToPlayer(player)            
-        if player == localPlayer then return end            
-        if not isKiller(player) then return end            
-        if player.Character then            
-            hookCharacter(player, player.Character)            
+    -- ========== RELOAD SAAT STATUS PLAYER LOKAL BERUBAH ==========            
+    local function getPlayerStatus()            
+        if not localPlayer then return "unknown" end            
+        if localPlayer.Team then            
+            local teamName = localPlayer.Team.Name:lower()            
+            if teamName:find("survivor") then return "survivor" end            
+            if teamName:find("killer") then return "killer" end            
+            if teamName:find("spectator") then return "spectator" end            
         end            
-        local charConn = player.CharacterAdded:Connect(function(char)            
-            hookedPlayers[player] = false  -- reset hook status saat respawn            
-            hookCharacter(player, char)            
-        end)            
-        table.insert(stateConnections, charConn)            
-    end
-            
-    for _, player in ipairs(Players:GetPlayers()) do            
-        attachToPlayer(player)            
+        return "unknown"            
     end            
         
-    local playerConn = Players.PlayerAdded:Connect(function(player)            
-        attachToPlayer(player)            
-    end)            
-    table.insert(stateConnections, playerConn)            
+    local function reloadParry()            
+        -- Matikan semua koneksi lama            
+        for _, conn in ipairs(stateConnections) do            
+            pcall(function() conn:Disconnect() end)            
+        end            
+        stateConnections = {}            
+        hookedPlayers = {}            
+            
+        -- Re-hook semua player yang ada            
+        for _, player in ipairs(Players:GetPlayers()) do            
+            if player ~= localPlayer and isKiller(player) then            
+                if player.Character then hookCharacter(player, player.Character) end            
+                local charConn = player.CharacterAdded:Connect(function(char)            
+                    hookedPlayers[player] = false  -- reset hook status saat respawn            
+                    hookCharacter(player, char)            
+                end)            
+                table.insert(stateConnections, charConn)            
+            end            
+        end            
+            
+        -- Hook player baru            
+        local playerConn = Players.PlayerAdded:Connect(function(player)            
+            local charConn = player.CharacterAdded:Connect(function(char)            
+                if isKiller(player) then                    
+                    hookedPlayers[player] = false            
+                    hookCharacter(player, char)            
+                end            
+            end)            
+            table.insert(stateConnections, charConn)            
+        end)            
+        table.insert(stateConnections, playerConn)            
+    end            
         
-    -- ========== WATCHDOG: Periksa ulang setiap 3 detik ==========            
-    local lastCheck = 0            
-    local CHECK_INTERVAL = 1            
+    -- Hook status player lokal (Team berubah atau Character muncul/hilang)            
+    local function onLocalStatusChanged()            
+        local newStatus = getPlayerStatus()            
+        if newStatus ~= currentStatus then            
+            currentStatus = newStatus            
+            reloadParry()            
+        end            
+    end            
         
-    -- ========== ESP DENGAN POSISI LEBIH TINGGI ==========            
+    -- Pantau perubahan Team dan Character        
+    if localPlayer.Team then            
+        local teamConn = localPlayer:GetPropertyChangedSignal("Team"):Connect(onLocalStatusChanged)            
+        table.insert(stateConnections, teamConn)            
+    end            
+    local charConn = localPlayer.CharacterAdded:Connect(onLocalStatusChanged)            
+    table.insert(stateConnections, charConn)            
+    local charRemovedConn = localPlayer.CharacterRemoved:Connect(onLocalStatusChanged)            
+    table.insert(stateConnections, charRemovedConn)            
+        
+    -- Inisialisasi status awal        
+    currentStatus = getPlayerStatus()            
+    reloadParry()  -- hook awal
+            
+    -- ========== ESP DENGAN NEON (TERANG) ==========            
     if radiusFolder then radiusFolder:Destroy() end            
     radiusFolder = Instance.new("Folder")            
     radiusFolder.Name = "ParryESP"            
@@ -1804,13 +1846,20 @@ local function autoParryLoop()
     local espRing = Instance.new("Part")            
     espRing.Name = "RadiusRing"            
     espRing.Shape = Enum.PartType.Cylinder            
-    espRing.Material = Enum.Material.SmoothPlastic            
+    espRing.Material = Enum.Material.Neon  -- NEON agar terang            
     espRing.Color = Color3.fromRGB(255, 0, 0)            
-    espRing.Transparency = 0.8            
+    espRing.Transparency = 0.9  -- kurang transparan agar lebih terlihat            
     espRing.Anchored = true            
     espRing.CanCollide = false            
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
     espRing.Parent = radiusFolder            
+        
+    -- Tambahkan efek cahaya (opsional)        
+    local light = Instance.new("PointLight")            
+    light.Color = Color3.fromRGB(255, 0, 0)            
+    light.Range = 5            
+    light.Brightness = 2            
+    light.Parent = espRing            
         
     local function refreshESP()            
         if espRing then            
@@ -1818,7 +1867,7 @@ local function autoParryLoop()
         end            
     end            
         
-    -- ========== MAIN LOOP (UPDATE ESP + WATCHDOG) ==========            
+    -- ========== MAIN LOOP (UPDATE ESP) ==========            
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)            
         if not config.infiniteAmmoEnabled then            
             combatStateConnected = false            
@@ -1831,18 +1880,6 @@ local function autoParryLoop()
             return            
         end            
         
-        -- Watchdog: periksa ulang killer yang mungkin terlewat            
-        if tick() - lastCheck >= CHECK_INTERVAL then            
-            lastCheck = tick()            
-            for _, player in ipairs(Players:GetPlayers()) do            
-                if player ~= localPlayer and isKiller(player) and not hookedPlayers[player] then            
-                    if player.Character then            
-                        hookCharacter(player, player.Character)            
-                    end            
-                end            
-            end            
-        end            
-        
         local rootPart = localRootPart            
         if not rootPart then            
             local char = localPlayer.Character            
@@ -1851,14 +1888,14 @@ local function autoParryLoop()
             end            
         end            
         if rootPart then            
-            -- Naikkan posisi ESP 1 stud dari kaki (agar tidak terlalu ke tanah)            
             local footPos = rootPart.Position - Vector3.new(0, 1, 0)            
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))            
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
+            if light then light.Position = espRing.Position end            
         end            
     end)            
         
-    print("[AutoParry] Triple detection + watchdog auto-reload, raised ESP")            
+    print("[AutoParry] Triple detection + auto-reload on status change, Neon ESP with light")            
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

@@ -2759,7 +2759,7 @@ local function InitializeAutobuy()
                     if inRange then                    
                         local now = tick()
                         -- kurangi jeda dari 0.05 ke 0.02 untuk lebih sensitif
-                        if now - lastTriggerTime > 0.02 then
+                        if now - lastTriggerTime > 0.002 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
                             TriggerMobileButton()                    

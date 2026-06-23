@@ -1777,7 +1777,7 @@ local function autoParryLoop(remotePath)
             task.spawn(function()
                 local success = fireParryRemote(attacker)
                 if not success then
-                    fallbackParry()
+                    fireParryRemote(player)
                 end
             end)
         end

@@ -1658,32 +1658,55 @@ end
 -- ============================================================================                
 local combatHeartbeat = nil            
 local radiusFolder = nil            
-        
+
+-- ==========================================
+-- AUTO RELOAD SAAT STATUS PLAYER BERUBAH
+-- ==========================================
+local function restartAutoParry()
+    if combatHeartbeat then
+        combatHeartbeat:Disconnect()
+        combatHeartbeat = nil
+    end
+    if radiusFolder then
+        radiusFolder:Destroy()
+        radiusFolder = nil
+    end
+    combatStateConnected = false
+    task.wait(0.5)
+    autoParryLoop()
+end
+
+local function monitorPlayerStatus()
+    local lastTeam = localPlayer.Team
+    local lastCharacter = localPlayer.Character
+    
+    localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+        if localPlayer.Team ~= lastTeam then
+            lastTeam = localPlayer.Team
+            restartAutoParry()
+        end
+    end)
+    
+    localPlayer.CharacterAdded:Connect(function(char)
+        if char ~= lastCharacter then
+            lastCharacter = char
+            restartAutoParry()
+        end
+    end)
+end
+
+monitorPlayerStatus()
+
+-- ==========================================
+-- AUTO PARRY LOOP (SEDERHANA & CEPAT)
+-- ==========================================
 local function autoParryLoop()            
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti            
+    local DETECTION_RADIUS = 9            
     local stateConnections = {}            
         
-    -- ==========================================        
-    -- COMBAT ANIMATIONS (hasil scanner)        
-    -- ==========================================        
-    local COMBAT_ANIMATIONS = {
-    "rbxassetid://110355011987939",
-    "rbxassetid://774628192837462",
-    "rbxassetid://928374655612873",
-    "rbxassetid://139369275981139",
-    }
-    -- ==========================================        
-        
-    local function isCombatAnimation(animId)        
-        for _, id in ipairs(COMBAT_ANIMATIONS) do        
-            if animId == id then return true end        
-        end        
-        return false        
-    end        
-            
     -- ========== FUNGSI PEMBANTU ==========            
     local function getRoot(char)            
         return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")            
@@ -1706,50 +1729,30 @@ local function autoParryLoop()
     local function hookCharacter(player, char)            
         if not isKiller(player) then return end            
         
-        -- === PRIORITAS 1: Animasi ===        
-        local humanoid = char:FindFirstChildOfClass("Humanoid")        
-        if humanoid then        
-            local animator = humanoid:FindFirstChildOfClass("Animator")        
-            if not animator then        
-                animator = humanoid:WaitForChild("Animator", 1)        
-            end        
-            if animator then        
-                local animConn = animator.AnimationPlayed:Connect(function(track)        
-                    local anim = track.Animation        
-                    if anim then        
-                        local animId = anim.AnimationId        
-                        if isCombatAnimation(animId) then        
-                            local root = getRoot(char)        
-                            if root and localRootPart then        
-                                local dist = (localRootPart.Position - root.Position).Magnitude        
-                                if dist <= DETECTION_RADIUS then        
-                                    pcall(function() fireParryRemote(player) end)        
-                                end        
-                            end        
-                        end        
-                    end        
-                end)        
-                table.insert(stateConnections, animConn)        
-            end        
-        end        
-            
-        -- === PRIORITAS 2: Arm.ChildAdded ===        
-        local armNames = {"Right Arm", "Left Arm", "Light Arm", "Arm"}        
-        for _, armName in ipairs(armNames) do        
-            local arm = char:FindFirstChild(armName, true)        
-            if arm then        
-                local conn = arm.ChildAdded:Connect(function(obj)        
-                    local root = getRoot(char)        
-                    if root and localRootPart then        
-                        local dist = (localRootPart.Position - root.Position).Magnitude        
-                        if dist <= DETECTION_RADIUS then        
-                            pcall(function() fireParryRemote(player) end)        
-                        end        
-                    end        
-                end)        
-                table.insert(stateConnections, conn)        
-            end        
-        end        
+        local function isCombatObject(obj)
+            local name = obj.Name:lower()
+            if name:find("sfx") then return true end
+            if name:find("weapon") and name:find("right") then return true end
+            if name:find("right arm") and name:find("sound") then return true end
+            if name:find("left arm") and name:find("sound") then return true end
+            if name:find("light arm") and name:find("sound") then return true end
+            if name:find("attack") or name:find("swing") or name:find("hit") then return true end
+            if name:find("machete") or name:find("knife") then return true end
+            return false
+        end
+        
+        local addedConn = char.DescendantAdded:Connect(function(obj)
+            if isCombatObject(obj) then
+                local root = getRoot(char)
+                if root and localRootPart then
+                    local dist = (localRootPart.Position - root.Position).Magnitude
+                    if dist <= DETECTION_RADIUS then
+                        pcall(function() fireParryRemote(player) end)
+                    end
+                end
+            end
+        end)
+        table.insert(stateConnections, addedConn)
     end            
         
     -- ========== HOOK PLAYERS ==========            
@@ -1771,7 +1774,7 @@ local function autoParryLoop()
     end)            
     table.insert(stateConnections, playerConn)            
         
-    -- ========== ESP SEDERHANA ==========            
+    -- ========== ESP SEDERHANA (posisi dinaikkan) ==========            
     if radiusFolder then radiusFolder:Destroy() end            
     radiusFolder = Instance.new("Folder")            
     radiusFolder.Name = "ParryESP"            
@@ -1794,7 +1797,7 @@ local function autoParryLoop()
         end            
     end            
         
-    -- ========== MAIN LOOP (UPDATE ESP) ==========            
+    -- ========== MAIN LOOP ==========            
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)            
         if not config.infiniteAmmoEnabled then            
             combatStateConnected = false            
@@ -1815,13 +1818,14 @@ local function autoParryLoop()
             end            
         end            
         if rootPart then            
-            local footPos = rootPart.Position - Vector3.new(0, 3, 0)            
+            -- Posisi ESP di pinggang (1 stud di atas tanah)
+            local footPos = rootPart.Position - Vector3.new(0, 1, 0)            
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))            
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
         end            
     end)            
         
-    print("[AutoParry] Hooked to AnimationPlayed + Arm.ChildAdded")            
+    print("[AutoParry] Ready with simple DescendantAdded detection + repositioned ESP")            
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

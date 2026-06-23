@@ -1737,7 +1737,7 @@ local function autoParryLoop()
         -- 2. DescendantAdded untuk deteksi sfx / action (fallback cepat)            
         local descConn = char.DescendantAdded:Connect(function(obj)            
             local name = obj.Name:lower()            
-            if name:find("BasicAttack") or name:find("hit") or name:find("attack") or name:find("swing") then            
+            if name:find("BasicAttack") or name:find("Powers") or name:find("attack") or name:find("swing") then            
                 local root = getRoot(char)            
                 if root and localRootPart then            
                     local dist = (localRootPart.Position - root.Position).Magnitude            

@@ -1658,53 +1658,12 @@ end
 -- ============================================================================                
 local combatHeartbeat = nil            
 local radiusFolder = nil            
-
--- ==========================================
--- AUTO RELOAD SAAT STATUS PLAYER BERUBAH
--- ==========================================
-local function restartAutoParry()
-    if combatHeartbeat then
-        combatHeartbeat:Disconnect()
-        combatHeartbeat = nil
-    end
-    if radiusFolder then
-        radiusFolder:Destroy()
-        radiusFolder = nil
-    end
-    combatStateConnected = false
-    task.wait(0.5)
-    autoParryLoop()
-end
-
-local function monitorPlayerStatus()
-    local lastTeam = localPlayer.Team
-    local lastCharacter = localPlayer.Character
-    
-    localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
-        if localPlayer.Team ~= lastTeam then
-            lastTeam = localPlayer.Team
-            restartAutoParry()
-        end
-    end)
-    
-    localPlayer.CharacterAdded:Connect(function(char)
-        if char ~= lastCharacter then
-            lastCharacter = char
-            restartAutoParry()
-        end
-    end)
-end
-
-monitorPlayerStatus()
-
--- ==========================================
--- AUTO PARRY LOOP (SEDERHANA & CEPAT)
--- ==========================================
+        
 local function autoParryLoop()            
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    local DETECTION_RADIUS = 9            
+    local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti            
     local stateConnections = {}            
         
     -- ========== FUNGSI PEMBANTU ==========            
@@ -1725,37 +1684,63 @@ local function autoParryLoop()
         return false            
     end            
         
-    -- ========== HOOK KARAKTER ==========            
+    -- ========== HOOK KARAKTER (TRIPLE DETEKSI) ==========            
     local function hookCharacter(player, char)            
         if not isKiller(player) then return end            
         
-        local function isCombatObject(obj)
-            local name = obj.Name:lower()
-            if name:find("sfx") then return true end
-            if name:find("weapon") and name:find("right") then return true end
-            if name:find("right arm") and name:find("sound") then return true end
-            if name:find("left arm") and name:find("sound") then return true end
-            if name:find("light arm") and name:find("sound") then return true end
-            if name:find("attack") or name:find("swing") or name:find("hit") then return true end
-            if name:find("machete") or name:find("knife") then return true end
-            return false
-        end
+        -- 1. ChildAdded di setiap Arm (paling cepat)            
+        local armNames = {"Right Arm", "Left Arm", "Light Arm"}            
+        for _, armName in ipairs(armNames) do            
+            local arm = char:FindFirstChild(armName, true)  -- true untuk mencari di seluruh turunan            
+            if arm then            
+                local conn = arm.ChildAdded:Connect(function(obj)            
+                    local root = getRoot(char)            
+                    if root and localRootPart then            
+                        local dist = (localRootPart.Position - root.Position).Magnitude            
+                        if dist <= DETECTION_RADIUS then            
+                            pcall(function() fireParryRemote(player) end)            
+                        end            
+                    end            
+                end)            
+                table.insert(stateConnections, conn)            
+            end            
+        end            
         
-        local addedConn = char.DescendantAdded:Connect(function(obj)
-            if isCombatObject(obj) then
-                local root = getRoot(char)
-                if root and localRootPart then
-                    local dist = (localRootPart.Position - root.Position).Magnitude
-                    if dist <= DETECTION_RADIUS then
-                        pcall(function() fireParryRemote(player) end)
-                    end
-                end
-            end
-        end)
-        table.insert(stateConnections, addedConn)
+        -- 2. DescendantAdded untuk deteksi sfx / action (fallback cepat)            
+        local descConn = char.DescendantAdded:Connect(function(obj)            
+            local name = obj.Name:lower()            
+            if name:find("sfx") or name:find("action") or name:find("attack") or name:find("swing") then            
+                local root = getRoot(char)            
+                if root and localRootPart then            
+                    local dist = (localRootPart.Position - root.Position).Magnitude            
+                    if dist <= DETECTION_RADIUS then            
+                        pcall(function() fireParryRemote(player) end)            
+                    end            
+                end            
+            end            
+        end)            
+        table.insert(stateConnections, descConn)            
+        
+        -- 3. Attribute Changed sebagai last resort            
+        local attrConn = char.AttributeChanged:Connect(function(attrName)            
+            local lowerAttr = attrName:lower()            
+            if lowerAttr == "frenzy" or lowerAttr == "parry" or lowerAttr == "hookprogress" then            
+                local val = char:GetAttribute(attrName)            
+                if (lowerAttr == "frenzy" and val == true) or (lowerAttr == "parry" and val == true) then            
+                    local root = getRoot(char)            
+                    if root and localRootPart then            
+                        local dist = (localRootPart.Position - root.Position).Magnitude            
+                        if dist <= DETECTION_RADIUS then            
+                            pcall(function() fireParryRemote(player) end)            
+                        end            
+                    end            
+                end            
+            end            
+        end)            
+        table.insert(stateConnections, attrConn)            
     end            
         
-    -- ========== HOOK PLAYERS ==========            
+    -- ========== HOOK PLAYERS (AUTO RELOAD SAAT RESPAWN) ==========            
     for _, player in ipairs(Players:GetPlayers()) do            
         if player ~= localPlayer and isKiller(player) then            
             if player.Character then hookCharacter(player, player.Character) end            
@@ -1774,7 +1759,7 @@ local function autoParryLoop()
     end)            
     table.insert(stateConnections, playerConn)            
         
-    -- ========== ESP SEDERHANA (posisi dinaikkan) ==========            
+    -- ========== ESP DENGAN POSISI LEBIH TINGGI ==========            
     if radiusFolder then radiusFolder:Destroy() end            
     radiusFolder = Instance.new("Folder")            
     radiusFolder.Name = "ParryESP"            
@@ -1785,7 +1770,7 @@ local function autoParryLoop()
     espRing.Shape = Enum.PartType.Cylinder            
     espRing.Material = Enum.Material.SmoothPlastic            
     espRing.Color = Color3.fromRGB(255, 0, 0)            
-    espRing.Transparency = 0.6            
+    espRing.Transparency = 0.8            
     espRing.Anchored = true            
     espRing.CanCollide = false            
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
@@ -1797,7 +1782,7 @@ local function autoParryLoop()
         end            
     end            
         
-    -- ========== MAIN LOOP ==========            
+    -- ========== MAIN LOOP (UPDATE ESP) ==========            
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)            
         if not config.infiniteAmmoEnabled then            
             combatStateConnected = false            
@@ -1818,14 +1803,14 @@ local function autoParryLoop()
             end            
         end            
         if rootPart then            
-            -- Posisi ESP di pinggang (1 stud di atas tanah)
-            local footPos = rootPart.Position - Vector3.new(0, 1, 0)            
+            -- Naikkan posisi ESP 2 stud dari kaki (agar tidak terlalu ke tanah)            
+            local footPos = rootPart.Position - Vector3.new(0, 1, 0)  -- lebih tinggi dari sebelumnya (3 -> 1)            
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))            
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)            
         end            
     end)            
         
-    print("[AutoParry] Ready with simple DescendantAdded detection + repositioned ESP")            
+    print("[AutoParry] Triple detection (Arm.ChildAdded + sfx/action + Attribute) with raised ESP")            
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

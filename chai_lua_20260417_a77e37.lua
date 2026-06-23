@@ -2681,6 +2681,9 @@ local function TriggerMobileButton()
     end                
 end                
                 
+local autoSkillCheckConnection = nil
+local skillCheckStatusWatcher = nil
+
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -2696,13 +2699,13 @@ local function InitializeAutobuy()
         if not line or not goal then return end                    
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
-        local triggerCount = 0          -- ganti dari hasTriggered
-        local MAX_TRIGGER = 99999999999           -- jumlah trigger yang diinginkan
+        local triggerCount = 0          
+        local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
-                triggerCount = 0         -- reset saat skillcheck baru muncul
+                triggerCount = 0         
                 lastTriggerTime = 0
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.Heartbeat:Connect(function()                    
@@ -2711,7 +2714,6 @@ local function InitializeAutobuy()
                         return     
                     end    
                     if triggerCount >= MAX_TRIGGER then 
-                        -- sudah mencapai batas, hentikan heartbeat
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                         return
                     end
@@ -2731,8 +2733,8 @@ local function InitializeAutobuy()
                     
                     if inRange then                    
                         local now = tick()
-                        -- minimal jeda 0.05 detik antar trigger untuk menghindari spam dalam frame yang sama
-                        if now - lastTriggerTime > 0.05 then
+                        -- kurangi jeda dari 0.05 ke 0.02 untuk lebih sensitif
+                        if now - lastTriggerTime > 0.02 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
                             TriggerMobileButton()                    
@@ -2753,7 +2755,8 @@ local function InitializeAutobuy()
 end
                 
 local function startAutoSkillCheck()                
-    if autoSkillCheckConnection then return end                
+    if autoSkillCheckConnection then return end
+                
     autoSkillCheckConnection = RunService.Heartbeat:Connect(function()                
         if not config.autoSkillCheckEnabled then return end                
         if not getLocalCharacter() then return end                
@@ -2771,16 +2774,51 @@ local function startAutoSkillCheck()
             end                
         end                
     end)                
-    InitializeAutobuy()                
-    print("[AutoSkillCheck] Auto skill check started")                
+                
+    InitializeAutobuy()
+    
+    -- Watchdog status pemain (reload saat status berubah)
+    if skillCheckStatusWatcher then skillCheckStatusWatcher:Disconnect() end
+    local lastStatus = nil
+    skillCheckStatusWatcher = RunService.Heartbeat:Connect(function()
+        if not config.autoSkillCheckEnabled then return end
+        local currentStatus = "Survivor"  -- default
+        if localPlayer.Team then
+            currentStatus = localPlayer.Team.Name
+        elseif localPlayer:FindFirstChild("Spectator") then
+            currentStatus = "Spectator"
+        end
+        if currentStatus ~= lastStatus then
+            lastStatus = currentStatus
+            -- Reload saat status berubah
+            if VisibilityConnection then VisibilityConnection:Disconnect() end
+            if HeartbeatConnection then HeartbeatConnection:Disconnect() end
+            InitializeAutobuy()
+        end
+    end)
+                
+    print("[AutoSkillCheck] Auto skill check started with status-based reload")                
 end                
                 
 local function stopAutoSkillCheck()                
-    if autoSkillCheckConnection then autoSkillCheckConnection:Disconnect(); autoSkillCheckConnection = nil end                
-    if VisibilityConnection then VisibilityConnection:Disconnect(); VisibilityConnection = nil end                
-    if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end                
+    if autoSkillCheckConnection then 
+        autoSkillCheckConnection:Disconnect() 
+        autoSkillCheckConnection = nil 
+    end                
+    if VisibilityConnection then 
+        VisibilityConnection:Disconnect() 
+        VisibilityConnection = nil 
+    end                
+    if HeartbeatConnection then 
+        HeartbeatConnection:Disconnect() 
+        HeartbeatConnection = nil 
+    end
+    if skillCheckStatusWatcher then
+        skillCheckStatusWatcher:Disconnect()
+        skillCheckStatusWatcher = nil
+    end
     print("[AutoSkillCheck] Auto skill check stopped")                
-end                
+end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================

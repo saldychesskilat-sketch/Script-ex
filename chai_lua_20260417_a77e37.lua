@@ -1641,7 +1641,7 @@ local function findActionButton()
 end
 
 -- Fungsi utama: remote event dulu, lalu action button
-local function fireParryRemote(targetPlayer)
+local function fireParryRemote(player)
     local remote = findParryRemote()
     if remote then
         pcall(function()

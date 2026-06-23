@@ -1663,7 +1663,7 @@ local function autoParryLoop()
     if combatStateConnected then return end            
     combatStateConnected = true            
         
-    local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti            
+    local DETECTION_RADIUS = 10  -- bisa diatur via slider nanti            
     local stateConnections = {}            
         
     -- ========== FUNGSI PEMBANTU ==========            

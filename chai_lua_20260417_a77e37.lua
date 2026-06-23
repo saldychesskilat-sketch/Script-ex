@@ -1766,34 +1766,23 @@ local function autoParryLoop()
         table.insert(stateConnections, attrConn)            
     end            
         
-    -- ========== FUNGSI RELOAD SEMUA HOOK ==========            
-    local function reloadAllHooks()            
-        -- Hapus semua koneksi lama            
-        for _, conn in ipairs(stateConnections) do            
-            pcall(function() conn:Disconnect() end)            
-        end            
-        stateConnections = {}            
-        
-        -- Pasang ulang hook untuk semua player yang ada            
-        for _, player in ipairs(Players:GetPlayers()) do            
-            if player ~= localPlayer and isKiller(player) then            
-                if player.Character then hookCharacter(player, player.Character) end            
-                local charConn = player.CharacterAdded:Connect(function(char)            
-                    hookCharacter(player, char)            
-                end)            
-                table.insert(stateConnections, charConn)            
-            end            
-        end            
-        
-        -- Pasang ulang listener untuk player baru            
-        local playerConn = Players.PlayerAdded:Connect(function(player)            
+    for _, player in ipairs(Players:GetPlayers()) do            
+        if player ~= localPlayer and isKiller(player) then            
+            if player.Character then hookCharacter(player, player.Character) end            
             local charConn = player.CharacterAdded:Connect(function(char)            
-                if isKiller(player) then hookCharacter(player, char) end            
+                hookCharacter(player, char)            
             end)            
             table.insert(stateConnections, charConn)            
-        end)            
-        table.insert(stateConnections, playerConn)            
+        end            
     end            
+        
+    local playerConn = Players.PlayerAdded:Connect(function(player)            
+        local charConn = player.CharacterAdded:Connect(function(char)            
+            if isKiller(player) then hookCharacter(player, char) end            
+        end)            
+        table.insert(stateConnections, charConn)            
+    end)            
+    table.insert(stateConnections, playerConn)            
         
     -- ========== WATCHDOG PERUBAHAN STATUS PLAYER LOKAL ==========            
     local function onTeamChanged()            

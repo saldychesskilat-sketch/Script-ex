@@ -1687,9 +1687,10 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 9.5  -- bisa diatur via slider
+    local DETECTION_RADIUS = 9.5 -- bisa diatur via slider
     local stateConnections = {}
-    local activeKiller = nil          -- killer terdekat dalam radius
+    local activeKiller = nil
+    local isChasing = {}  -- tabel per player: apakah sedang mengejar (IsChasing == true)
 
     -- ========== FUNGSI PEMBANTU ==========
     local function getRoot(char)
@@ -1760,41 +1761,75 @@ local function autoParryLoop()
         end
     end
 
-    -- ========== HOOK KARAKTER ==========
+    -- ========== HOOK ANIMASI PADA KARAKTER ==========
+    local function hookAnimator(player, char)
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if not animator then
+            -- Pantau jika Animator muncul belakangan
+            local waitConn = char.DescendantAdded:Connect(function(obj)
+                if obj:IsA("Animator") and obj.Parent == hum then
+                    waitConn:Disconnect()
+                    hookAnimator(player, char)  -- panggil ulang untuk pasang hook
+                end
+            end)
+            table.insert(stateConnections, waitConn)
+            return
+        end
+
+        -- Hook AnimationPlayed
+        local animConn = animator.AnimationPlayed:Connect(function(track)
+            -- Validasi: hanya jika player ini adalah activeKiller dan IsChasing == true
+            if player == activeKiller and isChasing[player] then
+                pcall(function() fireParryRemote(player) end)
+            end
+        end)
+        table.insert(stateConnections, animConn)
+        print("[AutoParry] Animator hooked for", player.Name)
+    end
+
+    -- ========== HOOK KARAKTER (ATRIBUT + ANIMATOR) ==========
     local function hookCharacter(player, char)
         if not isPlayerKiller(player) then return end
 
-        -- Pantau semua Trail yang sudah ada di karakter
-        for _, obj in ipairs(char:GetDescendants()) do
-            if obj:IsA("Trail") then
-                local conn = obj:GetPropertyChangedSignal("Enabled"):Connect(function()
-                    if obj.Enabled and player == activeKiller then
-                        pcall(function() fireParryRemote(player) end)
-                    end
-                end)
-                table.insert(stateConnections, conn)
-            end
-        end
-
-        -- Pantau Trail baru yang muncul (DescendantAdded)
-        local descConn = char.DescendantAdded:Connect(function(obj)
-            if obj:IsA("Trail") then
-                local conn = obj:GetPropertyChangedSignal("Enabled"):Connect(function()
-                    if obj.Enabled and player == activeKiller then
-                        pcall(function() fireParryRemote(player) end)
-                    end
-                end)
-                table.insert(stateConnections, conn)
+        -- 1. Pantau atribut IsChasing
+        local attrConn = char.AttributeChanged:Connect(function(attrName)
+            if attrName == "IsChasing" then
+                local val = char:GetAttribute("IsChasing")
+                isChasing[player] = (val == true)
+                if isChasing[player] then
+                    print("[AutoParry]", player.Name, "IsChasing = true")
+                else
+                    print("[AutoParry]", player.Name, "IsChasing = false")
+                end
             end
         end)
-        table.insert(stateConnections, descConn)
+        table.insert(stateConnections, attrConn)
+
+        -- Jika atribut sudah ada, set nilai awal
+        local initial = char:GetAttribute("IsChasing")
+        if initial ~= nil then
+            isChasing[player] = (initial == true)
+        else
+            isChasing[player] = false  -- default false
+        end
+
+        -- 2. Pasang hook animator
+        hookAnimator(player, char)
+
+        -- 3. Pantau jika karakter berganti (respawn) - ditangani oleh CharacterAdded di luar
     end
 
     -- ========== HOOK PLAYERS ==========
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer and isPlayerKiller(player) then
-            if player.Character then hookCharacter(player, player.Character) end
+            if player.Character then
+                hookCharacter(player, player.Character)
+            end
             local charConn = player.CharacterAdded:Connect(function(char)
+                -- Reset chasing state saat karakter baru
+                isChasing[player] = false
                 hookCharacter(player, char)
             end)
             table.insert(stateConnections, charConn)
@@ -1803,7 +1838,10 @@ local function autoParryLoop()
 
     local playerConn = Players.PlayerAdded:Connect(function(player)
         local charConn = player.CharacterAdded:Connect(function(char)
-            if isPlayerKiller(player) then hookCharacter(player, char) end
+            if isPlayerKiller(player) then
+                isChasing[player] = false
+                hookCharacter(player, char)
+            end
         end)
         table.insert(stateConnections, charConn)
     end)
@@ -1873,7 +1911,7 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Trail.Enabled detection + active killer mode + no cooldown, instant trigger")
+    print("[AutoParry] Animation detection + IsChasing validation, active killer mode")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

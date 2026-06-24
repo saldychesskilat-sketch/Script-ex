@@ -1687,10 +1687,10 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 9.5
+    local DETECTION_RADIUS = 9.5  -- bisa diatur via slider
     local stateConnections = {}
     local activeKiller = nil
-    local hookedPlayers = {}  -- track player yang sudah di-hook animator-nya
+    local hookedPlayers = {}  -- track player yang sudah di-hook
 
     -- ========== TEMPAT SCAN ANIMASI SERANGAN ==========
     local COMBAT_ANIMATIONS = {
@@ -1710,6 +1710,7 @@ local function autoParryLoop()
         "rbxassetid://78935059863801"
     }
 
+    -- Fungsi untuk mengecek apakah animasi termasuk serangan
     local function isCombatAnimation(animId)
         for _, id in ipairs(COMBAT_ANIMATIONS) do
             if animId == id then
@@ -1791,10 +1792,9 @@ local function autoParryLoop()
     -- ========== HOOK ANIMASI PADA KARAKTER ==========
     local function hookAnimator(player, char)
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum then return
+        if not hum then return end
         local animator = hum:FindFirstChildOfClass("Animator")
         if not animator then
-            -- Tunggu animator muncul
             local waitConn = char.DescendantAdded:Connect(function(obj)
                 if obj:IsA("Animator") and obj.Parent == hum then
                     waitConn:Disconnect()
@@ -1805,13 +1805,14 @@ local function autoParryLoop()
             return
         end
 
-        -- Hook AnimationPlayed
+        -- Hook AnimationPlayed dengan validasi Animation ID
         local animConn = animator.AnimationPlayed:Connect(function(track)
             local anim = track.Animation
             if not anim then return end
             local animId = anim.AnimationId
             if not animId then return end
 
+            -- Hanya jika player ini adalah activeKiller dan animasi termasuk combat
             if player == activeKiller and isCombatAnimation(animId) then
                 pcall(function() fireParryRemote(player) end)
             end
@@ -1823,60 +1824,73 @@ local function autoParryLoop()
     -- ========== HOOK KARAKTER ==========
     local function hookCharacter(player, char)
         if not isPlayerKiller(player) then return end
-        if hookedPlayers[player] then return end  -- sudah di-hook
-        hookedPlayers[player] = true
         hookAnimator(player, char)
     end
 
-    -- ========== REFRESH KILLER (periodik) ==========
-    local function refreshKillers()
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr ~= localPlayer and isPlayerKiller(plr) then
-                if not hookedPlayers[plr] then
-                    -- Killer baru terdeteksi
-                    print("[AutoParry] New killer detected:", plr.Name)
-                    if plr.Character then
-                        hookCharacter(plr, plr.Character)
-                    else
-                        -- Tunggu karakter muncul
-                        local conn = plr.CharacterAdded:Connect(function(char)
-                            conn:Disconnect()
-                            hookCharacter(plr, char)
-                        end)
-                        table.insert(stateConnections, conn)
-                    end
+    -- ========== SETUP PLAYER (Team + CharacterAdded) ==========
+    local function setupPlayer(player)
+        if player == localPlayer then return end
+
+        -- Hook perubahan Team
+        local teamConn = player:GetPropertyChangedSignal("Team"):Connect(function()
+            task.wait(0.5)
+            if isPlayerKiller(player) then
+                print("[AutoParry] Player", player.Name, "became killer. Hooking...")
+                if player.Character then
+                    hookCharacter(player, player.Character)
                 end
-            else
-                -- Jika player bukan killer, hapus dari tracked (agar bisa di-hook ulang jika kembali jadi killer)
-                hookedPlayers[plr] = nil
+            end
+        end)
+        table.insert(stateConnections, teamConn)
+
+        -- Hook CharacterAdded
+        local charConn = player.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            if isPlayerKiller(player) then
+                hookCharacter(player, char)
+            end
+        end)
+        table.insert(stateConnections, charConn)
+
+        -- Jika saat ini sudah menjadi killer, langsung hook
+        if player.Character and isPlayerKiller(player) then
+            hookCharacter(player, player.Character)
+        end
+    end
+
+    -- ========== REFRESH KILLERS (periodik) ==========
+    local function refreshKillers()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                if isPlayerKiller(player) then
+                    if not hookedPlayers[player] then
+                        hookedPlayers[player] = true
+                        setupPlayer(player)
+                    end
+                else
+                    hookedPlayers[player] = nil
+                end
             end
         end
     end
 
-    -- ========== PERIODIC SCAN ==========
-    refreshKillers()  -- pertama kali
-    local refreshConn = RunService.Heartbeat:Connect(function()
-        refreshKillers()
-    end)
-    table.insert(stateConnections, refreshConn)
+    -- ========== HOOK PLAYERS AWAL ==========
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            setupPlayer(player)
+        end
+    end
 
     -- ========== PLAYER ADDED ==========
     local playerConn = Players.PlayerAdded:Connect(function(player)
-        -- Saat player baru bergabung, kita tidak langsung hook, karena refreshKillers akan menangani
-        -- Tapi kita bisa langsung hook jika dia killer
-        task.wait(0.5)
-        if isPlayerKiller(player) and not hookedPlayers[player] then
-            hookedPlayers[player] = true
-            if player.Character then
-                hookCharacter(player, player.Character)
-            end
-        end
+        setupPlayer(player)
     end)
     table.insert(stateConnections, playerConn)
 
-    -- ========== UPDATE ACTIVE KILLER (RADIUS) periodik ==========
+    -- ========== PERIODIC SCAN (UPDATE RADIUS & REFRESH KILLERS) ==========
     local scanConnection = RunService.Heartbeat:Connect(function()
         updateActiveKiller()
+        refreshKillers()
     end)
     table.insert(stateConnections, scanConnection)
 
@@ -1920,6 +1934,7 @@ local function autoParryLoop()
             end
             stateConnections = {}
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
+            hookedPlayers = {}
             return
         end
 
@@ -1938,7 +1953,7 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Animation ID detection + auto-refresh killers, no IsChasing")
+    print("[AutoParry] Animation ID detection + periodic killer refresh, auto-reload on team change")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

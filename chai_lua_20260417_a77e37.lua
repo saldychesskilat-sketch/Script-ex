@@ -1833,7 +1833,6 @@ local function autoParryLoop()
 
         -- Hook perubahan Team
         local teamConn = player:GetPropertyChangedSignal("Team"):Connect(function()
-            task.wait(0.5)
             if isPlayerKiller(player) then
                 print("[AutoParry] Player", player.Name, "became killer. Hooking...")
                 if player.Character then
@@ -1845,7 +1844,6 @@ local function autoParryLoop()
 
         -- Hook CharacterAdded
         local charConn = player.CharacterAdded:Connect(function(char)
-            task.wait(0.5)
             if isPlayerKiller(player) then
                 hookCharacter(player, char)
             end

@@ -2084,38 +2084,75 @@ end
 -- FEATURE 9: AUTO SHIELD (ForceField Protection - ALWAYS ACTIVE WHEN ENABLED)
 -- Tidak menggunakan trigger jarak killer. Shield aktif terus saat fitur dinyalakan.
 -- ============================================================================
-local function addForceField()
-    if currentForceField then return end
-    if not localCharacter then return end
-    currentForceField = Instance.new("ForceField")
-    currentForceField.Name = "CyberHeroes_Shield"
-    currentForceField.Parent = localCharacter
-    isShieldActive = true
-end
+-- ============================================================================      
+-- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)      
+-- Menggantikan Shield dengan auto attack yang memanggil RemoteEvent secara periodik.      
+-- Toggle tetap menggunakan config.shieldEnabled.      
+-- ============================================================================      
 
-local function removeForceField()
-    if currentForceField then currentForceField:Destroy(); currentForceField = nil end
-    isShieldActive = false
-end
+local attackRemote = nil
 
--- Fungsi ini sekarang hanya mengaktifkan/menonaktifkan shield berdasarkan config (tanpa cek jarak).
-local function checkShieldProximity()
-    if not config.shieldEnabled then
-        if isShieldActive then removeForceField() end
-        return
+-- Cari RemoteEvent BasicAttack di ReplicatedStorage
+local function findAttackRemote()
+    if attackRemote and attackRemote.Parent then return attackRemote end
+    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+    if remotes then
+        local attacks = remotes:FindFirstChild("Attacks")
+        if attacks then
+            attackRemote = attacks:FindFirstChild("BasicAttack")
+            if attackRemote and attackRemote:IsA("RemoteEvent") then
+                return attackRemote
+            end
+        end
     end
-    if not isShieldActive then addForceField() end
+    -- fallback: scan semua RemoteEvent
+    for _, obj in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "BasicAttack" then
+            attackRemote = obj
+            return obj
+        end
+    end
+    return nil
 end
 
+-- Fungsi untuk mengirim spam attack
+local function performAutoAttack()
+    local remote = findAttackRemote()
+    if not remote then return end
+    pcall(function()
+        -- Kirim dengan berbagai variasi argumen untuk meningkatkan peluang berhasil
+        remote:FireServer()
+        remote:FireServer("BasicAttack")
+        remote:FireServer(game.Players.LocalPlayer)
+        -- Jika perlu argumen posisi/CFrame, bisa ditambahkan di sini
+    end)
+end
+
+-- Variabel koneksi (gunakan shieldConnection yang sudah ada)
+local shieldConnection = nil
+
+-- Start auto attack (dipanggil saat toggle ON)
 local function startShieldMonitor()
     if shieldConnection then return end
-    shieldConnection = RunService.Heartbeat:Connect(checkShieldProximity)
+    shieldConnection = RunService.Heartbeat:Connect(function()
+        if config.shieldEnabled then
+            performAutoAttack()
+        end
+    end)
+    print("[AutoAttack] Started (spamming BasicAttack remote)")
 end
 
+-- Stop auto attack (dipanggil saat toggle OFF)
 local function stopShieldMonitor()
-    if shieldConnection then shieldConnection:Disconnect(); shieldConnection = nil end
-    removeForceField()
+    if shieldConnection then
+        shieldConnection:Disconnect()
+        shieldConnection = nil
+    end
+    print("[AutoAttack] Stopped")
 end
+
+-- Hapus/komentari fungsi shield lama (ForceField) jika tidak diperlukan lagi.
+-- Fungsi addForceField, removeForceField, checkShieldProximity tidak digunakan.
 
 -- ============================================================================
 -- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ONLY WHEN MOVING (CONTROLLED)
@@ -5145,7 +5182,7 @@ local function createGUI()
         {name="stealthEnabled", text="STEALTH"},  
         {name="godModeEnabled", text="GOD MODE"},  
         {name="infiniteAmmoEnabled", text="Dagger"},  
-        {name="shieldEnabled", text="SHIELD"},  
+        {name="shieldEnabled", text="auto Attack"},  
         {name="tpwalkEnabled", text="TPWALK"},  
         {name="noCollideEnabled", text="NO COLLIDE"},  
         {name="massKillEnabled", text="MASS KILL"},  

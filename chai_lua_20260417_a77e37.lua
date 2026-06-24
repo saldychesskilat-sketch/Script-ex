@@ -2501,7 +2501,7 @@ local function startAutoGeneratorLoop()
         end
         -- Fallback scan
         for _, obj in ipairs(replicatedStorage:GetDescendants()) do
-            if obj:IsA("RemoteEvent") and obj.Name == "BreakGenEvent" then
+            if obj:IsA("RemoteEvent") and obj.Name == "BreakGenReject" then
                 return obj
             end
         end

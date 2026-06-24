@@ -4986,7 +4986,7 @@ local function createGUI()
         {name="tpwalkEnabled", text="TPWALK"},  
         {name="noCollideEnabled", text="NO COLLIDE"},  
         {name="massKillEnabled", text="MASS KILL"},  
-        {name="autoGeneratorEnabled", text="AUTO GEN"},  
+        {name="autoGeneratorEnabled", text="Break GEN"},  
         {name="autoSkillCheckEnabled", text="SKILL CHECK"},  
         {name="autoAimEnabled", text="AUTO AIM"},  
         {name="povMode", text="POV"}  

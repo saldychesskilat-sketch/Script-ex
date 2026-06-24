@@ -1826,7 +1826,7 @@ local function autoParryLoop()
     espRing.Shape = Enum.PartType.Cylinder
     espRing.Material = Enum.Material.Neon
     espRing.Color = Color3.fromRGB(255, 50, 50)
-    espRing.Transparency = 0.4
+    espRing.Transparency = 0.8
     espRing.Anchored = true
     espRing.CanCollide = false
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
@@ -1866,7 +1866,7 @@ local function autoParryLoop()
             end
         end
         if rootPart then
-            local footPos = rootPart.Position - Vector3.new(0, 1, 0)
+            local footPos = rootPart.Position - Vector3.new(0, 2, 0)
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
             if ringLight then ringLight.Range = DETECTION_RADIUS * 1.5 end

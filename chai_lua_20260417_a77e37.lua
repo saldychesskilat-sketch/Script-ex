@@ -1687,10 +1687,26 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 9.5 -- bisa diatur via slider
+    local DETECTION_RADIUS = 9  -- bisa diatur via slider
     local stateConnections = {}
     local activeKiller = nil
-    local isChasing = {}  -- tabel per player: apakah sedang mengejar (IsChasing == true)
+
+    -- ========== TEMPAT SCAN ANIMASI SERANGAN ==========
+    local COMBAT_ANIMATIONS = {
+        -- Tambahkan ID animasi serangan hasil scan di sini
+        -- Contoh: "rbxassetid://1234567890",
+        -- "rbxassetid://9876543210",
+    }
+
+    -- Fungsi untuk mengecek apakah animasi termasuk serangan
+    local function isCombatAnimation(animId)
+        for _, id in ipairs(COMBAT_ANIMATIONS) do
+            if animId == id then
+                return true
+            end
+        end
+        return false
+    end
 
     -- ========== FUNGSI PEMBANTU ==========
     local function getRoot(char)
@@ -1767,21 +1783,25 @@ local function autoParryLoop()
         if not hum then return end
         local animator = hum:FindFirstChildOfClass("Animator")
         if not animator then
-            -- Pantau jika Animator muncul belakangan
             local waitConn = char.DescendantAdded:Connect(function(obj)
                 if obj:IsA("Animator") and obj.Parent == hum then
                     waitConn:Disconnect()
-                    hookAnimator(player, char)  -- panggil ulang untuk pasang hook
+                    hookAnimator(player, char)
                 end
             end)
             table.insert(stateConnections, waitConn)
             return
         end
 
-        -- Hook AnimationPlayed
+        -- Hook AnimationPlayed dengan validasi Animation ID
         local animConn = animator.AnimationPlayed:Connect(function(track)
-            -- Validasi: hanya jika player ini adalah activeKiller dan IsChasing == true
-            if player == activeKiller and isChasing[player] then
+            local anim = track.Animation
+            if not anim then return end
+            local animId = anim.AnimationId
+            if not animId then return end
+
+            -- Hanya jika player ini adalah activeKiller dan animasi termasuk combat
+            if player == activeKiller and isCombatAnimation(animId) then
                 pcall(function() fireParryRemote(player) end)
             end
         end)
@@ -1789,36 +1809,10 @@ local function autoParryLoop()
         print("[AutoParry] Animator hooked for", player.Name)
     end
 
-    -- ========== HOOK KARAKTER (ATRIBUT + ANIMATOR) ==========
+    -- ========== HOOK KARAKTER ==========
     local function hookCharacter(player, char)
         if not isPlayerKiller(player) then return end
-
-        -- 1. Pantau atribut IsChasing
-        local attrConn = char.AttributeChanged:Connect(function(attrName)
-            if attrName == "IsChasing" then
-                local val = char:GetAttribute("IsChasing")
-                isChasing[player] = (val == true)
-                if isChasing[player] then
-                    print("[AutoParry]", player.Name, "IsChasing = true")
-                else
-                    print("[AutoParry]", player.Name, "IsChasing = false")
-                end
-            end
-        end)
-        table.insert(stateConnections, attrConn)
-
-        -- Jika atribut sudah ada, set nilai awal
-        local initial = char:GetAttribute("IsChasing")
-        if initial ~= nil then
-            isChasing[player] = (initial == true)
-        else
-            isChasing[player] = false  -- default false
-        end
-
-        -- 2. Pasang hook animator
         hookAnimator(player, char)
-
-        -- 3. Pantau jika karakter berganti (respawn) - ditangani oleh CharacterAdded di luar
     end
 
     -- ========== HOOK PLAYERS ==========
@@ -1828,8 +1822,6 @@ local function autoParryLoop()
                 hookCharacter(player, player.Character)
             end
             local charConn = player.CharacterAdded:Connect(function(char)
-                -- Reset chasing state saat karakter baru
-                isChasing[player] = false
                 hookCharacter(player, char)
             end)
             table.insert(stateConnections, charConn)
@@ -1839,7 +1831,6 @@ local function autoParryLoop()
     local playerConn = Players.PlayerAdded:Connect(function(player)
         local charConn = player.CharacterAdded:Connect(function(char)
             if isPlayerKiller(player) then
-                isChasing[player] = false
                 hookCharacter(player, char)
             end
         end)
@@ -1864,7 +1855,7 @@ local function autoParryLoop()
     espRing.Shape = Enum.PartType.Cylinder
     espRing.Material = Enum.Material.Neon
     espRing.Color = Color3.fromRGB(255, 50, 50)
-    espRing.Transparency = 0.8
+    espRing.Transparency = 0.4
     espRing.Anchored = true
     espRing.CanCollide = false
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
@@ -1904,14 +1895,14 @@ local function autoParryLoop()
             end
         end
         if rootPart then
-            local footPos = rootPart.Position - Vector3.new(0, 2, 0)
+            local footPos = rootPart.Position - Vector3.new(0, 1, 0)
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
             if ringLight then ringLight.Range = DETECTION_RADIUS * 1.5 end
         end
     end)
 
-    print("[AutoParry] Animation detection + IsChasing validation, active killer mode")
+    print("[AutoParry] Animation ID detection (no IsChasing), active killer mode")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

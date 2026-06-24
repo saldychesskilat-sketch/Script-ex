@@ -2477,105 +2477,63 @@ end
 -- AUTO GENERATOR LOOP (SPAM REMOTE EVENT)
 -- Menggunakan remote: BreakGenAnim, BreakGenCommit, BreakGenEvent, BreakGenReject
 -- ============================================================================
+-- ============================================================================
+-- AUTO GENERATOR LOOP (REMOTE EVENT SPAM - BREAKGENEVENT)
+-- ============================================================================
 
 local function startAutoGeneratorLoop()
     if config.autoGeneratorThread then
         return
     end
 
-    -- Cari remote events generator di ReplicatedStorage
-    local function findGenRemotes()
-        local remotes = {}
-        local rs = game:GetService("ReplicatedStorage")
-        if not rs then return remotes end
-        
-        -- Cari di path yang mungkin
-        local searchPaths = {rs, rs:FindFirstChild("Remotes")}
-        local targetNames = {"BreakGenAnim", "BreakGenCommit", "BreakGenEvent", "BreakGenReject"}
-        
-        for _, parent in ipairs(searchPaths) do
-            if parent then
-                for _, name in ipairs(targetNames) do
-                    local r = parent:FindFirstChild(name)
-                    if r and r:IsA("RemoteEvent") and not table.find(remotes, r) then
-                        table.insert(remotes, r)
-                    end
+    -- Cari remote event BreakGenEvent
+    local function findBreakGenRemote()
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        local remotes = replicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            local generator = remotes:FindFirstChild("Generator")
+            if generator then
+                local remote = generator:FindFirstChild("BreakGenEvent")
+                if remote and remote:IsA("RemoteEvent") then
+                    return remote
                 end
             end
         end
-        
-        -- Fallback: scan semua descendant
-        if #remotes == 0 then
-            for _, obj in ipairs(rs:GetDescendants()) do
-                if obj:IsA("RemoteEvent") then
-                    local name = obj.Name
-                    if name:find("BreakGen") or name:find("Gen") or name:find("Generator") then
-                        table.insert(remotes, obj)
-                    end
-                end
+        -- Fallback scan
+        for _, obj in ipairs(replicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteEvent") and obj.Name == "BreakGenEvent" then
+                return obj
             end
         end
-        
-        return remotes
+        return nil
     end
 
-    -- Fungsi spam remote dengan variasi argumen
-    local function spamRemote(remote)
-        if not remote then return end
-        -- Variasi argumen yang mungkin diterima
-        local argsVariants = {
-            {},  -- tanpa argumen
-            {localPlayer},  -- player
-            {localPlayer and localPlayer.Character},  -- character
-            {"repair"},  -- string
-            {"start"},   -- string
-            {"break"},   -- string
-        }
-        for _, args in ipairs(argsVariants) do
-            pcall(function()
-                if #args == 0 then
-                    remote:FireServer()
-                else
-                    remote:FireServer(unpack(args))
-                end
-            end)
-        end
+    local breakGenRemote = findBreakGenRemote()
+    if not breakGenRemote then
+        print("[AutoGenerator] BreakGenEvent remote not found!")
+        return
     end
 
     local thread = task.spawn(function()
-        local genRemotes = findGenRemotes()
-        if #genRemotes == 0 then
-            print("[AutoGenerator] No generator remote events found. Retrying...")
-        else
-            print("[AutoGenerator] Found", #genRemotes, "generator remotes")
-        end
-
-        local remoteRefreshTimer = 0
+        local lastSpamTime = 0
+        local spamInterval = 0.05
 
         while config.autoGeneratorEnabled do
-            pcall(function()
-                -- Refresh daftar remote setiap 5 detik (jika ada perubahan)
-                if tick() - remoteRefreshTimer >= 5 then
-                    remoteRefreshTimer = tick()
-                    genRemotes = findGenRemotes()
-                    if #genRemotes > 0 then
-                        print("[AutoGenerator] Refreshed remotes, found", #genRemotes)
-                    end
+            if getLocalCharacter() then
+                local now = tick()
+                if now - lastSpamTime >= spamInterval then
+                    lastSpamTime = now
+                    pcall(function()
+                        breakGenRemote:FireServer()
+                    end)
                 end
-
-                -- Spam semua remote yang ditemukan
-                if #genRemotes > 0 then
-                    for _, remote in ipairs(genRemotes) do
-                        spamRemote(remote)
-                    end
-                end
-            end)
-            task.wait(0.08)  -- spam cepat (8-10x per detik)
+            end
+            task.wait(0.01)
         end
     end)
 
     config.autoGeneratorThread = thread
-    print("[AutoGenerator] Started (spamming generator remote events)")
+    print("[AutoGenerator] Started (spamming BreakGenEvent)")
 end
 
 local function stopAutoGeneratorLoop()
@@ -2585,7 +2543,6 @@ local function stopAutoGeneratorLoop()
     end
     print("[AutoGenerator] Stopped")
 end
-
 --========================
 -- Skull check
 --=======================

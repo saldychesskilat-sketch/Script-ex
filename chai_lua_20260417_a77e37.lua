@@ -1687,9 +1687,9 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti
+    local DETECTION_RADIUS = 9.5  -- bisa diatur via slider
     local stateConnections = {}
-    local activeKiller = nil
+    local activeKiller = nil          -- killer terdekat dalam radius
 
     -- ========== FUNGSI PEMBANTU ==========
     local function getRoot(char)
@@ -1706,12 +1706,14 @@ local function autoParryLoop()
         end
         local char = player.Character
         if char then
-            if char:GetAttribute("Frenzy") ~= nil or char:FindFirstChild("Killerost") then
-                return true
-            end
             local tool = char:FindFirstChildWhichIsA("Tool")
             if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon") or tool.Name:lower():find("blade")) then
                 return true
+            end
+            for _, child in ipairs(char:GetChildren()) do
+                if child.Name:lower():find("scp") then
+                    return true
+                end
             end
         end
         return false
@@ -1724,7 +1726,7 @@ local function autoParryLoop()
         return (localRootPart.Position - targetRoot.Position).Magnitude
     end
 
-    -- ========== UPDATE ACTIVE KILLER (jarak dulu) ==========
+    -- ========== UPDATE ACTIVE KILLER (RADIUS CHECK) ==========
     local function updateActiveKiller()
         if not config.infiniteAmmoEnabled then
             if activeKiller then activeKiller = nil end
@@ -1748,27 +1750,44 @@ local function autoParryLoop()
         if nearestKiller and nearestDist <= DETECTION_RADIUS then
             if activeKiller ~= nearestKiller then
                 activeKiller = nearestKiller
-                print("[AutoParry] Killer in radius:", activeKiller.Name, "dist:", math.floor(nearestDist))
+                print("[AutoParry] Killer in range:", activeKiller.Name, "dist:", math.floor(nearestDist))
             end
         else
             if activeKiller then
                 activeKiller = nil
-                print("[AutoParry] No killer in radius")
+                print("[AutoParry] No killer in range")
             end
         end
     end
 
-    -- ========== HOOK KARAKTER (DescendantAdded langsung trigger) ==========
+    -- ========== HOOK KARAKTER ==========
     local function hookCharacter(player, char)
         if not isPlayerKiller(player) then return end
 
-        -- Hanya trigger jika player ini adalah activeKiller
-        local conn = char.DescendantAdded:Connect(function(obj)
-            if player == activeKiller then
-                pcall(function() fireParryRemote(player) end)
+        -- Pantau semua Trail yang sudah ada di karakter
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("Trail") then
+                local conn = obj:GetPropertyChangedSignal("Enabled"):Connect(function()
+                    if obj.Enabled and player == activeKiller then
+                        pcall(function() fireParryRemote(player) end)
+                    end
+                end)
+                table.insert(stateConnections, conn)
+            end
+        end
+
+        -- Pantau Trail baru yang muncul (DescendantAdded)
+        local descConn = char.DescendantAdded:Connect(function(obj)
+            if obj:IsA("Trail") then
+                local conn = obj:GetPropertyChangedSignal("Enabled"):Connect(function()
+                    if obj.Enabled and player == activeKiller then
+                        pcall(function() fireParryRemote(player) end)
+                    end
+                end)
+                table.insert(stateConnections, conn)
             end
         end)
-        table.insert(stateConnections, conn)
+        table.insert(stateConnections, descConn)
     end
 
     -- ========== HOOK PLAYERS ==========
@@ -1790,7 +1809,7 @@ local function autoParryLoop()
     end)
     table.insert(stateConnections, playerConn)
 
-    -- ========== PERIODIC SCAN (update activeKiller setiap frame) ==========
+    -- ========== PERIODIC SCAN (UPDATE RADIUS) ==========
     local scanConnection = RunService.Heartbeat:Connect(function()
         updateActiveKiller()
     end)
@@ -1819,7 +1838,14 @@ local function autoParryLoop()
     ringLight.Range = DETECTION_RADIUS * 1.5
     ringLight.Parent = espRing
 
-    -- ========== MAIN LOOP (update ESP) ==========
+    local function refreshESP()
+        if espRing then
+            espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+            if ringLight then ringLight.Range = DETECTION_RADIUS * 1.5 end
+        end
+    end
+
+    -- ========== MAIN LOOP ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
             combatStateConnected = false
@@ -1840,14 +1866,14 @@ local function autoParryLoop()
             end
         end
         if rootPart then
-            local footPos = rootPart.Position - Vector3.new(0, 2, 0)
+            local footPos = rootPart.Position - Vector3.new(0, 1, 0)
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
             espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
             if ringLight then ringLight.Range = DETECTION_RADIUS * 1.5 end
         end
     end)
 
-    print("[AutoParry] Radius > DescendantAdded > Trigger (fastest)")
+    print("[AutoParry] Trail.Enabled detection + active killer mode + no cooldown, instant trigger")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

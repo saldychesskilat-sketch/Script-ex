@@ -2474,309 +2474,110 @@ end
 -- FEATURE 13: 
 -- ============================================================================
 -- ============================================================================
--- AUTO GENERATOR LOOP (MANUAL REPAIR + SMART ESCAPE + SKILL CHECK)
--- Tidak membuat config/state global baru. Hanya menggunakan config.autoGeneratorThread.
--- Skill check menggunakan variabel lokal terisolasi (tidak konflik dengan autoSkillCheck asli).
+-- AUTO GENERATOR LOOP (SPAM REMOTE EVENT)
+-- Menggunakan remote: BreakGenAnim, BreakGenCommit, BreakGenEvent, BreakGenReject
 -- ============================================================================
 
 local function startAutoGeneratorLoop()
-    -- Cegah multiple thread
     if config.autoGeneratorThread then
         return
     end
 
-    -- =========================================================================
-    -- FUNGSI DETEKSI GENERATOR (lokal, tidak global)
-    -- =========================================================================
-    local function isGeneratorObject(obj)
-        if not obj then return false end
-        local name = tostring(obj.Name):lower()
-        if name:find("generator") or name:find("gen") or name == "generatorrepair" then
-            return true
-        end
-        if obj:FindFirstChild("Progress") or obj:FindFirstChild("Completed") then
-            return true
-        end
-        if obj:FindFirstChildWhichIsA("ClickDetector") or obj:FindFirstChildWhichIsA("ProximityPrompt", true) then
-            return true
-        end
-        return false
-    end
-
-    local function getAllIncompleteGenerators()
-        local list = {}
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if isGeneratorObject(obj) then
-                local completed = false
-                local prog = obj:FindFirstChild("Progress")
-                if prog and (prog:IsA("IntValue") or prog:IsA("NumberValue")) then
-                    if prog.Value >= 100 then completed = true end
-                end
-                local comp = obj:FindFirstChild("Completed")
-                if comp and comp:IsA("BoolValue") and comp.Value then completed = true end
-                if obj:GetAttribute("RepairProgress") and obj:GetAttribute("RepairProgress") >= 100 then completed = true end
-                if not completed then
-                    table.insert(list, obj)
-                end
-            end
-        end
-        return list
-    end
-
-    local function getRandomIncompleteGenerator()
-        local gens = getAllIncompleteGenerators()
-        if #gens == 0 then return nil end
-        return gens[math.random(1, #gens)]
-    end
-
-    -- =========================================================================
-    -- DETEKSI THREAT (killer / scp / enemy)
-    -- =========================================================================
-    local function isThreatNearby(radius)
-        if not localRootPart then return false end
-        local pos = localRootPart.Position
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer then
-                local char = player.Character
-                if char then
-                    local isThreat = false
-                    if player.Team then
-                        local teamName = player.Team.Name:lower()
-                        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") or teamName:find("scp") then
-                            isThreat = true
-                        end
-                    end
-                    if not isThreat then
-                        local tool = char:FindFirstChildWhichIsA("Tool")
-                        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                            isThreat = true
-                        end
-                    end
-                    if not isThreat then
-                        for _, child in ipairs(char:GetChildren()) do
-                            if child.Name:lower():find("scp") then
-                                isThreat = true
-                                break
-                            end
-                        end
-                    end
-                    if isThreat then
-                        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                        if root and (pos - root.Position).Magnitude <= radius then
-                            return true
-                        end
+    -- Cari remote events generator di ReplicatedStorage
+    local function findGenRemotes()
+        local remotes = {}
+        local rs = game:GetService("ReplicatedStorage")
+        if not rs then return remotes end
+        
+        -- Cari di path yang mungkin
+        local searchPaths = {rs, rs:FindFirstChild("Remotes")}
+        local targetNames = {"BreakGenAnim", "BreakGenCommit", "BreakGenEvent", "BreakGenReject"}
+        
+        for _, parent in ipairs(searchPaths) do
+            if parent then
+                for _, name in ipairs(targetNames) do
+                    local r = parent:FindFirstChild(name)
+                    if r and r:IsA("RemoteEvent") and not table.find(remotes, r) then
+                        table.insert(remotes, r)
                     end
                 end
             end
         end
-        return false
-    end
-
-    -- =========================================================================
-    -- SIMULASI INTERAKSI (tombol E)
-    -- =========================================================================
-    local function simulatePressE()
-        pcall(function()
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        end)
-        pcall(function()
-            VirtualUser:Button1Down(Vector2.new(500, 500))
-            VirtualUser:Button1Up(Vector2.new(500, 500))
-        end)
-    end
-
-    -- =========================================================================
-    -- SKILL CHECK HANDLER KHUSUS UNTUK AUTO GENERATOR (tidak konflik dengan fitur lain)
-    -- =========================================================================
-    local function setupAutoGenSkillCheck()
-        local visibilityConn = nil
-        local heartbeatConn = nil
-        local touchID = 8823  -- berbeda dengan fitur asli (8822)
-        local actionPath = "SkillCheckPromptGui.Check"
-
-        local function getActionTarget()
-            local current = localPlayer:FindFirstChild("PlayerGui")
-            if not current then return nil end
-            for segment in string.gmatch(actionPath, "[^%.]+") do
-                current = current and current:FindFirstChild(segment)
-                if not current then break end
-            end
-            return current
-        end
-
-        local function triggerMobileButton()
-            local b = getActionTarget()
-            if b and b:IsA("GuiObject") then
-                local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
-                local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y
-                pcall(function()
-                    VirtualInputManager:SendTouchEvent(touchID, 0, cx, cy)
-                    task.wait(0.01)
-                    VirtualInputManager:SendTouchEvent(touchID, 2, cx, cy)
-                end)
+        
+        -- Fallback: scan semua descendant
+        if #remotes == 0 then
+            for _, obj in ipairs(rs:GetDescendants()) do
+                if obj:IsA("RemoteEvent") then
+                    local name = obj.Name
+                    if name:find("BreakGen") or name:find("Gen") or name:find("Generator") then
+                        table.insert(remotes, obj)
+                    end
+                end
             end
         end
+        
+        return remotes
+    end
 
-        task.spawn(function()
-            local playerGui = localPlayer:FindFirstChild("PlayerGui")
-            if not playerGui then return end
-            local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")
-            if not prompt then
-                prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)
-            end
-            local check = prompt and prompt:FindFirstChild("Check")
-            if not check then return end
-            local line = check:FindFirstChild("Line")
-            local goal = check:FindFirstChild("Goal")
-            if not line or not goal then return end
-
-            if visibilityConn then visibilityConn:Disconnect() end
-            visibilityConn = check:GetPropertyChangedSignal("Visible"):Connect(function()
-                if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then
-                    if heartbeatConn then heartbeatConn:Disconnect() end
-                    heartbeatConn = RunService.Heartbeat:Connect(function()
-                        local lr = line.Rotation % 360
-                        local gr = goal.Rotation % 360
-                        local ss = (gr + 104) % 360
-                        local se = (gr + 118) % 360
-                        local inRange = false
-                        if ss > se then
-                            if lr >= ss or lr <= se then inRange = true end
-                        else
-                            if lr >= ss and lr <= se then inRange = true end
-                        end
-                        if inRange then
-                            triggerMobileButton()
-                            if heartbeatConn then heartbeatConn:Disconnect(); heartbeatConn = nil end
-                        end
-                    end)
-                elseif heartbeatConn then
-                    heartbeatConn:Disconnect()
-                    heartbeatConn = nil
+    -- Fungsi spam remote dengan variasi argumen
+    local function spamRemote(remote)
+        if not remote then return end
+        -- Variasi argumen yang mungkin diterima
+        local argsVariants = {
+            {},  -- tanpa argumen
+            {localPlayer},  -- player
+            {localPlayer and localPlayer.Character},  -- character
+            {"repair"},  -- string
+            {"start"},   -- string
+            {"break"},   -- string
+        }
+        for _, args in ipairs(argsVariants) do
+            pcall(function()
+                if #args == 0 then
+                    remote:FireServer()
+                else
+                    remote:FireServer(unpack(args))
                 end
             end)
-        end)
-
-        -- Kembalikan fungsi cleanup
-        return function()
-            if visibilityConn then visibilityConn:Disconnect() end
-            if heartbeatConn then heartbeatConn:Disconnect() end
         end
     end
 
-    -- =========================================================================
-    -- LOOP UTAMA (semua state disimpan dalam closure thread)
-    -- =========================================================================
     local thread = task.spawn(function()
-        -- State lokal (hanya ada dalam thread ini)
-        local currentGen = nil
-        local repairStarted = false
-        local lastEscapeTime = 0
-        local lastProgressCheck = 0
-        local skillCheckCleanup = setupAutoGenSkillCheck()
+        local genRemotes = findGenRemotes()
+        if #genRemotes == 0 then
+            print("[AutoGenerator] No generator remote events found. Retrying...")
+        else
+            print("[AutoGenerator] Found", #genRemotes, "generator remotes")
+        end
+
+        local remoteRefreshTimer = 0
 
         while config.autoGeneratorEnabled do
             pcall(function()
-                if not getLocalCharacter() or not localRootPart then
-                    task.wait(0.5)
-                    return
-                end
-
-                -- 1. Cek ancaman (killer/scp dalam radius 30 studs)
-                local threatNearby = isThreatNearby(30)
-
-                -- 2. Jika ancaman, pindah ke generator lain (lompat)
-                if threatNearby and tick() - lastEscapeTime >= 1 then
-                    local newGen = getRandomIncompleteGenerator()
-                    if newGen and newGen ~= currentGen then
-                        local success, pivot = pcall(function() return newGen:GetPivot() end)
-                        if success and pivot then
-                            teleportTo(pivot.Position + Vector3.new(0, 3, 0))
-                            currentGen = newGen
-                            repairStarted = false
-                            lastEscapeTime = tick()
-                            print("[AutoGenerator] Escaped threat, switched to:", currentGen.Name)
-                            task.wait(0.3)
-                        end
-                    end
-                    task.wait(0.5)
-                    return
-                end
-
-                -- 3. Pilih generator baru jika belum punya atau generator sebelumnya selesai
-                if not currentGen then
-                    local gen = getRandomIncompleteGenerator()
-                    if gen then
-                        currentGen = gen
-                        repairStarted = false
-                        print("[AutoGenerator] New target:", currentGen.Name)
-                    else
-                        task.wait(1)
-                        return
+                -- Refresh daftar remote setiap 5 detik (jika ada perubahan)
+                if tick() - remoteRefreshTimer >= 5 then
+                    remoteRefreshTimer = tick()
+                    genRemotes = findGenRemotes()
+                    if #genRemotes > 0 then
+                        print("[AutoGenerator] Refreshed remotes, found", #genRemotes)
                     end
                 end
 
-                -- 4. Cek progress generator saat ini
-                local progress = 0
-                local progVal = currentGen:FindFirstChild("Progress")
-                if progVal and (progVal:IsA("IntValue") or progVal:IsA("NumberValue")) then
-                    progress = progVal.Value
-                elseif currentGen:GetAttribute("RepairProgress") then
-                    progress = currentGen:GetAttribute("RepairProgress")
-                end
-
-                if progress >= 100 then
-                    print("[AutoGenerator] Completed:", currentGen.Name)
-                    currentGen = getRandomIncompleteGenerator()
-                    repairStarted = false
-                    if currentGen then
-                        print("[AutoGenerator] Next target:", currentGen.Name)
+                -- Spam semua remote yang ditemukan
+                if #genRemotes > 0 then
+                    for _, remote in ipairs(genRemotes) do
+                        spamRemote(remote)
                     end
-                    task.wait(0.5)
-                    return
-                end
-
-                -- 5. Mulai repair jika belum dimulai
-                if not repairStarted then
-                    local success, pivot = pcall(function() return currentGen:GetPivot() end)
-                    if success and pivot then
-                        teleportTo(pivot.Position + Vector3.new(0, 3, 0))
-                        task.wait(0.2)
-                        simulatePressE()   -- Interaksi mulai repair
-                        repairStarted = true
-                        print("[AutoGenerator] Repair started on:", currentGen.Name)
-                        task.wait(0.3)
-                    else
-                        print("[AutoGenerator] Teleport failed, retrying...")
-                        currentGen = nil
-                    end
-                    return
-                end
-
-                -- 6. Cek progress secara berkala (skill check sudah berjalan otomatis)
-                if tick() - lastProgressCheck >= 0.3 then
-                    lastProgressCheck = tick()
-                    -- Tidak perlu aksi tambahan, skill check handler akan menangani QTE
                 end
             end)
-            task.wait(0.2)
-        end
-
-        -- Bersihkan skill check handler saat loop berhenti
-        if skillCheckCleanup then
-            skillCheckCleanup()
+            task.wait(0.08)  -- spam cepat (8-10x per detik)
         end
     end)
 
-    -- Simpan thread ke config (menggunakan field yang sudah ada)
     config.autoGeneratorThread = thread
-    print("[AutoGenerator] Started (manual repair + smart escape + skill check)")
+    print("[AutoGenerator] Started (spamming generator remote events)")
 end
 
--- ============================================================================
--- STOP AUTO GENERATOR LOOP
--- ============================================================================
 local function stopAutoGeneratorLoop()
     if config.autoGeneratorThread then
         task.cancel(config.autoGeneratorThread)
@@ -2784,7 +2585,6 @@ local function stopAutoGeneratorLoop()
     end
     print("[AutoGenerator] Stopped")
 end
-
 
 --========================
 -- Skull check

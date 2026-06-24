@@ -2673,9 +2673,20 @@ local function TriggerMobileButton()
     end                
 end                
                 
-local autoSkillCheckConnection = nil
-local skillCheckStatusWatcher = nil
+local currentRole = nil
+local roleWatcherConnection = nil
 
+-- Fungsi untuk mendapatkan role player lokal
+local function getCurrentRole()
+    local team = localPlayer.Team
+    if not team then return "Spectator" end
+    local name = team.Name
+    if name == "Survivors" then return "Survivor"
+    elseif name == "Killers" then return "Killer" end
+    return "Spectator"
+end
+
+-- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -2684,11 +2695,10 @@ local function InitializeAutobuy()
         if not prompt then                    
             prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)                    
         end                    
-        local check = prompt and prompt:FindFirstChild("Check")                    
+        if not prompt then return end
+        local check = prompt:FindFirstChild("Check")                    
         if not check then return end                    
-        local line = check:FindFirstChild("Line")                    
-        local goal = check:FindFirstChild("Goal")                    
-        if not line or not goal then return end                    
+        -- Jangan cache line dan goal secara permanen, ambil ulang saat dibutuhkan
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
         local triggerCount = 0          
@@ -2700,7 +2710,8 @@ local function InitializeAutobuy()
                 triggerCount = 0         
                 lastTriggerTime = 0
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
-                HeartbeatConnection = RunService.Heartbeat:Connect(function()                    
+                -- Gunakan RenderStepped untuk respons lebih cepat
+                HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end    
                         return     
@@ -2710,12 +2721,16 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    local currentLine = check:FindFirstChild("Line") or line    
-                    local currentGoal = check:FindFirstChild("Goal") or goal    
+                    -- Ambil Line dan Goal secara real-time (tidak pakai cache)
+                    local currentLine = check:FindFirstChild("Line")
+                    local currentGoal = check:FindFirstChild("Goal")
+                    if not currentLine or not currentGoal then return end
+                    
                     local lr = currentLine.Rotation % 360                    
-                    local gr = currentGoal.Rotation % 360                    
-                    local ss = (gr + 104) % 360                    
-                    local se = (gr + 118) % 360                    
+                    local gr = currentGoal.Rotation % 360
+                    -- Perlebar zone untuk sensitivitas lebih tinggi (102-120)
+                    local ss = (gr + 102) % 360                    
+                    local se = (gr + 120) % 360                    
                     local inRange = false                    
                     if ss > se then                    
                         if lr >= ss or lr <= se then inRange = true end                    
@@ -2725,8 +2740,7 @@ local function InitializeAutobuy()
                     
                     if inRange then                    
                         local now = tick()
-                        -- kurangi jeda dari 0.05 ke 0.02 untuk lebih sensitif
-                        if now - lastTriggerTime > 0.002 then
+                        if now - lastTriggerTime > 0.05 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
                             TriggerMobileButton()                    
@@ -2745,10 +2759,36 @@ local function InitializeAutobuy()
         end)                    
     end)                    
 end
-                
+
+-- Watcher perubahan role (Survivor/Killer/Spectator)
+local function startRoleWatcher()
+    if roleWatcherConnection then return end
+    roleWatcherConnection = RunService.Heartbeat:Connect(function()
+        local role = getCurrentRole()
+        if role ~= currentRole then
+            currentRole = role
+            print("[AutoSkillCheck] Role changed to", role, "- reloading hooks")
+            -- Reset semua koneksi lama
+            if VisibilityConnection then
+                VisibilityConnection:Disconnect()
+                VisibilityConnection = nil
+            end
+            if HeartbeatConnection then
+                HeartbeatConnection:Disconnect()
+                HeartbeatConnection = nil
+            end
+            -- Jika role Survivor dan fitur aktif, reload
+            if config.autoSkillCheckEnabled and role == "Survivor" then
+                task.wait(0.5) -- beri waktu GUI baru spawn
+                InitializeAutobuy()
+            end
+        end
+    end)
+end
+
+-- Modifikasi startAutoSkillCheck
 local function startAutoSkillCheck()                
-    if autoSkillCheckConnection then return end
-                
+    if autoSkillCheckConnection then return end                
     autoSkillCheckConnection = RunService.Heartbeat:Connect(function()                
         if not config.autoSkillCheckEnabled then return end                
         if not getLocalCharacter() then return end                
@@ -2766,30 +2806,13 @@ local function startAutoSkillCheck()
             end                
         end                
     end)                
-                
-    InitializeAutobuy()
-    
-    -- Watchdog status pemain (reload saat status berubah)
-    if skillCheckStatusWatcher then skillCheckStatusWatcher:Disconnect() end
-    local lastStatus = nil
-    skillCheckStatusWatcher = RunService.Heartbeat:Connect(function()
-        if not config.autoSkillCheckEnabled then return end
-        local currentStatus = "Survivor"  -- default
-        if localPlayer.Team then
-            currentStatus = localPlayer.Team.Name
-        elseif localPlayer:FindFirstChild("Spectator") then
-            currentStatus = "Spectator"
-        end
-        if currentStatus ~= lastStatus then
-            lastStatus = currentStatus
-            -- Reload saat status berubah
-            if VisibilityConnection then VisibilityConnection:Disconnect() end
-            if HeartbeatConnection then HeartbeatConnection:Disconnect() end
-            InitializeAutobuy()
-        end
-    end)
-                
-    print("[AutoSkillCheck] Auto skill check started with status-based reload")                
+    -- Inisialisasi role awal
+    currentRole = getCurrentRole()
+    startRoleWatcher()
+    if config.autoSkillCheckEnabled and currentRole == "Survivor" then
+        InitializeAutobuy()
+    end
+    print("[AutoSkillCheck] Auto skill check started with role watcher + RenderStepped")                
 end                
                 
 local function stopAutoSkillCheck()                
@@ -2805,9 +2828,9 @@ local function stopAutoSkillCheck()
         HeartbeatConnection:Disconnect() 
         HeartbeatConnection = nil 
     end
-    if skillCheckStatusWatcher then
-        skillCheckStatusWatcher:Disconnect()
-        skillCheckStatusWatcher = nil
+    if roleWatcherConnection then
+        roleWatcherConnection:Disconnect()
+        roleWatcherConnection = nil
     end
     print("[AutoSkillCheck] Auto skill check stopped")                
 end

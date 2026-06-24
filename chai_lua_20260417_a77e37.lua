@@ -1687,7 +1687,7 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 9  -- bisa diatur via slider
+    local DETECTION_RADIUS = 9.5  -- bisa diatur via slider
     local stateConnections = {}
     local activeKiller = nil
 
@@ -1866,7 +1866,7 @@ local function autoParryLoop()
     espRing.Shape = Enum.PartType.Cylinder
     espRing.Material = Enum.Material.Neon
     espRing.Color = Color3.fromRGB(255, 50, 50)
-    espRing.Transparency = 0.4
+    espRing.Transparency = 0.8
     espRing.Anchored = true
     espRing.CanCollide = false
     espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)

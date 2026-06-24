@@ -1707,7 +1707,9 @@ local function autoParryLoop()
         "rbxassetid://113255068724446",
         "rbxassetid://74968262036854",
         "rbxassetid://122812055447896",
-        "rbxassetid://78935059863801"
+        "rbxassetid://78935059863801",
+        "rbxassetid://135002183282873",
+        "rbxassetid://121216847022485"
     }
 
     -- Fungsi untuk mengecek apakah animasi termasuk serangan

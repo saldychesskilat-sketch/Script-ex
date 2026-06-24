@@ -1693,9 +1693,20 @@ local function autoParryLoop()
 
     -- ========== TEMPAT SCAN ANIMASI SERANGAN ==========
     local COMBAT_ANIMATIONS = {
-        -- Tambahkan ID animasi serangan hasil scan di sini
-        -- Contoh: "rbxassetid://1234567890",
-        -- "rbxassetid://9876543210",
+    "rbxassetid://110355011987939",
+    "rbxassetid://139369275981139",
+    "rbxassetid://105374834496520",
+    "rbxassetid://111920872708571",
+    "rbxassetid://117042998468241",
+    "rbxassetid://133963973694098",
+    "rbxassetid://129784271201071",
+    "rbxassetid://132817836308238",
+    "rbxassetid://82666958311998",
+    "rbxassetid://130012819736632",
+    "rbxassetid://113255068724446",
+    "rbxassetid://74968262036854",
+    "rbxassetid://122812055447896",
+    "rbxassetid://78935059863801"
     }
 
     -- Fungsi untuk mengecek apakah animasi termasuk serangan

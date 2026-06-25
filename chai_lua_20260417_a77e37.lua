@@ -293,11 +293,12 @@ end
 -- Menggunakan RemoteEvent: ReplicatedStorage.Remotes.Exit.LeverEvent
 -- ============================================================================
 
--- Cache remote event lever
 local cachedLeverRemote = nil
-local leverEventConnected = false
+local currentTaskConnection = nil
 
--- Cari remote event LeverEvent
+-- ============================================================================
+-- FUNGSI MENCARI REMOTE EVENT LeverEvent
+-- ============================================================================
 local function findLeverRemote()
     if cachedLeverRemote and cachedLeverRemote.Parent then
         return cachedLeverRemote
@@ -325,86 +326,77 @@ local function findLeverRemote()
     return nil
 end
 
--- Aktifkan lever goal menggunakan remote event (hold simulation)
-local function activateLeverGoalViaRemote()
+-- ============================================================================
+-- FUNGSI MENCARI PART TARGET (Exit / LeverGoal / Gate)
+-- ============================================================================
+local function findTargetPart()
+    local targetNames = {"Exit", "LeverGoal", "Gate", "gate", "lever"}
+    for _, name in ipairs(targetNames) do
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Name:lower():find(name:lower()) then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
+-- ============================================================================
+-- TELEPORT KE TARGET PART
+-- ============================================================================
+local function teleportToTarget(part)
+    if not part or not localRootPart then return end
+    local pos = part.Position + Vector3.new(0, 3, 0)
+    pcall(function()
+        localRootPart.CFrame = CFrame.new(pos)
+    end)
+end
+
+-- ============================================================================
+-- SPAM REMOTE EVENT LeverEvent
+-- ============================================================================
+local function spamLeverEvent()
     local remote = findLeverRemote()
     if not remote then
-        print("[AutoTask] LeverEvent remote not found, fallback to manual press")
-        simulatePressE()
+        print("[AutoTask] LeverEvent remote not found, skipping")
         return false
     end
 
-    -- Variasi argumen untuk memulai hold (start)
-    local startArgsList = {
-        {},             -- tanpa argumen
+    local argsList = {
+        {},
         {"Start"},
         {"Hold"},
         {"activate"},
         {"begin"},
         {true},
-        {1}
-    }
-    -- Variasi argumen untuk mengakhiri hold (stop)
-    local stopArgsList = {
-        {},
-        {"Stop"},
-        {"Release"},
-        {"deactivate"},
-        {"end"},
-        {false},
-        {0}
+        {1},
+        {"Pull"},
+        {"Interact"}
     }
 
-    local startSuccess = false
-    for _, args in ipairs(startArgsList) do
-        pcall(function()
-            if #args == 0 then
-                remote:FireServer()
-            else
-                remote:FireServer(unpack(args))
-            end
-            startSuccess = true
-        end)
-        if startSuccess then break end
+    for i = 1, 3 do
+        for _, args in ipairs(argsList) do
+            pcall(function()
+                if #args == 0 then
+                    remote:FireServer()
+                else
+                    remote:FireServer(unpack(args))
+                end
+            end)
+        end
+        task.wait(0.01)
     end
-
-    if not startSuccess then
-        print("[AutoTask] Failed to send start hold event, fallback to manual press")
-        simulatePressE()
-        return false
-    end
-
-    -- Tunggu simulasi hold (durasi sesuai kebutuhan, misal 1.5 detik)
-    task.wait(1.5)
-
-    local stopSuccess = false
-    for _, args in ipairs(stopArgsList) do
-        pcall(function()
-            if #args == 0 then
-                remote:FireServer()
-            else
-                remote:FireServer(unpack(args))
-            end
-            stopSuccess = true
-        end)
-        if stopSuccess then break end
-    end
-
-    if stopSuccess then
-        print("[AutoTask] Lever goal activated via remote event (hold simulated)")
-    else
-        print("[AutoTask] Lever goal release may have failed, but continuing")
-    end
-
     return true
 end
 
--- MODIFIKASI autoTaskLoop: ganti simulatePressE() dengan activateLeverGoalViaRemote()
+-- ============================================================================
+-- AUTO TASK LOOP (UTAMA)
+-- ============================================================================
 local function autoTaskLoop()
     if not config.autoTaskEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    -- Anti-hook (tidak diubah)
+    -- 1. Anti-hook (tetap dipertahankan)
     if isPlayerHooked() then
         local killerChar = findKillerCharacter()
         if knockbackKiller(killerChar) then
@@ -415,63 +407,54 @@ local function autoTaskLoop()
         return
     end
 
-    -- Buka escape dengan lever goal + gate
-    local leverGoal = findLeverGoal()
-    if leverGoal then
-        teleportToLeverGoal()
-        task.wait(0.1)
-        -- Gunakan remote event untuk interaksi lever goal
-        activateLeverGoalViaRemote()
-        task.wait(0.5)
-
-        -- Sisanya tetap menggunakan interaksi gate (ClickDetector, dll)
-        local gateFO = findGateFO()
-        if gateFO then
-            interactWithGate(gateFO)
-            print("[AutoTask] Interacted with F_O gate")
-        end
-        local rightGate = findRightGate()
-        if rightGate then
-            interactWithGate(rightGate)
-            print("[AutoTask] Interacted with RightGate")
-        end
-        local liftGate = findLiftGate()
-        if liftGate then
-            interactWithGate(liftGate)
-            print("[AutoTask] Interacted with LiftGate")
-        end
-    else
-        -- Fallback: repair generator (tetap sama)
-        local nearestGen = getNearestGeneratorOptimized()
-        if nearestGen then
-            local targetPos = nearestGen:GetPivot().Position
-            teleportTo(targetPos)
-            task.wait(0.1)
-            simulatePressE()
-            print("[AutoTask] Repaired generator")
-        end
+    -- 2. Cari target part
+    local target = findTargetPart()
+    if not target then
+        print("[AutoTask] No target part found (Exit/LeverGoal/Gate)")
+        task.wait(1)
+        return
     end
+
+    -- 3. Teleport ke target
+    teleportToTarget(target)
+    task.wait(0.1)
+
+    -- 4. Spam LeverEvent
+    local success = spamLeverEvent()
+    if success then
+        print("[AutoTask] LeverEvent spammed at", target.Name)
+    else
+        print("[AutoTask] LeverEvent spam failed")
+    end
+
     task.wait(0.5)
 end
 
--- Fungsi startAutoTask dan stopAutoTask tidak diubah (tetap sama)
+-- ============================================================================
+-- START / STOP AUTO TASK
+-- ============================================================================
 local function startAutoTask()
     if currentTaskConnection then return end
     currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
-    print("[AutoTask] Auto task started (anti-hook + lever gate system with remote event)")
+    print("[AutoTask] Auto task started (teleport + LeverEvent spam)")
 end
 
 local function stopAutoTask()
-    if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
+    if currentTaskConnection then
+        currentTaskConnection:Disconnect()
+        currentTaskConnection = nil
+    end
     if localHumanoid and config.auto1xModeEnabled then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
         config.auto1xModeEnabled = false
         isAuto1xModeActive = false
     end
-    if auto1xModeTimerConnection then auto1xModeTimerConnection:Disconnect(); auto1xModeTimerConnection = nil end
+    if auto1xModeTimerConnection then
+        auto1xModeTimerConnection:Disconnect()
+        auto1xModeTimerConnection = nil
+    end
     print("[AutoTask] Auto task stopped")
 end
-
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED: SCP ENTITY + MORE TRANSPARENT
 -- ============================================================================

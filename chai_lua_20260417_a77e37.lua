@@ -2084,18 +2084,11 @@ end
 -- Tidak menggunakan trigger jarak killer. Shield aktif terus saat fitur dinyalakan.
 -- ============================================================================
 -- ============================================================================      
--- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)      
--- Dengan deteksi radius & ESP merah berbentuk bulat (silinder)      
--- ============================================================================      
--- ============================================================================      
--- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + RADIUS DETECTION      
--- Toggle menggunakan config.shieldEnabled.      
+-- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection
+-- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
 
 local attackRemote = nil
-local attackEspFolder = nil
-local attackEspRing = nil
-local attackEspLight = nil
 
 -- Cari RemoteEvent BasicAttack di ReplicatedStorage
 local function findAttackRemote()
@@ -2120,64 +2113,16 @@ local function findAttackRemote()
     return nil
 end
 
--- Buat ESP radius (lingkaran merah) jika belum ada
-local function createAttackESP()
-    if attackEspFolder and attackEspFolder.Parent then return end
-    if attackEspFolder then attackEspFolder:Destroy() end
-    attackEspFolder = Instance.new("Folder")
-    attackEspFolder.Name = "AttackESP"
-    attackEspFolder.Parent = workspace
-
-    attackEspRing = Instance.new("Part")
-    attackEspRing.Name = "AttackRadius"
-    attackEspRing.Shape = Enum.PartType.Cylinder
-    attackEspRing.Material = Enum.Material.Neon
-    attackEspRing.Color = Color3.fromRGB(255, 0, 0)
-    attackEspRing.Transparency = 0.7
-    attackEspRing.Anchored = true
-    attackEspRing.CanCollide = false
-    attackEspRing.Size = Vector3.new(0.05, 18, 18) -- radius 9
-    attackEspRing.Parent = attackEspFolder
-
-    attackEspLight = Instance.new("PointLight")
-    attackEspLight.Color = Color3.fromRGB(255, 0, 0)
-    attackEspLight.Brightness = 1
-    attackEspLight.Range = 13
-    attackEspLight.Parent = attackEspRing
-end
-
--- Hapus ESP
-local function destroyAttackESP()
-    if attackEspFolder then
-        attackEspFolder:Destroy()
-        attackEspFolder = nil
-        attackEspRing = nil
-        attackEspLight = nil
-    end
-end
-
--- Periksa apakah ada survival (bukan killer) dalam radius 9
-local function isSurvivalNearby()
+-- Cek apakah ada player lain dalam radius (selain localPlayer)
+local function hasTargetInRadius(radius)
     if not localRootPart then return false end
     local pos = localRootPart.Position
     for _, player in ipairs(Players:GetPlayers()) do
-        if player == localPlayer then continue end
-        -- Cek apakah player adalah survivor (bukan killer)
-        local isKiller = false
-        if player.Team then
-            local teamName = player.Team.Name:lower()
-            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                isKiller = true
-            end
-        end
-        if isKiller then continue end
-        -- Cek karakter dan jarak
-        local char = player.Character
-        if char then
-            local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-            if root then
-                local dist = (pos - root.Position).Magnitude
-                if dist <= 9 then
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if root and (pos - root.Position).Magnitude <= radius then
                     return true
                 end
             end
@@ -2186,51 +2131,97 @@ local function isSurvivalNearby()
     return false
 end
 
--- Fungsi untuk mengirim spam attack (hanya jika ada survival dalam radius)
+-- Fungsi untuk mengirim spam attack (hanya jika ada target dalam radius)
 local function performAutoAttack()
-    if not config.shieldEnabled then return end
     local remote = findAttackRemote()
     if not remote then return end
-    if not isSurvivalNearby() then return end
-
+    if not hasTargetInRadius(9) then return end  -- deteksi radius 9
     pcall(function()
-        -- Kirim beberapa variasi argumen
+        -- Kirim dengan berbagai variasi argumen untuk meningkatkan peluang berhasil
         remote:FireServer()
         remote:FireServer("BasicAttack")
         remote:FireServer(game.Players.LocalPlayer)
+        -- Jika perlu argumen posisi/CFrame, bisa ditambahkan di sini
     end)
 end
 
 -- Variabel koneksi
 local shieldConnection = nil
-local attackEspUpdateConnection = nil
+
+-- ESP lingkaran merah (sama seperti auto parry)
+local function createAttackESP()
+    if radiusFolder then radiusFolder:Destroy() end
+    radiusFolder = Instance.new("Folder")
+    radiusFolder.Name = "AttackESP"
+    radiusFolder.Parent = workspace
+
+    local espRing = Instance.new("Part")
+    espRing.Name = "RadiusRing"
+    espRing.Shape = Enum.PartType.Cylinder
+    espRing.Material = Enum.Material.Neon
+    espRing.Color = Color3.fromRGB(255, 50, 50)
+    espRing.Transparency = 0.4
+    espRing.Anchored = true
+    espRing.CanCollide = false
+    espRing.Size = Vector3.new(0.05, 18, 18)  -- radius 9 * 2
+    espRing.Parent = radiusFolder
+
+    local ringLight = Instance.new("PointLight")
+    ringLight.Color = Color3.fromRGB(255, 50, 50)
+    ringLight.Brightness = 2
+    ringLight.Range = 13.5  -- 9 * 1.5
+    ringLight.Parent = espRing
+
+    return espRing, ringLight
+end
+
+local espRing, ringLight = createAttackESP()
+
+-- Update ESP position di main loop (gunakan RenderStepped)
+local function updateAttackESP()
+    local rootPart = localRootPart
+    if not rootPart then
+        local char = localPlayer.Character
+        if char then
+            rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+        end
+    end
+    if rootPart and espRing then
+        local footPos = rootPart.Position - Vector3.new(0, 2, 0)
+        espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
+        espRing.Size = Vector3.new(0.05, 18, 18)  -- radius 9 * 2
+        if ringLight then ringLight.Range = 13.5 end
+    end
+end
 
 -- Start auto attack (dipanggil saat toggle ON)
 local function startShieldMonitor()
     if shieldConnection then return end
-    createAttackESP()
     shieldConnection = RunService.Heartbeat:Connect(function()
-        performAutoAttack()
-        -- Update posisi ESP (mengikuti player)
-        if attackEspRing and localRootPart then
-            local footPos = localRootPart.Position - Vector3.new(0, 2, 0)
-            attackEspRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
-            attackEspRing.Size = Vector3.new(0.05, 18, 18)
-            if attackEspLight then
-                attackEspLight.Range = 13
-            end
+        if config.shieldEnabled then
+            performAutoAttack()
         end
     end)
-    print("[AutoAttack] Started (spamming BasicAttack remote within 9 stud radius) + ESP")
+    -- Update ESP setiap frame
+    local espUpdateConn = RunService.RenderStepped:Connect(updateAttackESP)
+    -- Simpan koneksi ESP untuk cleanup
+    table.insert(shieldConnection, espUpdateConn)  -- gunakan tabel untuk multiple connection
+    print("[AutoAttack] Started (spamming BasicAttack remote) with radius 9 ESP")
 end
 
 -- Stop auto attack (dipanggil saat toggle OFF)
 local function stopShieldMonitor()
     if shieldConnection then
-        shieldConnection:Disconnect()
+        if type(shieldConnection) == "table" then
+            for _, conn in ipairs(shieldConnection) do
+                pcall(function() conn:Disconnect() end)
+            end
+        else
+            pcall(function() shieldConnection:Disconnect() end)
+        end
         shieldConnection = nil
     end
-    destroyAttackESP()
+    if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
     print("[AutoAttack] Stopped")
 end
 -- ============================================================================

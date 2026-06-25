@@ -292,11 +292,10 @@ end
 -- FEATURE 2: AUTO TASK (ANTI-HOOK + LEVER GOAL GATE SYSTEM) - UPGRADED
 -- Menggunakan RemoteEvent: ReplicatedStorage.Remotes.Exit.LeverEvent
 -- ============================================================================
--- ============================================================================
--- AUTO TASK (LEVER + GATE) VIA REMOTE EVENT SPAM
--- ============================================================================
+local cachedLeverRemote = nil
+local leverEventConnected = false
 
--- Cari remote event LeverEvent (path: Remotes.Exit.LeverEvent)
+-- Cari remote event LeverEvent
 local function findLeverRemote()
     if cachedLeverRemote and cachedLeverRemote.Parent then
         return cachedLeverRemote
@@ -324,21 +323,81 @@ local function findLeverRemote()
     return nil
 end
 
--- Spam LeverEvent remote secara cepat (tanpa argumen)
-local function spamLeverRemote(remote, duration, interval)
-    local startTime = tick()
-    local count = 0
-    while tick() - startTime < duration do
-        pcall(function()
-            remote:FireServer()
-        end)
-        count = count + 1
-        task.wait(interval or 0.02)
+-- Aktifkan lever goal menggunakan remote event (hold simulation)
+local function activateLeverGoalViaRemote()
+    local remote = findLeverRemote()
+    if not remote then
+        print("[AutoTask] LeverEvent remote not found, fallback to manual press")
+        simulatePressE()
+        return false
     end
-    return count
+
+    -- Variasi argumen untuk memulai hold (start)
+    local startArgsList = {
+        {},             -- tanpa argumen
+        {"Start"},
+        {"Hold"},
+        {"activate"},
+        {"begin"},
+        {true},
+        {1}
+    }
+    -- Variasi argumen untuk mengakhiri hold (stop)
+    local stopArgsList = {
+        {},
+        {"Stop"},
+        {"Release"},
+        {"deactivate"},
+        {"end"},
+        {false},
+        {0}
+    }
+
+    local startSuccess = false
+    for _, args in ipairs(startArgsList) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            else
+                remote:FireServer(unpack(args))
+            end
+            startSuccess = true
+        end)
+        if startSuccess then break end
+    end
+
+    if not startSuccess then
+        print("[AutoTask] Failed to send start hold event, fallback to manual press")
+        simulatePressE()
+        return false
+    end
+
+    -- Tunggu simulasi hold (durasi sesuai kebutuhan, misal 1.5 detik)
+    task.wait(1.5)
+
+    local stopSuccess = false
+    for _, args in ipairs(stopArgsList) do
+        pcall(function()
+            if #args == 0 then
+                remote:FireServer()
+            else
+                remote:FireServer(unpack(args))
+            end
+            stopSuccess = true
+        end)
+        if stopSuccess then break end
+    end
+
+    if stopSuccess then
+        print("[AutoTask] Lever goal activated via remote event (hold simulated)")
+    else
+        print("[AutoTask] Lever goal release may have failed, but continuing")
+    end
+
+    return true
 end
 
--- MODIFIKASI autoTaskLoop: ganti dengan remote event spam
+-- MODIFIKASI autoTaskLoop: ganti simulatePressE() dengan activateLeverGoalViaRemote()
 local function autoTaskLoop()
     if not config.autoTaskEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
@@ -357,24 +416,13 @@ local function autoTaskLoop()
     -- Buka escape dengan lever goal + gate
     local leverGoal = findLeverGoal()
     if leverGoal then
-        -- Teleport ke lever
         teleportToLeverGoal()
         task.wait(0.1)
+        -- Gunakan remote event untuk interaksi lever goal
+        activateLeverGoalViaRemote()
+        task.wait(0.5)
 
-        -- Cari remote LeverEvent
-        local leverRemote = findLeverRemote()
-        if leverRemote then
-            -- Spam remote selama 1.5 detik (cukup untuk mengaktifkan lever)
-            local sentCount = spamLeverRemote(leverRemote, 1.5, 0.02)
-            print("[AutoTask] Spammed LeverEvent remote", sentCount, "times")
-        else
-            -- Fallback: tekan E manual jika remote tidak ditemukan
-            print("[AutoTask] LeverEvent not found, fallback to E press")
-            simulatePressE()
-            task.wait(0.5)
-        end
-
-        -- Interaksi dengan gate (tetap sama)
+        -- Sisanya tetap menggunakan interaksi gate (ClickDetector, dll)
         local gateFO = findGateFO()
         if gateFO then
             interactWithGate(gateFO)
@@ -404,11 +452,11 @@ local function autoTaskLoop()
     task.wait(0.5)
 end
 
--- startAutoTask dan stopAutoTask tidak diubah (tetap sama)
+-- Fungsi startAutoTask dan stopAutoTask tidak diubah (tetap sama)
 local function startAutoTask()
     if currentTaskConnection then return end
     currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
-    print("[AutoTask] Auto task started (lever via remote event spam + gates)")
+    print("[AutoTask] Auto task started (anti-hook + lever gate system with remote event)")
 end
 
 local function stopAutoTask()

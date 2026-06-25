@@ -2080,16 +2080,16 @@ local function togglePOV()
 end
 
 -- ============================================================================      
--- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)      
--- Menambahkan deteksi radius 9 dengan ESP merah berbentuk lingkaran.      
+-- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection + ESP      
+-- Menyerang otomatis ke survival terdekat dalam radius.      
 -- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
 
 local attackRemote = nil
-local autoAttackConnection = nil
-local attackRadiusFolder = nil
-local attackEspRing = nil
-local attackRingLight = nil
+local shieldESP = nil
+local shieldConnection = nil
+local shieldRadiusFolder = nil
+local DETECTION_RADIUS = 9  -- bisa diatur via slider nanti
 
 -- Cari RemoteEvent BasicAttack di ReplicatedStorage
 local function findAttackRemote()
@@ -2114,80 +2114,21 @@ local function findAttackRemote()
     return nil
 end
 
--- Fungsi untuk mengirim spam attack
-local function performAutoAttack(targetPlayer)
-    local remote = findAttackRemote()
-    if not remote then return end
-    pcall(function()
-        -- Kirim dengan berbagai variasi argumen untuk meningkatkan peluang berhasil
-        remote:FireServer()
-        remote:FireServer("BasicAttack")
-        remote:FireServer(game.Players.LocalPlayer)
-        if targetPlayer then
-            remote:FireServer(targetPlayer)
-        end
-        -- Jika perlu argumen posisi/CFrame, bisa ditambahkan di sini
-    end)
-end
-
--- Fungsi untuk membuat ESP
-local function createAttackESP()
-    if attackRadiusFolder then attackRadiusFolder:Destroy() end
-    attackRadiusFolder = Instance.new("Folder")
-    attackRadiusFolder.Name = "AttackESP"
-    attackRadiusFolder.Parent = workspace
-
-    attackEspRing = Instance.new("Part")
-    attackEspRing.Name = "AttackRadiusRing"
-    attackEspRing.Shape = Enum.PartType.Cylinder
-    attackEspRing.Material = Enum.Material.Neon
-    attackEspRing.Color = Color3.fromRGB(255, 50, 50)  -- merah terang
-    attackEspRing.Transparency = 0.4
-    attackEspRing.Anchored = true
-    attackEspRing.CanCollide = false
-    attackEspRing.Size = Vector3.new(0.05, 9*2, 9*2)  -- radius 9
-    attackEspRing.Parent = attackRadiusFolder
-
-    attackRingLight = Instance.new("PointLight")
-    attackRingLight.Color = Color3.fromRGB(255, 50, 50)
-    attackRingLight.Brightness = 2
-    attackRingLight.Range = 9 * 1.5
-    attackRingLight.Parent = attackEspRing
-end
-
--- Fungsi untuk update ESP posisi
-local function updateAttackESP()
-    if not attackEspRing or not attackEspRing.Parent then return end
-    local rootPart = localRootPart
-    if not rootPart then
-        local char = localPlayer.Character
-        if char then
-            rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-        end
-    end
-    if rootPart then
-        local footPos = rootPart.Position - Vector3.new(0, 2, 0)
-        attackEspRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
-        attackEspRing.Size = Vector3.new(0.05, 9*2, 9*2)
-        if attackRingLight then attackRingLight.Range = 9 * 1.5 end
-    end
-end
-
--- Fungsi untuk mengecek jarak ke player lain
-local function getNearestTarget()
+-- Fungsi untuk mencari survival terdekat dalam radius
+local function findNearestSurvivor()
     if not localRootPart then return nil end
-    local pos = localRootPart.Position
+    local localPos = localRootPart.Position
     local nearest = nil
-    local nearestDist = math.huge
-    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-        if player ~= localPlayer then
+    local minDist = DETECTION_RADIUS + 1
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Team and player.Team.Name:lower() == "survivors" then
             local char = player.Character
             if char then
                 local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
                 if root then
-                    local dist = (pos - root.Position).Magnitude
-                    if dist <= 9 and dist < nearestDist then
-                        nearestDist = dist
+                    local dist = (localPos - root.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
                         nearest = player
                     end
                 end
@@ -2197,55 +2138,92 @@ local function getNearestTarget()
     return nearest
 end
 
--- Variabel koneksi (gunakan shieldConnection yang sudah ada)
-local shieldConnection = nil
-
--- Start auto attack (dipanggil saat toggle ON)
-local function startShieldMonitor()
-    if shieldConnection then return end
-    if not config.shieldEnabled then return end
-
-    -- Buat ESP
-    createAttackESP()
-
-    -- Mulai loop deteksi + spam
-    shieldConnection = RunService.Heartbeat:Connect(function()
-        if not config.shieldEnabled then
-            -- Jika mati di tengah, stop
-            stopShieldMonitor()
-            return
-        end
-
-        -- Update posisi ESP
-        updateAttackESP()
-
-        -- Cari target dalam radius
-        local target = getNearestTarget()
-        if target then
-            performAutoAttack(target)
-        end
+-- Fungsi untuk mengirim spam attack ke target (opsional, bisa pakai argumen)
+local function performAutoAttack()
+    local remote = findAttackRemote()
+    if not remote then return end
+    pcall(function()
+        remote:FireServer()
+        remote:FireServer("BasicAttack")
+        remote:FireServer(localPlayer)
     end)
-
-    print("[AutoAttack] Started with radius detection and ESP")
 end
 
--- Stop auto attack (dipanggil saat toggle OFF)
+-- ========== ESP ==========
+local function createShieldESP()
+    if shieldRadiusFolder then shieldRadiusFolder:Destroy() end
+    shieldRadiusFolder = Instance.new("Folder")
+    shieldRadiusFolder.Name = "ShieldESP"
+    shieldRadiusFolder.Parent = workspace
+
+    local espRing = Instance.new("Part")
+    espRing.Name = "RadiusRing"
+    espRing.Shape = Enum.PartType.Cylinder
+    espRing.Material = Enum.Material.Neon
+    espRing.Color = Color3.fromRGB(255, 50, 50)
+    espRing.Transparency = 0.6
+    espRing.Anchored = true
+    espRing.CanCollide = false
+    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+    espRing.Parent = shieldRadiusFolder
+
+    local ringLight = Instance.new("PointLight")
+    ringLight.Color = Color3.fromRGB(255, 50, 50)
+    ringLight.Brightness = 2
+    ringLight.Range = DETECTION_RADIUS * 1.5
+    ringLight.Parent = espRing
+
+    shieldESP = espRing
+end
+
+local function updateESP()
+    if not shieldESP then return end
+    local rootPart = localRootPart
+    if not rootPart then
+        local char = localPlayer.Character
+        if char then
+            rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+        end
+    end
+    if rootPart then
+        local footPos = rootPart.Position - Vector3.new(0, 1, 0)
+        shieldESP.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
+        shieldESP.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+    end
+end
+
+local function destroyShieldESP()
+    if shieldRadiusFolder then shieldRadiusFolder:Destroy(); shieldRadiusFolder = nil end
+    shieldESP = nil
+end
+
+-- ========== MAIN FUNCTIONS ==========
+local function startShieldMonitor()
+    if shieldConnection then return end
+    createShieldESP()
+    shieldConnection = RunService.Heartbeat:Connect(function()
+        if not config.shieldEnabled then
+            return
+        end
+        -- Update posisi ESP setiap frame
+        updateESP()
+        -- Cari survival dalam radius
+        local target = findNearestSurvivor()
+        if target then
+            performAutoAttack()
+        end
+    end)
+    print("[AutoAttack] Started with radius detection + ESP")
+end
+
 local function stopShieldMonitor()
     if shieldConnection then
         shieldConnection:Disconnect()
         shieldConnection = nil
     end
-    if attackRadiusFolder then
-        attackRadiusFolder:Destroy()
-        attackRadiusFolder = nil
-        attackEspRing = nil
-        attackRingLight = nil
-    end
+    destroyShieldESP()
     print("[AutoAttack] Stopped")
 end
-
--- Tambahkan juga fungsi untuk cleanup jika config berubah (opsional)
--- Tapi stopShieldMonitor sudah menangani penghapusan ESP
 -- ============================================================================
 -- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ONLY WHEN MOVING (CONTROLLED)
 -- ============================================================================

@@ -292,147 +292,97 @@ end
 -- FEATURE 2: AUTO TASK (ANTI-HOOK + LEVER GOAL GATE SYSTEM) - UPGRADED
 -- Menggunakan RemoteEvent: ReplicatedStorage.Remotes.Exit.LeverEvent
 -- ============================================================================
-
-local cachedLeverRemote = nil
-local currentTaskConnection = nil
-
 -- ============================================================================
--- FUNGSI MENCARI REMOTE EVENT LeverEvent
+-- AUTO TASK LOOP (TELEPORT + SPAM LEVEREVENT)
 -- ============================================================================
-local function findLeverRemote()
-    if cachedLeverRemote and cachedLeverRemote.Parent then
-        return cachedLeverRemote
-    end
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        local exit = remotes:FindFirstChild("Exit")
-        if exit then
-            local lever = exit:FindFirstChild("LeverEvent")
-            if lever and lever:IsA("RemoteEvent") then
-                cachedLeverRemote = lever
-                print("[AutoTask] Found LeverEvent remote at correct path")
-                return lever
+
+-- Cari part target (bisa disesuaikan)
+local function getTargetPart()
+    local part = workspace:FindFirstChild("LeverGoal")
+    if part then return part end
+    local exitFolder = workspace:FindFirstChild("Exit")
+    if exitFolder then
+        for _, child in ipairs(exitFolder:GetChildren()) do
+            if child:IsA("BasePart") then
+                return child
             end
         end
     end
-    -- fallback scan
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and obj.Name == "LeverEvent" then
-            cachedLeverRemote = obj
-            print("[AutoTask] Found LeverEvent via scan")
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name:lower():find("lever") or obj.Name:lower():find("exit")) then
             return obj
         end
     end
     return nil
 end
 
--- ============================================================================
--- FUNGSI MENCARI PART TARGET (Exit / LeverGoal / Gate)
--- ============================================================================
-local function findTargetPart()
-    local targetNames = {"Exit", "LeverGoal", "Gate", "gate", "lever"}
-    for _, name in ipairs(targetNames) do
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.Name:lower():find(name:lower()) then
-                return obj
+-- Cari remote event LeverEvent
+local function findLeverRemote()
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    local remotes = replicatedStorage:FindFirstChild("Remotes")
+    if remotes then
+        local exit = remotes:FindFirstChild("Exit")
+        if exit then
+            local lever = exit:FindFirstChild("LeverEvent")
+            if lever and lever:IsA("RemoteEvent") then
+                return lever
             end
+        end
+    end
+    for _, obj in ipairs(replicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "LeverEvent" then
+            return obj
         end
     end
     return nil
 end
 
--- ============================================================================
--- TELEPORT KE TARGET PART
--- ============================================================================
-local function teleportToTarget(part)
-    if not part or not localRootPart then return end
-    local pos = part.Position + Vector3.new(0, 3, 0)
+-- Spam remote event LeverEvent
+local function spamLeverRemote()
+    local remote = findLeverRemote()
+    if not remote then
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
+        return
+    end
     pcall(function()
-        localRootPart.CFrame = CFrame.new(pos)
+        remote:FireServer()
+        remote:FireServer("activate")
+        remote:FireServer("lever")
+        remote:FireServer(true)
     end)
 end
 
--- ============================================================================
--- SPAM REMOTE EVENT LeverEvent
--- ============================================================================
-local function spamLeverEvent()
-    local remote = findLeverRemote()
-    if not remote then
-        print("[AutoTask] LeverEvent remote not found, skipping")
-        return false
-    end
-
-    local argsList = {
-        {},
-        {"Start"},
-        {"Hold"},
-        {"activate"},
-        {"begin"},
-        {true},
-        {1},
-        {"Pull"},
-        {"Interact"}
-    }
-
-    for i = 1, 3 do
-        for _, args in ipairs(argsList) do
-            pcall(function()
-                if #args == 0 then
-                    remote:FireServer()
-                else
-                    remote:FireServer(unpack(args))
-                end
-            end)
-        end
-        task.wait(0.01)
-    end
-    return true
-end
-
--- ============================================================================
--- AUTO TASK LOOP (UTAMA)
--- ============================================================================
+-- Loop utama auto task
 local function autoTaskLoop()
     if not config.autoTaskEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    -- 1. Anti-hook (tetap dipertahankan)
-    if isPlayerHooked() then
-        local killerChar = findKillerCharacter()
-        if knockbackKiller(killerChar) then
-            print("[AutoTask] Knocked back killer, releasing player")
-            activateAuto1xMode()
-        end
-        task.wait(0.5)
-        return
-    end
-
-    -- 2. Cari target part
-    local target = findTargetPart()
+    local target = getTargetPart()
     if not target then
-        print("[AutoTask] No target part found (Exit/LeverGoal/Gate)")
+        print("[AutoTask] Target part not found, retrying...")
         task.wait(1)
         return
     end
 
-    -- 3. Teleport ke target
-    teleportToTarget(target)
-    task.wait(0.1)
+    -- Teleport ke posisi target (3 stud di atas)
+    local pos = target.Position + Vector3.new(0, 3, 0)
+    teleportTo(pos)
+    task.wait(0.2)
 
-    -- 4. Spam LeverEvent
-    local success = spamLeverEvent()
-    if success then
-        print("[AutoTask] LeverEvent spammed at", target.Name)
-    else
-        print("[AutoTask] LeverEvent spam failed")
+    -- Spam remote event LeverEvent sebanyak 5 kali
+    for i = 1, 5 do
+        spamLeverRemote()
+        task.wait(0.05)
     end
 
+    print("[AutoTask] Teleported and spammed LeverEvent")
     task.wait(0.5)
 end
 
--- ============================================================================
--- START / STOP AUTO TASK
--- ============================================================================
+-- startAutoTask dan stopAutoTask tetap sama
 local function startAutoTask()
     if currentTaskConnection then return end
     currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
@@ -440,21 +390,16 @@ local function startAutoTask()
 end
 
 local function stopAutoTask()
-    if currentTaskConnection then
-        currentTaskConnection:Disconnect()
-        currentTaskConnection = nil
-    end
+    if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
     if localHumanoid and config.auto1xModeEnabled then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
         config.auto1xModeEnabled = false
         isAuto1xModeActive = false
     end
-    if auto1xModeTimerConnection then
-        auto1xModeTimerConnection:Disconnect()
-        auto1xModeTimerConnection = nil
-    end
+    if auto1xModeTimerConnection then auto1xModeTimerConnection:Disconnect(); auto1xModeTimerConnection = nil end
     print("[AutoTask] Auto task stopped")
 end
+
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED: SCP ENTITY + MORE TRANSPARENT
 -- ============================================================================

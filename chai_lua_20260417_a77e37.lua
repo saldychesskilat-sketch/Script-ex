@@ -1686,7 +1686,6 @@ local function autoParryLoop()
 
     local DETECTION_RADIUS = 9.5  -- bisa diatur via slider
     local stateConnections = {}
-    local activeKiller = nil
     local hookedPlayers = {}  -- track player yang sudah di-hook
 
     -- ========== TEMPAT SCAN ANIMASI SERANGAN ==========
@@ -1756,38 +1755,9 @@ local function autoParryLoop()
         return (localRootPart.Position - targetRoot.Position).Magnitude
     end
 
-    -- ========== UPDATE ACTIVE KILLER (RADIUS CHECK) ==========
+    -- ========== UPDATE ACTIVE KILLER (RADIUS CHECK) - hanya untuk info, tidak dipakai untuk trigger ==========
     local function updateActiveKiller()
-        if not config.infiniteAmmoEnabled then
-            if activeKiller then activeKiller = nil end
-            return
-        end
-        if not localRootPart then return end
-
-        local nearestKiller = nil
-        local nearestDist = math.huge
-
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer and isPlayerKiller(player) then
-                local dist = getDistanceToPlayer(player)
-                if dist < nearestDist then
-                    nearestDist = dist
-                    nearestKiller = player
-                end
-            end
-        end
-
-        if nearestKiller and nearestDist <= DETECTION_RADIUS then
-            if activeKiller ~= nearestKiller then
-                activeKiller = nearestKiller
-                print("[AutoParry] Killer in range:", activeKiller.Name, "dist:", math.floor(nearestDist))
-            end
-        else
-            if activeKiller then
-                activeKiller = nil
-                print("[AutoParry] No killer in range")
-            end
-        end
+        -- Tidak digunakan untuk trigger, hanya untuk debugging
     end
 
     -- ========== HOOK ANIMASI PADA KARAKTER ==========
@@ -1806,16 +1776,20 @@ local function autoParryLoop()
             return
         end
 
-        -- Hook AnimationPlayed dengan validasi Animation ID
+        -- Hook AnimationPlayed dengan validasi Animation ID + Cek Jarak Langsung
         local animConn = animator.AnimationPlayed:Connect(function(track)
             local anim = track.Animation
             if not anim then return end
             local animId = anim.AnimationId
             if not animId then return end
 
-            -- Hanya jika player ini adalah activeKiller dan animasi termasuk combat
-            if player == activeKiller and isCombatAnimation(animId) then
-                pcall(function() fireParryRemote(player) end)
+            -- Cek apakah animasi termasuk combat
+            if isCombatAnimation(animId) then
+                -- Langsung periksa jarak tanpa menunggu activeKiller
+                local dist = getDistanceToPlayer(player)
+                if dist <= DETECTION_RADIUS then
+                    pcall(function() fireParryRemote(player) end)
+                end
             end
         end)
         table.insert(stateConnections, animConn)
@@ -1886,9 +1860,8 @@ local function autoParryLoop()
     end)
     table.insert(stateConnections, playerConn)
 
-    -- ========== PERIODIC SCAN (UPDATE RADIUS & REFRESH KILLERS) ==========
+    -- ========== PERIODIC SCAN (REFRESH KILLERS) ==========
     local scanConnection = RunService.Heartbeat:Connect(function()
-        updateActiveKiller()
         refreshKillers()
     end)
     table.insert(stateConnections, scanConnection)
@@ -1952,7 +1925,7 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Animation ID detection + periodic killer refresh, auto-reload on team change")
+    print("[AutoParry] Animation ID detection with direct distance check (no activeKiller delay)")
 end
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

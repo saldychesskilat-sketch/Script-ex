@@ -2087,64 +2087,18 @@ local function findAttackRemote()
 end
 
 local function performAutoAttack()
-    -- ===== STATE LOKAL (tidak global) =====
-    local attackRadiusFolder = nil
-    local attackESP = nil
-    local ATTACK_RADIUS = 9
-
-    -- Fungsi untuk menghancurkan ESP
-    local function destroyESP()
-        if attackRadiusFolder then
-            attackRadiusFolder:Destroy()
-            attackRadiusFolder = nil
-            attackESP = nil
-        end
-    end
-
-    -- Fungsi untuk membuat ESP
-    local function createESP()
-        if attackRadiusFolder then return end
-        attackRadiusFolder = Instance.new("Folder")
-        attackRadiusFolder.Name = "AttackRadiusESP"
-        attackRadiusFolder.Parent = workspace
-
-        attackESP = Instance.new("Part")
-        attackESP.Name = "Radius"
-        attackESP.Shape = Enum.PartType.Cylinder
-        attackESP.Material = Enum.Material.Neon
-        attackESP.Color = Color3.fromRGB(255, 0, 0)
-        attackESP.Transparency = 1
-        attackESP.Anchored = true
-        attackESP.CanCollide = false
-        attackESP.Size = Vector3.new(0.05, ATTACK_RADIUS * 2, ATTACK_RADIUS * 2)
-        attackESP.Parent = attackRadiusFolder
-    end
-
-    -- Jika fitur dimatikan, hancurkan ESP dan return
-    if not config.shieldEnabled then
-        destroyESP()
-        return false
-    end
-
-    -- Pastikan ESP tersedia
-    createESP()
-
-    -- Update posisi ESP di bawah kaki player
-    if localRootPart and attackESP then
-        attackESP.CFrame = CFrame.new(localRootPart.Position - Vector3.new(0, 1, 0)) * CFrame.Angles(0, 0, math.rad(90))
-    end
-
-    -- Cari remote
     local remote = findAttackRemote()
     if not remote then return false end
 
-    -- Cek radius dan cari survivor
+    -- Cek radius dan cari survivor terdekat
     if not localRootPart then return false end
     local localPos = localRootPart.Position
+    local ATTACK_RADIUS = 9  -- bisa diubah atau diambil dari config nanti
     local targetFound = false
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
+            -- Cek apakah player adalah survivor (bukan killer/monster/enemy)
             local isSurvivor = true
             if player.Team then
                 local teamName = player.Team.Name:lower()
@@ -2177,7 +2131,6 @@ local function performAutoAttack()
     end)
     return true
 end
-
 -- Variabel koneksi (tetap di luar untuk start/stop)
 local shieldConnection = nil
 

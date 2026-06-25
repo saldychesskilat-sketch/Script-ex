@@ -295,30 +295,48 @@ end
 -- ============================================================================
 -- AUTO TASK (LEVER + GATE) VIA REMOTE EVENT SPAM
 -- ============================================================================
+-- ============================================================================
+-- AUTO TASK (LEVER + GATE) VIA REMOTE EVENT SPAM - PERBAIKAN
+-- ============================================================================
 
--- Cari LeverGoal di workspace
+-- Cari LeverGoal dengan lebih akurat
 local function findLeverGoal()
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name:lower():find("lever") or obj.Name:lower():find("goal") then
-            return obj
+        local name = obj.Name:lower()
+        if name:find("lever") or name:find("goal") or name:find("exit") then
+            if obj:IsA("BasePart") or obj:IsA("Model") then
+                return obj
+            end
         end
     end
     return nil
 end
 
--- Teleport ke LeverGoal
+-- Teleport ke posisi LeverGoal dengan aman
 local function teleportToLeverGoal()
     local goal = findLeverGoal()
-    if goal then
-        local pos = goal.Position or goal:GetPivot().Position
-        local character = localPlayer.Character
-        if character then
-            local hrp = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
-            if hrp then
-                hrp.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
-            end
-        end
+    if not goal then
+        print("[AutoTask] LeverGoal not found")
+        return false
     end
+    local char = localPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    if not hrp then return false end
+
+    local targetPos
+    if goal:IsA("BasePart") then
+        targetPos = goal.Position
+    elseif goal:IsA("Model") and goal:GetPivot then
+        targetPos = goal:GetPivot().Position
+    else
+        targetPos = goal.Position
+    end
+    if not targetPos then return false end
+
+    hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))
+    print("[AutoTask] Teleported to LeverGoal at", targetPos)
+    return true
 end
 
 -- Cari remote event LeverEvent (path: Remotes.Exit.LeverEvent)
@@ -351,26 +369,41 @@ local function findLeverRemote()
     return nil
 end
 
--- Spam LeverEvent remote secara cepat (tanpa argumen)
+-- Spam LeverEvent remote dengan berbagai variasi argumen
 local function spamLeverRemote(remote, duration, interval)
     local startTime = tick()
     local count = 0
+    local argsList = {
+        {},                             -- tanpa argumen
+        {"Start"}, {"Stop"}, {"Hold"}, {"Release"},
+        {"activate"}, {"deactivate"}, {"begin"}, {"end"},
+        {true}, {false}, {1}, {0},
+        {game.Players.LocalPlayer}
+    }
     while tick() - startTime < duration do
-        pcall(function()
-            remote:FireServer()
-        end)
-        count = count + 1
-        task.wait(interval or 0.02)
+        for _, args in ipairs(argsList) do
+            pcall(function()
+                if #args == 0 then
+                    remote:FireServer()
+                else
+                    remote:FireServer(unpack(args))
+                end
+                count = count + 1
+            end)
+            task.wait(interval or 0.02)
+        end
     end
     return count
 end
 
--- MODIFIKASI autoTaskLoop: ganti dengan remote event spam
+-- LOOP AUTO TASK (thread terpisah, bukan Heartbeat)
+local taskThread = nil
+
 local function autoTaskLoop()
     if not config.autoTaskEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    -- Anti-hook (tidak diubah)
+    -- Anti-hook
     if isPlayerHooked() then
         local killerChar = findKillerCharacter()
         if knockbackKiller(killerChar) then
@@ -385,23 +418,33 @@ local function autoTaskLoop()
     local leverGoal = findLeverGoal()
     if leverGoal then
         -- Teleport ke lever
-        teleportToLeverGoal()
-        task.wait(0.1)
+        local teleported = teleportToLeverGoal()
+        if teleported then
+            task.wait(0.3)  -- tunggu replikasi posisi
+        else
+            print("[AutoTask] Teleport failed, skipping lever")
+            task.wait(0.5)
+            return
+        end
+
+        -- Cek jarak sebenarnya
+        if localRootPart and leverGoal then
+            local dist = (localRootPart.Position - leverGoal.Position).Magnitude
+            print("[AutoTask] Distance to LeverGoal after teleport:", dist)
+        end
 
         -- Cari remote LeverEvent
         local leverRemote = findLeverRemote()
         if leverRemote then
-            -- Spam remote selama 0.5 detik (cukup untuk mengaktifkan lever)
-            local sentCount = spamLeverRemote(leverRemote, 0.5, 0.02)
+            local sentCount = spamLeverRemote(leverRemote, 1.0, 0.025)
             print("[AutoTask] Spammed LeverEvent remote", sentCount, "times")
         else
-            -- Fallback: tekan E manual jika remote tidak ditemukan
             print("[AutoTask] LeverEvent not found, fallback to E press")
             simulatePressE()
             task.wait(0.5)
         end
 
-        -- Interaksi dengan gate (tetap sama)
+        -- Interaksi dengan gate
         local gateFO = findGateFO()
         if gateFO then
             interactWithGate(gateFO)
@@ -418,7 +461,7 @@ local function autoTaskLoop()
             print("[AutoTask] Interacted with LiftGate")
         end
     else
-        -- Fallback: repair generator (tetap sama)
+        -- Fallback: repair generator
         local nearestGen = getNearestGeneratorOptimized()
         if nearestGen then
             local targetPos = nearestGen:GetPivot().Position
@@ -428,27 +471,36 @@ local function autoTaskLoop()
             print("[AutoTask] Repaired generator")
         end
     end
-    task.wait(0.5)
 end
 
--- startAutoTask dan stopAutoTask tidak diubah (tetap sama)
+-- START / STOP AUTO TASK (menggunakan thread)
 local function startAutoTask()
-    if currentTaskConnection then return end
-    currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
+    if taskThread then return end
+    taskThread = task.spawn(function()
+        while config.autoTaskEnabled do
+            pcall(autoTaskLoop)
+            task.wait(0.5)
+        end
+    end)
     print("[AutoTask] Auto task started (lever via remote event spam + gates)")
 end
 
 local function stopAutoTask()
-    if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
+    if taskThread then
+        task.cancel(taskThread)
+        taskThread = nil
+    end
     if localHumanoid and config.auto1xModeEnabled then
         localHumanoid.WalkSpeed = config.originalWalkSpeed
         config.auto1xModeEnabled = false
         isAuto1xModeActive = false
     end
-    if auto1xModeTimerConnection then auto1xModeTimerConnection:Disconnect(); auto1xModeTimerConnection = nil end
+    if auto1xModeTimerConnection then
+        auto1xModeTimerConnection:Disconnect()
+        auto1xModeTimerConnection = nil
+    end
     print("[AutoTask] Auto task stopped")
 end
-
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED: SCP ENTITY + MORE TRANSPARENT
 -- ============================================================================

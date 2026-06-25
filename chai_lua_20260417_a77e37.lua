@@ -2084,7 +2084,8 @@ end
 -- Tidak menggunakan trigger jarak killer. Shield aktif terus saat fitur dinyalakan.
 -- ============================================================================
 -- ============================================================================      
--- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection
+-- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)      
+-- Menggantikan Shield dengan auto attack yang memanggil RemoteEvent secara periodik.      
 -- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
 
@@ -2113,29 +2114,10 @@ local function findAttackRemote()
     return nil
 end
 
--- Cek apakah ada player lain dalam radius (selain localPlayer)
-local function hasTargetInRadius(radius)
-    if not localRootPart then return false end
-    local pos = localRootPart.Position
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                if root and (pos - root.Position).Magnitude <= radius then
-                    return true
-                end
-            end
-        end
-    end
-    return false
-end
-
--- Fungsi untuk mengirim spam attack (hanya jika ada target dalam radius)
+-- Fungsi untuk mengirim spam attack
 local function performAutoAttack()
     local remote = findAttackRemote()
     if not remote then return end
-    if not hasTargetInRadius(9) then return end  -- deteksi radius 9
     pcall(function()
         -- Kirim dengan berbagai variasi argumen untuk meningkatkan peluang berhasil
         remote:FireServer()
@@ -2145,54 +2127,8 @@ local function performAutoAttack()
     end)
 end
 
--- Variabel koneksi
+-- Variabel koneksi (gunakan shieldConnection yang sudah ada)
 local shieldConnection = nil
-
--- ESP lingkaran merah (sama seperti auto parry)
-local function createAttackESP()
-    if radiusFolder then radiusFolder:Destroy() end
-    radiusFolder = Instance.new("Folder")
-    radiusFolder.Name = "AttackESP"
-    radiusFolder.Parent = workspace
-
-    local espRing = Instance.new("Part")
-    espRing.Name = "RadiusRing"
-    espRing.Shape = Enum.PartType.Cylinder
-    espRing.Material = Enum.Material.Neon
-    espRing.Color = Color3.fromRGB(255, 50, 50)
-    espRing.Transparency = 0.4
-    espRing.Anchored = true
-    espRing.CanCollide = false
-    espRing.Size = Vector3.new(0.05, 18, 18)  -- radius 9 * 2
-    espRing.Parent = radiusFolder
-
-    local ringLight = Instance.new("PointLight")
-    ringLight.Color = Color3.fromRGB(255, 50, 50)
-    ringLight.Brightness = 2
-    ringLight.Range = 13.5  -- 9 * 1.5
-    ringLight.Parent = espRing
-
-    return espRing, ringLight
-end
-
-local espRing, ringLight = createAttackESP()
-
--- Update ESP position di main loop (gunakan RenderStepped)
-local function updateAttackESP()
-    local rootPart = localRootPart
-    if not rootPart then
-        local char = localPlayer.Character
-        if char then
-            rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-        end
-    end
-    if rootPart and espRing then
-        local footPos = rootPart.Position - Vector3.new(0, 2, 0)
-        espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
-        espRing.Size = Vector3.new(0.05, 18, 18)  -- radius 9 * 2
-        if ringLight then ringLight.Range = 13.5 end
-    end
-end
 
 -- Start auto attack (dipanggil saat toggle ON)
 local function startShieldMonitor()
@@ -2202,26 +2138,15 @@ local function startShieldMonitor()
             performAutoAttack()
         end
     end)
-    -- Update ESP setiap frame
-    local espUpdateConn = RunService.RenderStepped:Connect(updateAttackESP)
-    -- Simpan koneksi ESP untuk cleanup
-    table.insert(shieldConnection, espUpdateConn)  -- gunakan tabel untuk multiple connection
-    print("[AutoAttack] Started (spamming BasicAttack remote) with radius 9 ESP")
+    print("[AutoAttack] Started (spamming BasicAttack remote)")
 end
 
 -- Stop auto attack (dipanggil saat toggle OFF)
 local function stopShieldMonitor()
     if shieldConnection then
-        if type(shieldConnection) == "table" then
-            for _, conn in ipairs(shieldConnection) do
-                pcall(function() conn:Disconnect() end)
-            end
-        else
-            pcall(function() shieldConnection:Disconnect() end)
-        end
+        shieldConnection:Disconnect()
         shieldConnection = nil
     end
-    if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
     print("[AutoAttack] Stopped")
 end
 -- ============================================================================

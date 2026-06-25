@@ -293,14 +293,37 @@ end
 -- Menggunakan RemoteEvent: ReplicatedStorage.Remotes.Exit.LeverEvent
 -- ============================================================================
 -- ============================================================================
--- AUTO TASK LOOP (TELEPORT + SPAM LEVEREVENT)
--- ============================================================================
-
--- ============================================================================
 -- AUTO TASK (LEVER + GATE) VIA REMOTE EVENT SPAM
 -- ============================================================================
 
+-- Cari LeverGoal di workspace
+local function findLeverGoal()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name:lower():find("lever") or obj.Name:lower():find("goal") then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- Teleport ke LeverGoal
+local function teleportToLeverGoal()
+    local goal = findLeverGoal()
+    if goal then
+        local pos = goal.Position or goal:GetPivot().Position
+        local character = localPlayer.Character
+        if character then
+            local hrp = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+            if hrp then
+                hrp.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
+            end
+        end
+    end
+end
+
 -- Cari remote event LeverEvent (path: Remotes.Exit.LeverEvent)
+local cachedLeverRemote = nil
+
 local function findLeverRemote()
     if cachedLeverRemote and cachedLeverRemote.Parent then
         return cachedLeverRemote
@@ -368,8 +391,8 @@ local function autoTaskLoop()
         -- Cari remote LeverEvent
         local leverRemote = findLeverRemote()
         if leverRemote then
-            -- Spam remote selama 1.5 detik (cukup untuk mengaktifkan lever)
-            local sentCount = spamLeverRemote(leverRemote, 1.5, 0.02)
+            -- Spam remote selama 0.5 detik (cukup untuk mengaktifkan lever)
+            local sentCount = spamLeverRemote(leverRemote, 0.5, 0.02)
             print("[AutoTask] Spammed LeverEvent remote", sentCount, "times")
         else
             -- Fallback: tekan E manual jika remote tidak ditemukan

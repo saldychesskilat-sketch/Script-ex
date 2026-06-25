@@ -296,97 +296,123 @@ end
 -- AUTO TASK LOOP (TELEPORT + SPAM LEVEREVENT)
 -- ============================================================================
 
--- Cari part target (bisa disesuaikan)
-local function getTargetPart()
-    local part = workspace:FindFirstChild("LeverGoal")
-    if part then return part end
-    local exitFolder = workspace:FindFirstChild("Exit")
-    if exitFolder then
-        for _, child in ipairs(exitFolder:GetChildren()) do
-            if child:IsA("BasePart") then
-                return child
-            end
-        end
-    end
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and (obj.Name:lower():find("lever") or obj.Name:lower():find("exit")) then
-            return obj
-        end
-    end
-    return nil
-end
+-- ============================================================================
+-- AUTO TASK (LEVER + GATE) VIA REMOTE EVENT SPAM
+-- ============================================================================
 
--- Cari remote event LeverEvent
+-- Cari remote event LeverEvent (path: Remotes.Exit.LeverEvent)
 local function findLeverRemote()
-    local replicatedStorage = game:GetService("ReplicatedStorage")
-    local remotes = replicatedStorage:FindFirstChild("Remotes")
+    if cachedLeverRemote and cachedLeverRemote.Parent then
+        return cachedLeverRemote
+    end
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
     if remotes then
         local exit = remotes:FindFirstChild("Exit")
         if exit then
             local lever = exit:FindFirstChild("LeverEvent")
             if lever and lever:IsA("RemoteEvent") then
+                cachedLeverRemote = lever
+                print("[AutoTask] Found LeverEvent remote at correct path")
                 return lever
             end
         end
     end
-    for _, obj in ipairs(replicatedStorage:GetDescendants()) do
+    -- fallback scan
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") and obj.Name == "LeverEvent" then
+            cachedLeverRemote = obj
+            print("[AutoTask] Found LeverEvent via scan")
             return obj
         end
     end
     return nil
 end
 
--- Spam remote event LeverEvent
-local function spamLeverRemote()
-    local remote = findLeverRemote()
-    if not remote then
+-- Spam LeverEvent remote secara cepat (tanpa argumen)
+local function spamLeverRemote(remote, duration, interval)
+    local startTime = tick()
+    local count = 0
+    while tick() - startTime < duration do
         pcall(function()
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            remote:FireServer()
         end)
-        return
+        count = count + 1
+        task.wait(interval or 0.02)
     end
-    pcall(function()
-        remote:FireServer()
-        remote:FireServer("activate")
-        remote:FireServer("lever")
-        remote:FireServer(true)
-    end)
+    return count
 end
 
--- Loop utama auto task
+-- MODIFIKASI autoTaskLoop: ganti dengan remote event spam
 local function autoTaskLoop()
     if not config.autoTaskEnabled then return end
     if not getLocalCharacter() or not localRootPart then return end
 
-    local target = getTargetPart()
-    if not target then
-        print("[AutoTask] Target part not found, retrying...")
-        task.wait(1)
+    -- Anti-hook (tidak diubah)
+    if isPlayerHooked() then
+        local killerChar = findKillerCharacter()
+        if knockbackKiller(killerChar) then
+            print("[AutoTask] Knocked back killer, releasing player")
+            activateAuto1xMode()
+        end
+        task.wait(0.5)
         return
     end
 
-    -- Teleport ke posisi target (3 stud di atas)
-    local pos = target.Position + Vector3.new(0, 3, 0)
-    teleportTo(pos)
-    task.wait(0.2)
+    -- Buka escape dengan lever goal + gate
+    local leverGoal = findLeverGoal()
+    if leverGoal then
+        -- Teleport ke lever
+        teleportToLeverGoal()
+        task.wait(0.1)
 
-    -- Spam remote event LeverEvent sebanyak 5 kali
-    for i = 1, 5 do
-        spamLeverRemote()
-        task.wait(0.05)
+        -- Cari remote LeverEvent
+        local leverRemote = findLeverRemote()
+        if leverRemote then
+            -- Spam remote selama 1.5 detik (cukup untuk mengaktifkan lever)
+            local sentCount = spamLeverRemote(leverRemote, 1.5, 0.02)
+            print("[AutoTask] Spammed LeverEvent remote", sentCount, "times")
+        else
+            -- Fallback: tekan E manual jika remote tidak ditemukan
+            print("[AutoTask] LeverEvent not found, fallback to E press")
+            simulatePressE()
+            task.wait(0.5)
+        end
+
+        -- Interaksi dengan gate (tetap sama)
+        local gateFO = findGateFO()
+        if gateFO then
+            interactWithGate(gateFO)
+            print("[AutoTask] Interacted with F_O gate")
+        end
+        local rightGate = findRightGate()
+        if rightGate then
+            interactWithGate(rightGate)
+            print("[AutoTask] Interacted with RightGate")
+        end
+        local liftGate = findLiftGate()
+        if liftGate then
+            interactWithGate(liftGate)
+            print("[AutoTask] Interacted with LiftGate")
+        end
+    else
+        -- Fallback: repair generator (tetap sama)
+        local nearestGen = getNearestGeneratorOptimized()
+        if nearestGen then
+            local targetPos = nearestGen:GetPivot().Position
+            teleportTo(targetPos)
+            task.wait(0.1)
+            simulatePressE()
+            print("[AutoTask] Repaired generator")
+        end
     end
-
-    print("[AutoTask] Teleported and spammed LeverEvent")
     task.wait(0.5)
 end
 
--- startAutoTask dan stopAutoTask tetap sama
+-- startAutoTask dan stopAutoTask tidak diubah (tetap sama)
 local function startAutoTask()
     if currentTaskConnection then return end
     currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
-    print("[AutoTask] Auto task started (teleport + LeverEvent spam)")
+    print("[AutoTask] Auto task started (lever via remote event spam + gates)")
 end
 
 local function stopAutoTask()

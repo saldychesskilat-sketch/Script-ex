@@ -2055,8 +2055,9 @@ local function togglePOV()
 end
 
 -- ============================================================================      
--- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)      
--- Menggantikan Shield dengan auto attack yang memanggil RemoteEvent secara periodik.      
+-- ============================================================================      
+-- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection + ESP      
+-- Semua state (ESP, radius) berada di dalam performAutoAttack() agar tidak konflik.      
 -- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
 
@@ -2085,31 +2086,108 @@ local function findAttackRemote()
     return nil
 end
 
--- Fungsi untuk mengirim spam attack
+-- ========== FUNGSI UTAMA: performAutoAttack (semua state lokal di dalam) ==========
 local function performAutoAttack()
+    -- State lokal untuk ESP dan radius
+    local attackRadiusFolder = nil
+    local attackESP = nil
+    local ATTACK_RADIUS = 9
+
+    -- Fungsi untuk membuat ESP
+    local function createESP()
+        if attackRadiusFolder then attackRadiusFolder:Destroy() end
+        attackRadiusFolder = Instance.new("Folder")
+        attackRadiusFolder.Name = "AttackRadiusESP"
+        attackRadiusFolder.Parent = workspace
+
+        attackESP = Instance.new("Part")
+        attackESP.Name = "Radius"
+        attackESP.Shape = Enum.PartType.Cylinder
+        attackESP.Material = Enum.Material.Neon
+        attackESP.Color = Color3.fromRGB(255, 0, 0)
+        attackESP.Transparency = 0.7
+        attackESP.Anchored = true
+        attackESP.CanCollide = false
+        attackESP.Size = Vector3.new(0.05, ATTACK_RADIUS * 2, ATTACK_RADIUS * 2)
+        attackESP.Parent = attackRadiusFolder
+    end
+
+    -- Fungsi untuk menghancurkan ESP
+    local function destroyESP()
+        if attackRadiusFolder then
+            attackRadiusFolder:Destroy()
+            attackRadiusFolder = nil
+            attackESP = nil
+        end
+    end
+
+    -- Jika fitur dimatikan, hancurkan ESP dan return
+    if not config.shieldEnabled then
+        destroyESP()
+        return false
+    end
+
+    -- Buat ESP jika belum ada
+    if not attackRadiusFolder then
+        createESP()
+    end
+
+    -- Update posisi ESP di bawah kaki player
+    if localRootPart and attackESP then
+        attackESP.CFrame = CFrame.new(localRootPart.Position - Vector3.new(0, 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+    end
+
+    -- Cari remote dan target survivor dalam radius
     local remote = findAttackRemote()
-    if not remote then return end
+    if not remote then return false end
+    if not localRootPart then return false end
+
+    local localPos = localRootPart.Position
+    local targetFound = false
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local isSurvivor = true
+            if player.Team then
+                local teamName = player.Team.Name:lower()
+                if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                    isSurvivor = false
+                end
+            end
+            if isSurvivor and player.Character then
+                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+                if targetRoot then
+                    local dist = (localPos - targetRoot.Position).Magnitude
+                    if dist <= ATTACK_RADIUS then
+                        targetFound = true
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    if not targetFound then
+        return false
+    end
+
+    -- Jika ada target, spam remote
     pcall(function()
-        -- Kirim dengan berbagai variasi argumen untuk meningkatkan peluang berhasil
         remote:FireServer()
         remote:FireServer("BasicAttack")
-        remote:FireServer(game.Players.LocalPlayer)
-        -- Jika perlu argumen posisi/CFrame, bisa ditambahkan di sini
+        remote:FireServer(localPlayer)
     end)
+    return true
 end
 
--- Variabel koneksi (gunakan shieldConnection yang sudah ada)
+-- Variabel koneksi (tetap di luar untuk start/stop)
 local shieldConnection = nil
 
 -- Start auto attack (dipanggil saat toggle ON)
 local function startShieldMonitor()
     if shieldConnection then return end
-    shieldConnection = RunService.Heartbeat:Connect(function()
-        if config.shieldEnabled then
-            performAutoAttack()
-        end
-    end)
-    print("[AutoAttack] Started (spamming BasicAttack remote)")
+    shieldConnection = RunService.Heartbeat:Connect(performAutoAttack)
+    print("[AutoAttack] Started (Radius Mode)")
 end
 
 -- Stop auto attack (dipanggil saat toggle OFF)
@@ -2118,6 +2196,8 @@ local function stopShieldMonitor()
         shieldConnection:Disconnect()
         shieldConnection = nil
     end
+    -- Panggil performAutoAttack sekali untuk menghancurkan ESP
+    performAutoAttack()
     print("[AutoAttack] Stopped")
 end
 -- ============================================================================

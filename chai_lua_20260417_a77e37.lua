@@ -2086,16 +2086,24 @@ local function findAttackRemote()
     return nil
 end
 
--- ========== FUNGSI UTAMA: performAutoAttack (semua state lokal di dalam) ==========
 local function performAutoAttack()
-    -- State lokal untuk ESP dan radius
+    -- ===== STATE LOKAL (tidak global) =====
     local attackRadiusFolder = nil
     local attackESP = nil
     local ATTACK_RADIUS = 9
 
+    -- Fungsi untuk menghancurkan ESP
+    local function destroyESP()
+        if attackRadiusFolder then
+            attackRadiusFolder:Destroy()
+            attackRadiusFolder = nil
+            attackESP = nil
+        end
+    end
+
     -- Fungsi untuk membuat ESP
     local function createESP()
-        if attackRadiusFolder then attackRadiusFolder:Destroy() end
+        if attackRadiusFolder then return end
         attackRadiusFolder = Instance.new("Folder")
         attackRadiusFolder.Name = "AttackRadiusESP"
         attackRadiusFolder.Parent = workspace
@@ -2112,36 +2120,26 @@ local function performAutoAttack()
         attackESP.Parent = attackRadiusFolder
     end
 
-    -- Fungsi untuk menghancurkan ESP
-    local function destroyESP()
-        if attackRadiusFolder then
-            attackRadiusFolder:Destroy()
-            attackRadiusFolder = nil
-            attackESP = nil
-        end
-    end
-
     -- Jika fitur dimatikan, hancurkan ESP dan return
     if not config.shieldEnabled then
         destroyESP()
         return false
     end
 
-    -- Buat ESP jika belum ada
-    if not attackRadiusFolder then
-        createESP()
-    end
+    -- Pastikan ESP tersedia
+    createESP()
 
     -- Update posisi ESP di bawah kaki player
     if localRootPart and attackESP then
-        attackESP.CFrame = CFrame.new(localRootPart.Position - Vector3.new(0, 2, 0)) * CFrame.Angles(0, 0, math.rad(90))
+        attackESP.CFrame = CFrame.new(localRootPart.Position - Vector3.new(0, 1, 0)) * CFrame.Angles(0, 0, math.rad(90))
     end
 
-    -- Cari remote dan target survivor dalam radius
+    -- Cari remote
     local remote = findAttackRemote()
     if not remote then return false end
-    if not localRootPart then return false end
 
+    -- Cek radius dan cari survivor
+    if not localRootPart then return false end
     local localPos = localRootPart.Position
     local targetFound = false
 

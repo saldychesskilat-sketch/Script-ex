@@ -2084,145 +2084,70 @@ end
 -- Menyerang otomatis ke survival terdekat dalam radius.      
 -- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
--- ============================================================================      
--- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection + ESP      
--- Menggantikan Shield dengan auto attack yang memanggil RemoteEvent secara periodik.      
--- Toggle tetap menggunakan config.shieldEnabled.      
--- Hanya menyerang jika ada survivor dalam radius 9 stud.      
--- ============================================================================      
-
-local attackRemote = nil
-local ATTACK_RADIUS = 9
-local attackRadiusFolder = nil
-local attackESP = nil
-
--- Cari RemoteEvent BasicAttack di ReplicatedStorage
-local function findAttackRemote()
-    if attackRemote and attackRemote.Parent then return attackRemote end
-    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-    if remotes then
-        local attacks = remotes:FindFirstChild("Attacks")
-        if attacks then
-            attackRemote = attacks:FindFirstChild("BasicAttack")
-            if attackRemote and attackRemote:IsA("RemoteEvent") then
-                return attackRemote
-            end
-        end
-    end
-    -- fallback: scan semua RemoteEvent
-    for _, obj in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
-        if obj:IsA("RemoteEvent") and obj.Name == "BasicAttack" then
-            attackRemote = obj
-            return obj
-        end
-    end
-    return nil
-end
-
--- Fungsi untuk mengirim spam attack
-local function performAutoAttack()
-    local remote = findAttackRemote()
-    if not remote then return end
-    pcall(function()
-        remote:FireServer()
-        remote:FireServer("BasicAttack")
-        remote:FireServer(localPlayer)
-    end)
-end
-
--- Fungsi mencari survivor terdekat dalam radius
-local function getNearestSurvivorInRadius()
-    if not localRootPart then return nil end
-    local localPos = localRootPart.Position
-    local nearestPlayer = nil
-    local nearestDist = ATTACK_RADIUS
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            -- Cek apakah player adalah survivor
-            local isSurvivor = true
-            if player.Team then
-                local teamName = player.Team.Name:lower()
-                if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                    isSurvivor = false
-                end
-            end
-            if isSurvivor and player.Character then
-                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
-                if targetRoot then
-                    local dist = (localPos - targetRoot.Position).Magnitude
-                    if dist <= nearestDist then
-                        nearestDist = dist
-                        nearestPlayer = player
-                    end
-                end
-            end
-        end
-    end
-    return nearestPlayer
-end
-
--- Fungsi membuat ESP radius merah neon
-local function createAttackESP()
-    if attackRadiusFolder then
-        attackRadiusFolder:Destroy()
-    end
-    attackRadiusFolder = Instance.new("Folder")
-    attackRadiusFolder.Name = "AttackRadiusESP"
-    attackRadiusFolder.Parent = workspace
-
-    attackESP = Instance.new("Part")
-    attackESP.Name = "Radius"
-    attackESP.Shape = Enum.PartType.Cylinder
-    attackESP.Material = Enum.Material.Neon
-    attackESP.Color = Color3.fromRGB(255, 0, 0)
-    attackESP.Transparency = 0.7
-    attackESP.Anchored = true
-    attackESP.CanCollide = false
-    attackESP.Size = Vector3.new(0.05, ATTACK_RADIUS * 2, ATTACK_RADIUS * 2)
-    attackESP.Parent = attackRadiusFolder
-end
-
-local function destroyAttackESP()
-    if attackRadiusFolder then
-        attackRadiusFolder:Destroy()
-        attackRadiusFolder = nil
-        attackESP = nil
-    end
-end
-
--- Variabel koneksi (gunakan shieldConnection yang sudah ada)
-local shieldConnection = nil
-
--- Start auto attack (dipanggil saat toggle ON)
-local function startShieldMonitor()
-    if shieldConnection then return end
-    createAttackESP()
-    shieldConnection = RunService.Heartbeat:Connect(function()
-        if not config.shieldEnabled then return end
-
-        -- Update posisi ESP di kaki player
-        if localRootPart and attackESP then
-            attackESP.CFrame = CFrame.new(localRootPart.Position - Vector3.new(0, 1, 0)) * CFrame.Angles(0, 0, math.rad(90))
-        end
-
-        -- Cek target survivor dalam radius
-        local target = getNearestSurvivorInRadius()
-        if target then
-            performAutoAttack()
-        end
-    end)
-    print("[AutoAttack] Started (Radius Mode, ATTACK_RADIUS = " .. ATTACK_RADIUS .. ")")
-end
-
--- Stop auto attack (dipanggil saat toggle OFF)
-local function stopShieldMonitor()
-    if shieldConnection then
-        shieldConnection:Disconnect()
-        shieldConnection = nil
-    end
-    destroyAttackESP()
-    print("[AutoAttack] Stopped")
+-- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)            
+-- Menggantikan Shield dengan auto attack yang memanggil RemoteEvent secara periodik.            
+-- Toggle tetap menggunakan config.shieldEnabled.            
+-- ============================================================================            
+      
+local attackRemote = nil      
+      
+-- Cari RemoteEvent BasicAttack di ReplicatedStorage      
+local function findAttackRemote()      
+    if attackRemote and attackRemote.Parent then return attackRemote end      
+    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")      
+    if remotes then      
+        local attacks = remotes:FindFirstChild("Attacks")      
+        if attacks then      
+            attackRemote = attacks:FindFirstChild("BasicAttack")      
+            if attackRemote and attackRemote:IsA("RemoteEvent") then      
+                return attackRemote      
+            end      
+        end      
+    end      
+    -- fallback: scan semua RemoteEvent      
+    for _, obj in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do      
+        if obj:IsA("RemoteEvent") and obj.Name == "BasicAttack" then      
+            attackRemote = obj      
+            return obj      
+        end      
+    end      
+    return nil      
+end      
+      
+-- Fungsi untuk mengirim spam attack      
+local function performAutoAttack()      
+    local remote = findAttackRemote()      
+    if not remote then return end      
+    pcall(function()      
+        -- Kirim dengan berbagai variasi argumen untuk meningkatkan peluang berhasil      
+        remote:FireServer()      
+        remote:FireServer("BasicAttack")      
+        remote:FireServer(game.Players.LocalPlayer)      
+        -- Jika perlu argumen posisi/CFrame, bisa ditambahkan di sini      
+    end)      
+end      
+      
+-- Variabel koneksi (gunakan shieldConnection yang sudah ada)      
+local shieldConnection = nil      
+      
+-- Start auto attack (dipanggil saat toggle ON)      
+local function startShieldMonitor()      
+    if shieldConnection then return end      
+    shieldConnection = RunService.Heartbeat:Connect(function()      
+        if config.shieldEnabled then      
+            performAutoAttack()      
+        end      
+    end)      
+    print("[AutoAttack] Started (spamming BasicAttack remote)")      
+end      
+      
+-- Stop auto attack (dipanggil saat toggle OFF)      
+local function stopShieldMonitor()      
+    if shieldConnection then      
+        shieldConnection:Disconnect()      
+        shieldConnection = nil      
+    end      
+    print("[AutoAttack] Stopped")      
 end
 -- ============================================================================
 -- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ONLY WHEN MOVING (CONTROLLED)

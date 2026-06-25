@@ -2113,7 +2113,7 @@ local function performAutoAttack()
         attackESP.Shape = Enum.PartType.Cylinder
         attackESP.Material = Enum.Material.Neon
         attackESP.Color = Color3.fromRGB(255, 0, 0)
-        attackESP.Transparency = 0.7
+        attackESP.Transparency = 1
         attackESP.Anchored = true
         attackESP.CanCollide = false
         attackESP.Size = Vector3.new(0.05, ATTACK_RADIUS * 2, ATTACK_RADIUS * 2)

@@ -2079,17 +2079,17 @@ local function togglePOV()
     if config.povEnabled then disablePOV() else enablePOV() end
 end
 
--- ============================================================================
--- FEATURE 9: AUTO SHIELD (ForceField Protection - ALWAYS ACTIVE WHEN ENABLED)
--- Tidak menggunakan trigger jarak killer. Shield aktif terus saat fitur dinyalakan.
--- ============================================================================
 -- ============================================================================      
 -- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)      
--- Menggantikan Shield dengan auto attack yang memanggil RemoteEvent secara periodik.      
+-- Menambahkan deteksi radius 9 dengan ESP merah berbentuk lingkaran.      
 -- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
 
 local attackRemote = nil
+local autoAttackConnection = nil
+local attackRadiusFolder = nil
+local attackEspRing = nil
+local attackRingLight = nil
 
 -- Cari RemoteEvent BasicAttack di ReplicatedStorage
 local function findAttackRemote()
@@ -2115,7 +2115,7 @@ local function findAttackRemote()
 end
 
 -- Fungsi untuk mengirim spam attack
-local function performAutoAttack()
+local function performAutoAttack(targetPlayer)
     local remote = findAttackRemote()
     if not remote then return end
     pcall(function()
@@ -2123,8 +2123,78 @@ local function performAutoAttack()
         remote:FireServer()
         remote:FireServer("BasicAttack")
         remote:FireServer(game.Players.LocalPlayer)
+        if targetPlayer then
+            remote:FireServer(targetPlayer)
+        end
         -- Jika perlu argumen posisi/CFrame, bisa ditambahkan di sini
     end)
+end
+
+-- Fungsi untuk membuat ESP
+local function createAttackESP()
+    if attackRadiusFolder then attackRadiusFolder:Destroy() end
+    attackRadiusFolder = Instance.new("Folder")
+    attackRadiusFolder.Name = "AttackESP"
+    attackRadiusFolder.Parent = workspace
+
+    attackEspRing = Instance.new("Part")
+    attackEspRing.Name = "AttackRadiusRing"
+    attackEspRing.Shape = Enum.PartType.Cylinder
+    attackEspRing.Material = Enum.Material.Neon
+    attackEspRing.Color = Color3.fromRGB(255, 50, 50)  -- merah terang
+    attackEspRing.Transparency = 0.4
+    attackEspRing.Anchored = true
+    attackEspRing.CanCollide = false
+    attackEspRing.Size = Vector3.new(0.05, 9*2, 9*2)  -- radius 9
+    attackEspRing.Parent = attackRadiusFolder
+
+    attackRingLight = Instance.new("PointLight")
+    attackRingLight.Color = Color3.fromRGB(255, 50, 50)
+    attackRingLight.Brightness = 2
+    attackRingLight.Range = 9 * 1.5
+    attackRingLight.Parent = attackEspRing
+end
+
+-- Fungsi untuk update ESP posisi
+local function updateAttackESP()
+    if not attackEspRing or not attackEspRing.Parent then return end
+    local rootPart = localRootPart
+    if not rootPart then
+        local char = localPlayer.Character
+        if char then
+            rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+        end
+    end
+    if rootPart then
+        local footPos = rootPart.Position - Vector3.new(0, 2, 0)
+        attackEspRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
+        attackEspRing.Size = Vector3.new(0.05, 9*2, 9*2)
+        if attackRingLight then attackRingLight.Range = 9 * 1.5 end
+    end
+end
+
+-- Fungsi untuk mengecek jarak ke player lain
+local function getNearestTarget()
+    if not localRootPart then return nil end
+    local pos = localRootPart.Position
+    local nearest = nil
+    local nearestDist = math.huge
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        if player ~= localPlayer then
+            local char = player.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if root then
+                    local dist = (pos - root.Position).Magnitude
+                    if dist <= 9 and dist < nearestDist then
+                        nearestDist = dist
+                        nearest = player
+                    end
+                end
+            end
+        end
+    end
+    return nearest
 end
 
 -- Variabel koneksi (gunakan shieldConnection yang sudah ada)
@@ -2133,12 +2203,30 @@ local shieldConnection = nil
 -- Start auto attack (dipanggil saat toggle ON)
 local function startShieldMonitor()
     if shieldConnection then return end
+    if not config.shieldEnabled then return end
+
+    -- Buat ESP
+    createAttackESP()
+
+    -- Mulai loop deteksi + spam
     shieldConnection = RunService.Heartbeat:Connect(function()
-        if config.shieldEnabled then
-            performAutoAttack()
+        if not config.shieldEnabled then
+            -- Jika mati di tengah, stop
+            stopShieldMonitor()
+            return
+        end
+
+        -- Update posisi ESP
+        updateAttackESP()
+
+        -- Cari target dalam radius
+        local target = getNearestTarget()
+        if target then
+            performAutoAttack(target)
         end
     end)
-    print("[AutoAttack] Started (spamming BasicAttack remote)")
+
+    print("[AutoAttack] Started with radius detection and ESP")
 end
 
 -- Stop auto attack (dipanggil saat toggle OFF)
@@ -2147,8 +2235,17 @@ local function stopShieldMonitor()
         shieldConnection:Disconnect()
         shieldConnection = nil
     end
+    if attackRadiusFolder then
+        attackRadiusFolder:Destroy()
+        attackRadiusFolder = nil
+        attackEspRing = nil
+        attackRingLight = nil
+    end
     print("[AutoAttack] Stopped")
 end
+
+-- Tambahkan juga fungsi untuk cleanup jika config berubah (opsional)
+-- Tapi stopShieldMonitor sudah menangani penghapusan ESP
 -- ============================================================================
 -- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ONLY WHEN MOVING (CONTROLLED)
 -- ============================================================================

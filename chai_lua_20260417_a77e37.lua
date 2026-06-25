@@ -2056,73 +2056,166 @@ end
 
 -- ============================================================================      
 -- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection + ESP      
--- Menyerang otomatis ke survival terdekat dalam radius.      
--- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
--- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack)            
--- Menggantikan Shield dengan auto attack yang memanggil RemoteEvent secara periodik.            
--- Toggle tetap menggunakan config.shieldEnabled.            
--- ============================================================================            
-      
-local attackRemote = nil      
-      
--- Cari RemoteEvent BasicAttack di ReplicatedStorage      
-local function findAttackRemote()      
-    if attackRemote and attackRemote.Parent then return attackRemote end      
-    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")      
-    if remotes then      
-        local attacks = remotes:FindFirstChild("Attacks")      
-        if attacks then      
-            attackRemote = attacks:FindFirstChild("BasicAttack")      
-            if attackRemote and attackRemote:IsA("RemoteEvent") then      
-                return attackRemote      
-            end      
-        end      
-    end      
-    -- fallback: scan semua RemoteEvent      
-    for _, obj in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do      
-        if obj:IsA("RemoteEvent") and obj.Name == "BasicAttack" then      
-            attackRemote = obj      
-            return obj      
-        end      
-    end      
-    return nil      
-end      
-      
--- Fungsi untuk mengirim spam attack      
-local function performAutoAttack()      
-    local remote = findAttackRemote()      
-    if not remote then return end      
-    pcall(function()      
-        -- Kirim dengan berbagai variasi argumen untuk meningkatkan peluang berhasil      
-        remote:FireServer()      
-        remote:FireServer("BasicAttack")      
-        remote:FireServer(game.Players.LocalPlayer)      
-        -- Jika perlu argumen posisi/CFrame, bisa ditambahkan di sini      
-    end)      
-end      
-      
--- Variabel koneksi (gunakan shieldConnection yang sudah ada)      
-local shieldConnection = nil      
-      
--- Start auto attack (dipanggil saat toggle ON)      
-local function startShieldMonitor()      
-    if shieldConnection then return end      
-    shieldConnection = RunService.Heartbeat:Connect(function()      
-        if config.shieldEnabled then      
-            performAutoAttack()      
-        end      
-    end)      
-    print("[AutoAttack] Started (spamming BasicAttack remote)")      
-end      
-      
--- Stop auto attack (dipanggil saat toggle OFF)      
-local function stopShieldMonitor()      
-    if shieldConnection then      
-        shieldConnection:Disconnect()      
-        shieldConnection = nil      
-    end      
-    print("[AutoAttack] Stopped")      
+
+local attackRemote = nil
+local ATTACK_RADIUS = 9
+local attackRadiusFolder = nil
+local attackESP = nil
+local espInitialized = false
+
+-- Cari RemoteEvent BasicAttack
+local function findAttackRemote()
+    if attackRemote and attackRemote.Parent then return attackRemote end
+    local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+    if remotes then
+        local attacks = remotes:FindFirstChild("Attacks")
+        if attacks then
+            attackRemote = attacks:FindFirstChild("BasicAttack")
+            if attackRemote and attackRemote:IsA("RemoteEvent") then
+                return attackRemote
+            end
+        end
+    end
+    for _, obj in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+        if obj:IsA("RemoteEvent") and obj.Name == "BasicAttack" then
+            attackRemote = obj
+            return obj
+        end
+    end
+    return nil
+end
+
+-- Fungsi untuk membuat ESP radius
+local function createAttackESP()
+    if attackRadiusFolder then
+        attackRadiusFolder:Destroy()
+    end
+    attackRadiusFolder = Instance.new("Folder")
+    attackRadiusFolder.Name = "AttackRadiusESP"
+    attackRadiusFolder.Parent = workspace
+
+    attackESP = Instance.new("Part")
+    attackESP.Name = "Radius"
+    attackESP.Shape = Enum.PartType.Cylinder
+    attackESP.Material = Enum.Material.Neon
+    attackESP.Color = Color3.fromRGB(255, 0, 0)
+    attackESP.Transparency = 0.7
+    attackESP.Anchored = true
+    attackESP.CanCollide = false
+    attackESP.Size = Vector3.new(0.05, ATTACK_RADIUS * 2, ATTACK_RADIUS * 2)
+    attackESP.Parent = attackRadiusFolder
+
+    -- Tambahkan PointLight untuk efek terang
+    local ringLight = Instance.new("PointLight")
+    ringLight.Color = Color3.fromRGB(255, 0, 0)
+    ringLight.Brightness = 2
+    ringLight.Range = ATTACK_RADIUS * 1.5
+    ringLight.Parent = attackESP
+end
+
+-- Fungsi untuk update posisi ESP
+local function updateAttackESP()
+    if not attackESP then return end
+    local rootPart = localRootPart
+    if not rootPart then
+        local char = localPlayer.Character
+        if char then
+            rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+        end
+    end
+    if rootPart then
+        local footPos = rootPart.Position - Vector3.new(0, 1, 0)
+        attackESP.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
+    end
+end
+
+-- Fungsi untuk menghancurkan ESP
+local function destroyAttackESP()
+    if attackRadiusFolder then
+        attackRadiusFolder:Destroy()
+        attackRadiusFolder = nil
+        attackESP = nil
+    end
+    espInitialized = false
+end
+
+-- Fungsi performAutoAttack (dengan ESP built-in)
+local function performAutoAttack()
+    -- Inisialisasi ESP jika belum
+    if not espInitialized then
+        createAttackESP()
+        espInitialized = true
+    end
+
+    -- Update posisi ESP
+    updateAttackESP()
+
+    -- Cari target survivor dalam radius
+    local remote = findAttackRemote()
+    if not remote then return false end
+
+    if not localRootPart then return false end
+    local localPos = localRootPart.Position
+    local targetFound = false
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local isSurvivor = true
+            if player.Team then
+                local teamName = player.Team.Name:lower()
+                if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                    isSurvivor = false
+                end
+            end
+            if isSurvivor and player.Character then
+                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+                if targetRoot then
+                    local dist = (localPos - targetRoot.Position).Magnitude
+                    if dist <= ATTACK_RADIUS then
+                        targetFound = true
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    if not targetFound then
+        return false
+    end
+
+    -- Spam remote
+    pcall(function()
+        remote:FireServer()
+        remote:FireServer("BasicAttack")
+        remote:FireServer(localPlayer)
+    end)
+    return true
+end
+
+-- Variabel koneksi
+local shieldConnection = nil
+
+-- Start auto attack
+local function startShieldMonitor()
+    if shieldConnection then return end
+    shieldConnection = RunService.Heartbeat:Connect(function()
+        if config.shieldEnabled then
+            performAutoAttack()
+        end
+    end)
+    print("[AutoAttack] Started with radius detection + ESP")
+end
+
+-- Stop auto attack
+local function stopShieldMonitor()
+    if shieldConnection then
+        shieldConnection:Disconnect()
+        shieldConnection = nil
+    end
+    destroyAttackESP()
+    print("[AutoAttack] Stopped")
 end
 -- ============================================================================
 -- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ONLY WHEN MOVING (CONTROLLED)

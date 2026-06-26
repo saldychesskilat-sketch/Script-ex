@@ -1949,20 +1949,21 @@ end
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================
 -- ============================================================================
--- POV CONTROLLER (Consistent with other features)
+-- POV CONTROLLER (Consistent with ESP, Mass Kill, Auto Task)
 -- ============================================================================
 
 -- Pastikan config.povEnabled ada
 config.povEnabled = config.povEnabled or false
 
+-- Variabel global/upvalue
 local originalFOV = nil
 local originalBrightness = nil
 local originalAmbient = nil
-local povRenderConnection = nil  -- koneksi RenderStepped untuk efek
+local povRenderConnection = nil  -- koneksi RenderStepped untuk efek visual
 local lightPart = nil
-local povLoopConnection = nil    -- koneksi Heartbeat untuk monitor status (flag aktif)
+local povConnection = false       -- flag status aktif (digunakan untuk pengecekan di restore)
 
--- Fungsi menerapkan efek
+-- Fungsi menerapkan efek (tidak diubah)
 local function applyPOV()
     if not config.povEnabled then return end
     if not camera then return end
@@ -1977,7 +1978,7 @@ local function applyPOV()
     Lighting.ClockTime = 14
 end
 
--- Aktifkan efek (hanya membuat koneksi RenderStepped)
+-- Aktifkan efek (hanya membuat koneksi RenderStepped, tidak mengubah flag)
 local function enablePOV()
     if povRenderConnection then return end
     
@@ -2001,8 +2002,7 @@ local function enablePOV()
     
     povRenderConnection = RunService.RenderStepped:Connect(function()
         if not config.povEnabled then
-            -- Jika config mati, matikan juga render connection
-            disablePOV()
+            disablePOV()  -- jika config mati, matikan render juga
             return
         end
         applyPOV()
@@ -2049,25 +2049,19 @@ local function disablePOV()
     print("[POV] POV render disabled")
 end
 
--- Wrapper start/stop (konsisten dengan fitur lain)
+-- Wrapper start (mengatur flag dan memanggil enablePOV)
 local function startPOVLoop()
-    if povLoopConnection then return end
+    if povConnection then return end  -- sudah aktif
     enablePOV()
-    povLoopConnection = RunService.Heartbeat:Connect(function()
-        -- Jika config dimatikan di luar, matikan loop
-        if not config.povEnabled then
-            stopPOVLoop()
-        end
-    end)
+    povConnection = true
     print("[POV] POV loop started")
 end
 
+-- Wrapper stop (mengatur flag dan memanggil disablePOV)
 local function stopPOVLoop()
-    if povLoopConnection then
-        povLoopConnection:Disconnect()
-        povLoopConnection = nil
-    end
+    if not povConnection then return end
     disablePOV()
+    povConnection = false
     print("[POV] POV loop stopped")
 end
 
@@ -4688,13 +4682,8 @@ local function createGridButton(parent, name, text, initialState, onChange)
             if newState then startAutoAim() else stopAutoAim() end  
   
         elseif name == "povMode" then
-    local newState = not config.povEnabled
-    config.povEnabled = newState
-    if newState then
-        startPOVLoop()
-    else
-        stopPOVLoop()
-    end
+            config.povEnabled = newState
+            if newState then startPOVLoop() else stopPOVLoop() end
     return
   
         updateState(newState)  
@@ -5317,9 +5306,9 @@ local function restoreFeatureStates()
         stopESP()
     end
     
-    if config.povEnabled then
+    if config.povEnabled and not povConnection then
         startPOVLoop()
-    else
+    elseif not config.povEnabled and povConnection then
         stopPOVLoop()
     end
     

@@ -1666,7 +1666,7 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 9.5  -- bisa diatur via slider
+    local DETECTION_RADIUS = 9.6  -- bisa diatur via slider
     local stateConnections = {}
     local hookedPlayers = {}  -- track player yang sudah di-hook
 

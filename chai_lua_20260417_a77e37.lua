@@ -1949,155 +1949,126 @@ end
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================
 -- ============================================================================
--- POV CONTROLLER (Consistent with Stealth pattern)
+-- POV CONTROLLER (State inside maintainPOV)
 -- ============================================================================
 
--- Tambahkan di CONFIGURATION (setelah config lainnya)
-config.povEnabled = config.povEnabled or false
+local povLoopConnection = nil  -- koneksi Heartbeat
 
--- Variabel untuk menyimpan nilai asli
-local originalFOV = nil
-local originalBrightness = nil
-local originalAmbient = nil
-local povConnection = nil       -- koneksi RenderStepped untuk efek (flag juga)
-local lightPart = nil
-local povLoopConnection = nil   -- koneksi Heartbeat untuk monitor loop
-
--- Fungsi untuk menerapkan efek POV (dipanggil berkala)
-local function applyPOV()
-    if not config.povEnabled then return end
-    if not camera then return end
-    if originalFOV == nil then
-        originalFOV = camera.FieldOfView
-        originalBrightness = Lighting.Brightness
-        originalAmbient = Lighting.Ambient
+-- Fungsi utama: semua state ada di dalam sini
+local function maintainPOV()
+    -- State disimpan sebagai properti fungsi agar persist antar panggilan
+    if maintainPOV._init == nil then
+        maintainPOV.originalFOV = nil
+        maintainPOV.originalBrightness = nil
+        maintainPOV.originalAmbient = nil
+        maintainPOV.povRenderConnection = nil
+        maintainPOV.lightPart = nil
+        maintainPOV._init = true
     end
-    camera.FieldOfView = math.clamp(originalFOV + 35, 70, 120)
-    Lighting.Brightness = 3
-    Lighting.Ambient = Color3.fromRGB(200, 200, 200)
-    Lighting.ClockTime = 14
+
+    -- Ambil state dari fungsi
+    local originalFOV = maintainPOV.originalFOV
+    local originalBrightness = maintainPOV.originalBrightness
+    local originalAmbient = maintainPOV.originalAmbient
+    local povRenderConnection = maintainPOV.povRenderConnection
+    local lightPart = maintainPOV.lightPart
+
+    -- Jika fitur dimatikan, bersihkan semua efek
+    if not config.povEnabled then
+        if povRenderConnection then
+            povRenderConnection:Disconnect()
+            maintainPOV.povRenderConnection = nil
+        end
+        if lightPart then
+            lightPart:Destroy()
+            maintainPOV.lightPart = nil
+        end
+        if originalFOV and camera then
+            camera.FieldOfView = originalFOV
+            Lighting.Brightness = originalBrightness
+            Lighting.Ambient = originalAmbient
+            Lighting.ClockTime = os.date("!*t").hour
+            maintainPOV.originalFOV = nil
+            maintainPOV.originalBrightness = nil
+            maintainPOV.originalAmbient = nil
+        end
+        return
+    end
+
+    -- Jika fitur aktif, pastikan efek berjalan
+    if not maintainPOV.povRenderConnection then
+        -- Backup nilai asli jika belum
+        if camera and maintainPOV.originalFOV == nil then
+            maintainPOV.originalFOV = camera.FieldOfView
+            maintainPOV.originalBrightness = Lighting.Brightness
+            maintainPOV.originalAmbient = Lighting.Ambient
+        end
+
+        -- Buat light part jika belum
+        if not maintainPOV.lightPart or not maintainPOV.lightPart.Parent then
+            maintainPOV.lightPart = Instance.new("Part")
+            maintainPOV.lightPart.Name = "CyberHeroes_LightEffect"
+            maintainPOV.lightPart.Size = Vector3.new(15,15,15)
+            maintainPOV.lightPart.Anchored = true
+            maintainPOV.lightPart.CanCollide = false
+            maintainPOV.lightPart.Transparency = 0.8
+            maintainPOV.lightPart.BrickColor = BrickColor.new("Bright yellow")
+            maintainPOV.lightPart.Material = Enum.Material.Neon
+            maintainPOV.lightPart.Parent = workspace
+        end
+
+        -- Pasang RenderStepped untuk efek
+        maintainPOV.povRenderConnection = RunService.RenderStepped:Connect(function()
+            if not config.povEnabled then
+                if maintainPOV.povRenderConnection then
+                    maintainPOV.povRenderConnection:Disconnect()
+                    maintainPOV.povRenderConnection = nil
+                end
+                if maintainPOV.lightPart then
+                    maintainPOV.lightPart:Destroy()
+                    maintainPOV.lightPart = nil
+                end
+                return
+            end
+            -- Terapkan efek POV
+            if camera then
+                if maintainPOV.originalFOV == nil then
+                    maintainPOV.originalFOV = camera.FieldOfView
+                    maintainPOV.originalBrightness = Lighting.Brightness
+                    maintainPOV.originalAmbient = Lighting.Ambient
+                end
+                camera.FieldOfView = math.clamp(maintainPOV.originalFOV + 35, 70, 120)
+                Lighting.Brightness = 3
+                Lighting.Ambient = Color3.fromRGB(200, 200, 200)
+                Lighting.ClockTime = 14
+                if maintainPOV.lightPart then
+                    maintainPOV.lightPart.Position = camera.CFrame.Position
+                end
+            end
+        end)
+        print("[POV] Effect activated")
+    end
 end
 
--- Aktifkan POV (persistent, akan terus menjaga efek)
-local function enablePOV()
-    if povConnection then return end
-    
-    if camera then
-        if originalFOV == nil then
-            originalFOV = camera.FieldOfView
-            originalBrightness = Lighting.Brightness
-            originalAmbient = Lighting.Ambient
-        end
-    end
-    
-    -- Buat efek partikel cahaya (mengikuti kamera)
-    if not lightPart or not lightPart.Parent then
-        lightPart = Instance.new("Part")
-        lightPart.Name = "CyberHeroes_LightEffect"
-        lightPart.Size = Vector3.new(15,15,15)
-        lightPart.Anchored = true
-        lightPart.CanCollide = false
-        lightPart.Transparency = 0.8
-        lightPart.BrickColor = BrickColor.new("Bright yellow")
-        lightPart.Material = Enum.Material.Neon
-        lightPart.Parent = workspace
-    end
-    
-    -- Koneksi utama untuk menjaga efek setiap frame (agar tidak direset oleh game)
-    povConnection = RunService.RenderStepped:Connect(function()
-        if not config.povEnabled then
-            if povConnection then povConnection:Disconnect() end
-            povConnection = nil
-            if lightPart then lightPart:Destroy() end
-            return
-        end
-        applyPOV()
-        if camera and lightPart then
-            lightPart.Position = camera.CFrame.Position
-        end
-    end)
-    
-    -- Juga tangani saat karakter berganti (respawn, masuk game) yang mungkin mereset kamera
-    local function onCharacterAdded()
-        if config.povEnabled then
-            task.wait(1) -- tunggu kamera stabil
-            applyPOV()
-        end
-    end
-    if localPlayer.Character then
-        onCharacterAdded()
-    end
-    localPlayer.CharacterAdded:Connect(onCharacterAdded)
-    
-    config.povEnabled = true
-    print("[POV] Zoom out + Brightness ON (persistent)")
-end
-
--- Nonaktifkan POV
-local function disablePOV()
-    if povConnection then
-        povConnection:Disconnect()
-        povConnection = nil
-    end
-    if originalFOV and camera then
-        camera.FieldOfView = originalFOV
-    end
-    if originalBrightness then
-        Lighting.Brightness = originalBrightness
-        Lighting.Ambient = originalAmbient
-    end
-    Lighting.ClockTime = os.date("!*t").hour  -- waktu normal
-    if lightPart then lightPart:Destroy() end
-    config.povEnabled = false
-    print("[POV] Zoom out + Brightness OFF")
-end
-
--- Start POV (mirip startStealthMonitor)
+-- Start POV (mirip startInfiniteAmmo)
 local function startPOVLoop()
-    if povLoopConnection then return end  -- sudah berjalan
-    
-    -- Jika config aktif, langsung aktifkan (mirip makeInvisible)
-    if config.povEnabled then
-        enablePOV()
-    end
-    
-    -- Pasang Heartbeat untuk memantau status
-    povLoopConnection = RunService.Heartbeat:Connect(function()
-        if config.povEnabled and not povConnection then
-            enablePOV()
-        elseif not config.povEnabled and povConnection then
-            disablePOV()
-        end
-    end)
+    if povLoopConnection then return end
+    povLoopConnection = RunService.Heartbeat:Connect(maintainPOV)
     print("[POV] POV loop started")
 end
 
--- Stop POV (mirip stopStealthMonitor)
+-- Stop POV (mirip stopInfiniteAmmo)
 local function stopPOVLoop()
     if povLoopConnection then
         povLoopConnection:Disconnect()
         povLoopConnection = nil
     end
-    -- Matikan efek jika aktif
-    if povConnection then
-        disablePOV()
-    end
     print("[POV] POV loop stopped")
-end
-
--- Fungsi toggle (opsional)
-local function togglePOV()
-    if config.povEnabled then
-        stopPOVLoop()
-    else
-        startPOVLoop()
-    end
 end
 
 -- ============================================================================
 -- END POV CONTROLLER
 -- ============================================================================
--- ============================================================================      
 -- ============================================================================      
 -- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection + ESP      
 -- Semua state (ESP, radius) berada di dalam performAutoAttack() agar tidak konflik.      

@@ -5193,6 +5193,15 @@ local function createGUI()
 
     -- Sinkronisasi: aktifkan tampilan FEATURES secara default (bukan HOME)
     featuresItem.MouseButton1Click:Fire()
+
+    -- Sinkronisasi warna sidebar secara manual untuk memastikan FEATURES aktif di awal
+    -- Ini adalah perbaikan karena Fire() terkadang tidak mengubah warna pada inisialisasi.
+    featuresItem.TextColor3 = Color3.fromRGB(0, 230, 255)
+    homeItem.TextColor3 = Color3.fromRGB(200, 200, 200)
+    settingsItem.TextColor3 = Color3.fromRGB(200, 200, 200)
+    infoItem.TextColor3 = Color3.fromRGB(200, 200, 200)
+    aboutItem.TextColor3 = Color3.fromRGB(200, 200, 200)
+    -- ======================================
 end
 -- ============================================================================
 -- RESTORE FEATURE STATES FUNCTION (LENGKAP)

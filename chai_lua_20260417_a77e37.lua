@@ -1949,21 +1949,21 @@ end
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================
 -- ============================================================================
--- POV CONTROLLER (Consistent with ESP, Mass Kill, Auto Task)
+-- POV CONTROLLER (Consistent with Shield/Auto Attack pattern)
 -- ============================================================================
 
--- Pastikan config.povEnabled ada
+-- Tambahkan di CONFIGURATION (setelah config lainnya)
 config.povEnabled = config.povEnabled or false
 
--- Variabel global/upvalue
+-- Variabel untuk menyimpan nilai asli
 local originalFOV = nil
 local originalBrightness = nil
 local originalAmbient = nil
-local povRenderConnection = nil  -- koneksi RenderStepped untuk efek visual
+local povConnection = nil       -- koneksi RenderStepped untuk efek
 local lightPart = nil
-local povConnection = false       -- flag status aktif (digunakan untuk pengecekan di restore)
+local povLoopConnection = nil   -- koneksi Heartbeat untuk monitor loop (sama seperti shieldConnection)
 
--- Fungsi menerapkan efek (tidak diubah)
+-- Fungsi untuk menerapkan efek POV (dipanggil berkala)
 local function applyPOV()
     if not config.povEnabled then return end
     if not camera then return end
@@ -1978,16 +1978,19 @@ local function applyPOV()
     Lighting.ClockTime = 14
 end
 
--- Aktifkan efek (hanya membuat koneksi RenderStepped, tidak mengubah flag)
+-- Aktifkan POV (persistent, akan terus menjaga efek)
 local function enablePOV()
-    if povRenderConnection then return end
+    if povConnection then return end
     
-    if camera and originalFOV == nil then
-        originalFOV = camera.FieldOfView
-        originalBrightness = Lighting.Brightness
-        originalAmbient = Lighting.Ambient
+    if camera then
+        if originalFOV == nil then
+            originalFOV = camera.FieldOfView
+            originalBrightness = Lighting.Brightness
+            originalAmbient = Lighting.Ambient
+        end
     end
     
+    -- Buat efek partikel cahaya (mengikuti kamera)
     if not lightPart or not lightPart.Parent then
         lightPart = Instance.new("Part")
         lightPart.Name = "CyberHeroes_LightEffect"
@@ -2000,9 +2003,12 @@ local function enablePOV()
         lightPart.Parent = workspace
     end
     
-    povRenderConnection = RunService.RenderStepped:Connect(function()
+    -- Koneksi utama untuk menjaga efek setiap frame (agar tidak direset oleh game)
+    povConnection = RunService.RenderStepped:Connect(function()
         if not config.povEnabled then
-            disablePOV()  -- jika config mati, matikan render juga
+            if povConnection then povConnection:Disconnect() end
+            povConnection = nil
+            if lightPart then lightPart:Destroy() end
             return
         end
         applyPOV()
@@ -2011,10 +2017,10 @@ local function enablePOV()
         end
     end)
     
-    -- Tangani respawn
+    -- Juga tangani saat karakter berganti (respawn, masuk game) yang mungkin mereset kamera
     local function onCharacterAdded()
         if config.povEnabled then
-            task.wait(1)
+            task.wait(1) -- tunggu kamera stabil
             applyPOV()
         end
     end
@@ -2024,14 +2030,14 @@ local function enablePOV()
     localPlayer.CharacterAdded:Connect(onCharacterAdded)
     
     config.povEnabled = true
-    print("[POV] POV render active")
+    print("[POV] Zoom out + Brightness ON (persistent)")
 end
 
--- Nonaktifkan efek render
+-- Nonaktifkan POV
 local function disablePOV()
-    if povRenderConnection then
-        povRenderConnection:Disconnect()
-        povRenderConnection = nil
+    if povConnection then
+        povConnection:Disconnect()
+        povConnection = nil
     end
     if originalFOV and camera then
         camera.FieldOfView = originalFOV
@@ -2040,31 +2046,39 @@ local function disablePOV()
         Lighting.Brightness = originalBrightness
         Lighting.Ambient = originalAmbient
     end
-    Lighting.ClockTime = os.date("!*t").hour
-    if lightPart then
-        lightPart:Destroy()
-        lightPart = nil
-    end
+    Lighting.ClockTime = os.date("!*t").hour  -- waktu normal
+    if lightPart then lightPart:Destroy() end
     config.povEnabled = false
-    print("[POV] POV render disabled")
+    print("[POV] Zoom out + Brightness OFF")
 end
 
--- Wrapper start (mengatur flag dan memanggil enablePOV)
+-- Wrapper start (sama seperti startShieldMonitor)
 local function startPOVLoop()
-    if povConnection then return end  -- sudah aktif
+    if povLoopConnection then return end  -- sudah aktif
     enablePOV()
-    povConnection = true
+    -- Pasang Heartbeat untuk memantau status (opsional, karena enablePOV sudah punya self-monitoring)
+    -- Tapi kita tetap pasang agar konsisten dengan pola fitur lain yang menggunakan loop monitor.
+    povLoopConnection = RunService.Heartbeat:Connect(function()
+        if not config.povEnabled then
+            stopPOVLoop()
+        end
+    end)
     print("[POV] POV loop started")
 end
 
--- Wrapper stop (mengatur flag dan memanggil disablePOV)
+-- Wrapper stop (sama seperti stopShieldMonitor)
 local function stopPOVLoop()
-    if not povConnection then return end
+    if povLoopConnection then
+        povLoopConnection:Disconnect()
+        povLoopConnection = nil
+    end
     disablePOV()
-    povConnection = false
     print("[POV] POV loop stopped")
 end
 
+-- ============================================================================
+-- END POV CONTROLLER
+-- ============================================================================
 -- ============================================================================
 -- END POV CONTROLLER
 -- ============================================================================

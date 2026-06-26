@@ -4651,8 +4651,9 @@ local function createGridButton(parent, name, text, initialState, onChange)
             if newState then startAutoAim() else stopAutoAim() end  
   
         elseif name == "povMode" then  
-            togglePOV()   
-    return
+            togglePOV()  
+            return  
+        end  
   
         updateState(newState)  
   

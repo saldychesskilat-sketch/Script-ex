@@ -1949,7 +1949,7 @@ end
 -- PENGGANTI RESTART SCRIPT DENGAN FITUR POV (ZOOM OUT + BRIGHTNESS) - FIXED PERSISTENT
 -- ============================================================================
 -- ============================================================================
--- POV CONTROLLER (Consistent with Shield/Auto Attack pattern)
+-- POV CONTROLLER (Consistent with Stealth pattern)
 -- ============================================================================
 
 -- Tambahkan di CONFIGURATION (setelah config lainnya)
@@ -1959,9 +1959,9 @@ config.povEnabled = config.povEnabled or false
 local originalFOV = nil
 local originalBrightness = nil
 local originalAmbient = nil
-local povConnection = nil       -- koneksi RenderStepped untuk efek
+local povConnection = nil       -- koneksi RenderStepped untuk efek (flag juga)
 local lightPart = nil
-local povLoopConnection = nil   -- koneksi Heartbeat untuk monitor loop (sama seperti shieldConnection)
+local povLoopConnection = nil   -- koneksi Heartbeat untuk monitor loop
 
 -- Fungsi untuk menerapkan efek POV (dipanggil berkala)
 local function applyPOV()
@@ -2052,33 +2052,48 @@ local function disablePOV()
     print("[POV] Zoom out + Brightness OFF")
 end
 
--- Wrapper start (sama seperti startShieldMonitor)
+-- Start POV (mirip startStealthMonitor)
 local function startPOVLoop()
-    if povLoopConnection then return end  -- sudah aktif
-    enablePOV()
-    -- Pasang Heartbeat untuk memantau status (opsional, karena enablePOV sudah punya self-monitoring)
-    -- Tapi kita tetap pasang agar konsisten dengan pola fitur lain yang menggunakan loop monitor.
+    if povLoopConnection then return end  -- sudah berjalan
+    
+    -- Jika config aktif, langsung aktifkan (mirip makeInvisible)
+    if config.povEnabled then
+        enablePOV()
+    end
+    
+    -- Pasang Heartbeat untuk memantau status
     povLoopConnection = RunService.Heartbeat:Connect(function()
-        if not config.povEnabled then
-            stopPOVLoop()
+        if config.povEnabled and not povConnection then
+            enablePOV()
+        elseif not config.povEnabled and povConnection then
+            disablePOV()
         end
     end)
     print("[POV] POV loop started")
 end
 
--- Wrapper stop (sama seperti stopShieldMonitor)
+-- Stop POV (mirip stopStealthMonitor)
 local function stopPOVLoop()
     if povLoopConnection then
         povLoopConnection:Disconnect()
         povLoopConnection = nil
     end
-    disablePOV()
+    -- Matikan efek jika aktif
+    if povConnection then
+        disablePOV()
+    end
     print("[POV] POV loop stopped")
 end
 
--- ============================================================================
--- END POV CONTROLLER
--- ============================================================================
+-- Fungsi toggle (opsional)
+local function togglePOV()
+    if config.povEnabled then
+        stopPOVLoop()
+    else
+        startPOVLoop()
+    end
+end
+
 -- ============================================================================
 -- END POV CONTROLLER
 -- ============================================================================

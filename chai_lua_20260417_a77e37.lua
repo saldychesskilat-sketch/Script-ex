@@ -5065,10 +5065,7 @@ local function createGUI()
         infoItem.TextColor3 = Color3.fromRGB(200,200,200)
         aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
 
-        if featuresContainer then
-            featuresContainer:Destroy()
-            featuresContainer = nil
-        end
+        if featuresContainer then featuresContainer:Destroy() end
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
         if aboutContent then aboutContent:Destroy() end
@@ -5099,10 +5096,7 @@ local function createGUI()
         infoItem.TextColor3 = Color3.fromRGB(200,200,200)
         aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
 
-        if featuresContainer then
-            featuresContainer:Destroy()
-            featuresContainer = nil
-        end
+        if featuresContainer then featuresContainer:Destroy() end
         if homeContent then homeContent:Destroy() end
         if infoContent then infoContent:Destroy() end
         if aboutContent then aboutContent:Destroy() end
@@ -5118,10 +5112,7 @@ local function createGUI()
         settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
         aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
 
-        if featuresContainer then
-            featuresContainer:Destroy()
-            featuresContainer = nil
-        end
+        if featuresContainer then featuresContainer:Destroy() end
         if homeContent then homeContent:Destroy() end
         if settingsContent then settingsContent:Destroy() end
         if aboutContent then aboutContent:Destroy() end
@@ -5137,10 +5128,7 @@ local function createGUI()
         settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
         infoItem.TextColor3 = Color3.fromRGB(200,200,200)
 
-        if featuresContainer then
-            featuresContainer:Destroy()
-            featuresContainer = nil
-        end
+        if featuresContainer then featuresContainer:Destroy() end
         if homeContent then homeContent:Destroy() end
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end

@@ -4541,12 +4541,10 @@ end
   
 -- ============================================================================  
 -- GUI BUTTONS (sama, tidak diubah)  
--- ============================================================================  
+-- ============================================================================
+local featuresContainer = nil
 local function createGridButton(parent, name, text, initialState, onChange)  
-    if featuresContainer then  
-            featuresContainer:Destroy()  
-            featuresContainer = nil  
-    end  
+    if featuresContainer then featuresContainer:Destroy() end  
     local button = Instance.new("TextButton")  
     button.Name = name  
     button.Size = UDim2.new(0,85,0,32)  

@@ -4688,8 +4688,13 @@ local function createGridButton(parent, name, text, initialState, onChange)
             if newState then startAutoAim() else stopAutoAim() end  
   
         elseif name == "povMode" then
-            config.povEnabled = newState
-            if newState then startPOVLoop() else stopPOVLoop() end
+    local newState = not config.povEnabled
+    config.povEnabled = newState
+    if newState then
+        startPOVLoop()
+    else
+        stopPOVLoop()
+    end
     return
   
         updateState(newState)  
@@ -5312,9 +5317,9 @@ local function restoreFeatureStates()
         stopESP()
     end
     
-    if config.povEnabled and not povConnection then
+    if config.povEnabled then
         startPOVLoop()
-    elseif not config.povEnabled and povConnection then
+    else
         stopPOVLoop()
     end
     

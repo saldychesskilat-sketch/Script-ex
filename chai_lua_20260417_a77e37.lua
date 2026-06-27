@@ -2075,7 +2075,7 @@ local function autoParryLoop()
         loopToggle.Size = UDim2.new(0.85, 0, 0, 24)
         loopToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
         loopToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-        loopToggle.Text = loopingActive and "LOOPING MODE: ON" or "LOOPING MODE: OFF"
+        loopToggle.Text = loopingActive and "Running MODE: ON" or "Running MODE: OFF"
         loopToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
         loopToggle.Font = Enum.Font.GothamBold
         loopToggle.TextSize = 10
@@ -2088,10 +2088,10 @@ local function autoParryLoop()
         loopToggle.MouseButton1Click:Connect(function()
             loopingActive = not loopingActive
             if loopingActive then
-                loopToggle.Text = "LOOPING MODE: ON"
+                loopToggle.Text = "Running MODE: ON"
                 loopToggle.BackgroundColor3 = Color3.fromRGB(0, 140, 200)
             else
-                loopToggle.Text = "LOOPING MODE: OFF"
+                loopToggle.Text = "Running MODE: OFF"
                 loopToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
                 DETECTION_RADIUS = sliderRadius
                 espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)

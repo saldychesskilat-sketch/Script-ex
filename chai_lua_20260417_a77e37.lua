@@ -1669,7 +1669,7 @@ local function autoParryLoop()
     -- Variabel radius yang bisa diubah oleh slider dan mode looping
     local DETECTION_RADIUS = 9.6
     local sliderRadius = 9.6            -- nilai dari slider (1-15)
-    local dynamicRadius = nil           -- nilai radius aktif (bisa dari slider atau mode looping)
+    local loopingActive = false         -- status looping mode
 
     local stateConnections = {}
     local hookedPlayers = {}
@@ -1677,20 +1677,19 @@ local function autoParryLoop()
     -- ========== VARIABEL UNTUK FAKE PARRY ==========
     local fakeParryActive = false
     local fakeParryButton = nil
-    local fakeParryDragConn = nil
     local fakeParryAnimId = "rbxassetid://97915871372697"  -- default animasi pertama
     local selectedAnimIndex = 1
     local ANIMATION_LIST = {
-        "Parry 1",  -- placeholder, nanti diisi dengan ID asli
+        "Parry 1",
         "Parry 2",
         "Parry 3",
         "Parry 4"
     }
     local ANIMATION_IDS = {
         "rbxassetid://97915871372697",   -- ganti dengan ID asli
-        "rbxassetid://97915871372697",
-        "rbxassetid://97915871372697",
-        "rbxassetid://97915871372697"
+        "rbxassetid://97915871372698",
+        "rbxassetid://97915871372699",
+        "rbxassetid://97915871372700"
     }
 
     -- ========== FUNGSI UNTUK MEMUTAR ANIMASI PARRY PADA LOCALPLAYER ==========
@@ -1906,8 +1905,9 @@ local function autoParryLoop()
         gui.Parent = game.CoreGui
 
         local frame = Instance.new("Frame")
+        -- Posisi tetap di sisi kanan, sejajar dengan fake button, di atasnya 20 pixel
         frame.Size = UDim2.new(0, 240, 0, 280)
-        frame.Position = UDim2.new(0.5, -120, 0.5, -140)
+        frame.Position = UDim2.new(0.85, -120, 0.5, -160)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.1
         frame.BorderSizePixel = 0
@@ -2015,14 +2015,16 @@ local function autoParryLoop()
                 local px = math.clamp(rel * w, tw/2, w - tw/2)
                 radThumb.Position = UDim2.new(0, px - tw/2, 0.5, -tw/2)
             end
-            -- update radius aktif
-            if not dynamicRadius then
+            if not loopingActive then
                 DETECTION_RADIUS = val
-                -- Update ESP
                 espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
                 ringLight.Range = DETECTION_RADIUS * 1.5
             end
         end
+
+        -- Inisialisasi posisi thumb setelah layout siap
+        task.wait(0.05)
+        updateRadUI(sliderRadius)
 
         local function onRadDrag(mouseX)
             local bgX = radBg.AbsolutePosition.X
@@ -2066,7 +2068,7 @@ local function autoParryLoop()
         loopToggle.Size = UDim2.new(0.85, 0, 0, 24)
         loopToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
         loopToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-        loopToggle.Text = "LOOPING MODE: OFF"
+        loopToggle.Text = loopingActive and "LOOPING MODE: ON" or "LOOPING MODE: OFF"
         loopToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
         loopToggle.Font = Enum.Font.GothamBold
         loopToggle.TextSize = 10
@@ -2076,19 +2078,14 @@ local function autoParryLoop()
         loopCorner.CornerRadius = UDim.new(0, 4)
         loopCorner.Parent = loopToggle
 
-        local loopingActive = false
         loopToggle.MouseButton1Click:Connect(function()
             loopingActive = not loopingActive
             if loopingActive then
                 loopToggle.Text = "LOOPING MODE: ON"
                 loopToggle.BackgroundColor3 = Color3.fromRGB(0, 140, 200)
-                dynamicRadius = true
-                -- langsung update radius berdasarkan jarak killer terdekat di main loop
             else
                 loopToggle.Text = "LOOPING MODE: OFF"
                 loopToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-                dynamicRadius = nil
-                -- kembali ke slider
                 DETECTION_RADIUS = sliderRadius
                 espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
                 ringLight.Range = DETECTION_RADIUS * 1.5
@@ -2102,7 +2099,7 @@ local function autoParryLoop()
         fakeToggle.Size = UDim2.new(0.85, 0, 0, 24)
         fakeToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
         fakeToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-        fakeToggle.Text = "FAKE PARRY: OFF"
+        fakeToggle.Text = fakeParryActive and "FAKE PARRY: ON" or "FAKE PARRY: OFF"
         fakeToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
         fakeToggle.Font = Enum.Font.GothamBold
         fakeToggle.TextSize = 10
@@ -2113,29 +2110,24 @@ local function autoParryLoop()
         fakeCorner.Parent = fakeToggle
 
         local fakeActive = false
-        -- Fungsi untuk membuat tombol bulat fake parry
         local function createFakeParryButton()
             if fakeParryButton then
                 fakeParryButton:Destroy()
                 fakeParryButton = nil
-                if fakeParryDragConn then
-                    fakeParryDragConn:Disconnect()
-                    fakeParryDragConn = nil
-                end
             end
             if not fakeActive then return end
 
             local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(0, 44, 0, 44)
-            btn.Position = UDim2.new(0.5, -22, 0.8, 0)
+            btn.Size = UDim2.new(0, 60, 0, 60)
+            btn.Position = UDim2.new(0.9, -30, 0.5, -30)
             btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
             btn.BackgroundTransparency = 0.2
             btn.BorderSizePixel = 0
             btn.Text = "P"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
             btn.Font = Enum.Font.GothamBold
-            btn.TextSize = 18
-            btn.Parent = parryConfigGui  -- taruh di GUI utama agar ikut hancur
+            btn.TextSize = 24
+            btn.Parent = gui
             local btnCorner = Instance.new("UICorner")
             btnCorner.CornerRadius = UDim.new(1, 0)
             btnCorner.Parent = btn
@@ -2147,30 +2139,6 @@ local function autoParryLoop()
 
             fakeParryButton = btn
 
-            -- Drag
-            local dragging = false
-            local dragStart, frameStart
-            btn.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    dragging = true
-                    dragStart = input.Position
-                    frameStart = btn.Position
-                end
-            end)
-            fakeParryDragConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
-                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    local delta = input.Position - dragStart
-                    btn.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
-                end
-            end)
-            local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    dragging = false
-                end
-            end)
-            table.insert(stateConnections, endConn)
-
-            -- Klik: play animasi sesuai pilihan
             btn.MouseButton1Click:Connect(function()
                 playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
             end)
@@ -2189,10 +2157,6 @@ local function autoParryLoop()
                 if fakeParryButton then
                     fakeParryButton:Destroy()
                     fakeParryButton = nil
-                    if fakeParryDragConn then
-                        fakeParryDragConn:Disconnect()
-                        fakeParryDragConn = nil
-                    end
                 end
             end
         end)
@@ -2214,7 +2178,7 @@ local function autoParryLoop()
         dropBtn.Size = UDim2.new(1, -4, 1, -4)
         dropBtn.Position = UDim2.new(0, 2, 0, 2)
         dropBtn.BackgroundTransparency = 1
-        dropBtn.Text = "Parry 1"
+        dropBtn.Text = ANIMATION_LIST[selectedAnimIndex]
         dropBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
         dropBtn.Font = Enum.Font.GothamBold
         dropBtn.TextSize = 10
@@ -2244,12 +2208,12 @@ local function autoParryLoop()
             end
             for i, name in ipairs(ANIMATION_LIST) do
                 local opt = Instance.new("TextButton")
-                opt.Size = UDim2.new(1, -4, 0, 20)
+                opt.Size = UDim2.new(1, -4, 0, 18)
                 opt.BackgroundColor3 = (i == selectedAnimIndex) and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(20, 30, 45)
                 opt.Text = name
                 opt.TextColor3 = (i == selectedAnimIndex) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
                 opt.Font = Enum.Font.Gotham
-                opt.TextSize = 10
+                opt.TextSize = 9
                 opt.BorderSizePixel = 0
                 opt.Parent = dropdownList
                 opt.MouseButton1Click:Connect(function()
@@ -2258,10 +2222,9 @@ local function autoParryLoop()
                     fakeParryAnimId = ANIMATION_IDS[i]
                     dropdownList.Visible = false
                     dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
-                    -- jika fake parry aktif, update animasi untuk klik selanjutnya
                 end)
             end
-            local totalHeight = #ANIMATION_LIST * 22 + 4
+            local totalHeight = #ANIMATION_LIST * 20 + 4
             dropdownList.Size = UDim2.new(1, 0, 0, totalHeight)
         end
         rebuildDropdown()
@@ -2298,7 +2261,6 @@ local function autoParryLoop()
             hookedPlayers = {}
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             if fakeParryButton then fakeParryButton:Destroy(); fakeParryButton = nil end
-            if fakeParryDragConn then fakeParryDragConn:Disconnect(); fakeParryDragConn = nil end
             return
         end
 
@@ -2312,7 +2274,6 @@ local function autoParryLoop()
 
         -- Update radius dynamic mode (looping)
         if loopingActive then
-            -- cari killer terdekat
             local nearestDist = math.huge
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer and isPlayerKiller(player) then
@@ -2322,20 +2283,21 @@ local function autoParryLoop()
                     end
                 end
             end
-            if nearestDist <= 12 then
-                -- set radius ke jarak killer (minimal 1, maksimal 12)
+            if nearestDist <= 11 then
                 local newRadius = math.clamp(nearestDist, 1, 15)
-                DETECTION_RADIUS = newRadius
-                espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-                ringLight.Range = DETECTION_RADIUS * 1.5
+                if DETECTION_RADIUS ~= newRadius then
+                    DETECTION_RADIUS = newRadius
+                    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+                    ringLight.Range = DETECTION_RADIUS * 1.5
+                end
             else
-                -- kembali ke slider
-                DETECTION_RADIUS = sliderRadius
-                espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-                ringLight.Range = DETECTION_RADIUS * 1.5
+                if DETECTION_RADIUS ~= sliderRadius then
+                    DETECTION_RADIUS = sliderRadius
+                    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+                    ringLight.Range = DETECTION_RADIUS * 1.5
+                end
             end
         else
-            -- pastikan radius sesuai slider
             if DETECTION_RADIUS ~= sliderRadius then
                 DETECTION_RADIUS = sliderRadius
                 espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
@@ -2353,6 +2315,7 @@ local function autoParryLoop()
 
     print("[AutoParry] Animation ID detection with direct distance check + GUI config loaded")
 end
+
         
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

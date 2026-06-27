@@ -1677,7 +1677,7 @@ local function autoParryLoop()
     -- ========== VARIABEL UNTUK FAKE PARRY ==========
     local fakeParryActive = false
     local fakeParryButton = nil
-    local fakeParryAnimId = "rbxassetid://97915871372697"  -- default animasi pertama
+    local fakeParryAnimId = "rbxassetid://123307242865945"  -- default animasi pertama
     local selectedAnimIndex = 1
     local ANIMATION_LIST = {
         "emote default 1",
@@ -1686,10 +1686,10 @@ local function autoParryLoop()
         "medal 4"
     }
     local ANIMATION_IDS = {
-        "rbxassetid://97915871372697",   -- ganti dengan ID asli
+        "rbxassetid://123307242865945",   -- ganti dengan ID asli
         "rbxassetid://97915871372698",
         "rbxassetid://97915871372699",
-        "rbxassetid://97915871372700"
+        "rbxassetid://97915871372697"
     }
 
     -- ========== FUNGSI UNTUK MEMUTAR ANIMASI PARRY PADA LOCALPLAYER ==========

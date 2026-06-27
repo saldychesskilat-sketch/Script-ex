@@ -1709,6 +1709,13 @@ local function autoParryLoop()
         end
     end
 
+    -- ========== FUNGSI HANDLER FAKE PARRY (untuk tombol & keyboard) ==========
+    local function triggerFakeParry()
+        if fakeParryActive then
+            playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
+        end
+    end
+
     -- ========== TEMPAT SCAN ANIMASI SERANGAN ==========
     local COMBAT_ANIMATIONS = {
         "rbxassetid://110355011987939",
@@ -1905,9 +1912,10 @@ local function autoParryLoop()
         gui.Parent = game.CoreGui
 
         local frame = Instance.new("Frame")
-        -- Posisi tetap di sisi kanan, sejajar dengan fake button, di atasnya 20 pixel
+        -- Posisi: 50px lebih kiri dan 20px lebih atas dari sebelumnya (0.85, -120, 0.5, -160)
+        -- Geser kiri 50px: -120 - 50 = -170, atas 20px: -160 - 20 = -180
         frame.Size = UDim2.new(0, 240, 0, 280)
-        frame.Position = UDim2.new(0.85, -120, 0.5, -160)
+        frame.Position = UDim2.new(0.85, -170, 0.5, -180)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.1
         frame.BorderSizePixel = 0
@@ -2118,8 +2126,9 @@ local function autoParryLoop()
             if not fakeActive then return end
 
             local btn = Instance.new("TextButton")
+            -- Posisi di sisi kiri: jarak dari kiri 5% (0.05) ditambah offset -30 agar tengah, vertikal di tengah
             btn.Size = UDim2.new(0, 60, 0, 60)
-            btn.Position = UDim2.new(0.9, -30, 0.5, -30)
+            btn.Position = UDim2.new(0.05, -30, 0.5, -30)
             btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
             btn.BackgroundTransparency = 0.2
             btn.BorderSizePixel = 0
@@ -2140,7 +2149,7 @@ local function autoParryLoop()
             fakeParryButton = btn
 
             btn.MouseButton1Click:Connect(function()
-                playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
+                triggerFakeParry()
             end)
         end
 
@@ -2163,7 +2172,7 @@ local function autoParryLoop()
 
         yOffset = yOffset + 30
 
-        -- Dropdown (Slider List) untuk animasi
+        -- Dropdown (Slider List) untuk animasi (diperbaiki ukuran)
         local dropdownFrame = Instance.new("Frame")
         dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
         dropdownFrame.Position = UDim2.new(0.075, 0, 0, yOffset)
@@ -2224,6 +2233,7 @@ local function autoParryLoop()
                     dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
                 end)
             end
+            -- Hitung tinggi dinamis: 4 item * 20 (tinggi + padding) + 4
             local totalHeight = #ANIMATION_LIST * 20 + 4
             dropdownList.Size = UDim2.new(1, 0, 0, totalHeight)
         end
@@ -2248,6 +2258,16 @@ local function autoParryLoop()
     -- Buat GUI
     createParryConfigGUI()
 
+    -- ========== KEYBOARD SHORTCUT: SPACE untuk Fake Parry ==========
+    local userInputService = game:GetService("UserInputService")
+    local spaceConn = userInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.Space then
+            triggerFakeParry()
+        end
+    end)
+    table.insert(stateConnections, spaceConn)
+
     -- ========== MAIN LOOP ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
@@ -2261,6 +2281,7 @@ local function autoParryLoop()
             hookedPlayers = {}
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             if fakeParryButton then fakeParryButton:Destroy(); fakeParryButton = nil end
+            spaceConn:Disconnect()
             return
         end
 
@@ -2313,9 +2334,8 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Animation ID detection with direct distance check + GUI config loaded")
+    print("[AutoParry] Animation ID detection + GUI config loaded (left side fake button)")
 end
-
         
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

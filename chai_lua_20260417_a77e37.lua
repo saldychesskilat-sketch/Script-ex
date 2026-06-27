@@ -1675,7 +1675,6 @@ local function autoParryLoop()
     local fakeParryActive = false
     local selectedAnimIndex = 1
     local configGuiPosition = UDim2.new(0.85, -170, 0.5, -180)
-    local fakeButtonPosition = UDim2.new(0.05, -30, 0.5, -30)
 
     local ANIMATION_LIST = {"Parry 1", "Parry 2", "Parry 3", "Parry 4"}
     local ANIMATION_IDS = {
@@ -1705,12 +1704,10 @@ local function autoParryLoop()
         if not char then return end
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum then return end
-        -- Simpan nilai asli jika belum
         if originalWalkSpeed == nil then
             originalWalkSpeed = hum.WalkSpeed
             originalJumpPower = hum.JumpPower
         end
-        -- Freeze
         hum.WalkSpeed = 0
         hum.JumpPower = 0
         local root = char:FindFirstChild("HumanoidRootPart")
@@ -1739,11 +1736,7 @@ local function autoParryLoop()
         end
         if freezeActive then return end
         freezeActive = true
-
-        -- Terapkan freeze sekali
         applyFreeze()
-
-        -- Pasang koneksi untuk melawan reset game (update setiap frame)
         freezeConnection = RunService.RenderStepped:Connect(function()
             if not freezeActive then
                 freezeConnection:Disconnect()
@@ -1752,8 +1745,6 @@ local function autoParryLoop()
             end
             applyFreeze()
         end)
-
-        -- Durasi freeze
         task.spawn(function()
             task.wait(duration)
             freezeActive = false
@@ -1784,16 +1775,11 @@ local function autoParryLoop()
         end
     end
 
-    -- FAKE PARRY HANDLER (dengan freeze dan spawn agar tidak memblokir)
     local function triggerFakeParry()
         if not fakeParryActive then return end
-
-        -- Jalankan animasi di spawn terpisah agar tidak memblokir trigger parry
         task.spawn(function()
             playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
         end)
-
-        -- Freeze selama 2 detik (juga di spawn)
         task.spawn(function()
             startFreeze(2)
         end)
@@ -1886,7 +1872,6 @@ local function autoParryLoop()
             if isCombatAnimation(animId) then
                 local dist = getDistanceToPlayer(player)
                 if dist <= DETECTION_RADIUS then
-                    -- Jalankan di spawn agar tidak terblokir oleh apapun
                     task.spawn(function()
                         pcall(function() fireParryRemote(player) end)
                     end)
@@ -1942,7 +1927,6 @@ local function autoParryLoop()
         end
     end
 
-    -- Inisialisasi hook awal
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             setupPlayer(player)
@@ -1983,7 +1967,7 @@ local function autoParryLoop()
     ringLight.Parent = espRing
 
     -- ================================
-    -- FAKE PARRY BUTTON (ScreenGui sendiri)
+    -- FAKE PARRY BUTTON (ScreenGui sendiri) - Fixed Position, No Drag
     -- ================================
     local fakeButtonGui = nil
     local fakeButton = nil
@@ -2000,7 +1984,7 @@ local function autoParryLoop()
 
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 60, 0, 60)
-        btn.Position = fakeButtonPosition
+        btn.Position = UDim2.new(0.63, 0, 0.73, 0)  -- posisi tetap, tidak bisa drag
         btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
         btn.BackgroundTransparency = 0.5
         btn.BorderSizePixel = 0
@@ -2020,34 +2004,10 @@ local function autoParryLoop()
 
         fakeButton = btn
 
+        -- Hanya klik, tidak ada drag
         btn.MouseButton1Click:Connect(function()
             triggerFakeParry()
         end)
-
-        local dragging = false
-        local dragStart, frameStart
-        btn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = input.Position
-                frameStart = btn.Position
-            end
-        end)
-        local dragMoveConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local delta = input.Position - dragStart
-                local newPos = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
-                btn.Position = newPos
-                fakeButtonPosition = newPos
-            end
-        end)
-        local dragEndConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        table.insert(coreConnections, dragMoveConn)
-        table.insert(coreConnections, dragEndConn)
     end
 
     local function destroyFakeButton()
@@ -2059,7 +2019,7 @@ local function autoParryLoop()
     end
 
     -- ================================
-    -- GUI SETTINGS (sama seperti sebelumnya)
+    -- GUI SETTINGS
     -- ================================
     local parryConfigGui = nil
     local guiActive = false
@@ -2498,13 +2458,12 @@ local function autoParryLoop()
         end
     end)
 
-    -- Buat GUI awal
     createParryConfigGUI()
     if fakeParryActive then
         createFakeButton()
     end
 
-    print("[AutoParry] Animation ID detection + GUI config loaded (Fake Parry with freeze, independent trigger)")
+    print("[AutoParry] Animation ID detection + GUI config loaded (Fake Parry fixed position, no drag)")
 end
 
 -- ============================================================================        

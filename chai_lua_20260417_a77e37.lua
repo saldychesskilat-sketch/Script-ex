@@ -1666,32 +1666,36 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    -- ========== STATE VARIABLES (LIFECYCLE INDEPENDENT FROM GUI) ==========
+    -- ================================
+    -- STATE (persistent, tidak bergantung GUI)
+    -- ================================
     local DETECTION_RADIUS = 9.6
     local sliderRadius = 9.6
     local loopingActive = false
     local fakeParryActive = false
     local selectedAnimIndex = 1
+    local configGuiPosition = UDim2.new(0.85, -170, 0.5, -180)  -- posisi terakhir GUI
+    local fakeButtonPosition = UDim2.new(0.05, -30, 0.5, -30)    -- posisi terakhir fake button
+
     local ANIMATION_LIST = {"Parry 1", "Parry 2", "Parry 3", "Parry 4"}
     local ANIMATION_IDS = {
-        "rbxassetid://123307242865945",
+        "rbxassetid://97915871372697",
         "rbxassetid://97915871372698",
         "rbxassetid://97915871372699",
-        "rbxassetid://97915871372697"
+        "rbxassetid://97915871372700"
     }
 
-    -- ========== GUI STATE (PERSISTEN) ==========
-    local configPosition = UDim2.new(0.85, -170, 0.5, -180)  -- default
-    local fakeButtonPosition = UDim2.new(0.05, -30, 0.5, -30) -- default
-    local parryConfigGui = nil
-    local fakeParryScreenGui = nil
-    local fakeParryButton = nil
+    -- ================================
+    -- CONNECTION TABLES
+    -- ================================
+    local coreConnections = {}    -- untuk hook animasi, refresh killers, ESP, shortcut Ctrl
+    local guiConnections = {}     -- untuk GUI slider, toggle, dropdown, drag
 
-    -- ========== CONNECTIONS ==========
-    local stateConnections = {}   -- Auto Parry & Combat Detection
-    local guiConnections = {}     -- GUI specific (will be cleaned on config close)
+    local hookedPlayers = {}
 
-    -- ========== FUNGSI UNTUK MEMUTAR ANIMASI PARRY ==========
+    -- ================================
+    -- CORE FUNCTIONS (tidak berubah)
+    -- ================================
     local function playLocalParryAnimation(animId)
         local char = localPlayer.Character
         if not char then return end
@@ -1714,33 +1718,214 @@ local function autoParryLoop()
         end
     end
 
-    -- ========== FAKE PARRY BUTTON (LIFECYCLE TERPISAH) ==========
-    local function createFakeParryButton()
-        -- Hancurkan yang lama jika ada
-        if fakeParryScreenGui then
-            fakeParryScreenGui:Destroy()
-            fakeParryScreenGui = nil
-            fakeParryButton = nil
+    local COMBAT_ANIMATIONS = {
+        "rbxassetid://110355011987939",
+        "rbxassetid://139369275981139",
+        "rbxassetid://105374834496520",
+        "rbxassetid://111920872708571",
+        "rbxassetid://117042998468241",
+        "rbxassetid://133963973694098",
+        "rbxassetid://129784271201071",
+        "rbxassetid://132817836308238",
+        "rbxassetid://82666958311998",
+        "rbxassetid://130012819736632",
+        "rbxassetid://113255068724446",
+        "rbxassetid://74968262036854",
+        "rbxassetid://122812055447896",
+        "rbxassetid://78935059863801",
+        "rbxassetid://135002183282873",
+        "rbxassetid://121216847022485",
+        "rbxassetid://118907603246885",
+        "rbxassetid://78432063483146"
+    }
+
+    local function isCombatAnimation(animId)
+        for _, id in ipairs(COMBAT_ANIMATIONS) do
+            if animId == id then return true end
         end
+        return false
+    end
+
+    local function getRoot(char)
+        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    end
+
+    local function isPlayerKiller(player)
+        if not player or player == localPlayer then return false end
+        if player.Team then
+            local teamName = player.Team.Name:lower()
+            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                return true
+            end
+        end
+        local char = player.Character
+        if char then
+            local tool = char:FindFirstChildWhichIsA("Tool")
+            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon") or tool.Name:lower():find("blade")) then
+                return true
+            end
+            for _, child in ipairs(char:GetChildren()) do
+                if child.Name:lower():find("scp") then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local function getDistanceToPlayer(player)
+        if not localRootPart or not player or not player.Character then return math.huge end
+        local targetRoot = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
+        if not targetRoot then return math.huge end
+        return (localRootPart.Position - targetRoot.Position).Magnitude
+    end
+
+    -- ========== HOOK ANIMASI ==========
+    local function hookAnimator(player, char)
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if not animator then
+            local waitConn = char.DescendantAdded:Connect(function(obj)
+                if obj:IsA("Animator") and obj.Parent == hum then
+                    waitConn:Disconnect()
+                    hookAnimator(player, char)
+                end
+            end)
+            table.insert(coreConnections, waitConn)
+            return
+        end
+
+        local animConn = animator.AnimationPlayed:Connect(function(track)
+            local anim = track.Animation
+            if not anim then return end
+            local animId = anim.AnimationId
+            if not animId then return end
+
+            if isCombatAnimation(animId) then
+                local dist = getDistanceToPlayer(player)
+                if dist <= DETECTION_RADIUS then
+                    pcall(function() fireParryRemote(player) end)
+                end
+            end
+        end)
+        table.insert(coreConnections, animConn)
+        print("[AutoParry] Animator hooked for", player.Name)
+    end
+
+    local function hookCharacter(player, char)
+        if not isPlayerKiller(player) then return end
+        hookAnimator(player, char)
+    end
+
+    local function setupPlayer(player)
+        if player == localPlayer then return end
+
+        local teamConn = player:GetPropertyChangedSignal("Team"):Connect(function()
+            if isPlayerKiller(player) then
+                print("[AutoParry] Player", player.Name, "became killer. Hooking...")
+                if player.Character then
+                    hookCharacter(player, player.Character)
+                end
+            end
+        end)
+        table.insert(coreConnections, teamConn)
+
+        local charConn = player.CharacterAdded:Connect(function(char)
+            if isPlayerKiller(player) then
+                hookCharacter(player, char)
+            end
+        end)
+        table.insert(coreConnections, charConn)
+
+        if player.Character and isPlayerKiller(player) then
+            hookCharacter(player, player.Character)
+        end
+    end
+
+    local function refreshKillers()
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                if isPlayerKiller(player) then
+                    if not hookedPlayers[player] then
+                        hookedPlayers[player] = true
+                        setupPlayer(player)
+                    end
+                else
+                    hookedPlayers[player] = nil
+                end
+            end
+        end
+    end
+
+    -- Inisialisasi hook awal
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            setupPlayer(player)
+        end
+    end
+
+    local playerConn = Players.PlayerAdded:Connect(function(player)
+        setupPlayer(player)
+    end)
+    table.insert(coreConnections, playerConn)
+
+    local scanConnection = RunService.Heartbeat:Connect(function()
+        refreshKillers()
+    end)
+    table.insert(coreConnections, scanConnection)
+
+    -- ========== ESP ==========
+    if radiusFolder then radiusFolder:Destroy() end
+    radiusFolder = Instance.new("Folder")
+    radiusFolder.Name = "ParryESP"
+    radiusFolder.Parent = workspace
+
+    local espRing = Instance.new("Part")
+    espRing.Name = "RadiusRing"
+    espRing.Shape = Enum.PartType.Cylinder
+    espRing.Material = Enum.Material.Neon
+    espRing.Color = Color3.fromRGB(255, 50, 50)
+    espRing.Transparency = 0.8
+    espRing.Anchored = true
+    espRing.CanCollide = false
+    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+    espRing.Parent = radiusFolder
+
+    local ringLight = Instance.new("PointLight")
+    ringLight.Color = Color3.fromRGB(255, 50, 50)
+    ringLight.Brightness = 2
+    ringLight.Range = DETECTION_RADIUS * 1.5
+    ringLight.Parent = espRing
+
+    -- ================================
+    -- FAKE PARRY BUTTON (ScreenGui sendiri)
+    -- ================================
+    local fakeButtonGui = nil
+    local fakeButton = nil
+
+    local function createFakeButton()
+        if fakeButton then return end
         if not fakeParryActive then return end
 
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "FakeParryButton"
-        gui.ResetOnSpawn = false
-        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        gui.Parent = game.CoreGui
+        -- Buat ScreenGui khusus untuk tombol
+        fakeButtonGui = Instance.new("ScreenGui")
+        fakeButtonGui.Name = "FakeParryButton"
+        fakeButtonGui.ResetOnSpawn = false
+        fakeButtonGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        fakeButtonGui.Parent = game.CoreGui
 
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 60, 0, 60)
-        btn.Position = fakeButtonPosition
+        btn.Position = fakeButtonPosition   -- posisi terakhir
         btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-        btn.BackgroundTransparency = 0.45   -- lebih transparan
+        btn.BackgroundTransparency = 0.5    -- lebih transparan
         btn.BorderSizePixel = 0
         btn.Text = "Ctrl"
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
         btn.Font = Enum.Font.GothamBold
         btn.TextSize = 18
-        btn.Parent = gui
+        btn.Parent = fakeButtonGui
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(1, 0)
         btnCorner.Parent = btn
@@ -1750,10 +1935,14 @@ local function autoParryLoop()
         btnStroke.Transparency = 0.4
         btnStroke.Parent = btn
 
-        fakeParryScreenGui = gui
-        fakeParryButton = btn
+        fakeButton = btn
 
-        -- Drag untuk Fake Button
+        -- Event klik
+        btn.MouseButton1Click:Connect(function()
+            triggerFakeParry()
+        end)
+
+        -- Drag tombol (geser)
         local dragging = false
         local dragStart, frameStart
         btn.InputBegan:Connect(function(input)
@@ -1763,41 +1952,44 @@ local function autoParryLoop()
                 frameStart = btn.Position
             end
         end)
-        local moveConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
+        local dragMoveConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
             if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 local delta = input.Position - dragStart
                 local newPos = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
                 btn.Position = newPos
-                fakeButtonPosition = newPos
+                fakeButtonPosition = newPos  -- simpan posisi
             end
         end)
-        local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+        local dragEndConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 dragging = false
             end
         end)
-        table.insert(guiConnections, moveConn)
-        table.insert(guiConnections, endConn)
-
-        btn.MouseButton1Click:Connect(triggerFakeParry)
+        -- Simpan koneksi drag agar bisa di-disconnect saat fake dimatikan
+        table.insert(coreConnections, dragMoveConn)
+        table.insert(coreConnections, dragEndConn)
     end
 
-    local function destroyFakeParryButton()
-        if fakeParryScreenGui then
-            fakeParryScreenGui:Destroy()
-            fakeParryScreenGui = nil
-            fakeParryButton = nil
+    local function destroyFakeButton()
+        if fakeButtonGui then
+            fakeButtonGui:Destroy()
+            fakeButtonGui = nil
+            fakeButton = nil
         end
     end
 
-    -- ========== GUI CONFIG (LIFECYCLE TERPISAH) ==========
+    -- ================================
+    -- GUI SETTINGS (dapat ditutup tanpa mempengaruhi state)
+    -- ================================
+    local parryConfigGui = nil
+    local guiActive = false
+
     local function createParryConfigGUI()
-        if parryConfigGui then parryConfigGui:Destroy() end
-        -- Hapus koneksi GUI lama
-        for _, conn in ipairs(guiConnections) do
-            pcall(function() conn:Disconnect() end)
+        if parryConfigGui then
+            -- Jika sudah ada, hanya tampilkan kembali (jika disembunyikan)
+            parryConfigGui.Enabled = true
+            return
         end
-        guiConnections = {}
 
         local gui = Instance.new("ScreenGui")
         gui.Name = "AutoParryConfig"
@@ -1807,7 +1999,7 @@ local function autoParryLoop()
 
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(0, 240, 0, 280)
-        frame.Position = configPosition
+        frame.Position = configGuiPosition  -- pakai posisi terakhir
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.1
         frame.BorderSizePixel = 0
@@ -1821,7 +2013,7 @@ local function autoParryLoop()
         stroke.Transparency = 0.4
         stroke.Parent = frame
 
-        -- Header
+        -- Header (untuk drag)
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 24)
         header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
@@ -1846,7 +2038,34 @@ local function autoParryLoop()
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Parent = header
 
-        -- Tombol close (hanya tutup GUI, tidak matikan fitur)
+        -- Drag GUI (geser)
+        local function startDrag(input)
+            local dragConn = game:GetService("UserInputService").InputChanged:Connect(function(inp)
+                if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
+                    local delta = inp.Position - input.Position
+                    local newX = frame.Position.X.Offset + delta.X
+                    local newY = frame.Position.Y.Offset + delta.Y
+                    frame.Position = UDim2.new(frame.Position.X.Scale, newX, frame.Position.Y.Scale, newY)
+                    configGuiPosition = frame.Position
+                end
+            end)
+            local endConn = game:GetService("UserInputService").InputEnded:Connect(function(inp)
+                if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+                    dragConn:Disconnect()
+                    endConn:Disconnect()
+                end
+            end)
+            table.insert(guiConnections, dragConn)
+            table.insert(guiConnections, endConn)
+        end
+
+        header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                startDrag(input)
+            end
+        end)
+
+        -- Tombol close (hanya tutup GUI, tidak reset state)
         local closeBtn = Instance.new("TextButton")
         closeBtn.Size = UDim2.new(0, 20, 0, 20)
         closeBtn.Position = UDim2.new(1, -24, 0.5, -10)
@@ -1860,45 +2079,18 @@ local function autoParryLoop()
         local closeCorner = Instance.new("UICorner")
         closeCorner.CornerRadius = UDim.new(0, 4)
         closeCorner.Parent = closeBtn
+
         closeBtn.MouseButton1Click:Connect(function()
-            if parryConfigGui then
-                parryConfigGui:Destroy()
-                parryConfigGui = nil
-            end
-            -- Hapus koneksi GUI
+            -- Hanya hancurkan GUI, jangan sentuh state
+            parryConfigGui:Destroy()
+            parryConfigGui = nil
             for _, conn in ipairs(guiConnections) do
                 pcall(function() conn:Disconnect() end)
             end
             guiConnections = {}
         end)
 
-        -- Drag untuk Config GUI
-        local dragging = false
-        local dragStart, frameStart
-        header.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = input.Position
-                frameStart = frame.Position
-            end
-        end)
-        local dragMove = game:GetService("UserInputService").InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local delta = input.Position - dragStart
-                local newPos = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
-                frame.Position = newPos
-                configPosition = newPos
-            end
-        end)
-        local dragEnd = game:GetService("UserInputService").InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        table.insert(guiConnections, dragMove)
-        table.insert(guiConnections, dragEnd)
-
-        -- Konten
+        -- ===== KONTEN GUI =====
         local yOffset = 30
 
         -- Slider Radius
@@ -1953,6 +2145,7 @@ local function autoParryLoop()
             end
         end
 
+        -- Inisialisasi posisi thumb
         task.wait(0.05)
         updateRadUI(sliderRadius)
 
@@ -1966,29 +2159,34 @@ local function autoParryLoop()
             updateRadUI(val)
         end
 
-        radThumb.InputBegan:Connect(function(input)
+        local radThumbConn = radThumb.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingRad = true
                 onRadDrag(input.Position.X)
             end
         end)
-        radBg.InputBegan:Connect(function(input)
+        table.insert(guiConnections, radThumbConn)
+
+        local radBgConn = radBg.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingRad = true
                 onRadDrag(input.Position.X)
             end
         end)
+        table.insert(guiConnections, radBgConn)
+
         local radMove = RunService.RenderStepped:Connect(function()
             if draggingRad then
                 onRadDrag(game:GetService("UserInputService"):GetMouseLocation().X)
             end
         end)
+        table.insert(guiConnections, radMove)
+
         local radEnd = game:GetService("UserInputService").InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingRad = false
             end
         end)
-        table.insert(guiConnections, radMove)
         table.insert(guiConnections, radEnd)
 
         yOffset = yOffset + 20
@@ -1997,7 +2195,7 @@ local function autoParryLoop()
         local loopToggle = Instance.new("TextButton")
         loopToggle.Size = UDim2.new(0.85, 0, 0, 24)
         loopToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
-        loopToggle.BackgroundColor3 = loopingActive and Color3.fromRGB(0, 140, 200) or Color3.fromRGB(30, 40, 60)
+        loopToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
         loopToggle.Text = loopingActive and "LOOPING MODE: ON" or "LOOPING MODE: OFF"
         loopToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
         loopToggle.Font = Enum.Font.GothamBold
@@ -2008,7 +2206,7 @@ local function autoParryLoop()
         loopCorner.CornerRadius = UDim.new(0, 4)
         loopCorner.Parent = loopToggle
 
-        loopToggle.MouseButton1Click:Connect(function()
+        local loopToggleConn = loopToggle.MouseButton1Click:Connect(function()
             loopingActive = not loopingActive
             if loopingActive then
                 loopToggle.Text = "LOOPING MODE: ON"
@@ -2021,6 +2219,7 @@ local function autoParryLoop()
                 ringLight.Range = DETECTION_RADIUS * 1.5
             end
         end)
+        table.insert(guiConnections, loopToggleConn)
 
         yOffset = yOffset + 30
 
@@ -2028,7 +2227,7 @@ local function autoParryLoop()
         local fakeToggle = Instance.new("TextButton")
         fakeToggle.Size = UDim2.new(0.85, 0, 0, 24)
         fakeToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
-        fakeToggle.BackgroundColor3 = fakeParryActive and Color3.fromRGB(0, 140, 200) or Color3.fromRGB(30, 40, 60)
+        fakeToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
         fakeToggle.Text = fakeParryActive and "FAKE PARRY: ON" or "FAKE PARRY: OFF"
         fakeToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
         fakeToggle.Font = Enum.Font.GothamBold
@@ -2039,18 +2238,19 @@ local function autoParryLoop()
         fakeCorner.CornerRadius = UDim.new(0, 4)
         fakeCorner.Parent = fakeToggle
 
-        fakeToggle.MouseButton1Click:Connect(function()
+        local fakeToggleConn = fakeToggle.MouseButton1Click:Connect(function()
             fakeParryActive = not fakeParryActive
             if fakeParryActive then
                 fakeToggle.Text = "FAKE PARRY: ON"
                 fakeToggle.BackgroundColor3 = Color3.fromRGB(0, 140, 200)
-                createFakeParryButton()
+                createFakeButton()
             else
                 fakeToggle.Text = "FAKE PARRY: OFF"
                 fakeToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-                destroyFakeParryButton()
+                destroyFakeButton()
             end
         end)
+        table.insert(guiConnections, fakeToggleConn)
 
         yOffset = yOffset + 30
 
@@ -2114,6 +2314,7 @@ local function autoParryLoop()
                 opt.MouseButton1Click:Connect(function()
                     selectedAnimIndex = i
                     dropBtn.Text = name
+                    fakeParryAnimId = ANIMATION_IDS[i]
                     dropdownList.Visible = false
                 end)
             end
@@ -2122,209 +2323,24 @@ local function autoParryLoop()
         end
         rebuildDropdown()
 
-        dropBtn.MouseButton1Click:Connect(function()
+        local dropToggleConn = dropBtn.MouseButton1Click:Connect(function()
             dropdownList.Visible = not dropdownList.Visible
             if dropdownList.Visible then
                 rebuildDropdown()
             end
         end)
+        table.insert(guiConnections, dropToggleConn)
 
         yOffset = yOffset + 30
         frame.Size = UDim2.new(0, 240, 0, yOffset + 10)
 
         parryConfigGui = gui
-        return gui
+        guiActive = true
     end
 
-    -- ========== COMBAT ANIMATIONS ==========
-    local COMBAT_ANIMATIONS = {
-        "rbxassetid://110355011987939",
-        "rbxassetid://139369275981139",
-        "rbxassetid://105374834496520",
-        "rbxassetid://111920872708571",
-        "rbxassetid://117042998468241",
-        "rbxassetid://133963973694098",
-        "rbxassetid://129784271201071",
-        "rbxassetid://132817836308238",
-        "rbxassetid://82666958311998",
-        "rbxassetid://130012819736632",
-        "rbxassetid://113255068724446",
-        "rbxassetid://74968262036854",
-        "rbxassetid://122812055447896",
-        "rbxassetid://78935059863801",
-        "rbxassetid://135002183282873",
-        "rbxassetid://121216847022485",
-        "rbxassetid://118907603246885",
-        "rbxassetid://78432063483146"
-    }
-
-    local function isCombatAnimation(animId)
-        for _, id in ipairs(COMBAT_ANIMATIONS) do
-            if animId == id then return true end
-        end
-        return false
-    end
-
-    -- ========== FUNGSI PEMBANTU ==========
-    local function getRoot(char)
-        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-    end
-
-    local function isPlayerKiller(player)
-        if not player or player == localPlayer then return false end
-        if player.Team then
-            local teamName = player.Team.Name:lower()
-            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                return true
-            end
-        end
-        local char = player.Character
-        if char then
-            local tool = char:FindFirstChildWhichIsA("Tool")
-            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon") or tool.Name:lower():find("blade")) then
-                return true
-            end
-            for _, child in ipairs(char:GetChildren()) do
-                if child.Name:lower():find("scp") then
-                    return true
-                end
-            end
-        end
-        return false
-    end
-
-    local function getDistanceToPlayer(player)
-        if not localRootPart or not player or not player.Character then return math.huge end
-        local targetRoot = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
-        if not targetRoot then return math.huge end
-        return (localRootPart.Position - targetRoot.Position).Magnitude
-    end
-
-    -- ========== HOOK ANIMASI ==========
-    local function hookAnimator(player, char)
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hum then return end
-        local animator = hum:FindFirstChildOfClass("Animator")
-        if not animator then
-            local waitConn = char.DescendantAdded:Connect(function(obj)
-                if obj:IsA("Animator") and obj.Parent == hum then
-                    waitConn:Disconnect()
-                    hookAnimator(player, char)
-                end
-            end)
-            table.insert(stateConnections, waitConn)
-            return
-        end
-
-        local animConn = animator.AnimationPlayed:Connect(function(track)
-            local anim = track.Animation
-            if not anim then return end
-            local animId = anim.AnimationId
-            if not animId then return end
-
-            if isCombatAnimation(animId) then
-                local dist = getDistanceToPlayer(player)
-                if dist <= DETECTION_RADIUS then
-                    pcall(function() fireParryRemote(player) end)
-                end
-            end
-        end)
-        table.insert(stateConnections, animConn)
-        print("[AutoParry] Animator hooked for", player.Name)
-    end
-
-    local function hookCharacter(player, char)
-        if not isPlayerKiller(player) then return end
-        hookAnimator(player, char)
-    end
-
-    -- ========== SETUP PLAYER ==========
-    local function setupPlayer(player)
-        if player == localPlayer then return end
-
-        local teamConn = player:GetPropertyChangedSignal("Team"):Connect(function()
-            if isPlayerKiller(player) then
-                print("[AutoParry] Player", player.Name, "became killer. Hooking...")
-                if player.Character then
-                    hookCharacter(player, player.Character)
-                end
-            end
-        end)
-        table.insert(stateConnections, teamConn)
-
-        local charConn = player.CharacterAdded:Connect(function(char)
-            if isPlayerKiller(player) then
-                hookCharacter(player, char)
-            end
-        end)
-        table.insert(stateConnections, charConn)
-
-        if player.Character and isPlayerKiller(player) then
-            hookCharacter(player, player.Character)
-        end
-    end
-
-    local function refreshKillers()
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= localPlayer then
-                if isPlayerKiller(player) then
-                    if not hookedPlayers[player] then
-                        hookedPlayers[player] = true
-                        setupPlayer(player)
-                    end
-                else
-                    hookedPlayers[player] = nil
-                end
-            end
-        end
-    end
-
-    -- ========== HOOK PLAYERS ==========
-    local hookedPlayers = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            setupPlayer(player)
-        end
-    end
-
-    local playerConn = Players.PlayerAdded:Connect(function(player)
-        setupPlayer(player)
-    end)
-    table.insert(stateConnections, playerConn)
-
-    local scanConnection = RunService.Heartbeat:Connect(function()
-        refreshKillers()
-    end)
-    table.insert(stateConnections, scanConnection)
-
-    -- ========== ESP ==========
-    if radiusFolder then radiusFolder:Destroy() end
-    radiusFolder = Instance.new("Folder")
-    radiusFolder.Name = "ParryESP"
-    radiusFolder.Parent = workspace
-
-    local espRing = Instance.new("Part")
-    espRing.Name = "RadiusRing"
-    espRing.Shape = Enum.PartType.Cylinder
-    espRing.Material = Enum.Material.Neon
-    espRing.Color = Color3.fromRGB(255, 50, 50)
-    espRing.Transparency = 0.8
-    espRing.Anchored = true
-    espRing.CanCollide = false
-    espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-    espRing.Parent = radiusFolder
-
-    local ringLight = Instance.new("PointLight")
-    ringLight.Color = Color3.fromRGB(255, 50, 50)
-    ringLight.Brightness = 2
-    ringLight.Range = DETECTION_RADIUS * 1.5
-    ringLight.Parent = espRing
-
-    -- ========== INITIAL GUI ==========
-    createParryConfigGUI()
-    if fakeParryActive then createFakeParryButton() end
-
-    -- ========== KEYBOARD SHORTCUT: Ctrl ==========
+    -- ================================
+    -- SHORTCUT Ctrl
+    -- ================================
     local userInputService = game:GetService("UserInputService")
     local ctrlConn = userInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -2332,26 +2348,27 @@ local function autoParryLoop()
             triggerFakeParry()
         end
     end)
-    table.insert(stateConnections, ctrlConn)
+    table.insert(coreConnections, ctrlConn)
 
-    -- ========== MAIN LOOP ==========
+    -- ================================
+    -- MAIN LOOP (ESP & Dynamic Radius)
+    -- ================================
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
         if not config.infiniteAmmoEnabled then
             combatStateConnected = false
             if combatHeartbeat then combatHeartbeat:Disconnect(); combatHeartbeat = nil end
-            for _, conn in ipairs(stateConnections) do
+            for _, conn in ipairs(coreConnections) do
                 pcall(function() conn:Disconnect() end)
             end
             for _, conn in ipairs(guiConnections) do
                 pcall(function() conn:Disconnect() end)
             end
-            stateConnections = {}
+            coreConnections = {}
             guiConnections = {}
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
             hookedPlayers = {}
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
-            destroyFakeParryButton()
-            ctrlConn:Disconnect()
+            destroyFakeButton()
             return
         end
 
@@ -2363,6 +2380,7 @@ local function autoParryLoop()
             end
         end
 
+        -- Dynamic radius (looping)
         if loopingActive then
             local nearestDist = math.huge
             for _, player in ipairs(Players:GetPlayers()) do
@@ -2403,10 +2421,16 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Animation ID detection + GUI improved (independent lifecycle, dragable)")
+    -- Buat GUI awal
+    createParryConfigGUI()
+    -- Jika fakeParryActive sudah true, buat tombol
+    if fakeParryActive then
+        createFakeButton()
+    end
+
+    print("[AutoParry] Animation ID detection + GUI config loaded (refactored, GUI independent)")
 end
 
-     
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

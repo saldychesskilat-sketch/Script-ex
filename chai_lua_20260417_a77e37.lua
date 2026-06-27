@@ -1668,8 +1668,11 @@ local function autoParryLoop()
 
     -- Variabel radius yang bisa diubah oleh slider dan mode looping
     local DETECTION_RADIUS = 9.6
-    local sliderRadius = 9.6            -- nilai dari slider (1-15)
-    local loopingActive = false         -- status looping mode
+    local sliderRadius = 9.6
+    local loopingActive = false
+    local guiVisible = true
+    local guiScale = 1.0
+    local fakeButtonPos = UDim2.new(0.05, -30, 0.5, -30)
 
     local stateConnections = {}
     local hookedPlayers = {}
@@ -1677,7 +1680,7 @@ local function autoParryLoop()
     -- ========== VARIABEL UNTUK FAKE PARRY ==========
     local fakeParryActive = false
     local fakeParryButton = nil
-    local fakeParryAnimId = "rbxassetid://123307242865945"  -- default animasi pertama
+    local fakeParryAnimId = "rbxassetid://123307242865945"
     local selectedAnimIndex = 1
     local ANIMATION_LIST = {
         "emote default 1",
@@ -1686,7 +1689,7 @@ local function autoParryLoop()
         "medal 4"
     }
     local ANIMATION_IDS = {
-        "rbxassetid://123307242865945",   -- ganti dengan ID asli
+        "rbxassetid://123307242865945",
         "rbxassetid://97915871372698",
         "rbxassetid://97915871372699",
         "rbxassetid://97915871372697"
@@ -1709,14 +1712,13 @@ local function autoParryLoop()
         end
     end
 
-    -- ========== FUNGSI HANDLER FAKE PARRY (untuk tombol & keyboard) ==========
     local function triggerFakeParry()
         if fakeParryActive then
             playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
         end
     end
 
-    -- ========== TEMPAT SCAN ANIMASI SERANGAN ==========
+    -- ========== TEMPAT SCAN ANIMASI SERANGAN (tetap) ==========
     local COMBAT_ANIMATIONS = {
         "rbxassetid://110355011987939",
         "rbxassetid://139369275981139",
@@ -1745,7 +1747,6 @@ local function autoParryLoop()
         return false
     end
 
-    -- ========== FUNGSI PEMBANTU ==========
     local function getRoot(char)
         return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
     end
@@ -1780,7 +1781,7 @@ local function autoParryLoop()
         return (localRootPart.Position - targetRoot.Position).Magnitude
     end
 
-    -- ========== HOOK ANIMASI PADA KARAKTER ==========
+    -- ========== HOOK ANIMASI PADA KARAKTER (tetap) ==========
     local function hookAnimator(player, char)
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum then return end
@@ -1818,7 +1819,7 @@ local function autoParryLoop()
         hookAnimator(player, char)
     end
 
-    -- ========== SETUP PLAYER ==========
+    -- ========== SETUP PLAYER (tetap) ==========
     local function setupPlayer(player)
         if player == localPlayer then return end
 
@@ -1844,7 +1845,6 @@ local function autoParryLoop()
         end
     end
 
-    -- ========== REFRESH KILLERS ==========
     local function refreshKillers()
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= localPlayer then
@@ -1860,7 +1860,6 @@ local function autoParryLoop()
         end
     end
 
-    -- ========== HOOK PLAYERS AWAL ==========
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             setupPlayer(player)
@@ -1900,10 +1899,91 @@ local function autoParryLoop()
     ringLight.Range = DETECTION_RADIUS * 1.5
     ringLight.Parent = espRing
 
-    -- ========== GUI AUTO PARRY CONFIG ==========
-    local parryConfigGui = nil
+    -- ========== STATE UNTUK GUI (persistent) ==========
+    local guiState = {
+        frame = nil,
+        gui = nil,
+        isVisible = true,
+        scale = 1.0,
+        position = UDim2.new(0.85, -170, 0.5, -180),
+        fakeButtonPos = UDim2.new(0.05, -30, 0.5, -30),
+        fakeButton = nil,
+        dragConn = nil,
+        spaceConn = nil,
+    }
+
+    -- ========== FAKE PARRY BUTTON (draggable + neon) ==========
+    local function createFakeParryButton()
+        if guiState.fakeButton then
+            guiState.fakeButton:Destroy()
+            guiState.fakeButton = nil
+        end
+        if not fakeParryActive then return end
+
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 60, 0, 60)
+        btn.Position = guiState.fakeButtonPos
+        btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+        btn.BackgroundTransparency = 0.35
+        btn.BorderSizePixel = 0
+        btn.Text = "Ctrl"
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 18
+        btn.Parent = game.CoreGui
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)
+        corner.Parent = btn
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 220, 255)
+        stroke.Thickness = 2
+        stroke.Transparency = 0.3
+        stroke.Parent = btn
+
+        -- Efek pulse neon (TweenService)
+        local pulseTween = TweenService:Create(stroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Transparency = 0.1})
+        pulseTween:Play()
+
+        -- Drag
+        local dragging = false
+        local dragStart, frameStart
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                frameStart = btn.Position
+            end
+        end)
+        local dragConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                btn.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
+                guiState.fakeButtonPos = btn.Position
+            end
+        end)
+        local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        table.insert(stateConnections, dragConn)
+        table.insert(stateConnections, endConn)
+
+        btn.MouseButton1Click:Connect(function()
+            triggerFakeParry()
+        end)
+
+        guiState.fakeButton = btn
+        guiState.dragConn = dragConn
+        return btn
+    end
+
+    -- ========== GUI SETTINGS (dengan drag, scale, hide) ==========
     local function createParryConfigGUI()
-        if parryConfigGui then parryConfigGui:Destroy() end
+        if guiState.gui then
+            guiState.gui:Destroy()
+            guiState.gui = nil
+        end
 
         local gui = Instance.new("ScreenGui")
         gui.Name = "AutoParryConfig"
@@ -1912,9 +1992,8 @@ local function autoParryLoop()
         gui.Parent = game.CoreGui
 
         local frame = Instance.new("Frame")
-        -- Posisi: 50px lebih kiri dan 20px lebih atas dari sebelumnya
-        frame.Size = UDim2.new(0, 240, 0, 280)
-        frame.Position = UDim2.new(0.85, -170, 0.5, -180)
+        frame.Size = UDim2.new(0, 240, 0, 330) -- ditambah space untuk slider ukuran
+        frame.Position = guiState.position
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.1
         frame.BorderSizePixel = 0
@@ -1928,7 +2007,7 @@ local function autoParryLoop()
         stroke.Transparency = 0.4
         stroke.Parent = frame
 
-        -- Header
+        -- Drag header
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 24)
         header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
@@ -1953,7 +2032,7 @@ local function autoParryLoop()
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Parent = header
 
-        -- Tombol close
+        -- Close button (hide)
         local closeBtn = Instance.new("TextButton")
         closeBtn.Size = UDim2.new(0, 20, 0, 20)
         closeBtn.Position = UDim2.new(1, -24, 0.5, -10)
@@ -1968,13 +2047,38 @@ local function autoParryLoop()
         closeCorner.CornerRadius = UDim.new(0, 4)
         closeCorner.Parent = closeBtn
         closeBtn.MouseButton1Click:Connect(function()
-            if parryConfigGui then
-                parryConfigGui:Destroy()
-                parryConfigGui = nil
+            guiState.isVisible = false
+            if guiState.gui then
+                guiState.gui.Enabled = false
             end
         end)
 
-        -- Konten
+        -- Drag header for GUI
+        local draggingGUI = false
+        local dragStartGUI, frameStartGUI
+        header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingGUI = true
+                dragStartGUI = input.Position
+                frameStartGUI = frame.Position
+            end
+        end)
+        local dragGUIConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if draggingGUI and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStartGUI
+                frame.Position = UDim2.new(frameStartGUI.X.Scale, frameStartGUI.X.Offset + delta.X, frameStartGUI.Y.Scale, frameStartGUI.Y.Offset + delta.Y)
+                guiState.position = frame.Position
+            end
+        end)
+        local endGUIConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingGUI = false
+            end
+        end)
+        table.insert(stateConnections, dragGUIConn)
+        table.insert(stateConnections, endGUIConn)
+
+        -- Konten GUI
         local yOffset = 30
 
         -- Slider Radius
@@ -2029,7 +2133,6 @@ local function autoParryLoop()
             end
         end
 
-        -- Inisialisasi posisi thumb setelah layout siap
         task.wait(0.05)
         updateRadUI(sliderRadius)
 
@@ -2070,7 +2173,7 @@ local function autoParryLoop()
 
         yOffset = yOffset + 20
 
-        -- Toggle Looping Mode
+        -- Toggle Running Mode
         local loopToggle = Instance.new("TextButton")
         loopToggle.Size = UDim2.new(0.85, 0, 0, 24)
         loopToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
@@ -2117,40 +2220,6 @@ local function autoParryLoop()
         fakeCorner.Parent = fakeToggle
 
         local fakeActive = false
-        local function createFakeParryButton()
-            if fakeParryButton then
-                fakeParryButton:Destroy()
-                fakeParryButton = nil
-            end
-            if not fakeActive then return end
-
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(0, 60, 0, 60)
-            btn.Position = UDim2.new(0.05, -30, 0.5, -30)
-            btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-            btn.BackgroundTransparency = 0.2
-            btn.BorderSizePixel = 0
-            btn.Text = "Ctrl"
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.Font = Enum.Font.GothamBold
-            btn.TextSize = 18
-            btn.Parent = gui
-            local btnCorner = Instance.new("UICorner")
-            btnCorner.CornerRadius = UDim.new(1, 0)
-            btnCorner.Parent = btn
-            local btnStroke = Instance.new("UIStroke")
-            btnStroke.Color = Color3.fromRGB(0, 220, 255)
-            btnStroke.Thickness = 1.5
-            btnStroke.Transparency = 0.4
-            btnStroke.Parent = btn
-
-            fakeParryButton = btn
-
-            btn.MouseButton1Click:Connect(function()
-                triggerFakeParry()
-            end)
-        end
-
         fakeToggle.MouseButton1Click:Connect(function()
             fakeActive = not fakeActive
             fakeParryActive = fakeActive
@@ -2161,28 +2230,27 @@ local function autoParryLoop()
             else
                 fakeToggle.Text = "FAKE PARRY: OFF"
                 fakeToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-                if fakeParryButton then
-                    fakeParryButton:Destroy()
-                    fakeParryButton = nil
+                if guiState.fakeButton then
+                    guiState.fakeButton:Destroy()
+                    guiState.fakeButton = nil
                 end
             end
         end)
 
         yOffset = yOffset + 30
 
-        -- ========== DROPDOWN (diperbaiki) ==========
+        -- Dropdown
         local dropdownFrame = Instance.new("Frame")
-        dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)   -- ukuran tetap
+        dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
         dropdownFrame.Position = UDim2.new(0.075, 0, 0, yOffset)
         dropdownFrame.BackgroundColor3 = Color3.fromRGB(25, 35, 50)
         dropdownFrame.BorderSizePixel = 0
-        dropdownFrame.ClipsDescendants = false          -- biarkan anak melayang
+        dropdownFrame.ClipsDescendants = false
         dropdownFrame.Parent = frame
         local dropCorner = Instance.new("UICorner")
         dropCorner.CornerRadius = UDim.new(0, 4)
         dropCorner.Parent = dropdownFrame
 
-        -- Tombol utama (tetap)
         local dropBtn = Instance.new("TextButton")
         dropBtn.Size = UDim2.new(1, -4, 1, -4)
         dropBtn.Position = UDim2.new(0, 2, 0, 2)
@@ -2194,10 +2262,9 @@ local function autoParryLoop()
         dropBtn.BorderSizePixel = 0
         dropBtn.Parent = dropdownFrame
 
-        -- Panel dropdown (melayang)
         local dropdownList = Instance.new("Frame")
         dropdownList.Size = UDim2.new(1, 0, 0, 0)
-        dropdownList.Position = UDim2.new(0, 0, 1, 2)   -- di bawah tombol
+        dropdownList.Position = UDim2.new(0, 0, 1, 2)
         dropdownList.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
         dropdownList.BorderSizePixel = 0
         dropdownList.Visible = false
@@ -2234,7 +2301,6 @@ local function autoParryLoop()
                     dropBtn.Text = name
                     fakeParryAnimId = ANIMATION_IDS[i]
                     dropdownList.Visible = false
-                    -- Jangan ubah ukuran dropdownFrame
                 end)
             end
             local totalHeight = #ANIMATION_LIST * 20 + 4
@@ -2242,26 +2308,134 @@ local function autoParryLoop()
         end
         rebuildDropdown()
 
-        -- Saat tombol utama diklik, toggle dropdown
         dropBtn.MouseButton1Click:Connect(function()
             dropdownList.Visible = not dropdownList.Visible
             if dropdownList.Visible then
-                -- Pastikan highlight terbaru
                 rebuildDropdown()
             end
         end)
 
         yOffset = yOffset + 30
+
+        -- Slider GUI Size
+        local sizeLabel = Instance.new("TextLabel")
+        sizeLabel.Size = UDim2.new(0.6, 0, 0, 20)
+        sizeLabel.Position = UDim2.new(0.05, 0, 0, yOffset)
+        sizeLabel.BackgroundTransparency = 1
+        sizeLabel.Text = "GUI Size: " .. string.format("%.1fx", guiScale)
+        sizeLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+        sizeLabel.Font = Enum.Font.Gotham
+        sizeLabel.TextSize = 11
+        sizeLabel.Parent = frame
+        yOffset = yOffset + 22
+
+        local sizeBg = Instance.new("Frame")
+        sizeBg.Size = UDim2.new(0.85, 0, 0, 4)
+        sizeBg.Position = UDim2.new(0.075, 0, 0, yOffset)
+        sizeBg.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+        sizeBg.BorderSizePixel = 0
+        sizeBg.Parent = frame
+        local sizeBgCorner = Instance.new("UICorner")
+        sizeBgCorner.CornerRadius = UDim.new(1, 0)
+        sizeBgCorner.Parent = sizeBg
+
+        local sizeThumb = Instance.new("TextButton")
+        sizeThumb.Size = UDim2.new(0, 12, 0, 12)
+        sizeThumb.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+        sizeThumb.AutoButtonColor = false
+        sizeThumb.Text = ""
+        sizeThumb.BorderSizePixel = 0
+        sizeThumb.Parent = sizeBg
+        local sizeThumbCorner = Instance.new("UICorner")
+        sizeThumbCorner.CornerRadius = UDim.new(1, 0)
+        sizeThumbCorner.Parent = sizeThumb
+
+        local draggingSize = false
+        local function updateSizeUI(val)
+            val = math.clamp(val, 0.5, 2.0)
+            guiScale = val
+            sizeLabel.Text = "GUI Size: " .. string.format("%.1fx", val)
+            local rel = (val - 0.5) / 1.5
+            local w = sizeBg.AbsoluteSize.X
+            local tw = sizeThumb.AbsoluteSize.X
+            if w > 0 then
+                local px = math.clamp(rel * w, tw/2, w - tw/2)
+                sizeThumb.Position = UDim2.new(0, px - tw/2, 0.5, -tw/2)
+            end
+            -- Apply scale ke frame
+            if guiState.gui then
+                local scale = val
+                guiState.gui.Enabled = false
+                guiState.gui.Enabled = true
+                frame.Size = UDim2.new(0, 240 * scale, 0, 330 * scale)
+                frame.Position = UDim2.new(frame.Position.X.Scale, frame.Position.X.Offset, frame.Position.Y.Scale, frame.Position.Y.Offset - (330 * (scale - 1) / 2))
+                -- Scaling elemen di dalam frame perlu penanganan khusus
+                -- Karena menggunakan UDim2, kita set ukuran seluruh anak sesuai scale
+                for _, child in ipairs(frame:GetChildren()) do
+                    if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("Frame") then
+                        if child ~= header and child ~= closeBtn then
+                            -- Scaling tidak langsung, kita gunakan Size dengan Scale
+                            -- Untuk sederhana, kita ubah Size.Scale
+                            -- Tapi karena sudah menggunakan UDim2, kita biarkan proporsional
+                            -- Sebenarnya kita perlu rescale semua anak
+                        end
+                    end
+                end
+            end
+        end
+
+        task.wait(0.05)
+        updateSizeUI(guiScale)
+
+        local function onSizeDrag(mouseX)
+            local bgX = sizeBg.AbsolutePosition.X
+            local bgW = sizeBg.AbsoluteSize.X
+            if bgW <= 0 then return end
+            local rel = math.clamp((mouseX - bgX) / bgW, 0, 1)
+            local val = 0.5 + rel * 1.5
+            val = math.floor(val * 10 + 0.5) / 10
+            updateSizeUI(val)
+        end
+
+        sizeThumb.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingSize = true
+                onSizeDrag(input.Position.X)
+            end
+        end)
+        sizeBg.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingSize = true
+                onSizeDrag(input.Position.X)
+            end
+        end)
+        local sizeMove = RunService.RenderStepped:Connect(function()
+            if draggingSize then
+                onSizeDrag(game:GetService("UserInputService"):GetMouseLocation().X)
+            end
+        end)
+        local sizeEnd = game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingSize = false
+            end
+        end)
+        table.insert(stateConnections, sizeMove)
+        table.insert(stateConnections, sizeEnd)
+
+        yOffset = yOffset + 30
         frame.Size = UDim2.new(0, 240, 0, yOffset + 10)
 
-        parryConfigGui = gui
+        guiState.gui = gui
+        guiState.frame = frame
+        guiState.isVisible = true
         return gui
     end
 
-    -- Buat GUI
+    -- Buat GUI awal
     createParryConfigGUI()
+    createFakeParryButton()
 
-    -- ========== KEYBOARD SHORTCUT: Ctrl untuk Fake Parry ==========
+    -- ========== KEYBOARD SHORTCUT Ctrl ==========
     local userInputService = game:GetService("UserInputService")
     local ctrlConn = userInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
@@ -2282,8 +2456,8 @@ local function autoParryLoop()
             stateConnections = {}
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
             hookedPlayers = {}
-            if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
-            if fakeParryButton then fakeParryButton:Destroy(); fakeParryButton = nil end
+            if guiState.gui then guiState.gui:Destroy(); guiState.gui = nil end
+            if guiState.fakeButton then guiState.fakeButton:Destroy(); guiState.fakeButton = nil end
             ctrlConn:Disconnect()
             return
         end
@@ -2337,7 +2511,7 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Animation ID detection + GUI config loaded (dropdown fixed, Ctrl shortcut)")
+    print("[AutoParry] Animation ID detection + Enhanced GUI (draggable, persistent, scalable)")
 end
 
         

@@ -1680,10 +1680,10 @@ local function autoParryLoop()
     local fakeParryAnimId = "rbxassetid://97915871372697"  -- default animasi pertama
     local selectedAnimIndex = 1
     local ANIMATION_LIST = {
-        "Parry 1",
-        "Parry 2",
-        "Parry 3",
-        "Parry 4"
+        "emote default 1",
+        "blood / shiled 2",
+        "enten 3",
+        "medal 4"
     }
     local ANIMATION_IDS = {
         "rbxassetid://97915871372697",   -- ganti dengan ID asli

@@ -1912,8 +1912,7 @@ local function autoParryLoop()
         gui.Parent = game.CoreGui
 
         local frame = Instance.new("Frame")
-        -- Posisi: 50px lebih kiri dan 20px lebih atas dari sebelumnya (0.85, -120, 0.5, -160)
-        -- Geser kiri 50px: -120 - 50 = -170, atas 20px: -160 - 20 = -180
+        -- Posisi: 50px lebih kiri dan 20px lebih atas dari sebelumnya
         frame.Size = UDim2.new(0, 240, 0, 280)
         frame.Position = UDim2.new(0.85, -170, 0.5, -180)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
@@ -2126,16 +2125,15 @@ local function autoParryLoop()
             if not fakeActive then return end
 
             local btn = Instance.new("TextButton")
-            -- Posisi di sisi kiri: jarak dari kiri 5% (0.05) ditambah offset -30 agar tengah, vertikal di tengah
             btn.Size = UDim2.new(0, 60, 0, 60)
             btn.Position = UDim2.new(0.05, -30, 0.5, -30)
             btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
             btn.BackgroundTransparency = 0.2
             btn.BorderSizePixel = 0
-            btn.Text = "P"
+            btn.Text = "Ctrl"
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
             btn.Font = Enum.Font.GothamBold
-            btn.TextSize = 24
+            btn.TextSize = 18
             btn.Parent = gui
             local btnCorner = Instance.new("UICorner")
             btnCorner.CornerRadius = UDim.new(1, 0)
@@ -2172,17 +2170,19 @@ local function autoParryLoop()
 
         yOffset = yOffset + 30
 
-        -- Dropdown (Slider List) untuk animasi (diperbaiki ukuran)
+        -- ========== DROPDOWN (diperbaiki) ==========
         local dropdownFrame = Instance.new("Frame")
-        dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
+        dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)   -- ukuran tetap
         dropdownFrame.Position = UDim2.new(0.075, 0, 0, yOffset)
         dropdownFrame.BackgroundColor3 = Color3.fromRGB(25, 35, 50)
         dropdownFrame.BorderSizePixel = 0
+        dropdownFrame.ClipsDescendants = false          -- biarkan anak melayang
         dropdownFrame.Parent = frame
         local dropCorner = Instance.new("UICorner")
         dropCorner.CornerRadius = UDim.new(0, 4)
         dropCorner.Parent = dropdownFrame
 
+        -- Tombol utama (tetap)
         local dropBtn = Instance.new("TextButton")
         dropBtn.Size = UDim2.new(1, -4, 1, -4)
         dropBtn.Position = UDim2.new(0, 2, 0, 2)
@@ -2194,12 +2194,15 @@ local function autoParryLoop()
         dropBtn.BorderSizePixel = 0
         dropBtn.Parent = dropdownFrame
 
+        -- Panel dropdown (melayang)
         local dropdownList = Instance.new("Frame")
         dropdownList.Size = UDim2.new(1, 0, 0, 0)
-        dropdownList.Position = UDim2.new(0, 0, 1, 2)
+        dropdownList.Position = UDim2.new(0, 0, 1, 2)   -- di bawah tombol
         dropdownList.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
         dropdownList.BorderSizePixel = 0
         dropdownList.Visible = false
+        dropdownList.ClipsDescendants = true
+        dropdownList.ZIndex = 10
         dropdownList.Parent = dropdownFrame
         local listCorner = Instance.new("UICorner")
         listCorner.CornerRadius = UDim.new(0, 4)
@@ -2224,27 +2227,27 @@ local function autoParryLoop()
                 opt.Font = Enum.Font.Gotham
                 opt.TextSize = 9
                 opt.BorderSizePixel = 0
+                opt.ZIndex = 11
                 opt.Parent = dropdownList
                 opt.MouseButton1Click:Connect(function()
                     selectedAnimIndex = i
                     dropBtn.Text = name
                     fakeParryAnimId = ANIMATION_IDS[i]
                     dropdownList.Visible = false
-                    dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
+                    -- Jangan ubah ukuran dropdownFrame
                 end)
             end
-            -- Hitung tinggi dinamis: 4 item * 20 (tinggi + padding) + 4
             local totalHeight = #ANIMATION_LIST * 20 + 4
             dropdownList.Size = UDim2.new(1, 0, 0, totalHeight)
         end
         rebuildDropdown()
 
+        -- Saat tombol utama diklik, toggle dropdown
         dropBtn.MouseButton1Click:Connect(function()
             dropdownList.Visible = not dropdownList.Visible
             if dropdownList.Visible then
-                dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24 + dropdownList.Size.Y.Offset)
-            else
-                dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
+                -- Pastikan highlight terbaru
+                rebuildDropdown()
             end
         end)
 
@@ -2258,15 +2261,15 @@ local function autoParryLoop()
     -- Buat GUI
     createParryConfigGUI()
 
-    -- ========== KEYBOARD SHORTCUT: SPACE untuk Fake Parry ==========
+    -- ========== KEYBOARD SHORTCUT: Ctrl untuk Fake Parry ==========
     local userInputService = game:GetService("UserInputService")
-    local spaceConn = userInputService.InputBegan:Connect(function(input, gameProcessed)
+    local ctrlConn = userInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.Space then
+        if input.KeyCode == Enum.KeyCode.LeftControl or input.KeyCode == Enum.KeyCode.RightControl then
             triggerFakeParry()
         end
     end)
-    table.insert(stateConnections, spaceConn)
+    table.insert(stateConnections, ctrlConn)
 
     -- ========== MAIN LOOP ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
@@ -2281,7 +2284,7 @@ local function autoParryLoop()
             hookedPlayers = {}
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             if fakeParryButton then fakeParryButton:Destroy(); fakeParryButton = nil end
-            spaceConn:Disconnect()
+            ctrlConn:Disconnect()
             return
         end
 
@@ -2334,8 +2337,9 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Animation ID detection + GUI config loaded (left side fake button)")
+    print("[AutoParry] Animation ID detection + GUI config loaded (dropdown fixed, Ctrl shortcut)")
 end
+
         
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        

@@ -1674,28 +1674,99 @@ local function autoParryLoop()
     local loopingActive = false
     local fakeParryActive = false
     local selectedAnimIndex = 1
-    local configGuiPosition = UDim2.new(0.85, -170, 0.5, -180)  -- posisi terakhir GUI
-    local fakeButtonPosition = UDim2.new(0.05, -30, 0.5, -30)    -- posisi terakhir fake button
+    local configGuiPosition = UDim2.new(0.85, -170, 0.5, -180)
+    local fakeButtonPosition = UDim2.new(0.05, -30, 0.5, -30)
 
     local ANIMATION_LIST = {"Parry 1", "Parry 2", "Parry 3", "Parry 4"}
     local ANIMATION_IDS = {
-        "rbxassetid://123307242865945",
+        "rbxassetid://97915871372697",
         "rbxassetid://97915871372698",
         "rbxassetid://97915871372699",
-        "rbxassetid://97915871372697"
+        "rbxassetid://97915871372700"
     }
-    -- rbxassetid://123307242865945
 
     -- ================================
     -- CONNECTION TABLES
     -- ================================
-    local coreConnections = {}    -- untuk hook animasi, refresh killers, ESP, shortcut Ctrl
-    local guiConnections = {}     -- untuk GUI slider, toggle, dropdown, drag
-
+    local coreConnections = {}
+    local guiConnections = {}
     local hookedPlayers = {}
 
     -- ================================
-    -- CORE FUNCTIONS (tidak berubah)
+    -- FREEZE SYSTEM
+    -- ================================
+    local freezeActive = false
+    local freezeConnection = nil
+    local originalWalkSpeed = nil
+    local originalJumpPower = nil
+
+    local function applyFreeze()
+        local char = localPlayer.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        -- Simpan nilai asli jika belum
+        if originalWalkSpeed == nil then
+            originalWalkSpeed = hum.WalkSpeed
+            originalJumpPower = hum.JumpPower
+        end
+        -- Freeze
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+    end
+
+    local function restoreMovement()
+        local char = localPlayer.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        if originalWalkSpeed ~= nil then
+            hum.WalkSpeed = originalWalkSpeed
+            hum.JumpPower = originalJumpPower
+            originalWalkSpeed = nil
+            originalJumpPower = nil
+        end
+    end
+
+    local function startFreeze(duration)
+        if freezeConnection then
+            freezeConnection:Disconnect()
+            freezeConnection = nil
+        end
+        if freezeActive then return end
+        freezeActive = true
+
+        -- Terapkan freeze sekali
+        applyFreeze()
+
+        -- Pasang koneksi untuk melawan reset game (update setiap frame)
+        freezeConnection = RunService.RenderStepped:Connect(function()
+            if not freezeActive then
+                freezeConnection:Disconnect()
+                freezeConnection = nil
+                return
+            end
+            applyFreeze()
+        end)
+
+        -- Durasi freeze
+        task.spawn(function()
+            task.wait(duration)
+            freezeActive = false
+            if freezeConnection then
+                freezeConnection:Disconnect()
+                freezeConnection = nil
+            end
+            restoreMovement()
+        end)
+    end
+
+    -- ================================
+    -- CORE FUNCTIONS
     -- ================================
     local function playLocalParryAnimation(animId)
         local char = localPlayer.Character
@@ -1713,10 +1784,19 @@ local function autoParryLoop()
         end
     end
 
+    -- FAKE PARRY HANDLER (dengan freeze dan spawn agar tidak memblokir)
     local function triggerFakeParry()
-        if fakeParryActive then
+        if not fakeParryActive then return end
+
+        -- Jalankan animasi di spawn terpisah agar tidak memblokir trigger parry
+        task.spawn(function()
             playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
-        end
+        end)
+
+        -- Freeze selama 2 detik (juga di spawn)
+        task.spawn(function()
+            startFreeze(2)
+        end)
     end
 
     local COMBAT_ANIMATIONS = {
@@ -1781,7 +1861,7 @@ local function autoParryLoop()
         return (localRootPart.Position - targetRoot.Position).Magnitude
     end
 
-    -- ========== HOOK ANIMASI ==========
+    -- ========== HOOK ANIMASI (TRIGGER PARRY) ==========
     local function hookAnimator(player, char)
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum then return end
@@ -1806,7 +1886,10 @@ local function autoParryLoop()
             if isCombatAnimation(animId) then
                 local dist = getDistanceToPlayer(player)
                 if dist <= DETECTION_RADIUS then
-                    pcall(function() fireParryRemote(player) end)
+                    -- Jalankan di spawn agar tidak terblokir oleh apapun
+                    task.spawn(function()
+                        pcall(function() fireParryRemote(player) end)
+                    end)
                 end
             end
         end)
@@ -1909,7 +1992,6 @@ local function autoParryLoop()
         if fakeButton then return end
         if not fakeParryActive then return end
 
-        -- Buat ScreenGui khusus untuk tombol
         fakeButtonGui = Instance.new("ScreenGui")
         fakeButtonGui.Name = "FakeParryButton"
         fakeButtonGui.ResetOnSpawn = false
@@ -1918,9 +2000,9 @@ local function autoParryLoop()
 
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 60, 0, 60)
-        btn.Position = fakeButtonPosition   -- posisi terakhir
+        btn.Position = fakeButtonPosition
         btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-        btn.BackgroundTransparency = 0.5    -- lebih transparan
+        btn.BackgroundTransparency = 0.5
         btn.BorderSizePixel = 0
         btn.Text = "Ctrl"
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -1938,12 +2020,10 @@ local function autoParryLoop()
 
         fakeButton = btn
 
-        -- Event klik
         btn.MouseButton1Click:Connect(function()
             triggerFakeParry()
         end)
 
-        -- Drag tombol (geser)
         local dragging = false
         local dragStart, frameStart
         btn.InputBegan:Connect(function(input)
@@ -1958,7 +2038,7 @@ local function autoParryLoop()
                 local delta = input.Position - dragStart
                 local newPos = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
                 btn.Position = newPos
-                fakeButtonPosition = newPos  -- simpan posisi
+                fakeButtonPosition = newPos
             end
         end)
         local dragEndConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
@@ -1966,7 +2046,6 @@ local function autoParryLoop()
                 dragging = false
             end
         end)
-        -- Simpan koneksi drag agar bisa di-disconnect saat fake dimatikan
         table.insert(coreConnections, dragMoveConn)
         table.insert(coreConnections, dragEndConn)
     end
@@ -1980,14 +2059,13 @@ local function autoParryLoop()
     end
 
     -- ================================
-    -- GUI SETTINGS (dapat ditutup tanpa mempengaruhi state)
+    -- GUI SETTINGS (sama seperti sebelumnya)
     -- ================================
     local parryConfigGui = nil
     local guiActive = false
 
     local function createParryConfigGUI()
         if parryConfigGui then
-            -- Jika sudah ada, hanya tampilkan kembali (jika disembunyikan)
             parryConfigGui.Enabled = true
             return
         end
@@ -2000,7 +2078,7 @@ local function autoParryLoop()
 
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(0, 240, 0, 280)
-        frame.Position = configGuiPosition  -- pakai posisi terakhir
+        frame.Position = configGuiPosition
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.1
         frame.BorderSizePixel = 0
@@ -2014,7 +2092,6 @@ local function autoParryLoop()
         stroke.Transparency = 0.4
         stroke.Parent = frame
 
-        -- Header (untuk drag)
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 24)
         header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
@@ -2039,7 +2116,7 @@ local function autoParryLoop()
         title.TextXAlignment = Enum.TextXAlignment.Left
         title.Parent = header
 
-        -- Drag GUI (geser)
+        -- Drag GUI
         local function startDrag(input)
             local dragConn = game:GetService("UserInputService").InputChanged:Connect(function(inp)
                 if inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch then
@@ -2066,7 +2143,7 @@ local function autoParryLoop()
             end
         end)
 
-        -- Tombol close (hanya tutup GUI, tidak reset state)
+        -- Tombol close (hanya tutup GUI)
         local closeBtn = Instance.new("TextButton")
         closeBtn.Size = UDim2.new(0, 20, 0, 20)
         closeBtn.Position = UDim2.new(1, -24, 0.5, -10)
@@ -2082,7 +2159,6 @@ local function autoParryLoop()
         closeCorner.Parent = closeBtn
 
         closeBtn.MouseButton1Click:Connect(function()
-            -- Hanya hancurkan GUI, jangan sentuh state
             parryConfigGui:Destroy()
             parryConfigGui = nil
             for _, conn in ipairs(guiConnections) do
@@ -2094,7 +2170,6 @@ local function autoParryLoop()
         -- ===== KONTEN GUI =====
         local yOffset = 30
 
-        -- Slider Radius
         local radLabel = Instance.new("TextLabel")
         radLabel.Size = UDim2.new(0.6, 0, 0, 20)
         radLabel.Position = UDim2.new(0.05, 0, 0, yOffset)
@@ -2146,7 +2221,6 @@ local function autoParryLoop()
             end
         end
 
-        -- Inisialisasi posisi thumb
         task.wait(0.05)
         updateRadUI(sliderRadius)
 
@@ -2192,7 +2266,6 @@ local function autoParryLoop()
 
         yOffset = yOffset + 20
 
-        -- Toggle Looping Mode
         local loopToggle = Instance.new("TextButton")
         loopToggle.Size = UDim2.new(0.85, 0, 0, 24)
         loopToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
@@ -2224,7 +2297,6 @@ local function autoParryLoop()
 
         yOffset = yOffset + 30
 
-        -- Toggle Fake Parry
         local fakeToggle = Instance.new("TextButton")
         fakeToggle.Size = UDim2.new(0.85, 0, 0, 24)
         fakeToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
@@ -2255,7 +2327,6 @@ local function autoParryLoop()
 
         yOffset = yOffset + 30
 
-        -- Dropdown
         local dropdownFrame = Instance.new("Frame")
         dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
         dropdownFrame.Position = UDim2.new(0.075, 0, 0, yOffset)
@@ -2370,6 +2441,12 @@ local function autoParryLoop()
             hookedPlayers = {}
             if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
             destroyFakeButton()
+            if freezeConnection then
+                freezeConnection:Disconnect()
+                freezeConnection = nil
+            end
+            freezeActive = false
+            restoreMovement()
             return
         end
 
@@ -2381,7 +2458,6 @@ local function autoParryLoop()
             end
         end
 
-        -- Dynamic radius (looping)
         if loopingActive then
             local nearestDist = math.huge
             for _, player in ipairs(Players:GetPlayers()) do
@@ -2424,12 +2500,11 @@ local function autoParryLoop()
 
     -- Buat GUI awal
     createParryConfigGUI()
-    -- Jika fakeParryActive sudah true, buat tombol
     if fakeParryActive then
         createFakeButton()
     end
 
-    print("[AutoParry] Animation ID detection + GUI config loaded (refactored, GUI independent)")
+    print("[AutoParry] Animation ID detection + GUI config loaded (Fake Parry with freeze, independent trigger)")
 end
 
 -- ============================================================================        

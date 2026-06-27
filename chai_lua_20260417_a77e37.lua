@@ -1666,9 +1666,49 @@ local function autoParryLoop()
     if combatStateConnected then return end
     combatStateConnected = true
 
-    local DETECTION_RADIUS = 9.6  -- bisa diatur via slider
+    -- Variabel radius yang bisa diubah oleh slider dan mode looping
+    local DETECTION_RADIUS = 9.6
+    local sliderRadius = 9.6            -- nilai dari slider (1-15)
+    local dynamicRadius = nil           -- nilai radius aktif (bisa dari slider atau mode looping)
+
     local stateConnections = {}
-    local hookedPlayers = {}  -- track player yang sudah di-hook
+    local hookedPlayers = {}
+
+    -- ========== VARIABEL UNTUK FAKE PARRY ==========
+    local fakeParryActive = false
+    local fakeParryButton = nil
+    local fakeParryDragConn = nil
+    local fakeParryAnimId = "rbxassetid://97915871372697"  -- default animasi pertama
+    local selectedAnimIndex = 1
+    local ANIMATION_LIST = {
+        "Parry 1",  -- placeholder, nanti diisi dengan ID asli
+        "Parry 2",
+        "Parry 3",
+        "Parry 4"
+    }
+    local ANIMATION_IDS = {
+        "rbxassetid://97915871372697",   -- ganti dengan ID asli
+        "rbxassetid://97915871372697",
+        "rbxassetid://97915871372697",
+        "rbxassetid://97915871372697"
+    }
+
+    -- ========== FUNGSI UNTUK MEMUTAR ANIMASI PARRY PADA LOCALPLAYER ==========
+    local function playLocalParryAnimation(animId)
+        local char = localPlayer.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        local animator = hum:FindFirstChildOfClass("Animator")
+        if not animator then return end
+        local anim = Instance.new("Animation")
+        anim.AnimationId = animId
+        local track = animator:LoadAnimation(anim)
+        if track then
+            track.Priority = Enum.AnimationPriority.Action
+            track:Play()
+        end
+    end
 
     -- ========== TEMPAT SCAN ANIMASI SERANGAN ==========
     local COMBAT_ANIMATIONS = {
@@ -1692,12 +1732,9 @@ local function autoParryLoop()
         "rbxassetid://78432063483146"
     }
 
-    -- Fungsi untuk mengecek apakah animasi termasuk serangan
     local function isCombatAnimation(animId)
         for _, id in ipairs(COMBAT_ANIMATIONS) do
-            if animId == id then
-                return true
-            end
+            if animId == id then return true end
         end
         return false
     end
@@ -1737,11 +1774,6 @@ local function autoParryLoop()
         return (localRootPart.Position - targetRoot.Position).Magnitude
     end
 
-    -- ========== UPDATE ACTIVE KILLER (RADIUS CHECK) - hanya untuk info, tidak dipakai untuk trigger ==========
-    local function updateActiveKiller()
-        -- Tidak digunakan untuk trigger, hanya untuk debugging
-    end
-
     -- ========== HOOK ANIMASI PADA KARAKTER ==========
     local function hookAnimator(player, char)
         local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1758,16 +1790,13 @@ local function autoParryLoop()
             return
         end
 
-        -- Hook AnimationPlayed dengan validasi Animation ID + Cek Jarak Langsung
         local animConn = animator.AnimationPlayed:Connect(function(track)
             local anim = track.Animation
             if not anim then return end
             local animId = anim.AnimationId
             if not animId then return end
 
-            -- Cek apakah animasi termasuk combat
             if isCombatAnimation(animId) then
-                -- Langsung periksa jarak tanpa menunggu activeKiller
                 local dist = getDistanceToPlayer(player)
                 if dist <= DETECTION_RADIUS then
                     pcall(function() fireParryRemote(player) end)
@@ -1778,17 +1807,15 @@ local function autoParryLoop()
         print("[AutoParry] Animator hooked for", player.Name)
     end
 
-    -- ========== HOOK KARAKTER ==========
     local function hookCharacter(player, char)
         if not isPlayerKiller(player) then return end
         hookAnimator(player, char)
     end
 
-    -- ========== SETUP PLAYER (Team + CharacterAdded) ==========
+    -- ========== SETUP PLAYER ==========
     local function setupPlayer(player)
         if player == localPlayer then return end
 
-        -- Hook perubahan Team
         local teamConn = player:GetPropertyChangedSignal("Team"):Connect(function()
             if isPlayerKiller(player) then
                 print("[AutoParry] Player", player.Name, "became killer. Hooking...")
@@ -1799,7 +1826,6 @@ local function autoParryLoop()
         end)
         table.insert(stateConnections, teamConn)
 
-        -- Hook CharacterAdded
         local charConn = player.CharacterAdded:Connect(function(char)
             if isPlayerKiller(player) then
                 hookCharacter(player, char)
@@ -1807,13 +1833,12 @@ local function autoParryLoop()
         end)
         table.insert(stateConnections, charConn)
 
-        -- Jika saat ini sudah menjadi killer, langsung hook
         if player.Character and isPlayerKiller(player) then
             hookCharacter(player, player.Character)
         end
     end
 
-    -- ========== REFRESH KILLERS (periodik) ==========
+    -- ========== REFRESH KILLERS ==========
     local function refreshKillers()
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= localPlayer then
@@ -1836,13 +1861,11 @@ local function autoParryLoop()
         end
     end
 
-    -- ========== PLAYER ADDED ==========
     local playerConn = Players.PlayerAdded:Connect(function(player)
         setupPlayer(player)
     end)
     table.insert(stateConnections, playerConn)
 
-    -- ========== PERIODIC SCAN (REFRESH KILLERS) ==========
     local scanConnection = RunService.Heartbeat:Connect(function()
         refreshKillers()
     end)
@@ -1871,12 +1894,396 @@ local function autoParryLoop()
     ringLight.Range = DETECTION_RADIUS * 1.5
     ringLight.Parent = espRing
 
-    local function refreshESP()
-        if espRing then
-            espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
-            if ringLight then ringLight.Range = DETECTION_RADIUS * 1.5 end
+    -- ========== GUI AUTO PARRY CONFIG ==========
+    local parryConfigGui = nil
+    local function createParryConfigGUI()
+        if parryConfigGui then parryConfigGui:Destroy() end
+
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "AutoParryConfig"
+        gui.ResetOnSpawn = false
+        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        gui.Parent = game.CoreGui
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 240, 0, 280)
+        frame.Position = UDim2.new(0.5, -120, 0.5, -140)
+        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+        frame.BackgroundTransparency = 0.1
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = frame
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 180, 255)
+        stroke.Thickness = 1.2
+        stroke.Transparency = 0.4
+        stroke.Parent = frame
+
+        -- Header
+        local header = Instance.new("Frame")
+        header.Size = UDim2.new(1, 0, 0, 24)
+        header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
+        header.BorderSizePixel = 0
+        header.Parent = frame
+        local headerCorner = Instance.new("UICorner")
+        headerCorner.CornerRadius = UDim.new(0, 8)
+        headerCorner.Parent = header
+        local headerStroke = Instance.new("UIStroke")
+        headerStroke.Color = Color3.fromRGB(0, 180, 255)
+        headerStroke.Transparency = 0.5
+        headerStroke.Parent = header
+
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(0.7, 0, 1, 0)
+        title.Position = UDim2.new(0.02, 0, 0, 0)
+        title.BackgroundTransparency = 1
+        title.Text = "Auto Parry Config"
+        title.TextColor3 = Color3.fromRGB(0, 220, 255)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 12
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.Parent = header
+
+        -- Tombol close
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 20, 0, 20)
+        closeBtn.Position = UDim2.new(1, -24, 0.5, -10)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        closeBtn.Text = "X"
+        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.TextSize = 12
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Parent = header
+        local closeCorner = Instance.new("UICorner")
+        closeCorner.CornerRadius = UDim.new(0, 4)
+        closeCorner.Parent = closeBtn
+        closeBtn.MouseButton1Click:Connect(function()
+            if parryConfigGui then
+                parryConfigGui:Destroy()
+                parryConfigGui = nil
+            end
+        end)
+
+        -- Konten
+        local yOffset = 30
+
+        -- Slider Radius
+        local radLabel = Instance.new("TextLabel")
+        radLabel.Size = UDim2.new(0.6, 0, 0, 20)
+        radLabel.Position = UDim2.new(0.05, 0, 0, yOffset)
+        radLabel.BackgroundTransparency = 1
+        radLabel.Text = "Detection Radius: " .. sliderRadius
+        radLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+        radLabel.Font = Enum.Font.Gotham
+        radLabel.TextSize = 11
+        radLabel.Parent = frame
+        yOffset = yOffset + 22
+
+        local radBg = Instance.new("Frame")
+        radBg.Size = UDim2.new(0.85, 0, 0, 4)
+        radBg.Position = UDim2.new(0.075, 0, 0, yOffset)
+        radBg.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
+        radBg.BorderSizePixel = 0
+        radBg.Parent = frame
+        local radBgCorner = Instance.new("UICorner")
+        radBgCorner.CornerRadius = UDim.new(1, 0)
+        radBgCorner.Parent = radBg
+
+        local radThumb = Instance.new("TextButton")
+        radThumb.Size = UDim2.new(0, 12, 0, 12)
+        radThumb.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+        radThumb.AutoButtonColor = false
+        radThumb.Text = ""
+        radThumb.BorderSizePixel = 0
+        radThumb.Parent = radBg
+        local thumbCorner = Instance.new("UICorner")
+        thumbCorner.CornerRadius = UDim.new(1, 0)
+        thumbCorner.Parent = radThumb
+
+        local draggingRad = false
+        local function updateRadUI(val)
+            val = math.clamp(val, 1, 15)
+            sliderRadius = val
+            radLabel.Text = "Detection Radius: " .. string.format("%.1f", val)
+            local rel = (val - 1) / 14
+            local w = radBg.AbsoluteSize.X
+            local tw = radThumb.AbsoluteSize.X
+            if w > 0 then
+                local px = math.clamp(rel * w, tw/2, w - tw/2)
+                radThumb.Position = UDim2.new(0, px - tw/2, 0.5, -tw/2)
+            end
+            -- update radius aktif
+            if not dynamicRadius then
+                DETECTION_RADIUS = val
+                -- Update ESP
+                espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+                ringLight.Range = DETECTION_RADIUS * 1.5
+            end
         end
+
+        local function onRadDrag(mouseX)
+            local bgX = radBg.AbsolutePosition.X
+            local bgW = radBg.AbsoluteSize.X
+            if bgW <= 0 then return end
+            local rel = math.clamp((mouseX - bgX) / bgW, 0, 1)
+            local val = 1 + rel * 14
+            val = math.floor(val * 10 + 0.5) / 10
+            updateRadUI(val)
+        end
+
+        radThumb.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingRad = true
+                onRadDrag(input.Position.X)
+            end
+        end)
+        radBg.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingRad = true
+                onRadDrag(input.Position.X)
+            end
+        end)
+        local radMove = RunService.RenderStepped:Connect(function()
+            if draggingRad then
+                onRadDrag(game:GetService("UserInputService"):GetMouseLocation().X)
+            end
+        end)
+        table.insert(stateConnections, radMove)
+        local radEnd = game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                draggingRad = false
+            end
+        end)
+        table.insert(stateConnections, radEnd)
+
+        yOffset = yOffset + 20
+
+        -- Toggle Looping Mode
+        local loopToggle = Instance.new("TextButton")
+        loopToggle.Size = UDim2.new(0.85, 0, 0, 24)
+        loopToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
+        loopToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        loopToggle.Text = "LOOPING MODE: OFF"
+        loopToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
+        loopToggle.Font = Enum.Font.GothamBold
+        loopToggle.TextSize = 10
+        loopToggle.BorderSizePixel = 0
+        loopToggle.Parent = frame
+        local loopCorner = Instance.new("UICorner")
+        loopCorner.CornerRadius = UDim.new(0, 4)
+        loopCorner.Parent = loopToggle
+
+        local loopingActive = false
+        loopToggle.MouseButton1Click:Connect(function()
+            loopingActive = not loopingActive
+            if loopingActive then
+                loopToggle.Text = "LOOPING MODE: ON"
+                loopToggle.BackgroundColor3 = Color3.fromRGB(0, 140, 200)
+                dynamicRadius = true
+                -- langsung update radius berdasarkan jarak killer terdekat di main loop
+            else
+                loopToggle.Text = "LOOPING MODE: OFF"
+                loopToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+                dynamicRadius = nil
+                -- kembali ke slider
+                DETECTION_RADIUS = sliderRadius
+                espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+                ringLight.Range = DETECTION_RADIUS * 1.5
+            end
+        end)
+
+        yOffset = yOffset + 30
+
+        -- Toggle Fake Parry
+        local fakeToggle = Instance.new("TextButton")
+        fakeToggle.Size = UDim2.new(0.85, 0, 0, 24)
+        fakeToggle.Position = UDim2.new(0.075, 0, 0, yOffset)
+        fakeToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        fakeToggle.Text = "FAKE PARRY: OFF"
+        fakeToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
+        fakeToggle.Font = Enum.Font.GothamBold
+        fakeToggle.TextSize = 10
+        fakeToggle.BorderSizePixel = 0
+        fakeToggle.Parent = frame
+        local fakeCorner = Instance.new("UICorner")
+        fakeCorner.CornerRadius = UDim.new(0, 4)
+        fakeCorner.Parent = fakeToggle
+
+        local fakeActive = false
+        -- Fungsi untuk membuat tombol bulat fake parry
+        local function createFakeParryButton()
+            if fakeParryButton then
+                fakeParryButton:Destroy()
+                fakeParryButton = nil
+                if fakeParryDragConn then
+                    fakeParryDragConn:Disconnect()
+                    fakeParryDragConn = nil
+                end
+            end
+            if not fakeActive then return end
+
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 44, 0, 44)
+            btn.Position = UDim2.new(0.5, -22, 0.8, 0)
+            btn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+            btn.BackgroundTransparency = 0.2
+            btn.BorderSizePixel = 0
+            btn.Text = "P"
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 18
+            btn.Parent = parryConfigGui  -- taruh di GUI utama agar ikut hancur
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(1, 0)
+            btnCorner.Parent = btn
+            local btnStroke = Instance.new("UIStroke")
+            btnStroke.Color = Color3.fromRGB(0, 220, 255)
+            btnStroke.Thickness = 1.5
+            btnStroke.Transparency = 0.4
+            btnStroke.Parent = btn
+
+            fakeParryButton = btn
+
+            -- Drag
+            local dragging = false
+            local dragStart, frameStart
+            btn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    dragStart = input.Position
+                    frameStart = btn.Position
+                end
+            end)
+            fakeParryDragConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = input.Position - dragStart
+                    btn.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
+                end
+            end)
+            local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false
+                end
+            end)
+            table.insert(stateConnections, endConn)
+
+            -- Klik: play animasi sesuai pilihan
+            btn.MouseButton1Click:Connect(function()
+                playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
+            end)
+        end
+
+        fakeToggle.MouseButton1Click:Connect(function()
+            fakeActive = not fakeActive
+            fakeParryActive = fakeActive
+            if fakeActive then
+                fakeToggle.Text = "FAKE PARRY: ON"
+                fakeToggle.BackgroundColor3 = Color3.fromRGB(0, 140, 200)
+                createFakeParryButton()
+            else
+                fakeToggle.Text = "FAKE PARRY: OFF"
+                fakeToggle.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+                if fakeParryButton then
+                    fakeParryButton:Destroy()
+                    fakeParryButton = nil
+                    if fakeParryDragConn then
+                        fakeParryDragConn:Disconnect()
+                        fakeParryDragConn = nil
+                    end
+                end
+            end
+        end)
+
+        yOffset = yOffset + 30
+
+        -- Dropdown (Slider List) untuk animasi
+        local dropdownFrame = Instance.new("Frame")
+        dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
+        dropdownFrame.Position = UDim2.new(0.075, 0, 0, yOffset)
+        dropdownFrame.BackgroundColor3 = Color3.fromRGB(25, 35, 50)
+        dropdownFrame.BorderSizePixel = 0
+        dropdownFrame.Parent = frame
+        local dropCorner = Instance.new("UICorner")
+        dropCorner.CornerRadius = UDim.new(0, 4)
+        dropCorner.Parent = dropdownFrame
+
+        local dropBtn = Instance.new("TextButton")
+        dropBtn.Size = UDim2.new(1, -4, 1, -4)
+        dropBtn.Position = UDim2.new(0, 2, 0, 2)
+        dropBtn.BackgroundTransparency = 1
+        dropBtn.Text = "Parry 1"
+        dropBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+        dropBtn.Font = Enum.Font.GothamBold
+        dropBtn.TextSize = 10
+        dropBtn.BorderSizePixel = 0
+        dropBtn.Parent = dropdownFrame
+
+        local dropdownList = Instance.new("Frame")
+        dropdownList.Size = UDim2.new(1, 0, 0, 0)
+        dropdownList.Position = UDim2.new(0, 0, 1, 2)
+        dropdownList.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
+        dropdownList.BorderSizePixel = 0
+        dropdownList.Visible = false
+        dropdownList.Parent = dropdownFrame
+        local listCorner = Instance.new("UICorner")
+        listCorner.CornerRadius = UDim.new(0, 4)
+        listCorner.Parent = dropdownList
+
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Padding = UDim.new(0, 2)
+        listLayout.FillDirection = Enum.FillDirection.Vertical
+        listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        listLayout.Parent = dropdownList
+
+        local function rebuildDropdown()
+            for _, child in ipairs(dropdownList:GetChildren()) do
+                if child:IsA("TextButton") then child:Destroy() end
+            end
+            for i, name in ipairs(ANIMATION_LIST) do
+                local opt = Instance.new("TextButton")
+                opt.Size = UDim2.new(1, -4, 0, 20)
+                opt.BackgroundColor3 = (i == selectedAnimIndex) and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(20, 30, 45)
+                opt.Text = name
+                opt.TextColor3 = (i == selectedAnimIndex) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
+                opt.Font = Enum.Font.Gotham
+                opt.TextSize = 10
+                opt.BorderSizePixel = 0
+                opt.Parent = dropdownList
+                opt.MouseButton1Click:Connect(function()
+                    selectedAnimIndex = i
+                    dropBtn.Text = name
+                    fakeParryAnimId = ANIMATION_IDS[i]
+                    dropdownList.Visible = false
+                    dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
+                    -- jika fake parry aktif, update animasi untuk klik selanjutnya
+                end)
+            end
+            local totalHeight = #ANIMATION_LIST * 22 + 4
+            dropdownList.Size = UDim2.new(1, 0, 0, totalHeight)
+        end
+        rebuildDropdown()
+
+        dropBtn.MouseButton1Click:Connect(function()
+            dropdownList.Visible = not dropdownList.Visible
+            if dropdownList.Visible then
+                dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24 + dropdownList.Size.Y.Offset)
+            else
+                dropdownFrame.Size = UDim2.new(0.85, 0, 0, 24)
+            end
+        end)
+
+        yOffset = yOffset + 30
+        frame.Size = UDim2.new(0, 240, 0, yOffset + 10)
+
+        parryConfigGui = gui
+        return gui
     end
+
+    -- Buat GUI
+    createParryConfigGUI()
 
     -- ========== MAIN LOOP ==========
     combatHeartbeat = RunService.RenderStepped:Connect(function(dt)
@@ -1889,6 +2296,9 @@ local function autoParryLoop()
             stateConnections = {}
             if radiusFolder then radiusFolder:Destroy(); radiusFolder = nil end
             hookedPlayers = {}
+            if parryConfigGui then parryConfigGui:Destroy(); parryConfigGui = nil end
+            if fakeParryButton then fakeParryButton:Destroy(); fakeParryButton = nil end
+            if fakeParryDragConn then fakeParryDragConn:Disconnect(); fakeParryDragConn = nil end
             return
         end
 
@@ -1899,6 +2309,40 @@ local function autoParryLoop()
                 rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
             end
         end
+
+        -- Update radius dynamic mode (looping)
+        if loopingActive then
+            -- cari killer terdekat
+            local nearestDist = math.huge
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= localPlayer and isPlayerKiller(player) then
+                    local dist = getDistanceToPlayer(player)
+                    if dist < nearestDist then
+                        nearestDist = dist
+                    end
+                end
+            end
+            if nearestDist <= 12 then
+                -- set radius ke jarak killer (minimal 1, maksimal 12)
+                local newRadius = math.clamp(nearestDist, 1, 15)
+                DETECTION_RADIUS = newRadius
+                espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+                ringLight.Range = DETECTION_RADIUS * 1.5
+            else
+                -- kembali ke slider
+                DETECTION_RADIUS = sliderRadius
+                espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+                ringLight.Range = DETECTION_RADIUS * 1.5
+            end
+        else
+            -- pastikan radius sesuai slider
+            if DETECTION_RADIUS ~= sliderRadius then
+                DETECTION_RADIUS = sliderRadius
+                espRing.Size = Vector3.new(0.05, DETECTION_RADIUS*2, DETECTION_RADIUS*2)
+                ringLight.Range = DETECTION_RADIUS * 1.5
+            end
+        end
+
         if rootPart then
             local footPos = rootPart.Position - Vector3.new(0, 2, 0)
             espRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
@@ -1907,8 +2351,9 @@ local function autoParryLoop()
         end
     end)
 
-    print("[AutoParry] Animation ID detection with direct distance check (no activeKiller delay)")
+    print("[AutoParry] Animation ID detection with direct distance check + GUI config loaded")
 end
+        
 -- ============================================================================        
 -- START / STOP AUTO PARRY (menggantikan startInfiniteAmmo / stopInfiniteAmmo)        
 -- ============================================================================        

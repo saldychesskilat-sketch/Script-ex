@@ -5555,123 +5555,160 @@ local function createGUI()
     sep.BackgroundTransparency = 0.7  
     sep.Parent = sidebarList  
   
-    contentPanel = Instance.new("Frame")  
-    contentPanel.Size = UDim2.new(1, -90, 1, -30)  
-    contentPanel.Position = UDim2.new(0, 85, 0, 28)  
-    contentPanel.BackgroundTransparency = 1  
-    contentPanel.Parent = mainFrame  
-    local gridLayout = Instance.new("UIGridLayout")  
-    gridLayout.CellSize = UDim2.new(0, 80, 0, 32)  
-    gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)  
-    gridLayout.FillDirection = Enum.FillDirection.Horizontal  
-    gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center  
-    gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top  
-    gridLayout.SortOrder = Enum.SortOrder.LayoutOrder  
-    gridLayout.Parent = contentPanel  
-  
-    local features = {  
-        {name="autoWinEnabled", text="AUTO WIN"},  
-        {name="autoTaskEnabled", text="AUTO TASK"},  
-        {name="espEnabled", text="ESP"},  
-        {name="speedBoostEnabled", text="SPEED BOOST"},  
-        {name="stealthEnabled", text="STEALTH"},  
-        {name="godModeEnabled", text="GOD MODE"},  
-        {name="infiniteAmmoEnabled", text="Dagger"},  
-        {name="shieldEnabled", text="auto Attack"},  
-        {name="tpwalkEnabled", text="TPWALK"},  
-        {name="noCollideEnabled", text="NO COLLIDE"},  
-        {name="massKillEnabled", text="MASS KILL"},  
-        {name="autoGeneratorEnabled", text="Break GEN"},  
-        {name="autoSkillCheckEnabled", text="SKILL CHECK"},  
-        {name="autoAimEnabled", text="AUTO AIM"},  
-        {name="povMode", text="POV"}  
-    }  
-    for _, feat in ipairs(features) do  
-        local initialState = (feat.name ~= "restartScript") and config[feat.name] or false  
-        createGridButton(contentPanel, feat.name, feat.text, initialState)  
-    end  
-  
-    -- Navigation handlers  
-    homeItem.MouseButton1Click:Connect(function()  
-        homeItem.TextColor3 = Color3.fromRGB(0,230,255)  
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
-        if featuresContainer then featuresContainer:Destroy() end  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        if aboutContent then aboutContent:Destroy() end  
-  
-        gridLayout.Parent = nil  
-        createHomeContent()  
-    end)  
-  
-    featuresItem.MouseButton1Click:Connect(function()  
-        featuresItem.TextColor3 = Color3.fromRGB(0,230,255)  
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
-        if homeContent then homeContent:Destroy() end  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        if aboutContent then aboutContent:Destroy() end  
-  
-        gridLayout.Parent = contentPanel  
-    end)  
-  
-    settingsItem.MouseButton1Click:Connect(function()  
-        settingsItem.TextColor3 = Color3.fromRGB(0,230,255)  
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
-        if featuresContainer then featuresContainer:Destroy() end  
-        if homeContent then homeContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-        if aboutContent then aboutContent:Destroy() end  
-  
-        gridLayout.Parent = nil  
-        createSettingsContent()  
-    end)  
-  
-    infoItem.MouseButton1Click:Connect(function()  
-        infoItem.TextColor3 = Color3.fromRGB(0,230,255)  
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
-        if featuresContainer then featuresContainer:Destroy() end  
-        if homeContent then homeContent:Destroy() end  
-        if settingsContent then settingsContent:Destroy() end  
-        if aboutContent then aboutContent:Destroy() end  
-  
-        gridLayout.Parent = nil  
-        createInfoContent()  
-    end)  
-  
-    aboutItem.MouseButton1Click:Connect(function()  
-        aboutItem.TextColor3 = Color3.fromRGB(0,230,255)  
-        homeItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)  
-        infoItem.TextColor3 = Color3.fromRGB(200,200,200)  
-  
-        if featuresContainer then featuresContainer:Destroy() end  
-        if homeContent then homeContent:Destroy() end  
-        if settingsContent then settingsContent:Destroy() end  
-        if infoContent then infoContent:Destroy() end  
-  
-        gridLayout.Parent = nil  
-        createAboutContent()  
-    end)  
-  
-    makeDraggable(mainFrame)  
+    -- ============================================================
+    -- CONTENT PANEL & FEATURES CONTAINER (diperbaiki)
+    -- ============================================================
+    contentPanel = Instance.new("Frame")
+    contentPanel.Size = UDim2.new(1, -90, 1, -30)
+    contentPanel.Position = UDim2.new(0, 85, 0, 28)
+    contentPanel.BackgroundTransparency = 1
+    contentPanel.Parent = mainFrame
+
+    local featuresContainer = nil  -- wadah untuk tombol fitur
+
+    -- Fungsi untuk membuat ulang tombol fitur (dipanggil saat buka FEATURES)
+    local function buildFeatures()
+        if featuresContainer then
+            featuresContainer:Destroy()
+            featuresContainer = nil
+        end
+
+        featuresContainer = Instance.new("Frame")
+        featuresContainer.Size = UDim2.new(1, 0, 1, 0)
+        featuresContainer.BackgroundTransparency = 1
+        featuresContainer.Parent = contentPanel
+
+        local gridLayout = Instance.new("UIGridLayout")
+        gridLayout.CellSize = UDim2.new(0, 80, 0, 32)
+        gridLayout.CellPadding = UDim2.new(0, 4, 0, 4)
+        gridLayout.FillDirection = Enum.FillDirection.Horizontal
+        gridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        gridLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+        gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        gridLayout.Parent = featuresContainer
+
+        local features = {
+            {name="autoWinEnabled", text="AUTO WIN"},
+            {name="autoTaskEnabled", text="AUTO TASK"},
+            {name="espEnabled", text="ESP"},
+            {name="speedBoostEnabled", text="SPEED BOOST"},
+            {name="stealthEnabled", text="STEALTH"},
+            {name="godModeEnabled", text="GOD MODE"},
+            {name="infiniteAmmoEnabled", text="Dagger"},
+            {name="shieldEnabled", text="auto Attack"},
+            {name="tpwalkEnabled", text="TPWALK"},
+            {name="noCollideEnabled", text="NO COLLIDE"},
+            {name="massKillEnabled", text="MASS KILL"},
+            {name="autoGeneratorEnabled", text="Break GEN"},
+            {name="autoSkillCheckEnabled", text="SKILL CHECK"},
+            {name="autoAimEnabled", text="AUTO AIM"},
+            {name="povMode", text="POV"}
+        }
+        for _, feat in ipairs(features) do
+            local initialState = (feat.name ~= "restartScript") and config[feat.name] or false
+            createGridButton(featuresContainer, feat.name, feat.text, initialState)
+        end
+    end
+
+    -- Buat fitur pertama kali
+    buildFeatures()
+
+    -- ============================================================
+    -- NAVIGATION HANDLERS (disesuaikan)
+    -- ============================================================
+
+    homeItem.MouseButton1Click:Connect(function()
+        homeItem.TextColor3 = Color3.fromRGB(0,230,255)
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+
+        -- Hancurkan featuresContainer jika ada
+        if featuresContainer then
+            featuresContainer:Destroy()
+            featuresContainer = nil
+        end
+        if settingsContent then settingsContent:Destroy() end
+        if infoContent then infoContent:Destroy() end
+        if aboutContent then aboutContent:Destroy() end
+
+        createHomeContent()
+    end)
+
+    featuresItem.MouseButton1Click:Connect(function()
+        featuresItem.TextColor3 = Color3.fromRGB(0,230,255)
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+
+        if homeContent then homeContent:Destroy() end
+        if settingsContent then settingsContent:Destroy() end
+        if infoContent then infoContent:Destroy() end
+        if aboutContent then aboutContent:Destroy() end
+
+        -- Buat ulang featuresContainer jika belum ada
+        if not featuresContainer then
+            buildFeatures()
+        end
+    end)
+
+    settingsItem.MouseButton1Click:Connect(function()
+        settingsItem.TextColor3 = Color3.fromRGB(0,230,255)
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+
+        if featuresContainer then
+            featuresContainer:Destroy()
+            featuresContainer = nil
+        end
+        if homeContent then homeContent:Destroy() end
+        if infoContent then infoContent:Destroy() end
+        if aboutContent then aboutContent:Destroy() end
+
+        createSettingsContent()
+    end)
+
+    infoItem.MouseButton1Click:Connect(function()
+        infoItem.TextColor3 = Color3.fromRGB(0,230,255)
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
+        aboutItem.TextColor3 = Color3.fromRGB(200,200,200)
+
+        if featuresContainer then
+            featuresContainer:Destroy()
+            featuresContainer = nil
+        end
+        if homeContent then homeContent:Destroy() end
+        if settingsContent then settingsContent:Destroy() end
+        if aboutContent then aboutContent:Destroy() end
+
+        createInfoContent()
+    end)
+
+    aboutItem.MouseButton1Click:Connect(function()
+        aboutItem.TextColor3 = Color3.fromRGB(0,230,255)
+        homeItem.TextColor3 = Color3.fromRGB(200,200,200)
+        featuresItem.TextColor3 = Color3.fromRGB(200,200,200)
+        settingsItem.TextColor3 = Color3.fromRGB(200,200,200)
+        infoItem.TextColor3 = Color3.fromRGB(200,200,200)
+
+        if featuresContainer then
+            featuresContainer:Destroy()
+            featuresContainer = nil
+        end
+        if homeContent then homeContent:Destroy() end
+        if settingsContent then settingsContent:Destroy() end
+        if infoContent then infoContent:Destroy() end
+
+        createAboutContent()
+    end)
+
+    makeDraggable(mainFrame)
   
     local statusBar = Instance.new("Frame")  
     statusBar.Size = UDim2.new(1, 0, 0, 18)  

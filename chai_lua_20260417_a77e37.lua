@@ -5433,6 +5433,7 @@ local function createGUI()
         glowFrame.Position = mainFrame.Position
         glowFrame.Size = mainFrame.Size
     end
+    end)
 
 
     local titleBar = Instance.new("Frame")  

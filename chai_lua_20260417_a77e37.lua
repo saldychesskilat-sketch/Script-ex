@@ -5257,7 +5257,53 @@ local function createFeaturesContent()
         createFeatureButton(scroll, feat.name, feat.text, initialState)
     end
 end
+local function createSidebarItem(parent, text, icon, active)
 
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1,0,0,30)
+
+    button.Text = "   " .. icon .. "   " .. text
+    button.TextSize = 10
+    button.Font = Enum.Font.GothamBold
+
+    button.TextXAlignment = Enum.TextXAlignment.Left
+
+    button.TextColor3 =
+        active
+        and Color3.fromRGB(0,225,255)
+        or Color3.fromRGB(210,210,210)
+
+    button.BackgroundColor3 =
+        active
+        and Color3.fromRGB(12,30,50)
+        or Color3.fromRGB(8,18,32)
+
+    button.BackgroundTransparency = 0.08
+    button.BorderSizePixel = 0
+    button.AutoButtonColor = false
+    button.Parent = parent
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0,8)
+    corner.Parent = button
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.2
+
+    stroke.Color =
+        active
+        and Color3.fromRGB(0,200,255)
+        or Color3.fromRGB(60,100,140)
+
+    stroke.Transparency =
+        active
+        and 0.25
+        or 0.55
+
+    stroke.Parent = button
+
+    return button
+end
 -- ============================================================================
 -- FUNGSI createGUI (dengan modifikasi pada navigasi)
 -- ============================================================================

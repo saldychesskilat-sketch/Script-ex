@@ -1680,7 +1680,7 @@ local function autoParryLoop()
     local ANIMATION_IDS = {
         "rbxassetid://97915871372697",
         "rbxassetid://123307242865945",
-        "rbxassetid://97915871372699",
+        "rbxassetid://127096285501517",
         "rbxassetid://97915871372700"
     }
 

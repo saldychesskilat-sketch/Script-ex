@@ -5080,7 +5080,58 @@ end
 -- ============================================================================  
 local featuresContainer = nil  
 local function createGridButton(parent, name, text, initialState, onChange)    
-    if featuresContainer then featuresContainer:Destroy() end    
+    -- ============================================================
+    -- KHUSUS POV: Tampilan biru neon tanpa [ON]/[OFF]
+    -- ============================================================
+    if name == "povMode" then
+        local button = Instance.new("TextButton")    
+        button.Name = name    
+        button.Size = UDim2.new(0,85,0,32)    
+        
+        -- Hanya teks "POV" tanpa status ON/OFF
+        button.Text = text
+        button.TextSize = 9   
+        button.Font = Enum.Font.GothamBold    
+        
+        local isActive = config.povEnabled or false
+        button.TextColor3 = isActive and Color3.fromRGB(0,220,255) or Color3.fromRGB(220,220,220)
+        button.BackgroundColor3 = Color3.fromRGB(8,18,32)  -- selalu gelap
+        button.BackgroundTransparency = 0.05    
+        button.BorderSizePixel = 0    
+        button.AutoButtonColor = false    
+        button.Parent = parent    
+        
+        local corner = Instance.new("UICorner")    
+        corner.CornerRadius = UDim.new(0,8)    
+        corner.Parent = button    
+        
+        local stroke = Instance.new("UIStroke")    
+        stroke.Thickness = 1.2    
+        stroke.Transparency = 0.35    
+        stroke.Color = isActive and Color3.fromRGB(0,200,255) or Color3.fromRGB(70,120,160)    
+        stroke.Parent = button    
+        
+        local function updatePOVState()
+            local active = config.povEnabled or false
+            button.TextColor3 = active and Color3.fromRGB(0,220,255) or Color3.fromRGB(220,220,220)
+            stroke.Color = active and Color3.fromRGB(0,200,255) or Color3.fromRGB(70,120,160)
+        end
+        
+        button.MouseButton1Click:Connect(function()    
+            togglePOV()
+            updatePOVState()
+            TweenService:Create(button, TweenInfo.new(0.06), {Size = UDim2.new(0,82,0,30)}):Play()    
+            task.wait(0.06)    
+            TweenService:Create(button, TweenInfo.new(0.06), {Size = UDim2.new(0,85,0,32)}):Play()    
+        end)    
+        
+        updatePOVState()
+        return button
+    end
+    
+    -- ============================================================
+    -- FITUR LAIN (sama seperti sebelumnya)
+    -- ============================================================
     local button = Instance.new("TextButton")    
     button.Name = name    
     button.Size = UDim2.new(0,85,0,32)    
@@ -5120,19 +5171,15 @@ local function createGridButton(parent, name, text, initialState, onChange)
     stroke.Parent = button    
     
     local function updateState(state)    
-    
         button.Text = text .. (state and " [ON]" or " [OFF]")    
-    
         button.BackgroundColor3 =    
             state    
             and Color3.fromRGB(12,28,46)    
             or Color3.fromRGB(8,18,32)    
-    
         button.TextColor3 =    
             state    
             and Color3.fromRGB(0,225,255)    
             or Color3.fromRGB(220,220,220)    
-    
         stroke.Color =    
             state    
             and Color3.fromRGB(0,200,255)    
@@ -5140,7 +5187,6 @@ local function createGridButton(parent, name, text, initialState, onChange)
     end    
     
     button.MouseButton1Click:Connect(function()    
-    
         local newState = not (config[name] or false)    
     
         if name == "autoWinEnabled" then    
@@ -5202,10 +5248,8 @@ local function createGridButton(parent, name, text, initialState, onChange)
         elseif name == "autoAimEnabled" then    
             config.autoAimEnabled = newState    
             if newState then startAutoAim() else stopAutoAim() end    
-    
-        elseif name == "povMode" then    
-            togglePOV()    
-            return    
+        
+        -- Bagian POV dihapus dari sini karena sudah ditangani khusus di atas    
         end    
     
         updateState(newState)    
@@ -5230,7 +5274,7 @@ local function createGridButton(parent, name, text, initialState, onChange)
     end)    
     
     return button    
-end  
+end
   
   
 local function createSidebarItem(parent, text, icon, active)  

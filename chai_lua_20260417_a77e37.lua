@@ -5626,6 +5626,7 @@ local function createGUI()
     -- Default tampilkan FEATURES
     featuresItem.MouseButton1Click:Fire()
 end
+
 -- ============================================================================
 -- RESTORE FEATURE STATES FUNCTION (LENGKAP)
 -- ============================================================================

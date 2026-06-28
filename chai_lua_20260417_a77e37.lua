@@ -1681,7 +1681,7 @@ local function autoParryLoop()
         "rbxassetid://97915871372697",
         "rbxassetid://123307242865945",
         "rbxassetid://127096285501517",
-        "rbxassetid://97915871372700"
+        "rbxassetid://126894569253341"
     }
 
     -- ================================

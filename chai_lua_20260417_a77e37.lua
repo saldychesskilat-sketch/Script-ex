@@ -5384,26 +5384,43 @@ local function createGUI()
 
     -- Stroke utama
     mainStroke = Instance.new("UIStroke")
+    mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     mainStroke.Color = config.guiThemeColor
     mainStroke.Thickness = 1.5
-    mainStroke.Transparency = 0.2
+    mainStroke.Transparency = 0.15
     mainStroke.Parent = mainFrame
 
-    -- Glow layer 1
+    -- Glow Layer 1
     local glow1 = Instance.new("UIStroke")
     glow1.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     glow1.Color = config.guiThemeColor
     glow1.Thickness = 3
-    glow1.Transparency = 0.55
+    glow1.Transparency = 0.35
     glow1.Parent = mainFrame
 
-    -- Glow layer 2
+    -- Glow Layer 2
     local glow2 = Instance.new("UIStroke")
     glow2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     glow2.Color = config.guiThemeColor
-    glow2.Thickness = 6
-    glow2.Transparency = 0.8
+    glow2.Thickness = 5
+    glow2.Transparency = 0.55
     glow2.Parent = mainFrame
+
+    -- Glow Layer 3
+    local glow3 = Instance.new("UIStroke")
+    glow3.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glow3.Color = config.guiThemeColor
+    glow3.Thickness = 7
+    glow3.Transparency = 0.75
+    glow3.Parent = mainFrame
+ 
+    -- Glow Layer 4
+    local glow4 = Instance.new("UIStroke")
+    glow4.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glow4.Color = config.guiThemeColor
+    glow4.Thickness = 9
+    glow4.Transparency = 0.9
+    glow4.Parent = mainFrame
 
     local titleBar = Instance.new("Frame")  
     titleBar.Size = UDim2.new(1, 0, 0, 24)  

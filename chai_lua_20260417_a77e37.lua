@@ -1803,7 +1803,15 @@ local function autoParryLoop()
         "rbxassetid://135002183282873",
         "rbxassetid://121216847022485",
         "rbxassetid://118907603246885",
-        "rbxassetid://78432063483146"
+        "rbxassetid://78432063483146",
+        "rbxassetid://105374834496520",
+        "rbxassetid://111920872708571",
+        "rbxassetid://115244153053858",
+        "rbxassetid://130593238885843",
+        "rbxassetid://80411309607666",
+        "rbxassetid://98163597193511",
+        "rbxassetid://88848807662765",
+        "rbxassetid://123809268724645"
     }
 
     local function isCombatAnimation(animId)

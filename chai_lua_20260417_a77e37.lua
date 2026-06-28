@@ -5361,30 +5361,49 @@ end
 -- ============================================================================    
 -- MAIN GUI (dengan minimize ke floating bar)    
 -- ============================================================================    
-local function createGUI()  
-    if screenGui then screenGui:Destroy() end  
-    screenGui = Instance.new("ScreenGui")  
-    screenGui.Name = "CyberHeroes_GUI"  
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling  
-    screenGui.Parent = CoreGui  
-    screenGui.ResetOnSpawn = false  
-  
-    mainFrame = Instance.new("Frame")  
-    mainFrame.Name = "MainWindow"  
-    mainFrame.Size = UDim2.new(0, 360, 0, 240)  
-    mainFrame.Position = UDim2.new(0.5, -180, 0.5, -120)  
-    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)  
-    mainFrame.BackgroundTransparency = 0.1  
-    mainFrame.BorderSizePixel = 0  
-    mainFrame.Parent = screenGui  
-    local mainCorner = Instance.new("UICorner")  
-    mainCorner.CornerRadius = UDim.new(0, 8)  
-    mainCorner.Parent = mainFrame  
-    mainStroke = Instance.new("UIStroke")  
-    mainStroke.Color = config.guiThemeColor  
-    mainStroke.Thickness = 1.5  
-    mainStroke.Transparency = 0.4  
+local function createGUI()
+    if screenGui then screenGui:Destroy() end
+    screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CyberHeroes_GUI"
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = CoreGui
+    screenGui.ResetOnSpawn = false
+
+    mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainWindow"
+    mainFrame.Size = UDim2.new(0, 360, 0, 240)
+    mainFrame.Position = UDim2.new(0.5, -180, 0.5, -120)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+    mainFrame.BackgroundTransparency = 0.1
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.Parent = mainFrame
+
+    -- Stroke utama
+    mainStroke = Instance.new("UIStroke")
+    mainStroke.Color = config.guiThemeColor
+    mainStroke.Thickness = 1.5
+    mainStroke.Transparency = 0.2
     mainStroke.Parent = mainFrame
+
+    -- Glow layer 1
+    local glow1 = Instance.new("UIStroke")
+    glow1.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glow1.Color = config.guiThemeColor
+    glow1.Thickness = 3
+    glow1.Transparency = 0.55
+    glow1.Parent = mainFrame
+
+    -- Glow layer 2
+    local glow2 = Instance.new("UIStroke")
+    glow2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glow2.Color = config.guiThemeColor
+    glow2.Thickness = 6
+    glow2.Transparency = 0.8
+    glow2.Parent = mainFrame
 
     local titleBar = Instance.new("Frame")  
     titleBar.Size = UDim2.new(1, 0, 0, 24)  

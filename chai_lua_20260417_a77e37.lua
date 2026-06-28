@@ -1678,7 +1678,7 @@ local function autoParryLoop()
 
     local ANIMATION_LIST = {"Parry 1", "Parry 2", "Parry 3", "Parry 4"}
     local ANIMATION_IDS = {
-        "rbxassetid://97915871372697",
+        "rbxassetid://109133187196613",
         "rbxassetid://123307242865945",
         "rbxassetid://127096285501517",
         "rbxassetid://126894569253341"

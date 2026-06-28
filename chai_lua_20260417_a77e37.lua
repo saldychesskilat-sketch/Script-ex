@@ -5391,131 +5391,89 @@ local function createGUI()
     mainStroke.Parent = mainFrame
 
     -- ============================================================
-    -- [EFEK VISUAL MODERN] Aura, Pulse, Glow, Lightning Flash
+    -- [EFEK GLOW PINGGIRAN WINDOW] - TANPA PULSE, UKURAN SAMA
     -- ============================================================
 
-    -- Fungsi pembuat efek (modular, reusable)
-    local function createWindowEffects(targetFrame, parentGui)
-    -- Buat frame pembungkus untuk efek (sibling dari targetFrame)
-    local auraFrame = Instance.new("Frame")
-    auraFrame.Name = "WindowAura"
-    auraFrame.BackgroundTransparency = 1
-    auraFrame.BorderSizePixel = 0
-    auraFrame.AnchorPoint = targetFrame.AnchorPoint
-    auraFrame.Size = targetFrame.Size + UDim2.new(0, 24, 0, 24)  -- lebih besar 24px
-    auraFrame.Position = targetFrame.Position - UDim2.new(0, 12, 0, 12)
-    auraFrame.Parent = parentGui
-    auraFrame.ZIndex = 0  -- di belakang mainFrame
+    local function createWindowGlow(targetFrame, parentGui)
+    -- Frame untuk glow (sama persis ukuran dan posisi dengan targetFrame)
+    local glowFrame = Instance.new("Frame")
+    glowFrame.Name = "WindowGlow"
+    glowFrame.BackgroundTransparency = 1
+    glowFrame.BorderSizePixel = 0
+    glowFrame.AnchorPoint = targetFrame.AnchorPoint
+    glowFrame.Size = targetFrame.Size
+    glowFrame.Position = targetFrame.Position
+    glowFrame.Parent = parentGui
+    glowFrame.ZIndex = 0  -- di belakang mainFrame
 
-    -- --- Outer Glow (beberapa lapisan stroke) ---
+    -- --- Lapisan glow (3 stroke) ---
     local glow1 = Instance.new("UIStroke")
-    glow1.Color = Color3.fromRGB(255, 50, 50)
-    glow1.Thickness = 6
-    glow1.Transparency = 0.85
-    glow1.Parent = auraFrame
+    glow1.Color = Color3.fromRGB(255, 80, 80)
+    glow1.Thickness = 4
+    glow1.Transparency = 0.7
+    glow1.Parent = glowFrame
 
     local glow2 = Instance.new("UIStroke")
-    glow2.Color = Color3.fromRGB(255, 30, 30)
-    glow2.Thickness = 14
-    glow2.Transparency = 0.92
-    glow2.Parent = auraFrame
+    glow2.Color = Color3.fromRGB(255, 40, 40)
+    glow2.Thickness = 10
+    glow2.Transparency = 0.85
+    glow2.Parent = glowFrame
 
     local glow3 = Instance.new("UIStroke")
     glow3.Color = Color3.fromRGB(200, 0, 0)
-    glow3.Thickness = 26
-    glow3.Transparency = 0.96
-    glow3.Parent = auraFrame
+    glow3.Thickness = 18
+    glow3.Transparency = 0.93
+    glow3.Parent = glowFrame
 
-    -- --- Energy Border (gradien berjalan) ---
+    -- --- Border animasi (gradien berjalan) ---
     local borderStroke = Instance.new("UIStroke")
     borderStroke.Color = Color3.fromRGB(255, 100, 100)
     borderStroke.Thickness = 2
-    borderStroke.Transparency = 0.4
-    borderStroke.Parent = auraFrame
+    borderStroke.Transparency = 0.3
+    borderStroke.Parent = glowFrame
 
-    local borderGradient = Instance.new("UIGradient")
-    borderGradient.Rotation = 0
-    borderGradient.Color = ColorSequence.new({
+    local gradient = Instance.new("UIGradient")
+    gradient.Rotation = 0
+    gradient.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
         ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 200, 200)),
         ColorSequenceKeypoint.new(0.6, Color3.fromRGB(200, 0, 0)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 50))
     })
-    borderGradient.Parent = borderStroke
+    gradient.Parent = borderStroke
 
-    -- --- Pulse Animation (ukuran membesar-mengecil) ---
-    local pulseTween = nil
-    local function startPulse()
-        if pulseTween then pulseTween:Cancel() end
-        pulseTween = TweenService:Create(
-            auraFrame,
-            TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-            {Size = targetFrame.Size + UDim2.new(0, 32, 0, 32)}
-        )
-        pulseTween:Play()
-        -- Kembalikan ukuran setelah beberapa waktu? Sebenarnya kita bisa buat siklus.
-        -- Tapi karena TweenInfo dengan -1 repeats, kita perlu reset ukuran setelah selesai? 
-        -- Lebih baik buat dua tween bergantian.
-    end
-
-    -- Alternatif pulse: gunakan loop dengan dua tween
-    local pulseDir = 1
-    local function pulseLoop()
-        if not auraFrame.Parent then return end
-        local targetSize = targetFrame.Size + (pulseDir == 1 and UDim2.new(0, 32, 0, 32) or UDim2.new(0, 16, 0, 16))
-        local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(auraFrame, tweenInfo, {Size = targetSize})
-        tween:Play()
-        tween.Completed:Connect(function()
-            pulseDir = pulseDir * -1
-            pulseLoop()
-        end)
-    end
-    pulseLoop()
-
-    -- --- Lightning Flash (kilatan acak) ---
-    local flashStroke = Instance.new("UIStroke")
-    flashStroke.Color = Color3.fromRGB(255, 255, 255)
-    flashStroke.Thickness = 4
-    flashStroke.Transparency = 0.9
-    flashStroke.Parent = auraFrame
-
-    local flashTimer = 0
-    local flashConn
-    flashConn = RunService.Heartbeat:Connect(function(dt)
-        flashTimer = flashTimer + dt
-        if flashTimer > 3 + math.random() * 4 then  -- setiap 3-7 detik
-            flashTimer = 0
-            flashStroke.Transparency = 0.2
-            TweenService:Create(flashStroke, TweenInfo.new(0.1), {Transparency = 0.9}):Play()
-        end
+    -- --- Update rotasi gradien (animasi border) ---
+    local rot = 0
+    local rotConn
+    rotConn = RunService.Heartbeat:Connect(function(dt)
+        rot = (rot + dt * 30) % 360
+        gradient.Rotation = rot
     end)
 
-    -- --- Sinkronisasi posisi saat window di-drag ---
+    -- --- Sinkron posisi dan ukuran ---
     local syncConn
     syncConn = RunService.RenderStepped:Connect(function()
-        if not auraFrame.Parent or not targetFrame.Parent then
+        if not glowFrame.Parent or not targetFrame.Parent then
             syncConn:Disconnect()
             return
         end
-        auraFrame.Position = targetFrame.Position - UDim2.new(0, 12, 0, 12)
-        auraFrame.Size = targetFrame.Size + UDim2.new(0, 24, 0, 24)
+        glowFrame.Position = targetFrame.Position
+        glowFrame.Size = targetFrame.Size
     end)
 
     -- --- Cleanup ---
     local function cleanup()
-        if pulseTween then pulseTween:Cancel() end
-        if flashConn then flashConn:Disconnect() end
+        if rotConn then rotConn:Disconnect() end
         if syncConn then syncConn:Disconnect() end
-        auraFrame:Destroy()
+        glowFrame:Destroy()
+    end
+    parentGui.Destroying:Connect(cleanup)
+
+    return glowFrame
     end
 
-    -- Kaitkan cleanup ke penghancuran GUI
-    screenGui.Destroying:Connect(cleanup)
-    -- Jika ada tombol close yang menghancurkan screenGui, cleanup otomatis terpanggil.
-
-    return auraFrame
-    end
+    -- Panggil efek (setelah mainFrame dibuat)
+    local glow = createWindowGlow(mainFrame, screenGui)
 
     -- Panggil fungsi efek (setelah mainFrame dibuat)
     local aura = createWindowEffects(mainFrame, screenGui)

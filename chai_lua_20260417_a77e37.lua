@@ -5908,6 +5908,7 @@ local function init()
     ensureGUIPersistent()
     startAllSystems()
     restoreFeatureStates()
+    createPermanentTeleportButton()
 end
 
 task.wait(1)

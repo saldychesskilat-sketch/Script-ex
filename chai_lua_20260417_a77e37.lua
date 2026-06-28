@@ -5365,131 +5365,30 @@ end
 -- [EFEK VISUAL MODERN] Aura, Pulse, Glow, Lightning Flash
 -- ============================================================
 
--- Fungsi pembuat efek (modular, reusable)
-local function createWindowEffects(targetFrame, parentGui)
-    -- Buat frame pembungkus untuk efek (sibling dari targetFrame)
-    local auraFrame = Instance.new("Frame")
-    auraFrame.Name = "WindowAura"
-    auraFrame.BackgroundTransparency = 1
-    auraFrame.BorderSizePixel = 0
-    auraFrame.AnchorPoint = targetFrame.AnchorPoint
-    auraFrame.Size = targetFrame.Size + UDim2.new(0, 24, 0, 24)  -- lebih besar 24px
-    auraFrame.Position = targetFrame.Position - UDim2.new(0, 12, 0, 12)
-    auraFrame.Parent = parentGui
-    auraFrame.ZIndex = 0  -- di belakang mainFrame
-
-    -- --- Outer Glow (beberapa lapisan stroke) ---
-    local glow1 = Instance.new("UIStroke")
-    glow1.Color = Color3.fromRGB(255, 50, 50)
-    glow1.Thickness = 6
-    glow1.Transparency = 0.85
-    glow1.Parent = auraFrame
-
-    local glow2 = Instance.new("UIStroke")
-    glow2.Color = Color3.fromRGB(255, 30, 30)
-    glow2.Thickness = 14
-    glow2.Transparency = 0.92
-    glow2.Parent = auraFrame
-
-    local glow3 = Instance.new("UIStroke")
-    glow3.Color = Color3.fromRGB(200, 0, 0)
-    glow3.Thickness = 26
-    glow3.Transparency = 0.96
-    glow3.Parent = auraFrame
-
-    -- --- Energy Border (gradien berjalan) ---
-    local borderStroke = Instance.new("UIStroke")
-    borderStroke.Color = Color3.fromRGB(255, 100, 100)
-    borderStroke.Thickness = 2
-    borderStroke.Transparency = 0.4
-    borderStroke.Parent = auraFrame
-
-    local borderGradient = Instance.new("UIGradient")
-    borderGradient.Rotation = 0
-    borderGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 50)),
-        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(255, 200, 200)),
-        ColorSequenceKeypoint.new(0.6, Color3.fromRGB(200, 0, 0)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 50, 50))
-    })
-    borderGradient.Parent = borderStroke
-
-    -- --- Pulse Animation (ukuran membesar-mengecil) ---
-    local pulseTween = nil
-    local function startPulse()
-        if pulseTween then pulseTween:Cancel() end
-        pulseTween = TweenService:Create(
-            auraFrame,
-            TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-            {Size = targetFrame.Size + UDim2.new(0, 32, 0, 32)}
-        )
-        pulseTween:Play()
-        -- Kembalikan ukuran setelah beberapa waktu? Sebenarnya kita bisa buat siklus.
-        -- Tapi karena TweenInfo dengan -1 repeats, kita perlu reset ukuran setelah selesai? 
-        -- Lebih baik buat dua tween bergantian.
-    end
-
-    -- Alternatif pulse: gunakan loop dengan dua tween
-    local pulseDir = 1
-    local function pulseLoop()
-        if not auraFrame.Parent then return end
-        local targetSize = targetFrame.Size + (pulseDir == 1 and UDim2.new(0, 32, 0, 32) or UDim2.new(0, 16, 0, 16))
-        local tweenInfo = TweenInfo.new(1.0, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-        local tween = TweenService:Create(auraFrame, tweenInfo, {Size = targetSize})
-        tween:Play()
-        tween.Completed:Connect(function()
-            pulseDir = pulseDir * -1
-            pulseLoop()
-        end)
-    end
-    pulseLoop()
-
-    -- --- Lightning Flash (kilatan acak) ---
-    local flashStroke = Instance.new("UIStroke")
-    flashStroke.Color = Color3.fromRGB(255, 255, 255)
-    flashStroke.Thickness = 4
-    flashStroke.Transparency = 0.9
-    flashStroke.Parent = auraFrame
-
-    local flashTimer = 0
-    local flashConn
-    flashConn = RunService.Heartbeat:Connect(function(dt)
-        flashTimer = flashTimer + dt
-        if flashTimer > 3 + math.random() * 4 then  -- setiap 3-7 detik
-            flashTimer = 0
-            flashStroke.Transparency = 0.2
-            TweenService:Create(flashStroke, TweenInfo.new(0.1), {Transparency = 0.9}):Play()
-        end
-    end)
-
-    -- --- Sinkronisasi posisi saat window di-drag ---
-    local syncConn
-    syncConn = RunService.RenderStepped:Connect(function()
-        if not auraFrame.Parent or not targetFrame.Parent then
-            syncConn:Disconnect()
-            return
-        end
-        auraFrame.Position = targetFrame.Position - UDim2.new(0, 12, 0, 12)
-        auraFrame.Size = targetFrame.Size + UDim2.new(0, 24, 0, 24)
-    end)
-
-    -- --- Cleanup ---
-    local function cleanup()
-        if pulseTween then pulseTween:Cancel() end
-        if flashConn then flashConn:Disconnect() end
-        if syncConn then syncConn:Disconnect() end
-        auraFrame:Destroy()
-    end
-
-    -- Kaitkan cleanup ke penghancuran GUI
-    screenGui.Destroying:Connect(cleanup)
-    -- Jika ada tombol close yang menghancurkan screenGui, cleanup otomatis terpanggil.
-
-    return auraFrame
-
-    -- Panggil fungsi efek (setelah mainFrame dibuat)
-    local aura = createWindowEffects(mainFrame, screenGui)
+local function createGUI()  
+    if screenGui then screenGui:Destroy() end  
+    screenGui = Instance.new("ScreenGui")  
+    screenGui.Name = "CyberHeroes_GUI"  
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling  
+    screenGui.Parent = CoreGui  
+    screenGui.ResetOnSpawn = false  
   
+    mainFrame = Instance.new("Frame")  
+    mainFrame.Name = "MainWindow"  
+    mainFrame.Size = UDim2.new(0, 360, 0, 240)  
+    mainFrame.Position = UDim2.new(0.5, -180, 0.5, -120)  
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 5, 10)  
+    mainFrame.BackgroundTransparency = 0.1  
+    mainFrame.BorderSizePixel = 0  
+    mainFrame.Parent = screenGui  
+    local mainCorner = Instance.new("UICorner")  
+    mainCorner.CornerRadius = UDim.new(0, 8)  
+    mainCorner.Parent = mainFrame  
+    mainStroke = Instance.new("UIStroke")  
+    mainStroke.Color = config.guiThemeColor  
+    mainStroke.Thickness = 1.5  
+    mainStroke.Transparency = 0.4  
+    mainStroke.Parent = mainFrame  
     local titleBar = Instance.new("Frame")  
     titleBar.Size = UDim2.new(1, 0, 0, 24)  
     titleBar.BackgroundColor3 = Color3.fromRGB(25, 3, 7)  
@@ -5499,6 +5398,7 @@ local function createWindowEffects(targetFrame, parentGui)
     local titleCorner = Instance.new("UICorner")  
     titleCorner.CornerRadius = UDim.new(0, 8)  
     titleCorner.Parent = titleBar  
+    
     local title = Instance.new("TextLabel")  
     title.Size = UDim2.new(0.5, 0, 1, 0)  
     title.Position = UDim2.new(0.02, 0, 0, 0)  

@@ -5361,10 +5361,6 @@ end
 -- ============================================================================    
 -- MAIN GUI (dengan minimize ke floating bar)    
 -- ============================================================================    
--- ============================================================
--- [EFEK VISUAL MODERN] Aura, Pulse, Glow, Lightning Flash
--- ============================================================
-
 local function createGUI()  
     if screenGui then screenGui:Destroy() end  
     screenGui = Instance.new("ScreenGui")  
@@ -5389,6 +5385,55 @@ local function createGUI()
     mainStroke.Thickness = 1.5  
     mainStroke.Transparency = 0.4  
     mainStroke.Parent = mainFrame
+    -- ============================================================
+    -- WHITE OUTER GLOW
+    -- ============================================================
+
+    local glowFrame = Instance.new("Frame")
+    glowFrame.Name = "WhiteGlow"
+    glowFrame.Size = mainFrame.Size
+    glowFrame.Position = mainFrame.Position
+    glowFrame.AnchorPoint = mainFrame.AnchorPoint
+    glowFrame.BackgroundTransparency = 1
+    glowFrame.BorderSizePixel = 0
+    glowFrame.ZIndex = mainFrame.ZIndex - 1
+    glowFrame.Parent = screenGui
+
+    local glowCorner = Instance.new("UICorner")
+    glowCorner.CornerRadius = UDim.new(0, 8)
+    glowCorner.Parent = glowFrame
+
+    -- Glow dekat border
+    local glow1 = Instance.new("UIStroke")
+    glow1.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glow1.Color = Color3.fromRGB(255,255,255)
+    glow1.Thickness = 2
+    glow1.Transparency = 0.45
+    glow1.Parent = glowFrame
+
+    -- Glow sedang
+    local glow2 = Instance.new("UIStroke")
+    glow2.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glow2.Color = Color3.fromRGB(255,255,255)
+    glow2.Thickness = 5
+    glow2.Transparency = 0.75
+    glow2.Parent = glowFrame
+
+    -- Glow luar
+    local glow3 = Instance.new("UIStroke")
+    glow3.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glow3.Color = Color3.fromRGB(255,255,255)
+    glow3.Thickness = 8
+    glow3.Transparency = 0.9
+    glow3.Parent = glowFrame
+
+    -- Sinkron ukuran dan posisi
+    RunService.RenderStepped:Connect(function()
+    if glowFrame.Parent and mainFrame.Parent then
+        glowFrame.Position = mainFrame.Position
+        glowFrame.Size = mainFrame.Size
+    end
+
 
     local titleBar = Instance.new("Frame")  
     titleBar.Size = UDim2.new(1, 0, 0, 24)  

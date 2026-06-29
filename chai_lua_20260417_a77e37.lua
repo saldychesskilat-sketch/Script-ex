@@ -1781,7 +1781,7 @@ local function autoParryLoop()
             playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
         end)
         task.spawn(function()
-            startFreeze(2)
+            startFreeze(1.5)
         end)
     end
 

@@ -930,9 +930,8 @@ end
 -- Fungsi updateAllESP() tetap dipanggil untuk mengaktifkan/menonaktifkan ESP.
 -- ============================================================================
 
-
 -- ============================================================================
--- TPWALK NAMESPACE
+-- TPWALK NAMESPACE (AI MODE: KILLER / SURVIVAL)
 -- ============================================================================
 
 local TPWALK_SYSTEM = {}
@@ -940,116 +939,165 @@ local TPWALK_SYSTEM = {}
 TPWALK_SYSTEM.Active = false
 TPWALK_SYSTEM.Speed = 1
 TPWALK_SYSTEM.Connection = nil
-TPWALK_SYSTEM.LastMoveDirection = Vector3.zero
 TPWALK_SYSTEM.CharacterConnection = nil
+TPWALK_SYSTEM.Mode = "Survival"   -- default mode
+TPWALK_SYSTEM.MonitorConnection = nil
 
 -- ============================================================================
--- FUNGSI UTAMA TPWALK
+-- GUI PEMILIH MODE (KILLER / SURVIVAL)
+-- ============================================================================
+
+local function createTPWalkModeGUI()
+    if TPWALK_SYSTEM.ModeGui then
+        TPWALK_SYSTEM.ModeGui:Destroy()
+        TPWALK_SYSTEM.ModeGui = nil
+    end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "TPWalkModeSelector"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 180, 0, 60)
+    frame.Position = UDim2.new(0.5, -90, 0.5, 80)
+    frame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 180, 255)
+    stroke.Thickness = 1.2
+    stroke.Transparency = 0.4
+    stroke.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = "Mode AI"
+    label.TextColor3 = Color3.fromRGB(0, 220, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 12
+    label.Parent = frame
+
+    local btnKiller = Instance.new("TextButton")
+    btnKiller.Size = UDim2.new(0.45, -4, 0, 24)
+    btnKiller.Position = UDim2.new(0.03, 0, 0.6, 0)
+    btnKiller.BackgroundColor3 = (TPWALK_SYSTEM.Mode == "Killer") and Color3.fromRGB(0, 140, 200) or Color3.fromRGB(30, 40, 60)
+    btnKiller.Text = "Killer"
+    btnKiller.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnKiller.Font = Enum.Font.GothamBold
+    btnKiller.TextSize = 11
+    btnKiller.BorderSizePixel = 0
+    btnKiller.Parent = frame
+    local cornerK = Instance.new("UICorner")
+    cornerK.CornerRadius = UDim.new(0, 4)
+    cornerK.Parent = btnKiller
+
+    local btnSurvival = Instance.new("TextButton")
+    btnSurvival.Size = UDim2.new(0.45, -4, 0, 24)
+    btnSurvival.Position = UDim2.new(0.52, 0, 0.6, 0)
+    btnSurvival.BackgroundColor3 = (TPWALK_SYSTEM.Mode == "Survival") and Color3.fromRGB(0, 140, 200) or Color3.fromRGB(30, 40, 60)
+    btnSurvival.Text = "Survival"
+    btnSurvival.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnSurvival.Font = Enum.Font.GothamBold
+    btnSurvival.TextSize = 11
+    btnSurvival.BorderSizePixel = 0
+    btnSurvival.Parent = frame
+    local cornerS = Instance.new("UICorner")
+    cornerS.CornerRadius = UDim.new(0, 4)
+    cornerS.Parent = btnSurvival
+
+    btnKiller.MouseButton1Click:Connect(function()
+        if TPWALK_SYSTEM.Mode == "Killer" then return end
+        TPWALK_SYSTEM.Mode = "Killer"
+        btnKiller.BackgroundColor3 = Color3.fromRGB(0, 140, 200)
+        btnSurvival.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        print("[TPWalk] Mode switched to KILLER")
+    end)
+
+    btnSurvival.MouseButton1Click:Connect(function()
+        if TPWALK_SYSTEM.Mode == "Survival" then return end
+        TPWALK_SYSTEM.Mode = "Survival"
+        btnSurvival.BackgroundColor3 = Color3.fromRGB(0, 140, 200)
+        btnKiller.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        print("[TPWalk] Mode switched to SURVIVAL")
+    end)
+
+    TPWALK_SYSTEM.ModeGui = gui
+end
+
+-- ============================================================================
+-- AI LOGIC PLACEHOLDER (isi sendiri nanti)
+-- ============================================================================
+
+local function modeKiller()
+    -- TODO: implementasi AI Killer (kejar survivor terdekat)
+    return localRootPart.CFrame.LookVector, TPWALK_SYSTEM.Speed
+end
+
+local function modeSurvival()
+    -- TODO: implementasi AI Survival (hindari killer, lari acak)
+    return -localRootPart.CFrame.LookVector, TPWALK_SYSTEM.Speed * 0.8
+end
+
+-- ============================================================================
+-- FUNGSI UTAMA TPWALK (dengan AI Mode)
 -- ============================================================================
 
 local function startTPWalk(speed)
-
-    if TPWALK_SYSTEM.Active then
-        return
-    end
+    if TPWALK_SYSTEM.Active then return end
+    if not localCharacter or not localHumanoid or not localRootPart then return end
 
     TPWALK_SYSTEM.Active = true
+    TPWALK_SYSTEM.Speed = speed or 1
 
-    local char = localCharacter
-    local hum = char and char:FindFirstChildWhichIsA("Humanoid")
-
-    if not hum then
-        TPWALK_SYSTEM.Active = false
-        return
+    if not TPWALK_SYSTEM.ModeGui then
+        createTPWalkModeGUI()
     end
 
-    -- Gunakan Heartbeat agar sinkron dengan physics Roblox
-    TPWALK_SYSTEM.Connection =
-        RunService.Heartbeat:Connect(function(deltaTime)
-
-        if not TPWALK_SYSTEM.Active then
+    TPWALK_SYSTEM.Connection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not TPWALK_SYSTEM.Active then return end
+        if not config.tpwalkEnabled then
+            stopTPWalk()
             return
         end
-
-        if not config.speedBoostEnabled then
-            return
-        end
-
-        if not localCharacter
-            or not localHumanoid
-            or not localRootPart then
-            return
-        end
-
-        -- Pastikan humanoid masih hidup
+        if not localCharacter or not localHumanoid or not localRootPart then return end
         if localHumanoid.Health <= 0 then
             stopTPWalk()
             return
         end
 
-        -- Simpan arah depan karakter
-        TPWALK_SYSTEM.LastMoveDirection =
-            localRootPart.CFrame.LookVector.Unit
+        local direction, moveSpeed
+        if TPWALK_SYSTEM.Mode == "Killer" then
+            direction, moveSpeed = modeKiller()
+        else
+            direction, moveSpeed = modeSurvival()
+        end
 
-        -- Velocity correction ringan
-        local currentVelocity =
-            localRootPart.AssemblyLinearVelocity
+        if direction.Magnitude < 0.01 then
+            direction = localRootPart.CFrame.LookVector
+        end
+        direction = direction.Unit
 
-        localRootPart.AssemblyLinearVelocity =
-            Vector3.new(
-                currentVelocity.X,
-                0,
-                currentVelocity.Z
-            )
+        local movementOffset = direction * moveSpeed * deltaTime
+        local targetCFrame = localRootPart.CFrame + movementOffset
 
-        -- Hitung perpindahan maju
-        local movementOffset =
-            TPWALK_SYSTEM.LastMoveDirection *
-            speed *
-            deltaTime
-
-        -- Target posisi baru
-        local targetCFrame =
-            localRootPart.CFrame + movementOffset
-
-        -- Teleport smooth menggunakan PivotTo
         pcall(function()
-
             localCharacter:PivotTo(targetCFrame)
-
         end)
 
-        -- Anti-air correction
         if localHumanoid.FloorMaterial == Enum.Material.Air then
-
-            local airVelocity =
-                localRootPart.AssemblyLinearVelocity
-
-            localRootPart.AssemblyLinearVelocity =
-                Vector3.new(
-                    airVelocity.X,
-                    0,
-                    airVelocity.Z
-                )
-
+            local vel = localRootPart.AssemblyLinearVelocity
+            localRootPart.AssemblyLinearVelocity = Vector3.new(vel.X, 0, vel.Z)
         end
-
-        -- Character validation
-        if not localCharacter
-            or localCharacter ~= char then
-
-            stopTPWalk()
-
-        end
-
     end)
 
-    print(
-        "[SpeedBoost] Continuous Forward TPWalk Active | Speed = "
-        .. tostring(speed)
-        .. " stud/s"
-    )
-
+    print("[TPWalk] AI Mode Active | Mode:", TPWALK_SYSTEM.Mode, "| Speed:", speed)
 end
 
 -- ============================================================================
@@ -1057,131 +1105,90 @@ end
 -- ============================================================================
 
 local function stopTPWalk()
-
     if TPWALK_SYSTEM.Connection then
-
         TPWALK_SYSTEM.Connection:Disconnect()
         TPWALK_SYSTEM.Connection = nil
-
     end
-
     TPWALK_SYSTEM.Active = false
-    TPWALK_SYSTEM.LastMoveDirection = Vector3.zero
-
+    if TPWALK_SYSTEM.ModeGui then
+        TPWALK_SYSTEM.ModeGui:Destroy()
+        TPWALK_SYSTEM.ModeGui = nil
+    end
+    print("[TPWalk] Stopped")
 end
 
 -- ============================================================================
--- CHARACTER ADDED
+-- HANDLE RESPAWN
 -- ============================================================================
 
 local function onCharacterAddedForTPWalk()
-
-    if config.speedBoostEnabled then
-
-        stopTPWalk()
-
-        task.wait(0.25)
-
-        startTPWalk(TPWALK_SYSTEM.Speed)
-
+    if config.tpwalkEnabled then
+        task.wait(0.5)
+        if not TPWALK_SYSTEM.Active then
+            startTPWalk(TPWALK_SYSTEM.Speed)
+        end
     end
-
 end
 
 -- ============================================================================
--- SPEED BOOST UTAMA
+-- MONITOR UTAMA (START / STOP via toggle)
 -- ============================================================================
 
-local function applySpeedBoost()
-    -- Kompatibilitas
+local function startTPWalkMonitor()
+    if TPWALK_SYSTEM.MonitorConnection then return end
+
+    TPWALK_SYSTEM.MonitorConnection = RunService.Heartbeat:Connect(function()
+        if not config.tpwalkEnabled then
+            if TPWALK_SYSTEM.Active then
+                stopTPWalk()
+            end
+            return
+        end
+
+        if not getLocalCharacter() or not localHumanoid or not localRootPart then
+            if TPWALK_SYSTEM.Active then
+                stopTPWalk()
+            end
+            return
+        end
+
+        if not TPWALK_SYSTEM.Active then
+            startTPWalk(TPWALK_SYSTEM.Speed)
+        end
+    end)
+
+    if TPWALK_SYSTEM.CharacterConnection then
+        TPWALK_SYSTEM.CharacterConnection:Disconnect()
+    end
+    TPWALK_SYSTEM.CharacterConnection = localPlayer.CharacterAdded:Connect(onCharacterAddedForTPWalk)
+
+    print("[TPWalk] Monitor Started")
+end
+
+local function stopTPWalkMonitor()
+    if TPWALK_SYSTEM.MonitorConnection then
+        TPWALK_SYSTEM.MonitorConnection:Disconnect()
+        TPWALK_SYSTEM.MonitorConnection = nil
+    end
+    if TPWALK_SYSTEM.CharacterConnection then
+        TPWALK_SYSTEM.CharacterConnection:Disconnect()
+        TPWALK_SYSTEM.CharacterConnection = nil
+    end
+    stopTPWalk()
+    print("[TPWalk] Monitor Stopped")
 end
 
 -- ============================================================================
--- MONITOR UTAMA
+-- KOMPATIBILITAS DENGAN FITUR LAMA (speedBoostEnabled)
 -- ============================================================================
 
 local function startSpeedBoostMonitor()
-
-    if currentBoostConnection then
-        return
-    end
-
-    currentBoostConnection =
-        RunService.Heartbeat:Connect(function()
-
-        if not config.speedBoostEnabled then
-
-            if TPWALK_SYSTEM.Active then
-                stopTPWalk()
-            end
-
-            return
-        end
-
-        if not getLocalCharacter()
-            or not localHumanoid
-            or not localRootPart then
-
-            if TPWALK_SYSTEM.Active then
-                stopTPWalk()
-            end
-
-            return
-        end
-
-        -- Pastikan TPWalk aktif
-        if not TPWALK_SYSTEM.Active then
-
-            startTPWalk(TPWALK_SYSTEM.Speed)
-
-        end
-
-    end)
-
-    -- Hindari connection duplicate
-    if TPWALK_SYSTEM.CharacterConnection then
-        TPWALK_SYSTEM.CharacterConnection:Disconnect()
-    end
-
-    TPWALK_SYSTEM.CharacterConnection =
-        localPlayer.CharacterAdded:Connect(
-            onCharacterAddedForTPWalk
-        )
-
-    print(
-        "[SpeedBoost] TPWalk Monitor Active | Speed = "
-        .. tostring(TPWALK_SYSTEM.Speed)
-    )
-
+    startTPWalkMonitor()
 end
-
--- ============================================================================
--- STOP MONITOR
--- ============================================================================
 
 local function stopSpeedBoostMonitor()
-
-    if currentBoostConnection then
-
-        currentBoostConnection:Disconnect()
-        currentBoostConnection = nil
-
-    end
-
-    if TPWALK_SYSTEM.CharacterConnection then
-
-        TPWALK_SYSTEM.CharacterConnection:Disconnect()
-        TPWALK_SYSTEM.CharacterConnection = nil
-
-    end
-
-    stopTPWalk()
-
-    print("[SpeedBoost] TPWalk stopped")
-
+    stopTPWalkMonitor()
 end
-
-
 -- ============================================================================
 -- ============================================================================
 -- STEALTH INVISIBILITY (UPGRADED - SEAT METHOD + PRE-TELEPORT)
@@ -5679,7 +5686,7 @@ local function createGUI()
             {name="autoWinEnabled", text="AUTO WIN"},
             {name="autoTaskEnabled", text="AUTO TASK"},
             {name="espEnabled", text="ESP"},
-            {name="speedBoostEnabled", text="SPEED BOOST"},
+            {name="speedBoostEnabled", text="Play AI"},
             {name="stealthEnabled", text="STEALTH"},
             {name="godModeEnabled", text="GOD MODE"},
             {name="infiniteAmmoEnabled", text="Dagger"},

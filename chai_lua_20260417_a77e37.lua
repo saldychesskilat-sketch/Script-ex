@@ -1591,29 +1591,17 @@ end
 -- ============================================
 
 -- Cari RemoteEvent parry
-local function findParryRemote()
+-- Cari RemoteEvent parry dan parryResult (sekaligus)
+local function findParryRemotes()
     local path = game:GetService("ReplicatedStorage")
     path = path and path:FindFirstChild("Remotes")
     path = path and path:FindFirstChild("Items")
     path = path and path:FindFirstChild("Parrying Dagger")
-    path = path and path:FindFirstChild("parry")
-    if path and path:IsA("RemoteEvent") then
-        return path
-    end
-    return nil
-end
-
--- Cari RemoteEvent parryResult
-local function findParryResultRemote()
-    local path = game:GetService("ReplicatedStorage")
-    path = path and path:FindFirstChild("Remotes")
-    path = path and path:FindFirstChild("Items")
-    path = path and path:FindFirstChild("Parrying Dagger")
-    path = path and path:FindFirstChild("parryResult")
-    if path and path:IsA("RemoteEvent") then
-        return path
-    end
-    return nil
+    
+    local parry = path and path:FindFirstChild("parry")
+    local parryResult = path and path:FindFirstChild("parryResult")
+    
+    return parry, parryResult
 end
 
 -- Cari tombol action
@@ -1629,22 +1617,21 @@ end
 
 -- Fungsi utama: remote event dulu, lalu action button
 local function fireParryRemote(player)
-    local remote = findParryRemote()
-    local resultRemote = findParryResultRemote()
+    local parry, parryResult = findParryRemotes()
     
-    if remote then
+    if parry then
         pcall(function()
-            remote:FireServer()
-            remote:FireServer("parry")
-            remote:FireServer("Parrying Dagger")
+            parry:FireServer()
+            parry:FireServer("parry")
+            parry:FireServer("Parrying Dagger")
         end)
     end
     
-    if resultRemote then
+    if parryResult then
         pcall(function()
-            resultRemote:FireServer()
-            resultRemote:FireServer("parryResult")
-            resultRemote:FireServer("Parrying Dagger")
+            parryResult:FireServer()
+            parryResult:FireServer("parryResult")
+            parryResult:FireServer("Parrying Dagger")
         end)
     end
 

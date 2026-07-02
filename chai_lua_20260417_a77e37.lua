@@ -5459,7 +5459,7 @@ local function createGUI()
     local title = Instance.new("TextLabel")  
     title.Size = UDim2.new(0.5, 0, 1, 0)  
     title.Position = UDim2.new(0.02, 0, 0, 0)  
-    title.Text = "           KEMI"  
+    title.Text = "Cyberheroes script by KEMI"  
     title.TextColor3 = config.guiThemeColor  
     title.BackgroundTransparency = 1  
     title.Font = Enum.Font.GothamBold  

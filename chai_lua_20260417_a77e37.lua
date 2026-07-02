@@ -3503,7 +3503,7 @@ local function createHomeContent()
     logo.Position = UDim2.new(0.5,0,0.5,0)
     logo.BackgroundTransparency = 1
     logo.BorderSizePixel = 0
-    logo.Image = "rbxassetid://115802866071757"
+    logo.Image = "rbxassetid://76051161792347"
     logo.ScaleType = Enum.ScaleType.Fit
     logo.Visible = true
     logo.ImageTransparency = 0
@@ -5437,7 +5437,7 @@ local function createGUI()
     local title = Instance.new("TextLabel")  
     title.Size = UDim2.new(0.5, 0, 1, 0)  
     title.Position = UDim2.new(0.02, 0, 0, 0)  
-    title.Text = "CYBERHEROES script by kemi"  
+    title.Text = "kemi"  
     title.TextColor3 = config.guiThemeColor  
     title.BackgroundTransparency = 1  
     title.Font = Enum.Font.GothamBold  

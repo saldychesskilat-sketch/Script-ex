@@ -1603,6 +1603,19 @@ local function findParryRemote()
     return nil
 end
 
+-- Cari RemoteEvent parryResult
+local function findParryResultRemote()
+    local path = game:GetService("ReplicatedStorage")
+    path = path and path:FindFirstChild("Remotes")
+    path = path and path:FindFirstChild("Items")
+    path = path and path:FindFirstChild("Parrying Dagger")
+    path = path and path:FindFirstChild("parryResult")
+    if path and path:IsA("RemoteEvent") then
+        return path
+    end
+    return nil
+end
+
 -- Cari tombol action
 local function findActionButton()
     local playerGui = localPlayer:FindFirstChild("PlayerGui")
@@ -1617,12 +1630,21 @@ end
 -- Fungsi utama: remote event dulu, lalu action button
 local function fireParryRemote(player)
     local remote = findParryRemote()
+    local resultRemote = findParryResultRemote()
+    
     if remote then
         pcall(function()
             remote:FireServer()
-            -- Coba berbagai argumen jika diperlukan
             remote:FireServer("parry")
             remote:FireServer("Parrying Dagger")
+        end)
+    end
+    
+    if resultRemote then
+        pcall(function()
+            resultRemote:FireServer()
+            resultRemote:FireServer("parryResult")
+            resultRemote:FireServer("Parrying Dagger")
         end)
     end
 
@@ -3503,7 +3525,7 @@ local function createHomeContent()
     logo.Position = UDim2.new(0.5,0,0.5,0)
     logo.BackgroundTransparency = 1
     logo.BorderSizePixel = 0
-    logo.Image = "rbxassetid://76051161792347"
+    logo.Image = "rbxassetid://127173186832760"
     logo.ScaleType = Enum.ScaleType.Fit
     logo.Visible = true
     logo.ImageTransparency = 0

@@ -5628,7 +5628,8 @@ local function createGUI()
     sidebarLayout.Parent = sidebarList  
   
     local homeItem = createSidebarItem(sidebarList, "HOME", "", false)  
-    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false)  
+    local featuresItem = createSidebarItem(sidebarList, "FEATURES", "", false) 
+    featuresItem.TextColor3 = Color3.fromRGB(0,230,255)
     local settingsItem = createSidebarItem(sidebarList, "SETTINGS", "", false)  
     local infoItem = createSidebarItem(sidebarList, "INFO", "", false)  
     local aboutItem = createSidebarItem(sidebarList, "ABOUT", "", false)  

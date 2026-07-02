@@ -3097,7 +3097,7 @@ local function TriggerMobileButton()
         local cx, cy = p.X + (s.X/2) + i.X, p.Y + (s.Y/2) + i.Y                
         pcall(function()                
             VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy)                
-            task.wait(0.01)                
+            task.wait(0)                
             VirtualInputManager:SendTouchEvent(TouchID, 2, cx, cy)                
         end)                
     end                

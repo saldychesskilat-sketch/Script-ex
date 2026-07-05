@@ -629,29 +629,42 @@ local function createHighlightForPlayer(player)
     end
 
     local character = player.Character
-    if not character then return end
+    if not character then
+        return
+    end
 
     local function getPlayerType()
         local isKiller = false
+
         if player.Team then
             local teamName = player.Team.Name:lower()
-            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+            if teamName:find("killer")
+                or teamName:find("monster")
+                or teamName:find("enemy") then
                 isKiller = true
             end
         end
+
         if not isKiller then
             local tool = character:FindFirstChildWhichIsA("Tool")
-            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+            if tool and (
+                tool.Name:lower():find("knife")
+                or tool.Name:lower():find("weapon")
+            ) then
                 isKiller = true
             end
         end
+
         return isKiller
     end
 
     local isKiller = getPlayerType()
     local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
 
+    --------------------------------------------------
     -- Highlight
+    --------------------------------------------------
+
     local highlight = Instance.new("Highlight")
     highlight.Name = "CyberHeroes_ESP"
     highlight.FillColor = highlightColor
@@ -661,119 +674,149 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
-    -- Billboard jarak (ukuran lebih kecil dan proporsional)
+    --------------------------------------------------
+    -- Distance Billboard (2x lebih kecil)
+    --------------------------------------------------
+
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
     billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 80, 0, 20)
+    billboard.Size = UDim2.new(0, 40, 0, 10)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = character
+
     local distLabel = Instance.new("TextLabel")
-    distLabel.Size = UDim2.new(1, 0, 1, 0)
+    distLabel.Size = UDim2.new(1,0,1,0)
     distLabel.BackgroundTransparency = 1
-    distLabel.Text = "0 Studs"
-    distLabel.TextColor3 = highlightColor
-    distLabel.TextStrokeTransparency = 0.5
+    distLabel.Text = "0"
     distLabel.TextScaled = true
     distLabel.Font = Enum.Font.GothamBold
+    distLabel.TextColor3 = highlightColor
+    distLabel.TextStrokeTransparency = 0.5
     distLabel.Parent = billboard
 
-    -- ScreenGui untuk garis (line) - titik awal di center-bawah layar
+    --------------------------------------------------
+    -- ESP Line
+    --------------------------------------------------
+
     local lineGui = Instance.new("ScreenGui")
-    lineGui.Name = "CyberHeroes_Line_" .. player.UserId
+    lineGui.Name = "CyberHeroes_Line_"..player.UserId
     lineGui.ResetOnSpawn = false
-    lineGui.Parent = game:GetService("CoreGui")
+    lineGui.IgnoreGuiInset = true
     lineGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    lineGui.Parent = game:GetService("CoreGui")
 
     local lineFrame = Instance.new("Frame")
     lineFrame.Name = "Line"
-    lineFrame.Size = UDim2.new(0, 2, 0, 100) -- sementara
-    lineFrame.BackgroundColor3 = highlightColor
-    lineFrame.BackgroundTransparency = 0.5
+    lineFrame.AnchorPoint = Vector2.new(0,0.5)
     lineFrame.BorderSizePixel = 0
+    lineFrame.BackgroundTransparency = 0.5
+    lineFrame.BackgroundColor3 = highlightColor
     lineFrame.Parent = lineGui
-    lineFrame.AnchorPoint = Vector2.new(0, 0.5)
 
-    -- Fungsi update jarak dan line (perbaikan ESP Line)
+    --------------------------------------------------
+    -- Update
+    --------------------------------------------------
+
     local function updateDistanceAndLine()
+
         if not localRootPart or not player.Character then
-            distLabel.Text = "?"
             lineFrame.Visible = false
+            distLabel.Text = "?"
             return
         end
+
         local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
         if not targetRoot then
-            distLabel.Text = "?"
             lineFrame.Visible = false
+            distLabel.Text = "?"
             return
         end
 
-        -- Update jarak
-        local dist = (localRootPart.Position - targetRoot.Position).Magnitude
-        distLabel.Text = string.format("%.1f Studs", dist)
+        --------------------------------------------------
+        -- Distance
+        --------------------------------------------------
 
-        -- Update Line dari center-bawah layar ke posisi player
+        local distance = (localRootPart.Position - targetRoot.Position).Magnitude
+        distLabel.Text = string.format("%.0f", distance)
+
+        --------------------------------------------------
+        -- Screen Position
+        --------------------------------------------------
+
         local camera = workspace.CurrentCamera
         if not camera then
             lineFrame.Visible = false
             return
         end
 
-        local screenPos, onScreen = camera:WorldToViewportPoint(targetRoot.Position)
-        if not onScreen then
+        local screenPos, visible = camera:WorldToViewportPoint(targetRoot.Position)
+
+        if not visible then
             lineFrame.Visible = false
             return
         end
 
         local viewport = camera.ViewportSize
 
-        -- Titik awal benar-benar center bawah layar dengan pembulatan pixel
-        local originX = math.floor(viewport.X * 0.5 + 0.5)
-        local originY = math.floor(viewport.Y * 0.92 + 0.5)
+        --------------------------------------------------
+        -- Origin
+        --------------------------------------------------
 
-        local origin = Vector2.new(originX, originY)
-        local target = Vector2.new(screenPos.X, screenPos.Y)
+        -- geser sedikit ke kiri supaya benar-benar center
+        local originX = viewport.X * 0.5 - 8
+        local originY = viewport.Y * 0.92
 
-        local direction = target - origin
-        local length = direction.Magnitude
+        local dx = screenPos.X - originX
+        local dy = screenPos.Y - originY
+
+        local length = math.sqrt(dx*dx + dy*dy)
 
         if length <= 1 then
             lineFrame.Visible = false
             return
         end
 
-        -- Tambahkan sedikit panjang agar garis benar-benar menyentuh objek
-        length = length + 10
+        -- tambah panjang supaya menyentuh target
+        length = length + 15
 
         lineFrame.Visible = true
-        lineFrame.AnchorPoint = Vector2.new(0, 0.5)
         lineFrame.Position = UDim2.fromOffset(originX, originY)
         lineFrame.Size = UDim2.fromOffset(length, 2)
-
-        lineFrame.Rotation = math.deg(math.atan2(direction.Y, direction.X))
+        lineFrame.Rotation = math.deg(math.atan2(dy, dx))
         lineFrame.BackgroundColor3 = highlightColor
     end
 
     local lineUpdateConn = RunService.RenderStepped:Connect(updateDistanceAndLine)
-    updateDistanceAndLine() -- inisialisasi
 
-    -- Team change
-    local teamChangedConn = nil
+    updateDistanceAndLine()
+
+    --------------------------------------------------
+    -- Team Update
+    --------------------------------------------------
+
+    local teamChangedConn
+
     if player.Team then
         teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
+
             local newIsKiller = getPlayerType()
             local newColor = newIsKiller and config.highlightColorKiller or config.highlightColorSurvivor
+
             if highlight then
                 highlight.FillColor = newColor
                 highlight.OutlineColor = newColor
             end
+
             if distLabel then
                 distLabel.TextColor3 = newColor
             end
+
             if lineFrame then
                 lineFrame.BackgroundColor3 = newColor
             end
+
         end)
     end
 

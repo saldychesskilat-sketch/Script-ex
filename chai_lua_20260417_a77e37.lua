@@ -661,11 +661,11 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
-    -- Billboard jarak (ukuran 2x lebih kecil dan proporsional)
+    -- Billboard jarak (ukuran lebih kecil dan proporsional)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
     billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 80, 0, 20)   -- 120x30 -> 80x20 (lebih kecil)
+    billboard.Size = UDim2.new(0, 80, 0, 20)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = character
@@ -688,14 +688,14 @@ local function createHighlightForPlayer(player)
 
     local lineFrame = Instance.new("Frame")
     lineFrame.Name = "Line"
-    lineFrame.Size = UDim2.new(0, 2, 0, 100) -- sementara, diupdate
+    lineFrame.Size = UDim2.new(0, 2, 0, 100) -- sementara
     lineFrame.BackgroundColor3 = highlightColor
     lineFrame.BackgroundTransparency = 0.5
     lineFrame.BorderSizePixel = 0
     lineFrame.Parent = lineGui
     lineFrame.AnchorPoint = Vector2.new(0, 0.5)
 
-    -- Fungsi update jarak dan line (dengan perbaikan ESP Line)
+    -- Fungsi update jarak dan line (perbaikan ESP Line)
     local function updateDistanceAndLine()
         if not localRootPart or not player.Character then
             distLabel.Text = "?"
@@ -728,9 +728,10 @@ local function createHighlightForPlayer(player)
 
         local viewport = camera.ViewportSize
 
-        -- Titik origin: center-bawah (92% dari tinggi layar) dengan pembulatan pixel
+        -- Titik awal benar-benar center bawah layar dengan pembulatan pixel
         local originX = math.floor(viewport.X * 0.5 + 0.5)
         local originY = math.floor(viewport.Y * 0.92 + 0.5)
+
         local origin = Vector2.new(originX, originY)
         local target = Vector2.new(screenPos.X, screenPos.Y)
 
@@ -749,6 +750,7 @@ local function createHighlightForPlayer(player)
         lineFrame.AnchorPoint = Vector2.new(0, 0.5)
         lineFrame.Position = UDim2.fromOffset(originX, originY)
         lineFrame.Size = UDim2.fromOffset(length, 2)
+
         lineFrame.Rotation = math.deg(math.atan2(direction.Y, direction.X))
         lineFrame.BackgroundColor3 = highlightColor
     end

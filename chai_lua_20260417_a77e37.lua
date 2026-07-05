@@ -689,7 +689,7 @@ local function createHighlightForPlayer(player)
     local distLabel = Instance.new("TextLabel")
     distLabel.Size = UDim2.new(1,0,1,0)
     distLabel.BackgroundTransparency = 1
-    distLabel.Text = "0"
+    distLabel.Text = "0m"
     distLabel.TextScaled = true
     distLabel.Font = Enum.Font.GothamBold
     distLabel.TextColor3 = highlightColor
@@ -765,7 +765,7 @@ local function createHighlightForPlayer(player)
         --------------------------------------------------
 
         -- geser sedikit ke kiri supaya benar-benar center
-        local originX = viewport.X * 0.5 - 8
+        local originX = viewport.X * 0.5 - 15
         local originY = viewport.Y * 0.92
 
         local dx = screenPos.X - originX

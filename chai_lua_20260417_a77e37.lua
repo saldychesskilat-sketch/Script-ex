@@ -477,8 +477,9 @@ local ObjectColors = {
     Gate      = Color3.fromRGB(255, 255, 255),  
     Pallet    = Color3.fromRGB(128, 128, 128),    
     Hook      = Color3.fromRGB(255, 165, 0),  
-    SCP       = Color3.fromRGB(150, 0, 255)      -- Warna ungu untuk SCP entity  
-}  
+    SCP       = Color3.fromRGB(150, 0, 255),      -- Warna ungu untuk SCP entity
+    Window    = Color3.fromRGB(0, 150, 255)       -- Warna biru untuk Window
+}
   
 -- Variabel ESP (global untuk script utama)  
 espHighlights = espHighlights or {}              -- player ESP  
@@ -772,7 +773,9 @@ local function createObjectESP(obj, objType)
     elseif objType == "Pallet" then  
         color = ObjectColors.Pallet  
     elseif objType == "SCP" then  
-        color = ObjectColors.SCP               -- Warna ungu untuk SCP entity  
+        color = ObjectColors.SCP  
+    elseif objType == "Window" then  
+        color = ObjectColors.Window  
     end  
     local highlight = applyHighlight(obj, color)  
     generatorEspHighlights[obj] = highlight  
@@ -799,7 +802,6 @@ local function clearObjectESP()
     generatorEspHighlights = {}  
 end  
   
--- Refresh semua object ESP (pindai ulang seluruh workspace)  
 local function refreshAllObjectESP()  
     clearObjectESP()  
     for _, obj in ipairs(workspace:GetDescendants()) do  
@@ -810,16 +812,17 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "Hook")  
         elseif name == "Gate" then  
             createObjectESP(obj, "Gate")  
-        elseif name:lower():find("scp") then          -- DETEKSI SCP ENTITY (scp1, scp2, ..., scp26)  
+        elseif name:lower():find("scp") then  
             createObjectESP(obj, "SCP")  
         elseif name == "Pallet" or name == "Palletwrong" then  
             createObjectESP(obj, "Pallet")  
+        elseif name == "Window" or name:lower():find("window") then  
+            createObjectESP(obj, "Window")  
         end  
     end  
-    print("[ESP] Object ESP refreshed (including SCP entities)")  
+    print("[ESP] Object ESP refreshed (including Windows)")  
 end  
   
--- Event handlers untuk objek yang muncul/hilang  
 local function onDescendantAdded(instance)  
     if not config.espEnabled then return end  
     local name = instance.Name  
@@ -833,6 +836,8 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "SCP")  
     elseif name == "Pallet" or name == "Palletwrong" then  
         createObjectESP(instance, "Pallet")  
+    elseif name == "Window" or name:lower():find("window") then  
+        createObjectESP(instance, "Window")  
     end  
 end  
   
@@ -842,7 +847,6 @@ local function onDescendantRemoving(instance)
     end  
 end  
   
--- Periodic scan untuk menjamin objek yang muncul belakangan tetap terdeteksi  
 local function periodicObjectScan()  
     if not config.espEnabled then return end  
     local now = tick()  

@@ -472,7 +472,6 @@ end
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED: SCP ENTITY + MORE TRANSPARENT
 -- ============================================================================
-
 -- Konfigurasi warna objek (sama seperti referensi)
 local ObjectColors = {
     Generator = Color3.fromRGB(255, 165, 0), 
@@ -566,8 +565,14 @@ local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
     if percent >= 100 then
+        -- Generator selesai: highlight hijau permanen, billboard dihapus
         local h = generator:FindFirstChild("CyberHeroes_Highlight")
-        if h then h:Destroy() end
+        if h then
+            h.FillColor = Color3.fromRGB(0, 255, 0)
+            h.OutlineColor = Color3.fromRGB(0, 255, 0)
+        else
+            applyHighlight(generator, Color3.fromRGB(0, 255, 0))
+        end
         local bill = generator:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
         return true
@@ -642,43 +647,73 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
+    -- Billboard untuk jarak (bukan nama)
     local billboard = Instance.new("BillboardGui")
-    billboard.Name = "CyberHeroes_NameTag"
+    billboard.Name = "CyberHeroes_DistanceTag"
     billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 120, 0, 30)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Size = UDim2.new(0, 80, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
     billboard.Parent = character
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 1, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = highlightColor
-    nameLabel.TextStrokeTransparency = 0.5
-    nameLabel.TextScaled = true
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.Parent = billboard
+    local distanceLabel = Instance.new("TextLabel")
+    distanceLabel.Size = UDim2.new(1, 0, 1, 0)
+    distanceLabel.BackgroundTransparency = 1
+    distanceLabel.Text = "0m"
+    distanceLabel.TextColor3 = highlightColor
+    distanceLabel.TextStrokeTransparency = 0.5
+    distanceLabel.TextScaled = true
+    distanceLabel.Font = Enum.Font.GothamBold
+    distanceLabel.Parent = billboard
 
-    local teamChangedConn = nil
+    -- Update jarak secara realtime melalui fungsi terpisah
+    local function updateDistance()
+        if not character or not character.Parent then return end
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        local localRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if rootPart and localRoot then
+            local dist = (rootPart.Position - localRoot.Position).Magnitude
+            distanceLabel.Text = math.floor(dist) .. "m"
+        else
+            distanceLabel.Text = "?m"
+        end
+    end
+
+    -- Simpan fungsi update ke dalam tabel untuk dipanggil dari loop utama
+    local data = {
+        Highlight = highlight,
+        Billboard = billboard,
+        DistanceLabel = distanceLabel,
+        UpdateDistance = updateDistance,
+        TeamChanged = nil,
+        Character = character,
+        Player = player
+    }
+
     if player.Team then
-        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
+        data.TeamChanged = player:GetPropertyChangedSignal("Team"):Connect(function()
             local newIsKiller = getPlayerType()
             local newColor = newIsKiller and config.highlightColorKiller or config.highlightColorSurvivor
             if highlight then
                 highlight.FillColor = newColor
                 highlight.OutlineColor = newColor
             end
-            if nameLabel then
-                nameLabel.TextColor3 = newColor
+            if distanceLabel then
+                distanceLabel.TextColor3 = newColor
             end
         end)
     end
 
-    espHighlights[player.UserId] = {
-        Highlight = highlight,
-        Billboard = billboard,
-        NameLabel = nameLabel,
-        TeamChanged = teamChangedConn
-    }
+    espHighlights[player.UserId] = data
+    updateDistance() -- pertama kali
+end
+
+-- Update jarak untuk semua player (dipanggil dari loop utama)
+local function updateAllPlayerDistances()
+    for userId, data in pairs(espHighlights) do
+        if data and data.UpdateDistance then
+            data.UpdateDistance()
+        end
+    end
 end
 
 local function updateAllESP()
@@ -856,9 +891,12 @@ local function startESP()
         end
     end)
 
-    -- Loop untuk menjaga player ESP tetap up-to-date
+    -- Loop utama untuk menjaga player ESP dan update jarak
     espConnection = RunService.Heartbeat:Connect(function()
         if config.espEnabled then
+            -- Update jarak player
+            updateAllPlayerDistances()
+            -- Pastikan player ESP tetap ada
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer then
                     local currentChar = player.Character
@@ -880,7 +918,7 @@ local function startESP()
         end
     end)
 
-    print("[ESP] ESP started (player + object ESP with real-time progress, including SCP entities)")
+    print("[ESP] ESP started (player distance + object ESP with real-time progress, including SCP entities)")
 end
 
 -- ============================================================================

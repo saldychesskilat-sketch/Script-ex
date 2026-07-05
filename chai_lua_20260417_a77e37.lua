@@ -611,9 +611,9 @@ local function createHighlightForPlayer(player)
 		if espHighlights[player.UserId].Billboard then espHighlights[player.UserId].Billboard:Destroy() end
 		if espHighlights[player.UserId].TeamChanged then espHighlights[player.UserId].TeamChanged:Disconnect() end
 		if espHighlights[player.UserId].DistanceUpdate then espHighlights[player.UserId].DistanceUpdate:Disconnect() end
-		if espHighlights[player.UserId].LineGui then espHighlights[player.UserId].LineGui:Destroy() end
-		if espHighlights[player.UserId].LineUpdate then espHighlights[player.UserId].LineUpdate:Disconnect() end
-		if espHighlights[player.UserId].OriginCircle then espHighlights[player.UserId].OriginCircle:Destroy() end
+		if espHighlights[player.UserId].Beam then espHighlights[player.UserId].Beam:Destroy() end
+		if espHighlights[player.UserId].StartAttachment then espHighlights[player.UserId].StartAttachment:Destroy() end
+		if espHighlights[player.UserId].EndAttachment then espHighlights[player.UserId].EndAttachment:Destroy() end
 		espHighlights[player.UserId] = nil
 	end
 	local character = player.Character
@@ -655,45 +655,25 @@ local function createHighlightForPlayer(player)
 	distLabel.TextScaled = true
 	distLabel.Font = Enum.Font.GothamBold
 	distLabel.Parent = billboard
-	local lineGui = Instance.new("ScreenGui")
-	lineGui.Name = "CyberHeroes_Line_" .. player.UserId
-	lineGui.ResetOnSpawn = false
-	lineGui.Parent = game:GetService("CoreGui")
-	lineGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	local originCircle = Instance.new("Frame")
-	originCircle.Name = "OriginCircle"
-	originCircle.Size = UDim2.new(0, 8, 0, 8)
-	originCircle.Position = UDim2.new(0.5, -4, 0.92, -4)
-	originCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	originCircle.BackgroundTransparency = 0.8
-	originCircle.BorderSizePixel = 0
-	originCircle.Parent = lineGui
-	local circleCorner = Instance.new("UICorner")
-	circleCorner.CornerRadius = UDim.new(1, 0)
-	circleCorner.Parent = originCircle
-	local lineFrame = Instance.new("Frame")
-	lineFrame.Name = "Line"
-	lineFrame.Size = UDim2.new(0, 2, 0, 100)
-	lineFrame.BackgroundColor3 = currentColor
-	lineFrame.BackgroundTransparency = 0.5
-	lineFrame.BorderSizePixel = 0
-	lineFrame.Parent = lineGui
-	lineFrame.AnchorPoint = Vector2.new(0, 0.5)
-	lineFrame.ZIndex = 1
-	local function updateDistanceAndLine()
-		if not localRootPart or not player.Character then
-			distLabel.Text = "?"
-			lineFrame.Visible = false
-			return
-		end
-		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-		if not targetRoot then
-			distLabel.Text = "?"
-			lineFrame.Visible = false
-			return
-		end
-		local dist = (localRootPart.Position - targetRoot.Position).Magnitude
-		distLabel.Text = string.format("%.1f Studs", dist)
+	local startAttachment = Instance.new("Attachment")
+	startAttachment.Name = "CyberHeroes_LineStart"
+	startAttachment.Parent = localRootPart or localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") or localPlayer.Character
+	startAttachment.Position = Vector3.new(0, 0.5, 0)
+	local endAttachment = Instance.new("Attachment")
+	endAttachment.Name = "CyberHeroes_LineEnd"
+	endAttachment.Parent = character:FindFirstChild("HumanoidRootPart") or character
+	endAttachment.Position = Vector3.new(0, 0.5, 0)
+	local beam = Instance.new("Beam")
+	beam.Name = "CyberHeroes_Line"
+	beam.Attachment0 = startAttachment
+	beam.Attachment1 = endAttachment
+	beam.Color = ColorSequence.new(currentColor)
+	beam.Transparency = NumberSequence.new(0.5)
+	beam.Width0 = 0.1
+	beam.Width1 = 0.1
+	beam.FaceCamera = false
+	beam.Parent = workspace
+	local function updateBeamColor()
 		local newColor = getCurrentColor()
 		if highlight.FillColor ~= newColor then
 			highlight.FillColor = newColor
@@ -702,39 +682,27 @@ local function createHighlightForPlayer(player)
 		if distLabel.TextColor3 ~= newColor then
 			distLabel.TextColor3 = newColor
 		end
-		if lineFrame.BackgroundColor3 ~= newColor then
-			lineFrame.BackgroundColor3 = newColor
+		if beam.Color ~= ColorSequence.new(newColor) then
+			beam.Color = ColorSequence.new(newColor)
 		end
-		local camera = workspace.CurrentCamera
-		if not camera then
-			lineFrame.Visible = false
-			return
-		end
-		local screenPos, onScreen = camera:WorldToViewportPoint(targetRoot.Position)
-		if not onScreen then
-			lineFrame.Visible = false
-			return
-		end
-		local circlePos = originCircle.AbsolutePosition
-		local circleSize = originCircle.AbsoluteSize
-		local originX = circlePos.X + circleSize.X / 2
-		local originY = circlePos.Y + circleSize.Y / 2
-		local target = Vector2.new(screenPos.X, screenPos.Y)
-		local direction = target - Vector2.new(originX, originY)
-		local length = direction.Magnitude
-		if length <= 1 then
-			lineFrame.Visible = false
-			return
-		end
-		length = length + 10
-		lineFrame.Visible = true
-		lineFrame.AnchorPoint = Vector2.new(0, 0.5)
-		lineFrame.Position = UDim2.fromOffset(originX, originY)
-		lineFrame.Size = UDim2.fromOffset(length, 2)
-		lineFrame.Rotation = math.deg(math.atan2(direction.Y, direction.X))
 	end
-	local lineUpdateConn = RunService.RenderStepped:Connect(updateDistanceAndLine)
-	updateDistanceAndLine()
+	local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
+	updateBeamColor()
+	local function updateDistance()
+		if not localRootPart or not player.Character then
+			distLabel.Text = "?"
+			return
+		end
+		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+		if not targetRoot then
+			distLabel.Text = "?"
+			return
+		end
+		local dist = (localRootPart.Position - targetRoot.Position).Magnitude
+		distLabel.Text = string.format("%.1f Studs", dist)
+	end
+	local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
+	updateDistance()
 	local teamChangedConn
 	if player.Team then
 		teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function() end)
@@ -744,11 +712,11 @@ local function createHighlightForPlayer(player)
 		Billboard = billboard,
 		DistLabel = distLabel,
 		TeamChanged = teamChangedConn,
-		DistanceUpdate = nil,
-		LineGui = lineGui,
-		LineFrame = lineFrame,
-		LineUpdate = lineUpdateConn,
-		OriginCircle = originCircle,
+		DistanceUpdate = distUpdateConn,
+		Beam = beam,
+		StartAttachment = startAttachment,
+		EndAttachment = endAttachment,
+		BeamUpdate = beamUpdateConn,
 	}
 end
 -- ============================================================================  

@@ -619,6 +619,12 @@ local function createHighlightForPlayer(player)
         if espHighlights[player.UserId].DistanceUpdate then
             espHighlights[player.UserId].DistanceUpdate:Disconnect()
         end
+        if espHighlights[player.UserId].LineGui then
+            espHighlights[player.UserId].LineGui:Destroy()
+        end
+        if espHighlights[player.UserId].LineUpdate then
+            espHighlights[player.UserId].LineUpdate:Disconnect()
+        end
         espHighlights[player.UserId] = nil
     end
 
@@ -645,6 +651,7 @@ local function createHighlightForPlayer(player)
     local isKiller = getPlayerType()
     local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
 
+    -- Highlight
     local highlight = Instance.new("Highlight")
     highlight.Name = "CyberHeroes_ESP"
     highlight.FillColor = highlightColor
@@ -654,11 +661,13 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
+    -- Billboard untuk jarak (AlwaysOnTop = true agar selalu terlihat)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
     billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
     billboard.Size = UDim2.new(0, 120, 0, 30)
     billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true   -- <-- tambahan: selalu di atas
     billboard.Parent = character
     local distLabel = Instance.new("TextLabel")
     distLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -670,25 +679,77 @@ local function createHighlightForPlayer(player)
     distLabel.Font = Enum.Font.GothamBold
     distLabel.Parent = billboard
 
-    -- Fungsi update jarak
-    local function updateDistance()
+    -- ScreenGui untuk garis (line)
+    local lineGui = Instance.new("ScreenGui")
+    lineGui.Name = "CyberHeroes_Line_" .. player.UserId
+    lineGui.ResetOnSpawn = false
+    lineGui.Parent = game:GetService("CoreGui")
+    lineGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local lineFrame = Instance.new("Frame")
+    lineFrame.Name = "Line"
+    lineFrame.Size = UDim2.new(0, 2, 0, 100) -- sementara, akan diupdate
+    lineFrame.BackgroundColor3 = highlightColor
+    lineFrame.BackgroundTransparency = 0.5
+    lineFrame.BorderSizePixel = 0
+    lineFrame.Parent = lineGui
+    lineFrame.AnchorPoint = Vector2.new(0, 0.5) -- pivot di kiri tengah untuk rotasi
+
+    -- Fungsi update jarak dan line
+    local function updateDistanceAndLine()
         if not localRootPart or not player.Character then
             distLabel.Text = "?"
+            lineFrame.Visible = false
             return
         end
         local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
         if not targetRoot then
             distLabel.Text = "?"
+            lineFrame.Visible = false
             return
         end
+        -- Jarak
         local dist = (localRootPart.Position - targetRoot.Position).Magnitude
         distLabel.Text = string.format("%.1f Studs", dist)
+
+        -- Line ke center layar
+        local camera = workspace.CurrentCamera
+        if not camera then
+            lineFrame.Visible = false
+            return
+        end
+        local screenPos, onScreen = camera:WorldToScreenPoint(targetRoot.Position)
+        if not onScreen then
+            lineFrame.Visible = false
+            return
+        end
+        local viewportSize = camera.ViewportSize
+        local centerX = viewportSize.X / 2
+        local centerY = viewportSize.Y / 2
+        local dx = screenPos.X - centerX
+        local dy = screenPos.Y - centerY
+        local length = math.sqrt(dx*dx + dy*dy)
+        if length < 1 then
+            lineFrame.Visible = false
+            return
+        end
+        lineFrame.Visible = true
+        -- Posisi: mulai dari titik player di layar
+        lineFrame.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
+        -- Ukuran: panjang = distance, tinggi = 2px (lebar garis)
+        lineFrame.Size = UDim2.new(0, length, 0, 2)
+        -- Rotasi (arah dari player ke center)
+        local angle = math.atan2(dy, dx)
+        lineFrame.Rotation = math.deg(angle)
+        -- Warna sesuai highlight
+        lineFrame.BackgroundColor3 = highlightColor
     end
 
-    -- Update setiap frame
-    local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
-    updateDistance() -- sekali langsung
+    -- Update menggunakan RenderStepped agar lebih smooth untuk garis
+    local lineUpdateConn = RunService.RenderStepped:Connect(updateDistanceAndLine)
+    updateDistanceAndLine() -- inisialisasi
 
+    -- Team change
     local teamChangedConn = nil
     if player.Team then
         teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
@@ -701,6 +762,9 @@ local function createHighlightForPlayer(player)
             if distLabel then
                 distLabel.TextColor3 = newColor
             end
+            if lineFrame then
+                lineFrame.BackgroundColor3 = newColor
+            end
         end)
     end
 
@@ -709,10 +773,12 @@ local function createHighlightForPlayer(player)
         Billboard = billboard,
         DistLabel = distLabel,
         TeamChanged = teamChangedConn,
-        DistanceUpdate = distUpdateConn
+        DistanceUpdate = nil, -- tidak digunakan lagi
+        LineGui = lineGui,
+        LineFrame = lineFrame,
+        LineUpdate = lineUpdateConn
     }
 end
-  
 -- ============================================================================  
 -- OBJECT ESP (Generator, Hook, Gate, Pallet, Window, SCP)  
 -- ============================================================================  

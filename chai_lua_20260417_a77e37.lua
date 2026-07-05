@@ -765,7 +765,7 @@ local function createHighlightForPlayer(player)
         --------------------------------------------------
 
         -- geser sedikit ke kiri supaya benar-benar center
-        local originX = viewport.X * 0.5 - 15
+        local originX = viewport.X * 0.5 - 30
         local originY = viewport.Y * 0.92
 
         local dx = screenPos.X - originX

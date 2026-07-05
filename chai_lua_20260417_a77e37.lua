@@ -621,6 +621,7 @@ local function createHighlightForPlayer(player)
 	end
 	local character = player.Character
 	if not character then return end
+	local MAX_DISTANCE = 2000
 	local function getPlayerType()
 		if player.Team then
 			local teamName = player.Team.Name:lower()
@@ -639,8 +640,20 @@ local function createHighlightForPlayer(player)
 		local teamName = team.Name:lower()
 		return teamName == "survivors" or teamName == "killers" or teamName:find("survivor") or teamName:find("killer")
 	end
+	local function getDistanceToPlayer()
+		if not localRootPart or not player.Character then return math.huge end
+		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+		if not targetRoot then return math.huge end
+		return (localRootPart.Position - targetRoot.Position).Magnitude
+	end
 	local function shouldBeamActive()
-		return isLocalPlayerInGame() and localPlayer.Character and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not isLocalPlayerInGame() then return false end
+		if not localPlayer.Character or not player.Character then return false end
+		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+		if not targetRoot then return false end
+		if not localRootPart then return false end
+		local dist = getDistanceToPlayer()
+		return dist <= MAX_DISTANCE
 	end
 	local currentColor = getCurrentColor()
 	local highlight = Instance.new("Highlight")
@@ -651,13 +664,15 @@ local function createHighlightForPlayer(player)
 	highlight.OutlineTransparency = 0.2
 	highlight.Adornee = character
 	highlight.Parent = character
+	highlight.Enabled = shouldBeamActive()
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CyberHeroes_DistanceTag"
 	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 15, 0, 15)
+	billboard.Size = UDim2.new(0, 15, 0, 20)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = character
+	billboard.Enabled = shouldBeamActive()
 	local distLabel = Instance.new("TextLabel")
 	distLabel.Size = UDim2.new(1, 0, 1, 0)
 	distLabel.BackgroundTransparency = 1
@@ -695,6 +710,12 @@ local function createHighlightForPlayer(player)
 	beam.FaceCamera = false
 	beam.Parent = workspace
 	beam.Enabled = shouldBeamActive()
+	local function updateVisibility()
+		local active = shouldBeamActive()
+		beam.Enabled = active
+		highlight.Enabled = active
+		billboard.Enabled = active
+	end
 	local function updateBeamColor()
 		local newColor = getCurrentColor()
 		if highlight.FillColor ~= newColor then
@@ -707,22 +728,18 @@ local function createHighlightForPlayer(player)
 		if beam.Color ~= ColorSequence.new(newColor) then
 			beam.Color = ColorSequence.new(newColor)
 		end
-		beam.Enabled = shouldBeamActive()
+		updateVisibility()
 	end
 	local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
 	updateBeamColor()
 	local function updateDistance()
-		if not localRootPart or not player.Character then
-			distLabel.Text = "?"
-			return
+		local dist = getDistanceToPlayer()
+		if dist <= MAX_DISTANCE then
+			distLabel.Text = string.format("%.1f Studs", dist)
+		else
+			distLabel.Text = ">2000 Studs"
 		end
-		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-		if not targetRoot then
-			distLabel.Text = "?"
-			return
-		end
-		local dist = (localRootPart.Position - targetRoot.Position).Magnitude
-		distLabel.Text = string.format("%.1f Studs", dist)
+		-- Update visibility juga di sini sebagai cadangan, tapi RenderStepped sudah handle
 	end
 	local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
 	updateDistance()

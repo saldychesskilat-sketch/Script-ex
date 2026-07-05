@@ -632,6 +632,19 @@ local function createHighlightForPlayer(player)
 	local function getCurrentColor()
 		return getPlayerType() and config.highlightColorKiller or config.highlightColorSurvivor
 	end
+	local function isLocalPlayerSurvivor()
+		local localChar = localPlayer.Character
+		if not localChar then return false end
+		local team = localPlayer.Team
+		if team then
+			local teamName = team.Name:lower()
+			if teamName == "survivors" or teamName:find("survivor") then return true end
+		end
+		return false
+	end
+	local function shouldBeamActive()
+		return isLocalPlayerSurvivor() and localPlayer.Character and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	end
 	local currentColor = getCurrentColor()
 	local highlight = Instance.new("Highlight")
 	highlight.Name = "CyberHeroes_ESP"
@@ -684,6 +697,7 @@ local function createHighlightForPlayer(player)
 	beam.Width1 = 0.2
 	beam.FaceCamera = false
 	beam.Parent = workspace
+	beam.Enabled = shouldBeamActive()
 	local function updateBeamColor()
 		local newColor = getCurrentColor()
 		if highlight.FillColor ~= newColor then
@@ -696,6 +710,7 @@ local function createHighlightForPlayer(player)
 		if beam.Color ~= ColorSequence.new(newColor) then
 			beam.Color = ColorSequence.new(newColor)
 		end
+		beam.Enabled = shouldBeamActive()
 	end
 	local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
 	updateBeamColor()
@@ -722,11 +737,12 @@ local function createHighlightForPlayer(player)
 		updateBeamColor()
 	end
 	local targetCharAddedConn = player.CharacterAdded:Connect(onCharacterRespawn)
-	local localCharAddedConn = localPlayer.CharacterAdded:Connect(function()
+	local function onLocalCharacterChanged()
 		task.wait(0.5)
 		updateAttachments()
 		updateBeamColor()
-	end)
+	end
+	local localCharAddedConn = localPlayer.CharacterAdded:Connect(onLocalCharacterChanged)
 	local teamChangedConn
 	if player.Team then
 		teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function() end)

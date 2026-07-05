@@ -484,6 +484,7 @@ local ObjectColors = {
 -- Variabel ESP (global untuk script utama)
 espHighlights = espHighlights or {}              -- player ESP
 generatorEspHighlights = generatorEspHighlights or {}  -- object ESP
+completedGenerators = completedGenerators or {}  -- daftar generator yang sudah selesai (progress >= 100%)
 espConnection = nil
 espDescendantAddedConn = nil
 espDescendantRemovingConn = nil
@@ -493,9 +494,6 @@ espProgressUpdateConn = nil
 espPeriodicScanConn = nil
 lastObjectScanTime = 0
 OBJECT_SCAN_INTERVAL = 2
-
--- Untuk menyimpan status generator selesai
-local completedGenerators = completedGenerators or {} -- key = generator, value = true
 
 -- Helper untuk mendapatkan nilai dari objek (attribute atau child value)
 local function getGameValue(obj, name)
@@ -563,38 +561,32 @@ local function createProgressBillboard(generator, percent, color)
     return billboard
 end
 
--- Update progress generator (warna gradien + jika 100% -> hijau permanen, hapus billboard)
+-- Update progress generator (warna gradien + hilangkan jika sudah 100%)
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
     if percent >= 100 then
-        -- Tandai sebagai selesai
+        -- Generator selesai: tetap pertahankan highlight dengan warna hijau
         completedGenerators[generator] = true
-        -- Ubah highlight menjadi hijau permanen
-        local h = generator:FindFirstChild("CyberHeroes_Highlight")
-        if h then
-            h.FillColor = Color3.fromRGB(0, 200, 0)
-            h.OutlineColor = Color3.fromRGB(0, 200, 0)
-        else
-            applyHighlight(generator, Color3.fromRGB(0, 200, 0))
-        end
-        -- Hapus billboard progress
+        applyHighlight(generator, Color3.fromRGB(0, 200, 0))
         local bill = generator:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
         return true
-    else
-        -- Jika tidak selesai, update warna normal
-        local cp = math.clamp(percent, 0, 100)
-        local finalColor
-        if cp < 50 then
-            finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
-        else
-            finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
-        end
-        applyHighlight(generator, finalColor)
-        createProgressBillboard(generator, percent, finalColor)
-        return false
     end
+    -- Hapus dari completed jika ternyata progress turun (kemungkinan reset)
+    if completedGenerators[generator] then
+        completedGenerators[generator] = nil
+    end
+    local cp = math.clamp(percent, 0, 100)
+    local finalColor
+    if cp < 50 then
+        finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
+    else
+        finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
+    end
+    applyHighlight(generator, finalColor)
+    createProgressBillboard(generator, percent, finalColor)
+    return false
 end
 
 -- Update semua progress generator (dipanggil periodic)
@@ -607,7 +599,7 @@ local function updateAllGeneratorProgress()
 end
 
 -- ============================================================================
--- PLAYER ESP (dengan jarak realtime) - LEBIH TRANSPARAN
+-- PLAYER ESP (dengan deteksi killer/survivor, jarak, status) - LEBIH TRANSPARAN
 -- ============================================================================
 local function createHighlightForPlayer(player)
     if espHighlights[player.UserId] then
@@ -619,9 +611,6 @@ local function createHighlightForPlayer(player)
         end
         if espHighlights[player.UserId].TeamChanged then
             espHighlights[player.UserId].TeamChanged:Disconnect()
-        end
-        if espHighlights[player.UserId].DistanceUpdate then
-            espHighlights[player.UserId].DistanceUpdate:Disconnect()
         end
         espHighlights[player.UserId] = nil
     end
@@ -658,46 +647,21 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
-    -- Billboard untuk jarak
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
-    billboard.AlwaysOnTop = true
-    local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 100, 0, 30)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    billboard.Size = UDim2.new(0, 80, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
     billboard.Parent = character
-    local distanceLabel = Instance.new("TextLabel")
-    distanceLabel.Size = UDim2.new(1, 0, 1, 0)
-    distanceLabel.BackgroundTransparency = 1
-    distanceLabel.Text = "0m"
-    distanceLabel.TextColor3 = highlightColor
-    distanceLabel.TextStrokeTransparency = 0.5
-    distanceLabel.TextScaled = true
-    distanceLabel.Font = Enum.Font.GothamBold
-    distanceLabel.Parent = billboard
-
-    -- Fungsi update jarak realtime
-    local function updateDistance()
-        if not character or not character.Parent then
-            -- jika karakter hilang, cleanup akan menangani
-            return
-        end
-        local localChar = localPlayer.Character
-        if not localChar then return end
-        local localRoot = localChar:FindFirstChild("HumanoidRootPart")
-        local targetRoot = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
-        if not localRoot or not targetRoot then return end
-        local dist = (localRoot.Position - targetRoot.Position).Magnitude
-        distanceLabel.Text = math.floor(dist) .. "m"
-    end
-
-    -- Update awal
-    updateDistance()
-
-    -- Update jarak secara realtime menggunakan Heartbeat
-    local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
-    -- Juga update saat karakter bergerak (CharacterAdded sudah ditangani)
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Size = UDim2.new(1, 0, 1, 0)
+    distLabel.BackgroundTransparency = 1
+    distLabel.Text = "0m"
+    distLabel.TextColor3 = highlightColor
+    distLabel.TextStrokeTransparency = 0.5
+    distLabel.TextScaled = true
+    distLabel.Font = Enum.Font.GothamBold
+    distLabel.Parent = billboard
 
     local teamChangedConn = nil
     if player.Team then
@@ -708,8 +672,8 @@ local function createHighlightForPlayer(player)
                 highlight.FillColor = newColor
                 highlight.OutlineColor = newColor
             end
-            if distanceLabel then
-                distanceLabel.TextColor3 = newColor
+            if distLabel then
+                distLabel.TextColor3 = newColor
             end
         end)
     end
@@ -717,10 +681,9 @@ local function createHighlightForPlayer(player)
     espHighlights[player.UserId] = {
         Highlight = highlight,
         Billboard = billboard,
-        DistanceLabel = distanceLabel,
+        DistLabel = distLabel,
         TeamChanged = teamChangedConn,
-        DistanceUpdate = distUpdateConn,
-        Character = character
+        PlayerRef = player
     }
 end
 
@@ -730,7 +693,6 @@ local function updateAllESP()
             if data.Highlight then data.Highlight:Destroy() end
             if data.Billboard then data.Billboard:Destroy() end
             if data.TeamChanged then data.TeamChanged:Disconnect() end
-            if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
         end
         espHighlights = {}
         return
@@ -742,6 +704,32 @@ local function updateAllESP()
     end
 end
 
+-- Fungsi update jarak untuk semua player ESP
+local function updatePlayerDistances()
+    if not config.espEnabled then return end
+    local localChar = localPlayer.Character
+    if not localChar then return end
+    local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+    if not localRoot then return end
+    local localPos = localRoot.Position
+    for _, data in pairs(espHighlights) do
+        local player = data.PlayerRef
+        if player then
+            local char = player.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local dist = (localPos - root.Position).Magnitude
+                    dist = math.floor(dist)
+                    if data.DistLabel then
+                        data.DistLabel.Text = tostring(dist) .. "m"
+                    end
+                end
+            end
+        end
+    end
+end
+
 -- ============================================================================
 -- OBJECT ESP (Generator, Hook, Gate, Pallet, Window, SCP)
 -- ============================================================================
@@ -749,9 +737,9 @@ local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
     local color
     if objType == "Generator" then
-        -- Cek apakah generator sudah selesai
+        -- Cek apakah generator sudah selesai (completed)
         if completedGenerators[obj] then
-            color = Color3.fromRGB(0, 200, 0)  -- hijau permanen
+            color = Color3.fromRGB(0, 200, 0)
         else
             color = ObjectColors.Generator
         end
@@ -768,9 +756,7 @@ local function createObjectESP(obj, objType)
     generatorEspHighlights[obj] = highlight
 
     if objType == "Generator" then
-        if not completedGenerators[obj] then
-            updateGeneratorProgress(obj)
-        end
+        updateGeneratorProgress(obj)
     end
 end
 
@@ -793,10 +779,20 @@ end
 
 -- Refresh semua object ESP (pindai ulang seluruh workspace)
 local function refreshAllObjectESP()
+    -- Simpan daftar generator yang sudah completed sebelum clear
+    local completedList = {}
+    for gen, _ in pairs(completedGenerators) do
+        if gen and gen.Parent then
+            table.insert(completedList, gen)
+        end
+    end
+    -- Clear semua object ESP
     clearObjectESP()
+    -- Buat ulang ESP untuk semua objek
     for _, obj in ipairs(workspace:GetDescendants()) do
         local name = obj.Name
         if name == "Generator" then
+            -- Jika generator ada di completedList, tandai ulang sebagai completed
             createObjectESP(obj, "Generator")
         elseif name == "Hook" then
             createObjectESP(obj, "Hook")
@@ -808,7 +804,25 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "Pallet")
         end
     end
-    print("[ESP] Object ESP refreshed (including SCP entities)")
+    -- Pastikan generator yang completed tetap memiliki highlight hijau
+    for _, gen in ipairs(completedList) do
+        if gen and gen.Parent then
+            -- Jika generator sudah di-ESP, update warnanya
+            local h = gen:FindFirstChild("CyberHeroes_Highlight")
+            if h then
+                h.FillColor = Color3.fromRGB(0, 200, 0)
+                h.OutlineColor = Color3.fromRGB(0, 200, 0)
+            else
+                -- Jika belum, buat ESP dengan warna hijau
+                applyHighlight(gen, Color3.fromRGB(0, 200, 0))
+                generatorEspHighlights[gen] = gen:FindFirstChild("CyberHeroes_Highlight")
+            end
+            -- Hapus Billboard progress jika masih ada
+            local bill = gen:FindFirstChild("GenBitchHook")
+            if bill then bill:Destroy() end
+        end
+    end
+    print("[ESP] Object ESP refreshed (including completed generators)")
 end
 
 -- Event handlers untuk objek yang muncul/hilang
@@ -876,9 +890,6 @@ local function startESP()
             if espHighlights[player.UserId].TeamChanged then
                 espHighlights[player.UserId].TeamChanged:Disconnect()
             end
-            if espHighlights[player.UserId].DistanceUpdate then
-                espHighlights[player.UserId].DistanceUpdate:Disconnect()
-            end
             espHighlights[player.UserId] = nil
         end
     end)
@@ -910,9 +921,10 @@ local function startESP()
         end
     end)
 
-    -- Loop untuk menjaga player ESP tetap up-to-date
+    -- Loop untuk menjaga player ESP tetap up-to-date dan update jarak
     espConnection = RunService.Heartbeat:Connect(function()
         if config.espEnabled then
+            -- Update player ESP jika ada perubahan karakter
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer then
                     local currentChar = player.Character
@@ -922,20 +934,21 @@ local function startESP()
                     end
                 end
             end
+            -- Update jarak setiap player
+            updatePlayerDistances()
         else
             -- Jika ESP dimatikan, bersihkan semua
             for _, data in pairs(espHighlights) do
                 if data.Highlight then data.Highlight:Destroy() end
                 if data.Billboard then data.Billboard:Destroy() end
                 if data.TeamChanged then data.TeamChanged:Disconnect() end
-                if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
             end
             espHighlights = {}
             clearObjectESP()
         end
     end)
 
-    print("[ESP] ESP started (player distance + object ESP with real-time progress, including SCP entities)")
+    print("[ESP] ESP started (player distance + object ESP with real-time progress, completed generators remain green)")
 end
 
 -- ============================================================================
@@ -958,10 +971,11 @@ local function stopESP()
         if data.Highlight then data.Highlight:Destroy() end
         if data.Billboard then data.Billboard:Destroy() end
         if data.TeamChanged then data.TeamChanged:Disconnect() end
-        if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
     end
     espHighlights = {}
     clearObjectESP()
+    -- Hapus daftar completed generators (opsional, jika ingin reset)
+    completedGenerators = {}
 
     print("[ESP] ESP stopped")
 end
@@ -976,7 +990,6 @@ local function updateAllESP()
         stopESP()
     end
 end
-
 -- ============================================================================
 -- CATATAN: Kode di atas menggantikan seluruh bagian ESP SYSTEM dalam script utama.
 -- Upgrade: 

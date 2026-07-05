@@ -494,6 +494,9 @@ espPeriodicScanConn = nil
 lastObjectScanTime = 0
 OBJECT_SCAN_INTERVAL = 2
 
+-- Untuk menyimpan status generator selesai
+local completedGenerators = completedGenerators or {} -- key = generator, value = true
+
 -- Helper untuk mendapatkan nilai dari objek (attribute atau child value)
 local function getGameValue(obj, name)
     if not obj then return nil end
@@ -560,33 +563,38 @@ local function createProgressBillboard(generator, percent, color)
     return billboard
 end
 
--- Update progress generator (warna gradien + hilangkan jika sudah 100%)
+-- Update progress generator (warna gradien + jika 100% -> hijau permanen, hapus billboard)
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
     if percent >= 100 then
-        -- Generator selesai: highlight hijau permanen, billboard dihapus
+        -- Tandai sebagai selesai
+        completedGenerators[generator] = true
+        -- Ubah highlight menjadi hijau permanen
         local h = generator:FindFirstChild("CyberHeroes_Highlight")
         if h then
-            h.FillColor = Color3.fromRGB(0, 255, 0)
-            h.OutlineColor = Color3.fromRGB(0, 255, 0)
+            h.FillColor = Color3.fromRGB(0, 200, 0)
+            h.OutlineColor = Color3.fromRGB(0, 200, 0)
         else
-            applyHighlight(generator, Color3.fromRGB(0, 255, 0))
+            applyHighlight(generator, Color3.fromRGB(0, 200, 0))
         end
+        -- Hapus billboard progress
         local bill = generator:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
         return true
-    end
-    local cp = math.clamp(percent, 0, 100)
-    local finalColor
-    if cp < 50 then
-        finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
     else
-        finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
+        -- Jika tidak selesai, update warna normal
+        local cp = math.clamp(percent, 0, 100)
+        local finalColor
+        if cp < 50 then
+            finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
+        else
+            finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
+        end
+        applyHighlight(generator, finalColor)
+        createProgressBillboard(generator, percent, finalColor)
+        return false
     end
-    applyHighlight(generator, finalColor)
-    createProgressBillboard(generator, percent, finalColor)
-    return false
 end
 
 -- Update semua progress generator (dipanggil periodic)
@@ -599,7 +607,7 @@ local function updateAllGeneratorProgress()
 end
 
 -- ============================================================================
--- PLAYER ESP (dengan deteksi killer/survivor, jarak, status) - LEBIH TRANSPARAN
+-- PLAYER ESP (dengan jarak realtime) - LEBIH TRANSPARAN
 -- ============================================================================
 local function createHighlightForPlayer(player)
     if espHighlights[player.UserId] then
@@ -611,6 +619,9 @@ local function createHighlightForPlayer(player)
         end
         if espHighlights[player.UserId].TeamChanged then
             espHighlights[player.UserId].TeamChanged:Disconnect()
+        end
+        if espHighlights[player.UserId].DistanceUpdate then
+            espHighlights[player.UserId].DistanceUpdate:Disconnect()
         end
         espHighlights[player.UserId] = nil
     end
@@ -647,13 +658,14 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
-    -- Billboard untuk jarak (bukan nama)
+    -- Billboard untuk jarak
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
-    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 80, 0, 30)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
+    local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 100, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.Parent = character
     local distanceLabel = Instance.new("TextLabel")
     distanceLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -665,32 +677,31 @@ local function createHighlightForPlayer(player)
     distanceLabel.Font = Enum.Font.GothamBold
     distanceLabel.Parent = billboard
 
-    -- Update jarak secara realtime melalui fungsi terpisah
+    -- Fungsi update jarak realtime
     local function updateDistance()
-        if not character or not character.Parent then return end
-        local rootPart = character:FindFirstChild("HumanoidRootPart")
-        local localRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if rootPart and localRoot then
-            local dist = (rootPart.Position - localRoot.Position).Magnitude
-            distanceLabel.Text = math.floor(dist) .. "m"
-        else
-            distanceLabel.Text = "?m"
+        if not character or not character.Parent then
+            -- jika karakter hilang, cleanup akan menangani
+            return
         end
+        local localChar = localPlayer.Character
+        if not localChar then return end
+        local localRoot = localChar:FindFirstChild("HumanoidRootPart")
+        local targetRoot = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso")
+        if not localRoot or not targetRoot then return end
+        local dist = (localRoot.Position - targetRoot.Position).Magnitude
+        distanceLabel.Text = math.floor(dist) .. "m"
     end
 
-    -- Simpan fungsi update ke dalam tabel untuk dipanggil dari loop utama
-    local data = {
-        Highlight = highlight,
-        Billboard = billboard,
-        DistanceLabel = distanceLabel,
-        UpdateDistance = updateDistance,
-        TeamChanged = nil,
-        Character = character,
-        Player = player
-    }
+    -- Update awal
+    updateDistance()
 
+    -- Update jarak secara realtime menggunakan Heartbeat
+    local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
+    -- Juga update saat karakter bergerak (CharacterAdded sudah ditangani)
+
+    local teamChangedConn = nil
     if player.Team then
-        data.TeamChanged = player:GetPropertyChangedSignal("Team"):Connect(function()
+        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
             local newIsKiller = getPlayerType()
             local newColor = newIsKiller and config.highlightColorKiller or config.highlightColorSurvivor
             if highlight then
@@ -703,17 +714,14 @@ local function createHighlightForPlayer(player)
         end)
     end
 
-    espHighlights[player.UserId] = data
-    updateDistance() -- pertama kali
-end
-
--- Update jarak untuk semua player (dipanggil dari loop utama)
-local function updateAllPlayerDistances()
-    for userId, data in pairs(espHighlights) do
-        if data and data.UpdateDistance then
-            data.UpdateDistance()
-        end
-    end
+    espHighlights[player.UserId] = {
+        Highlight = highlight,
+        Billboard = billboard,
+        DistanceLabel = distanceLabel,
+        TeamChanged = teamChangedConn,
+        DistanceUpdate = distUpdateConn,
+        Character = character
+    }
 end
 
 local function updateAllESP()
@@ -722,6 +730,7 @@ local function updateAllESP()
             if data.Highlight then data.Highlight:Destroy() end
             if data.Billboard then data.Billboard:Destroy() end
             if data.TeamChanged then data.TeamChanged:Disconnect() end
+            if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
         end
         espHighlights = {}
         return
@@ -740,7 +749,12 @@ local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
     local color
     if objType == "Generator" then
-        color = ObjectColors.Generator
+        -- Cek apakah generator sudah selesai
+        if completedGenerators[obj] then
+            color = Color3.fromRGB(0, 200, 0)  -- hijau permanen
+        else
+            color = ObjectColors.Generator
+        end
     elseif objType == "Hook" then
         color = ObjectColors.Hook
     elseif objType == "Gate" then
@@ -754,7 +768,9 @@ local function createObjectESP(obj, objType)
     generatorEspHighlights[obj] = highlight
 
     if objType == "Generator" then
-        updateGeneratorProgress(obj)
+        if not completedGenerators[obj] then
+            updateGeneratorProgress(obj)
+        end
     end
 end
 
@@ -860,6 +876,9 @@ local function startESP()
             if espHighlights[player.UserId].TeamChanged then
                 espHighlights[player.UserId].TeamChanged:Disconnect()
             end
+            if espHighlights[player.UserId].DistanceUpdate then
+                espHighlights[player.UserId].DistanceUpdate:Disconnect()
+            end
             espHighlights[player.UserId] = nil
         end
     end)
@@ -891,12 +910,9 @@ local function startESP()
         end
     end)
 
-    -- Loop utama untuk menjaga player ESP dan update jarak
+    -- Loop untuk menjaga player ESP tetap up-to-date
     espConnection = RunService.Heartbeat:Connect(function()
         if config.espEnabled then
-            -- Update jarak player
-            updateAllPlayerDistances()
-            -- Pastikan player ESP tetap ada
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer then
                     local currentChar = player.Character
@@ -912,6 +928,7 @@ local function startESP()
                 if data.Highlight then data.Highlight:Destroy() end
                 if data.Billboard then data.Billboard:Destroy() end
                 if data.TeamChanged then data.TeamChanged:Disconnect() end
+                if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
             end
             espHighlights = {}
             clearObjectESP()
@@ -941,6 +958,7 @@ local function stopESP()
         if data.Highlight then data.Highlight:Destroy() end
         if data.Billboard then data.Billboard:Destroy() end
         if data.TeamChanged then data.TeamChanged:Disconnect() end
+        if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
     end
     espHighlights = {}
     clearObjectESP()

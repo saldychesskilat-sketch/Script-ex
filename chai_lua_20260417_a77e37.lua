@@ -644,7 +644,7 @@ local function createHighlightForPlayer(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CyberHeroes_DistanceTag"
 	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 10, 0, 10)
+	billboard.Size = UDim2.new(0, 15, 0, 15)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = character
@@ -657,34 +657,33 @@ local function createHighlightForPlayer(player)
 	distLabel.TextScaled = true
 	distLabel.Font = Enum.Font.GothamBold
 	distLabel.Parent = billboard
-	local function createBeam()
+	local startAttachment = Instance.new("Attachment")
+	startAttachment.Name = "CyberHeroes_LineStart"
+	startAttachment.Position = Vector3.new(0, 0.5, 0)
+	local endAttachment = Instance.new("Attachment")
+	endAttachment.Name = "CyberHeroes_LineEnd"
+	endAttachment.Position = Vector3.new(0, 0.5, 0)
+	local function updateAttachments()
 		local startParent = localRootPart or (localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart"))
-		local startAttach = Instance.new("Attachment")
-		startAttach.Name = "CyberHeroes_LineStart"
-		if startParent then
-			startAttach.Parent = startParent
-		else
-			startAttach.Parent = localPlayer.Character or workspace
+		if startParent and startParent ~= startAttachment.Parent then
+			startAttachment.Parent = startParent
 		end
-		startAttach.Position = Vector3.new(0, 0.5, 0)
-		local endParent = player.Character and player.Character:FindFirstChild("HumanoidRootPart") or player.Character or workspace
-		local endAttach = Instance.new("Attachment")
-		endAttach.Name = "CyberHeroes_LineEnd"
-		endAttach.Parent = endParent
-		endAttach.Position = Vector3.new(0, 0.5, 0)
-		local newBeam = Instance.new("Beam")
-		newBeam.Name = "CyberHeroes_Line"
-		newBeam.Attachment0 = startAttach
-		newBeam.Attachment1 = endAttach
-		newBeam.Color = ColorSequence.new(currentColor)
-		newBeam.Transparency = NumberSequence.new(0.5)
-		newBeam.Width0 = 0.2
-		newBeam.Width1 = 0.2
-		newBeam.FaceCamera = false
-		newBeam.Parent = workspace
-		return startAttach, endAttach, newBeam
+		local endParent = player.Character and player.Character:FindFirstChild("HumanoidRootPart") or player.Character
+		if endParent and endParent ~= endAttachment.Parent then
+			endAttachment.Parent = endParent
+		end
 	end
-	local startAttachment, endAttachment, beam = createBeam()
+	updateAttachments()
+	local beam = Instance.new("Beam")
+	beam.Name = "CyberHeroes_Line"
+	beam.Attachment0 = startAttachment
+	beam.Attachment1 = endAttachment
+	beam.Color = ColorSequence.new(currentColor)
+	beam.Transparency = NumberSequence.new(0.5)
+	beam.Width0 = 0.2
+	beam.Width1 = 0.2
+	beam.FaceCamera = false
+	beam.Parent = workspace
 	local function updateBeamColor()
 		local newColor = getCurrentColor()
 		if highlight.FillColor ~= newColor then
@@ -715,24 +714,18 @@ local function createHighlightForPlayer(player)
 	end
 	local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
 	updateDistance()
-	local function refreshBeam()
-		if beam then beam:Destroy() end
-		if startAttachment then startAttachment:Destroy() end
-		if endAttachment then endAttachment:Destroy() end
-		startAttachment, endAttachment, beam = createBeam()
-		updateBeamColor()
-	end
-	local targetCharAddedConn
-	targetCharAddedConn = player.CharacterAdded:Connect(function()
+	local function onCharacterRespawn()
 		task.wait(0.5)
-		refreshBeam()
+		updateAttachments()
 		billboard.Adornee = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
 		highlight.Adornee = player.Character
-	end)
-	local localCharAddedConn
-	localCharAddedConn = localPlayer.CharacterAdded:Connect(function()
+		updateBeamColor()
+	end
+	local targetCharAddedConn = player.CharacterAdded:Connect(onCharacterRespawn)
+	local localCharAddedConn = localPlayer.CharacterAdded:Connect(function()
 		task.wait(0.5)
-		refreshBeam()
+		updateAttachments()
+		updateBeamColor()
 	end)
 	local teamChangedConn
 	if player.Team then

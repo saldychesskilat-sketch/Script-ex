@@ -661,13 +661,13 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
-    -- Billboard untuk jarak (AlwaysOnTop = true agar selalu terlihat)
+    -- Billboard untuk jarak (ukuran diperkecil 2x dan proporsional terhadap karakter)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
     billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 120, 0, 30)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)
-    billboard.AlwaysOnTop = true   -- <-- tambahan: selalu di atas
+    billboard.Size = UDim2.new(0, 80, 0, 20)   -- lebih kecil (120x30 -> 80x20)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0) -- sedikit dinaikkan
+    billboard.AlwaysOnTop = true
     billboard.Parent = character
     local distLabel = Instance.new("TextLabel")
     distLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -679,7 +679,7 @@ local function createHighlightForPlayer(player)
     distLabel.Font = Enum.Font.GothamBold
     distLabel.Parent = billboard
 
-    -- ScreenGui untuk garis (line)
+    -- ScreenGui untuk garis (line) - titik awal di center layar
     local lineGui = Instance.new("ScreenGui")
     lineGui.Name = "CyberHeroes_Line_" .. player.UserId
     lineGui.ResetOnSpawn = false
@@ -693,7 +693,8 @@ local function createHighlightForPlayer(player)
     lineFrame.BackgroundTransparency = 0.5
     lineFrame.BorderSizePixel = 0
     lineFrame.Parent = lineGui
-    lineFrame.AnchorPoint = Vector2.new(0, 0.5) -- pivot di kiri tengah untuk rotasi
+    -- AnchorPoint di kiri-tengah, tapi kita akan set posisi di center layar
+    lineFrame.AnchorPoint = Vector2.new(0, 0.5)
 
     -- Fungsi update jarak dan line
     local function updateDistanceAndLine()
@@ -712,7 +713,7 @@ local function createHighlightForPlayer(player)
         local dist = (localRootPart.Position - targetRoot.Position).Magnitude
         distLabel.Text = string.format("%.1f Studs", dist)
 
-        -- Line ke center layar
+        -- Line dari center layar ke posisi player
         local camera = workspace.CurrentCamera
         if not camera then
             lineFrame.Visible = false
@@ -734,11 +735,11 @@ local function createHighlightForPlayer(player)
             return
         end
         lineFrame.Visible = true
-        -- Posisi: mulai dari titik player di layar
-        lineFrame.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y)
+        -- Posisi: mulai di center layar
+        lineFrame.Position = UDim2.new(0, centerX, 0, centerY)
         -- Ukuran: panjang = distance, tinggi = 2px (lebar garis)
         lineFrame.Size = UDim2.new(0, length, 0, 2)
-        -- Rotasi (arah dari player ke center)
+        -- Rotasi (arah dari center ke player)
         local angle = math.atan2(dy, dx)
         lineFrame.Rotation = math.deg(angle)
         -- Warna sesuai highlight
@@ -773,7 +774,7 @@ local function createHighlightForPlayer(player)
         Billboard = billboard,
         DistLabel = distLabel,
         TeamChanged = teamChangedConn,
-        DistanceUpdate = nil, -- tidak digunakan lagi
+        DistanceUpdate = nil,
         LineGui = lineGui,
         LineFrame = lineFrame,
         LineUpdate = lineUpdateConn

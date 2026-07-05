@@ -632,18 +632,14 @@ local function createHighlightForPlayer(player)
 	local function getCurrentColor()
 		return getPlayerType() and config.highlightColorKiller or config.highlightColorSurvivor
 	end
-	local function isLocalPlayerSurvivor()
-		local localChar = localPlayer.Character
-		if not localChar then return false end
+	local function isLocalPlayerInGame()
 		local team = localPlayer.Team
-		if team then
-			local teamName = team.Name:lower()
-			if teamName == "survivors" or teamName:find("survivor") then return true end
-		end
-		return false
+		if not team then return false end
+		local teamName = team.Name:lower()
+		return teamName == "survivors" or teamName == "killers" or teamName:find("survivor") or teamName:find("killer")
 	end
 	local function shouldBeamActive()
-		return isLocalPlayerSurvivor() and localPlayer.Character and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		return isLocalPlayerInGame() and localPlayer.Character and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	end
 	local currentColor = getCurrentColor()
 	local highlight = Instance.new("Highlight")
@@ -657,7 +653,7 @@ local function createHighlightForPlayer(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CyberHeroes_DistanceTag"
 	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 15, 0, 15)
+	billboard.Size = UDim2.new(0, 80, 0, 20)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = character

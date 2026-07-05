@@ -655,9 +655,14 @@ local function createHighlightForPlayer(player)
 	distLabel.TextScaled = true
 	distLabel.Font = Enum.Font.GothamBold
 	distLabel.Parent = billboard
+	local startParent = localRootPart or (localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart"))
 	local startAttachment = Instance.new("Attachment")
 	startAttachment.Name = "CyberHeroes_LineStart"
-	startAttachment.Parent = localRootPart or localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") or localPlayer.Character
+	if startParent then
+		startAttachment.Parent = startParent
+	else
+		startAttachment.Parent = localPlayer.Character or workspace
+	end
 	startAttachment.Position = Vector3.new(0, 0.5, 0)
 	local endAttachment = Instance.new("Attachment")
 	endAttachment.Name = "CyberHeroes_LineEnd"
@@ -669,8 +674,8 @@ local function createHighlightForPlayer(player)
 	beam.Attachment1 = endAttachment
 	beam.Color = ColorSequence.new(currentColor)
 	beam.Transparency = NumberSequence.new(0.5)
-	beam.Width0 = 0.1
-	beam.Width1 = 0.1
+	beam.Width0 = 0.2
+	beam.Width1 = 0.2
 	beam.FaceCamera = false
 	beam.Parent = workspace
 	local function updateBeamColor()

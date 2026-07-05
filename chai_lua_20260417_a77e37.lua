@@ -606,206 +606,150 @@ end
 -- PLAYER ESP (dengan deteksi killer/survivor, jarak, status) - LEBIH TRANSPARAN  
 -- ============================================================================  
 local function createHighlightForPlayer(player)
-    if espHighlights[player.UserId] then
-        if espHighlights[player.UserId].Highlight then
-            espHighlights[player.UserId].Highlight:Destroy()
-        end
-        if espHighlights[player.UserId].Billboard then
-            espHighlights[player.UserId].Billboard:Destroy()
-        end
-        if espHighlights[player.UserId].TeamChanged then
-            espHighlights[player.UserId].TeamChanged:Disconnect()
-        end
-        if espHighlights[player.UserId].DistanceUpdate then
-            espHighlights[player.UserId].DistanceUpdate:Disconnect()
-        end
-        if espHighlights[player.UserId].LineGui then
-            espHighlights[player.UserId].LineGui:Destroy()
-        end
-        if espHighlights[player.UserId].LineUpdate then
-            espHighlights[player.UserId].LineUpdate:Disconnect()
-        end
-        if espHighlights[player.UserId].OriginCircle then
-            espHighlights[player.UserId].OriginCircle:Destroy()
-        end
-        espHighlights[player.UserId] = nil
-    end
-
-    local character = player.Character
-    if not character then return end
-
-    local function getPlayerType()
-        local isKiller = false
-        if player.Team then
-            local teamName = player.Team.Name:lower()
-            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-                isKiller = true
-            end
-        end
-        if not isKiller then
-            local tool = character:FindFirstChildWhichIsA("Tool")
-            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-                isKiller = true
-            end
-        end
-        return isKiller
-    end
-
-    local isKiller = getPlayerType()
-    local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
-
-    -- Highlight
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "CyberHeroes_ESP"
-    highlight.FillColor = highlightColor
-    highlight.OutlineColor = highlightColor
-    highlight.FillTransparency = 1
-    highlight.OutlineTransparency = 0.2
-    highlight.Adornee = character
-    highlight.Parent = character
-
-    -- Billboard jarak (ukuran lebih kecil dan proporsional)
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "CyberHeroes_DistanceTag"
-    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 40, 0, 10)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = character
-    local distLabel = Instance.new("TextLabel")
-    distLabel.Size = UDim2.new(1, 0, 1, 0)
-    distLabel.BackgroundTransparency = 1
-    distLabel.Text = "0 Studs"
-    distLabel.TextColor3 = highlightColor
-    distLabel.TextStrokeTransparency = 0.5
-    distLabel.TextScaled = true
-    distLabel.Font = Enum.Font.GothamBold
-    distLabel.Parent = billboard
-
-    -- ScreenGui untuk garis (line) dengan origin circle
-    local lineGui = Instance.new("ScreenGui")
-    lineGui.Name = "CyberHeroes_Line_" .. player.UserId
-    lineGui.ResetOnSpawn = false
-    lineGui.Parent = game:GetService("CoreGui")
-    lineGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    -- Buat origin circle (titik tengah bawah layar, bisa diatur posisinya)
-    local originCircle = Instance.new("Frame")
-    originCircle.Name = "OriginCircle"
-    originCircle.Size = UDim2.new(0, 8, 0, 8)
-    originCircle.Position = UDim2.new(0.5, -4, 0.92, -4) -- center-bawah
-    originCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    originCircle.BackgroundTransparency = 0.8
-    originCircle.BorderSizePixel = 0
-    originCircle.Parent = lineGui
-    local circleCorner = Instance.new("UICorner")
-    circleCorner.CornerRadius = UDim.new(1, 0)
-    circleCorner.Parent = originCircle
-
-    local lineFrame = Instance.new("Frame")
-    lineFrame.Name = "Line"
-    lineFrame.Size = UDim2.new(0, 2, 0, 100) -- sementara
-    lineFrame.BackgroundColor3 = highlightColor
-    lineFrame.BackgroundTransparency = 0.5
-    lineFrame.BorderSizePixel = 0
-    lineFrame.Parent = lineGui
-    lineFrame.AnchorPoint = Vector2.new(0, 0.5)
-    lineFrame.ZIndex = 1
-
-    -- Fungsi update jarak dan line (dengan origin dari circle)
-    local function updateDistanceAndLine()
-        if not localRootPart or not player.Character then
-            distLabel.Text = "?"
-            lineFrame.Visible = false
-            return
-        end
-        local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-        if not targetRoot then
-            distLabel.Text = "?"
-            lineFrame.Visible = false
-            return
-        end
-
-        -- Update jarak
-        local dist = (localRootPart.Position - targetRoot.Position).Magnitude
-        distLabel.Text = string.format("%.1f Studs", dist)
-
-        -- Update warna secara real-time (cek ulang status setiap frame)
-        local currentIsKiller = getPlayerType()
-        local currentColor = currentIsKiller and config.highlightColorKiller or config.highlightColorSurvivor
-        if highlight and highlight.FillColor ~= currentColor then
-            highlight.FillColor = currentColor
-            highlight.OutlineColor = currentColor
-        end
-        if distLabel and distLabel.TextColor3 ~= currentColor then
-            distLabel.TextColor3 = currentColor
-        end
-        if lineFrame and lineFrame.BackgroundColor3 ~= currentColor then
-            lineFrame.BackgroundColor3 = currentColor
-        end
-
-        -- Update Line dari origin circle ke posisi player
-        local camera = workspace.CurrentCamera
-        if not camera then
-            lineFrame.Visible = false
-            return
-        end
-
-        local screenPos, onScreen = camera:WorldToViewportPoint(targetRoot.Position)
-        if not onScreen then
-            lineFrame.Visible = false
-            return
-        end
-
-        -- Titik origin dari posisi absolut originCircle
-        local circleAbsPos = originCircle.AbsolutePosition
-        local circleAbsSize = originCircle.AbsoluteSize
-        local originX = circleAbsPos.X + circleAbsSize.X / 2
-        local originY = circleAbsPos.Y + circleAbsSize.Y / 2
-
-        local target = Vector2.new(screenPos.X, screenPos.Y)
-        local direction = target - Vector2.new(originX, originY)
-        local length = direction.Magnitude
-
-        if length <= 1 then
-            lineFrame.Visible = false
-            return
-        end
-
-        -- Tambahkan sedikit panjang agar garis benar-benar menyentuh objek
-        length = length + 10
-
-        lineFrame.Visible = true
-        lineFrame.AnchorPoint = Vector2.new(0, 0.5)
-        lineFrame.Position = UDim2.fromOffset(originX, originY)
-        lineFrame.Size = UDim2.fromOffset(length, 2)
-        lineFrame.Rotation = math.deg(math.atan2(direction.Y, direction.X))
-        lineFrame.BackgroundColor3 = currentColor
-    end
-
-    local lineUpdateConn = RunService.RenderStepped:Connect(updateDistanceAndLine)
-    updateDistanceAndLine() -- inisialisasi
-
-    -- Team change event (tetap dipakai, tapi warna di-maintain oleh RenderStepped)
-    local teamChangedConn = nil
-    if player.Team then
-        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
-            -- Tidak perlu update warna di sini karena RenderStepped akan mengecek ulang
-            -- Hanya untuk trigger jika diperlukan
-        end)
-    end
-
-    espHighlights[player.UserId] = {
-        Highlight = highlight,
-        Billboard = billboard,
-        DistLabel = distLabel,
-        TeamChanged = teamChangedConn,
-        DistanceUpdate = nil,
-        LineGui = lineGui,
-        LineFrame = lineFrame,
-        LineUpdate = lineUpdateConn,
-        OriginCircle = originCircle,
-    }
+	if espHighlights[player.UserId] then
+		if espHighlights[player.UserId].Highlight then espHighlights[player.UserId].Highlight:Destroy() end
+		if espHighlights[player.UserId].Billboard then espHighlights[player.UserId].Billboard:Destroy() end
+		if espHighlights[player.UserId].TeamChanged then espHighlights[player.UserId].TeamChanged:Disconnect() end
+		if espHighlights[player.UserId].DistanceUpdate then espHighlights[player.UserId].DistanceUpdate:Disconnect() end
+		if espHighlights[player.UserId].LineGui then espHighlights[player.UserId].LineGui:Destroy() end
+		if espHighlights[player.UserId].LineUpdate then espHighlights[player.UserId].LineUpdate:Disconnect() end
+		if espHighlights[player.UserId].OriginCircle then espHighlights[player.UserId].OriginCircle:Destroy() end
+		espHighlights[player.UserId] = nil
+	end
+	local character = player.Character
+	if not character then return end
+	local function getPlayerType()
+		if player.Team then
+			local teamName = player.Team.Name:lower()
+			if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then return true end
+		end
+		local tool = character:FindFirstChildWhichIsA("Tool")
+		if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then return true end
+		return false
+	end
+	local function getCurrentColor()
+		return getPlayerType() and config.highlightColorKiller or config.highlightColorSurvivor
+	end
+	local currentColor = getCurrentColor()
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "CyberHeroes_ESP"
+	highlight.FillColor = currentColor
+	highlight.OutlineColor = currentColor
+	highlight.FillTransparency = 1
+	highlight.OutlineTransparency = 0.2
+	highlight.Adornee = character
+	highlight.Parent = character
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CyberHeroes_DistanceTag"
+	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+	billboard.Size = UDim2.new(0, 40, 0, 10)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = character
+	local distLabel = Instance.new("TextLabel")
+	distLabel.Size = UDim2.new(1, 0, 1, 0)
+	distLabel.BackgroundTransparency = 1
+	distLabel.Text = "0 Studs"
+	distLabel.TextColor3 = currentColor
+	distLabel.TextStrokeTransparency = 0.5
+	distLabel.TextScaled = true
+	distLabel.Font = Enum.Font.GothamBold
+	distLabel.Parent = billboard
+	local lineGui = Instance.new("ScreenGui")
+	lineGui.Name = "CyberHeroes_Line_" .. player.UserId
+	lineGui.ResetOnSpawn = false
+	lineGui.Parent = game:GetService("CoreGui")
+	lineGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	local originCircle = Instance.new("Frame")
+	originCircle.Name = "OriginCircle"
+	originCircle.Size = UDim2.new(0, 8, 0, 8)
+	originCircle.Position = UDim2.new(0.5, -4, 0.92, -4)
+	originCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	originCircle.BackgroundTransparency = 0.8
+	originCircle.BorderSizePixel = 0
+	originCircle.Parent = lineGui
+	local circleCorner = Instance.new("UICorner")
+	circleCorner.CornerRadius = UDim.new(1, 0)
+	circleCorner.Parent = originCircle
+	local lineFrame = Instance.new("Frame")
+	lineFrame.Name = "Line"
+	lineFrame.Size = UDim2.new(0, 2, 0, 100)
+	lineFrame.BackgroundColor3 = currentColor
+	lineFrame.BackgroundTransparency = 0.5
+	lineFrame.BorderSizePixel = 0
+	lineFrame.Parent = lineGui
+	lineFrame.AnchorPoint = Vector2.new(0, 0.5)
+	lineFrame.ZIndex = 1
+	local function updateDistanceAndLine()
+		if not localRootPart or not player.Character then
+			distLabel.Text = "?"
+			lineFrame.Visible = false
+			return
+		end
+		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+		if not targetRoot then
+			distLabel.Text = "?"
+			lineFrame.Visible = false
+			return
+		end
+		local dist = (localRootPart.Position - targetRoot.Position).Magnitude
+		distLabel.Text = string.format("%.1f Studs", dist)
+		local newColor = getCurrentColor()
+		if highlight.FillColor ~= newColor then
+			highlight.FillColor = newColor
+			highlight.OutlineColor = newColor
+		end
+		if distLabel.TextColor3 ~= newColor then
+			distLabel.TextColor3 = newColor
+		end
+		if lineFrame.BackgroundColor3 ~= newColor then
+			lineFrame.BackgroundColor3 = newColor
+		end
+		local camera = workspace.CurrentCamera
+		if not camera then
+			lineFrame.Visible = false
+			return
+		end
+		local screenPos, onScreen = camera:WorldToViewportPoint(targetRoot.Position)
+		if not onScreen then
+			lineFrame.Visible = false
+			return
+		end
+		local circlePos = originCircle.AbsolutePosition
+		local circleSize = originCircle.AbsoluteSize
+		local originX = circlePos.X + circleSize.X / 2
+		local originY = circlePos.Y + circleSize.Y / 2
+		local target = Vector2.new(screenPos.X, screenPos.Y)
+		local direction = target - Vector2.new(originX, originY)
+		local length = direction.Magnitude
+		if length <= 1 then
+			lineFrame.Visible = false
+			return
+		end
+		length = length + 10
+		lineFrame.Visible = true
+		lineFrame.AnchorPoint = Vector2.new(0, 0.5)
+		lineFrame.Position = UDim2.fromOffset(originX, originY)
+		lineFrame.Size = UDim2.fromOffset(length, 2)
+		lineFrame.Rotation = math.deg(math.atan2(direction.Y, direction.X))
+	end
+	local lineUpdateConn = RunService.RenderStepped:Connect(updateDistanceAndLine)
+	updateDistanceAndLine()
+	local teamChangedConn
+	if player.Team then
+		teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function() end)
+	end
+	espHighlights[player.UserId] = {
+		Highlight = highlight,
+		Billboard = billboard,
+		DistLabel = distLabel,
+		TeamChanged = teamChangedConn,
+		DistanceUpdate = nil,
+		LineGui = lineGui,
+		LineFrame = lineFrame,
+		LineUpdate = lineUpdateConn,
+		OriginCircle = originCircle,
+	}
 end
 -- ============================================================================  
 -- OBJECT ESP (Generator, Hook, Gate, Pallet, Window, SCP)  

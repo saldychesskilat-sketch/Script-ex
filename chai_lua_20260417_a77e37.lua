@@ -560,27 +560,38 @@ local function createProgressBillboard(generator, percent, color)
 end  
   
 -- Update progress generator (warna gradien + hilangkan jika sudah 100%)  
-local function updateGeneratorProgress(generator)  
-    if not generator or not generator.Parent then return true end  
-    local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0  
-    if percent >= 100 then  
-        local h = generator:FindFirstChild("CyberHeroes_Highlight")  
-        if h then h:Destroy() end  
-        local bill = generator:FindFirstChild("GenBitchHook")  
-        if bill then bill:Destroy() end  
-        return true  
-    end  
-    local cp = math.clamp(percent, 0, 100)  
-    local finalColor  
-    if cp < 50 then  
-        finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)  
-    else  
-        finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)  
-    end  
-    applyHighlight(generator, finalColor)  
-    createProgressBillboard(generator, percent, finalColor)  
-    return false  
-end  
+local function updateGeneratorProgress(generator)
+    if not generator or not generator.Parent then return true end
+    local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
+    if percent >= 100 then
+        -- Jangan hapus highlight, tapi ubah menjadi hijau permanen
+        local h = generator:FindFirstChild("CyberHeroes_Highlight")
+        if h then
+            h.FillColor = Color3.fromRGB(0, 255, 0)
+            h.OutlineColor = Color3.fromRGB(0, 255, 0)
+            -- Pastikan transparansi tetap sama
+            h.FillTransparency = 1
+            h.OutlineTransparency = 0.2
+        else
+            -- Jika highlight belum ada (misal baru pertama kali terdeteksi sudah 100%), buat
+            applyHighlight(generator, Color3.fromRGB(0, 255, 0))
+        end
+        -- Hapus billboard progress saja
+        local bill = generator:FindFirstChild("GenBitchHook")
+        if bill then bill:Destroy() end
+        return true
+    end
+    local cp = math.clamp(percent, 0, 100)
+    local finalColor
+    if cp < 50 then
+        finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
+    else
+        finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
+    end
+    applyHighlight(generator, finalColor)
+    createProgressBillboard(generator, percent, finalColor)
+    return false
+end
   
 -- Update semua progress generator (dipanggil periodic)  
 local function updateAllGeneratorProgress()  
@@ -594,107 +605,113 @@ end
 -- ============================================================================  
 -- PLAYER ESP (dengan deteksi killer/survivor, jarak, status) - LEBIH TRANSPARAN  
 -- ============================================================================  
-local function createHighlightForPlayer(player)  
-    if espHighlights[player.UserId] then  
-        if espHighlights[player.UserId].Highlight then  
-            espHighlights[player.UserId].Highlight:Destroy()  
-        end  
-        if espHighlights[player.UserId].Billboard then  
-            espHighlights[player.UserId].Billboard:Destroy()  
-        end  
-        if espHighlights[player.UserId].TeamChanged then  
-            espHighlights[player.UserId].TeamChanged:Disconnect()  
-        end  
-        espHighlights[player.UserId] = nil  
-    end  
-  
-    local character = player.Character  
-    if not character then return end  
-  
-    local function getPlayerType()  
-        local isKiller = false  
-        if player.Team then  
-            local teamName = player.Team.Name:lower()  
-            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then  
-                isKiller = true  
-            end  
-        end  
-        if not isKiller then  
-            local tool = character:FindFirstChildWhichIsA("Tool")  
-            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then  
-                isKiller = true  
-            end  
-        end  
-        return isKiller  
-    end  
-  
-    local isKiller = getPlayerType()  
-    local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor  
-  
-    local highlight = Instance.new("Highlight")  
-    highlight.Name = "CyberHeroes_ESP"  
-    highlight.FillColor = highlightColor  
-    highlight.OutlineColor = highlightColor  
-    highlight.FillTransparency = 1  
-    highlight.OutlineTransparency = 0.2  
-    highlight.Adornee = character  
-    highlight.Parent = character  
-  
-    local billboard = Instance.new("BillboardGui")  
-    billboard.Name = "CyberHeroes_NameTag"  
-    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")  
-    billboard.Size = UDim2.new(0, 120, 0, 30)  
-    billboard.StudsOffset = Vector3.new(0, 2, 0)  
-    billboard.Parent = character  
-    local nameLabel = Instance.new("TextLabel")  
-    nameLabel.Size = UDim2.new(1, 0, 1, 0)  
-    nameLabel.BackgroundTransparency = 1  
-    nameLabel.Text = player.Name  
-    nameLabel.TextColor3 = highlightColor  
-    nameLabel.TextStrokeTransparency = 0.5  
-    nameLabel.TextScaled = true  
-    nameLabel.Font = Enum.Font.GothamBold  
-    nameLabel.Parent = billboard  
-  
-    local teamChangedConn = nil  
-    if player.Team then  
-        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()  
-            local newIsKiller = getPlayerType()  
-            local newColor = newIsKiller and config.highlightColorKiller or config.highlightColorSurvivor  
-            if highlight then  
-                highlight.FillColor = newColor  
-                highlight.OutlineColor = newColor  
-            end  
-            if nameLabel then  
-                nameLabel.TextColor3 = newColor  
-            end  
-        end)  
-    end  
-  
-    espHighlights[player.UserId] = {  
-        Highlight = highlight,  
-        Billboard = billboard,  
-        NameLabel = nameLabel,  
-        TeamChanged = teamChangedConn  
-    }  
-end  
-  
-local function updateAllESP()  
-    if not config.espEnabled then  
-        for _, data in pairs(espHighlights) do  
-            if data.Highlight then data.Highlight:Destroy() end  
-            if data.Billboard then data.Billboard:Destroy() end  
-            if data.TeamChanged then data.TeamChanged:Disconnect() end  
-        end  
-        espHighlights = {}  
-        return  
-    end  
-    for _, player in ipairs(Players:GetPlayers()) do  
-        if player ~= localPlayer then  
-            createHighlightForPlayer(player)  
-        end  
-    end  
-end  
+local function createHighlightForPlayer(player)
+    if espHighlights[player.UserId] then
+        if espHighlights[player.UserId].Highlight then
+            espHighlights[player.UserId].Highlight:Destroy()
+        end
+        if espHighlights[player.UserId].Billboard then
+            espHighlights[player.UserId].Billboard:Destroy()
+        end
+        if espHighlights[player.UserId].TeamChanged then
+            espHighlights[player.UserId].TeamChanged:Disconnect()
+        end
+        if espHighlights[player.UserId].DistanceUpdate then
+            espHighlights[player.UserId].DistanceUpdate:Disconnect()
+        end
+        espHighlights[player.UserId] = nil
+    end
+
+    local character = player.Character
+    if not character then return end
+
+    local function getPlayerType()
+        local isKiller = false
+        if player.Team then
+            local teamName = player.Team.Name:lower()
+            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                isKiller = true
+            end
+        end
+        if not isKiller then
+            local tool = character:FindFirstChildWhichIsA("Tool")
+            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                isKiller = true
+            end
+        end
+        return isKiller
+    end
+
+    local isKiller = getPlayerType()
+    local highlightColor = isKiller and config.highlightColorKiller or config.highlightColorSurvivor
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "CyberHeroes_ESP"
+    highlight.FillColor = highlightColor
+    highlight.OutlineColor = highlightColor
+    highlight.FillTransparency = 1
+    highlight.OutlineTransparency = 0.2
+    highlight.Adornee = character
+    highlight.Parent = character
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "CyberHeroes_DistanceTag"
+    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    billboard.Size = UDim2.new(0, 120, 0, 30)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.Parent = character
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Size = UDim2.new(1, 0, 1, 0)
+    distLabel.BackgroundTransparency = 1
+    distLabel.Text = "0 Studs"
+    distLabel.TextColor3 = highlightColor
+    distLabel.TextStrokeTransparency = 0.5
+    distLabel.TextScaled = true
+    distLabel.Font = Enum.Font.GothamBold
+    distLabel.Parent = billboard
+
+    -- Fungsi update jarak
+    local function updateDistance()
+        if not localRootPart or not player.Character then
+            distLabel.Text = "?"
+            return
+        end
+        local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then
+            distLabel.Text = "?"
+            return
+        end
+        local dist = (localRootPart.Position - targetRoot.Position).Magnitude
+        distLabel.Text = string.format("%.1f Studs", dist)
+    end
+
+    -- Update setiap frame
+    local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
+    updateDistance() -- sekali langsung
+
+    local teamChangedConn = nil
+    if player.Team then
+        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
+            local newIsKiller = getPlayerType()
+            local newColor = newIsKiller and config.highlightColorKiller or config.highlightColorSurvivor
+            if highlight then
+                highlight.FillColor = newColor
+                highlight.OutlineColor = newColor
+            end
+            if distLabel then
+                distLabel.TextColor3 = newColor
+            end
+        end)
+    end
+
+    espHighlights[player.UserId] = {
+        Highlight = highlight,
+        Billboard = billboard,
+        DistLabel = distLabel,
+        TeamChanged = teamChangedConn,
+        DistanceUpdate = distUpdateConn
+    }
+end
   
 -- ============================================================================  
 -- OBJECT ESP (Generator, Hook, Gate, Pallet, Window, SCP)  

@@ -654,7 +654,7 @@ local function createHighlightForPlayer(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CyberHeroes_DistanceTag"
 	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 80, 0, 20)
+	billboard.Size = UDim2.new(0, 15, 0, 15)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = character

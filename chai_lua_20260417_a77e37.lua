@@ -665,8 +665,8 @@ local function createHighlightForPlayer(player)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
     billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 80, 0, 20)   -- lebih kecil (120x30 -> 80x20)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0) -- sedikit dinaikkan
+    billboard.Size = UDim2.new(0, 80, 0, 20)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = character
     local distLabel = Instance.new("TextLabel")
@@ -679,7 +679,7 @@ local function createHighlightForPlayer(player)
     distLabel.Font = Enum.Font.GothamBold
     distLabel.Parent = billboard
 
-    -- ScreenGui untuk garis (line) - titik awal di center layar
+    -- ScreenGui untuk garis (line)
     local lineGui = Instance.new("ScreenGui")
     lineGui.Name = "CyberHeroes_Line_" .. player.UserId
     lineGui.ResetOnSpawn = false
@@ -688,12 +688,11 @@ local function createHighlightForPlayer(player)
 
     local lineFrame = Instance.new("Frame")
     lineFrame.Name = "Line"
-    lineFrame.Size = UDim2.new(0, 2, 0, 100) -- sementara, akan diupdate
+    lineFrame.Size = UDim2.new(0, 2, 0, 100)
     lineFrame.BackgroundColor3 = highlightColor
     lineFrame.BackgroundTransparency = 0.5
     lineFrame.BorderSizePixel = 0
     lineFrame.Parent = lineGui
-    -- AnchorPoint di kiri-tengah, tapi kita akan set posisi di center layar
     lineFrame.AnchorPoint = Vector2.new(0, 0.5)
 
     -- Fungsi update jarak dan line
@@ -713,36 +712,35 @@ local function createHighlightForPlayer(player)
         local dist = (localRootPart.Position - targetRoot.Position).Magnitude
         distLabel.Text = string.format("%.1f Studs", dist)
 
-        -- Line dari center layar ke posisi player
+        -- Line dari bottom-center layar ke posisi player
         local camera = workspace.CurrentCamera
         if not camera then
             lineFrame.Visible = false
             return
         end
-        local screenPos, onScreen = camera:WorldToScreenPoint(targetRoot.Position)
+        local screenPos, onScreen = camera:WorldToViewportPoint(targetRoot.Position)
         if not onScreen then
             lineFrame.Visible = false
             return
         end
-        local viewportSize = camera.ViewportSize
-        local centerX = viewportSize.X / 2
-        local centerY = viewportSize.Y / 2
-        local dx = screenPos.X - centerX
-        local dy = screenPos.Y - centerY
-        local length = math.sqrt(dx*dx + dy*dy)
-        if length < 1 then
+        local viewport = camera.ViewportSize
+        -- Titik origin: bottom-center (92% dari tinggi layar)
+        local origin = Vector2.new(
+            viewport.X * 0.5,
+            viewport.Y * 0.92
+        )
+        local target = Vector2.new(screenPos.X, screenPos.Y)
+        local direction = target - origin
+        local length = direction.Magnitude
+        if length <= 1 then
             lineFrame.Visible = false
             return
         end
         lineFrame.Visible = true
-        -- Posisi: mulai di center layar
-        lineFrame.Position = UDim2.new(0, centerX, 0, centerY)
-        -- Ukuran: panjang = distance, tinggi = 2px (lebar garis)
-        lineFrame.Size = UDim2.new(0, length, 0, 2)
-        -- Rotasi (arah dari center ke player)
-        local angle = math.atan2(dy, dx)
-        lineFrame.Rotation = math.deg(angle)
-        -- Warna sesuai highlight
+        lineFrame.AnchorPoint = Vector2.new(0, 0.5)
+        lineFrame.Position = UDim2.fromOffset(origin.X, origin.Y)
+        lineFrame.Size = UDim2.fromOffset(length, 2)
+        lineFrame.Rotation = math.deg(math.atan2(direction.Y, direction.X))
         lineFrame.BackgroundColor3 = highlightColor
     end
 

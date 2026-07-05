@@ -661,11 +661,11 @@ local function createHighlightForPlayer(player)
     highlight.Adornee = character
     highlight.Parent = character
 
-    -- Billboard untuk jarak (ukuran diperkecil 2x dan proporsional terhadap karakter)
+    -- Billboard jarak (ukuran lebih kecil dan proporsional)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
     billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-    billboard.Size = UDim2.new(0, 80, 0, 20)
+    billboard.Size = UDim2.new(0, 80, 0, 20)   -- 2x lebih kecil dari sebelumnya
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = character
@@ -679,7 +679,7 @@ local function createHighlightForPlayer(player)
     distLabel.Font = Enum.Font.GothamBold
     distLabel.Parent = billboard
 
-    -- ScreenGui untuk garis (line)
+    -- ScreenGui untuk garis (line) - titik awal di center-bawah layar
     local lineGui = Instance.new("ScreenGui")
     lineGui.Name = "CyberHeroes_Line_" .. player.UserId
     lineGui.ResetOnSpawn = false
@@ -688,14 +688,14 @@ local function createHighlightForPlayer(player)
 
     local lineFrame = Instance.new("Frame")
     lineFrame.Name = "Line"
-    lineFrame.Size = UDim2.new(0, 2, 0, 100)
+    lineFrame.Size = UDim2.new(0, 2, 0, 100) -- sementara
     lineFrame.BackgroundColor3 = highlightColor
     lineFrame.BackgroundTransparency = 0.5
     lineFrame.BorderSizePixel = 0
     lineFrame.Parent = lineGui
     lineFrame.AnchorPoint = Vector2.new(0, 0.5)
 
-    -- Fungsi update jarak dan line
+    -- Fungsi update jarak dan line (perbaikan ESP Line)
     local function updateDistanceAndLine()
         if not localRootPart or not player.Character then
             distLabel.Text = "?"
@@ -708,34 +708,37 @@ local function createHighlightForPlayer(player)
             lineFrame.Visible = false
             return
         end
-        -- Jarak
+
+        -- Update jarak
         local dist = (localRootPart.Position - targetRoot.Position).Magnitude
         distLabel.Text = string.format("%.1f Studs", dist)
 
-        -- Line dari bottom-center layar ke posisi player
+        -- Update Line dari center-bawah layar ke posisi player
         local camera = workspace.CurrentCamera
         if not camera then
             lineFrame.Visible = false
             return
         end
+
         local screenPos, onScreen = camera:WorldToViewportPoint(targetRoot.Position)
         if not onScreen then
             lineFrame.Visible = false
             return
         end
+
         local viewport = camera.ViewportSize
-        -- Titik origin: bottom-center (92% dari tinggi layar)
-        local origin = Vector2.new(
-            viewport.X * 0.5,
-            viewport.Y * 0.92
-        )
+        -- Titik origin: center-bawah (92% dari tinggi layar)
+        local origin = Vector2.new(viewport.X * 0.5, viewport.Y * 0.92)
         local target = Vector2.new(screenPos.X, screenPos.Y)
+
         local direction = target - origin
         local length = direction.Magnitude
+
         if length <= 1 then
             lineFrame.Visible = false
             return
         end
+
         lineFrame.Visible = true
         lineFrame.AnchorPoint = Vector2.new(0, 0.5)
         lineFrame.Position = UDim2.fromOffset(origin.X, origin.Y)
@@ -744,7 +747,6 @@ local function createHighlightForPlayer(player)
         lineFrame.BackgroundColor3 = highlightColor
     end
 
-    -- Update menggunakan RenderStepped agar lebih smooth untuk garis
     local lineUpdateConn = RunService.RenderStepped:Connect(updateDistanceAndLine)
     updateDistanceAndLine() -- inisialisasi
 

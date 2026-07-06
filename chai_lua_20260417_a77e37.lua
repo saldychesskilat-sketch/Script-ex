@@ -475,7 +475,7 @@ end
 local ObjectColors = {  
     Generator = Color3.fromRGB(255, 165, 0),   
     Gate      = Color3.fromRGB(255, 255, 255),  
-    Pallet    = Color3.fromRGB(173.216.230),    
+    Pallet    = Color3.fromRGB(173, 216, 230),    
     Hook      = Color3.fromRGB(0, 128, 128),  
     SCP       = Color3.fromRGB(150, 0, 255),      -- Warna ungu untuk SCP entity
     Windows   = Color3.fromRGB(0,0,0)       -- Warna biru untuk Window

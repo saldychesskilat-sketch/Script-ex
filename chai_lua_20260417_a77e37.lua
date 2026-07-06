@@ -475,10 +475,10 @@ end
 local ObjectColors = {  
     Generator = Color3.fromRGB(255, 165, 0),   
     Gate      = Color3.fromRGB(255, 255, 255),  
-    Pallet    = Color3.fromRGB(0, 128, 128),    
-    Hook      = Color3.fromRGB(255, 165, 0),  
+    Pallet    = Color3.fromRGB(173.216.230),    
+    Hook      = Color3.fromRGB(0, 128, 128),  
     SCP       = Color3.fromRGB(150, 0, 255),      -- Warna ungu untuk SCP entity
-    VaultTrigger = Color3.fromRGB(0, 150, 255)       -- Warna biru untuk Window
+    Windows   = Color3.fromRGB(0,0,0)       -- Warna biru untuk Window
 }
   
 -- Variabel ESP (global untuk script utama)  
@@ -810,8 +810,8 @@ local function createObjectESP(obj, objType)
         color = ObjectColors.Pallet  
     elseif objType == "SCP" then  
         color = ObjectColors.SCP  
-    elseif objType == "VaultTrigger" then  
-        color = ObjectColors.VaultTrigger  
+    elseif objType == "Windows" then  
+        color = ObjectColors.Windows  
     end  
     local highlight = applyHighlight(obj, color)  
     generatorEspHighlights[obj] = highlight  
@@ -852,8 +852,8 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "SCP")  
         elseif name == "Pallet" or name == "Palletwrong" then  
             createObjectESP(obj, "Pallet")  
-        elseif name == "VaultTrigger" or name:lower():find("VaultTrigger") then  
-            createObjectESP(obj, "VaultTrigger")  
+        elseif name == "Windows" or name:lower():find("Windows") then  
+            createObjectESP(obj, "Windows")  
         end  
     end  
     print("[ESP] Object ESP refreshed (including Windows)")  
@@ -872,8 +872,8 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "SCP")  
     elseif name == "Pallet" or name == "Palletwrong" then  
         createObjectESP(instance, "Pallet")  
-    elseif name == "VaultTrigger" or name:lower():find("VaultTrigger") then  
-        createObjectESP(instance, "VaultTrigger")  
+    elseif name == "Windows" or name:lower():find("Windows") then  
+        createObjectESP(instance, "Windows")  
     end  
 end  
   

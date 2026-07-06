@@ -475,7 +475,7 @@ end
 local ObjectColors = {  
     Generator = Color3.fromRGB(255, 165, 0),   
     Gate      = Color3.fromRGB(255, 255, 255),  
-    Pallet    = Color3.fromRGB(128, 128, 128),    
+    Pallet    = Color3.fromRGB(0, 128, 128),    
     Hook      = Color3.fromRGB(255, 165, 0),  
     SCP       = Color3.fromRGB(150, 0, 255),      -- Warna ungu untuk SCP entity
     VaultTrigger = Color3.fromRGB(0, 150, 255)       -- Warna biru untuk Window
@@ -685,7 +685,7 @@ local function createHighlightForPlayer(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CyberHeroes_DistanceTag"
 	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 20, 0, 20)
+	billboard.Size = UDim2.new(0, 15, 0, 15)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = character

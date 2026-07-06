@@ -478,7 +478,7 @@ local ObjectColors = {
     Pallet    = Color3.fromRGB(173, 216, 230),    
     Hook      = Color3.fromRGB(0, 128, 128),  
     SCP       = Color3.fromRGB(150, 0, 255),      -- Warna ungu untuk SCP entity
-    Windows   = Color3.fromRGB(0, 0, 0)       -- Warna biru untuk Window
+    Windows   = Color3.fromRGB(105, 105, 105)       -- Warna biru untuk Window
 }
   
 -- Variabel ESP (global untuk script utama)  

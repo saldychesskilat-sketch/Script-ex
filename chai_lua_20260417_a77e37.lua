@@ -622,26 +622,32 @@ local function createHighlightForPlayer(player)
 	local character = player.Character
 	if not character then return end
 	local MAX_DISTANCE = 2000
-	local function getPlayerType()
+	local function getTargetRole()
 		if player.Team then
 			local teamName = player.Team.Name:lower()
-			if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then return true end
+			if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+				return "Killer"
+			elseif teamName:find("survivor") then
+				return "Survivor"
+			elseif teamName:find("spectator") or teamName == "" then
+				return "Spectator"
+			end
 		end
 		local tool = character:FindFirstChildWhichIsA("Tool")
-		if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then return true end
-		return false
-	end
-	local function isSpectator()
-		if player == localPlayer then return false end
-		if not player.Team then return true end
-		local teamName = player.Team.Name:lower()
-		return not (teamName == "survivors" or teamName == "killers" or teamName:find("survivor") or teamName:find("killer"))
+		if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+			return "Killer"
+		end
+		return "Spectator"
 	end
 	local function getCurrentColor()
-		if isSpectator() then
-			return Color3.fromRGB(255, 255, 255) -- putih
+		local role = getTargetRole()
+		if role == "Killer" then
+			return config.highlightColorKiller
+		elseif role == "Survivor" then
+			return config.highlightColorSurvivor
+		else -- Spectator
+			return Color3.fromRGB(255, 255, 255)
 		end
-		return getPlayerType() and config.highlightColorKiller or config.highlightColorSurvivor
 	end
 	local function isLocalPlayerInGame()
 		local team = localPlayer.Team
@@ -656,12 +662,13 @@ local function createHighlightForPlayer(player)
 		return (localRootPart.Position - targetRoot.Position).Magnitude
 	end
 	local function shouldBeamActive()
-		if isSpectator() then return false end
 		if not isLocalPlayerInGame() then return false end
 		if not localPlayer.Character or not player.Character then return false end
 		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
 		if not targetRoot then return false end
 		if not localRootPart then return false end
+		local role = getTargetRole()
+		if role == "Spectator" then return false end
 		local dist = getDistanceToPlayer()
 		return dist <= MAX_DISTANCE
 	end
@@ -678,7 +685,7 @@ local function createHighlightForPlayer(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CyberHeroes_DistanceTag"
 	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 20, 0, 20)
+	billboard.Size = UDim2.new(0, 80, 0, 20)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = character
@@ -723,7 +730,7 @@ local function createHighlightForPlayer(player)
 	local function updateVisibility()
 		local active = shouldBeamActive()
 		beam.Enabled = active
-		highlight.Enabled = active
+		highlight.Enabled = active or (getTargetRole() == "Spectator")
 		billboard.Enabled = active
 	end
 	local function updateBeamColor()
@@ -743,12 +750,11 @@ local function createHighlightForPlayer(player)
 	local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
 	updateBeamColor()
 	local function updateDistance()
-		if isSpectator() then
-			distLabel.Text = "Spectator"
-			return
-		end
 		local dist = getDistanceToPlayer()
-		if dist <= MAX_DISTANCE then
+		local role = getTargetRole()
+		if role == "Spectator" then
+			distLabel.Text = "Spectator"
+		elseif dist <= MAX_DISTANCE then
 			distLabel.Text = string.format("%.1f Studs", dist)
 		else
 			distLabel.Text = ">2000 Studs"

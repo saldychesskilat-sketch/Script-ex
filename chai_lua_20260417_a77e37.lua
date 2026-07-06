@@ -631,7 +631,16 @@ local function createHighlightForPlayer(player)
 		if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then return true end
 		return false
 	end
+	local function isSpectator()
+		if player == localPlayer then return false end
+		if not player.Team then return true end
+		local teamName = player.Team.Name:lower()
+		return not (teamName == "survivors" or teamName == "killers" or teamName:find("survivor") or teamName:find("killer"))
+	end
 	local function getCurrentColor()
+		if isSpectator() then
+			return Color3.fromRGB(255, 255, 255) -- putih
+		end
 		return getPlayerType() and config.highlightColorKiller or config.highlightColorSurvivor
 	end
 	local function isLocalPlayerInGame()
@@ -647,6 +656,7 @@ local function createHighlightForPlayer(player)
 		return (localRootPart.Position - targetRoot.Position).Magnitude
 	end
 	local function shouldBeamActive()
+		if isSpectator() then return false end
 		if not isLocalPlayerInGame() then return false end
 		if not localPlayer.Character or not player.Character then return false end
 		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
@@ -668,7 +678,7 @@ local function createHighlightForPlayer(player)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CyberHeroes_DistanceTag"
 	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 15, 0, 20)
+	billboard.Size = UDim2.new(0, 20, 0, 20)
 	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Parent = character
@@ -733,13 +743,16 @@ local function createHighlightForPlayer(player)
 	local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
 	updateBeamColor()
 	local function updateDistance()
+		if isSpectator() then
+			distLabel.Text = "Spectator"
+			return
+		end
 		local dist = getDistanceToPlayer()
 		if dist <= MAX_DISTANCE then
 			distLabel.Text = string.format("%.1f Studs", dist)
 		else
 			distLabel.Text = ">2000 Studs"
 		end
-		-- Update visibility juga di sini sebagai cadangan, tapi RenderStepped sudah handle
 	end
 	local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
 	updateDistance()

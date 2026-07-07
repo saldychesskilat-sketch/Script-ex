@@ -473,7 +473,6 @@ end
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - WITH CUSTOM ESP SUPPORT
 -- ============================================================================
-
 if not config.espCustom then
     config.espCustom = {
         generator = { enabled = false, color = Color3.fromRGB(255, 165, 0) },
@@ -1011,15 +1010,26 @@ local function stopESP()
     print("[ESP] ESP stopped")
 end
 
+-- ============================================================================
+-- UPDATE ALL ESP (dipanggil dari toggle utama)
+-- ============================================================================
 local function updateAllESP()
     if config.espEnabled then
+        -- Aktifkan semua custom ESP secara kolektif
+        for key, _ in pairs(config.espCustom) do
+            config.espCustom[key].enabled = true
+        end
         startESP()
     else
+        -- Reset semua custom ESP ke false
+        for key, _ in pairs(config.espCustom) do
+            config.espCustom[key].enabled = false
+        end
         stopESP()
     end
 end
 
--- Fungsi refresh custom ESP (dipanggil dari GUI saat toggle/warna berubah)
+-- Fungsi refresh custom ESP (dipanggil dari GUI saat toggle/warna berubah di sidebar About)
 local function refreshCustomESP()
     refreshAllObjectESP()
     for _, player in ipairs(Players:GetPlayers()) do

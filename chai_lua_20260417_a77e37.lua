@@ -4405,7 +4405,6 @@ end
 -- ABOUT CONTENT
 -- ============================================================================
 local aboutContent = nil
-local watchdogStarted = false
 
 -- State movement disimpan di luar fungsi agar persist saat pindah sidebar
 local movementState = {
@@ -4415,9 +4414,16 @@ local movementState = {
 }
 
 local function createAboutContent()
-    -- Jika sudah ada, cukup tampilkan (tidak rebuild)
-    if aboutContent then
+    -- Jika aboutContent sudah ada, hanya tampilkan dan refresh, jangan buat ulang
+    if aboutContent and aboutContent.Parent then
         aboutContent.Visible = true
+        -- Refresh ESP dan progress saat ditampilkan kembali
+        if type(refreshCustomESP) == "function" then
+            refreshCustomESP()
+        end
+        if type(updateAllGeneratorProgress) == "function" then
+            updateAllGeneratorProgress()
+        end
         return
     end
 
@@ -4482,7 +4488,7 @@ local function createAboutContent()
         end
     end
 
-    -- Buat GUI ABOUT
+    -- Buat GUI
     aboutContent = Instance.new("Frame")
     aboutContent.Size = UDim2.new(1,0,1,0)
     aboutContent.BackgroundTransparency = 1
@@ -4910,6 +4916,7 @@ local function createAboutContent()
                 bg.BorderSizePixel = 0
                 bg.Parent = holder
 
+                -- Gradien warna pada background
                 local grad = Instance.new("UIGradient")
                 grad.Color = colorGradient
                 grad.Parent = bg
@@ -5011,10 +5018,12 @@ local function createAboutContent()
             end
             local outsideConn = game:GetService("UserInputService").InputBegan:Connect(checkClickOutside)
 
+            -- Animasi keluar
             popup.Destroying:Connect(function()
                 outsideConn:Disconnect()
             end)
 
+            -- Animasi keluar saat destroy
             local oldDestroy = popup.Destroy
             popup.Destroy = function(self)
                 local tweenOut = TweenService:Create(popupFrame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
@@ -5138,53 +5147,52 @@ local function createAboutContent()
         updateToggleUI(not tpwalkActive)
     end)
 
-    -- ========== HANDLE RESPAWN ==========
+    -- ========== HANDLE RESPAWN & CLEANUP ==========
     characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
+    -- ========== WATCHDOG REFRESH (berjalan terus selama aboutContent ada) ==========
+    local function startWatchdog()
+        task.spawn(function()
+            while aboutContent and aboutContent.Parent and screenGui and screenGui.Parent do
+                -- Update generator progress setiap 1 detik (lebih sering)
+                if type(updateAllGeneratorProgress) == "function" then
+                    updateAllGeneratorProgress()
+                end
+                task.wait(1)
+                -- Refresh semua ESP setiap 3 detik (agar tidak terlalu berat)
+                if type(refreshCustomESP) == "function" then
+                    refreshCustomESP()
+                end
+                task.wait(2)
+            end
+        end)
+    end
+
+    startWatchdog()
+
+    -- Cleanup saat aboutContent dihancurkan (jika suatu saat di-destroy)
     aboutContent.Destroying:Connect(function()
         if sliderDragConnection then sliderDragConnection:Disconnect() end
         if characterAddedConn then characterAddedConn:Disconnect() end
         stopTPWalk()
     end)
 
-    -- ========== WATCHDOG GLOBAL (hanya dijalankan sekali) ==========
-    if not watchdogStarted then
-        watchdogStarted = true
-
-        -- Loop 1: Generator progress setiap 1 detik
-        task.spawn(function()
-            while true do
-                task.wait(1)
-                if type(updateAllGeneratorProgress) == "function" then
-                    updateAllGeneratorProgress()
-                end
-            end
-        end)
-
-        -- Loop 2: Refresh ESP lainnya setiap 3 detik
-        task.spawn(function()
-            while true do
-                task.wait(3)
-                if type(refreshCustomESP) == "function" then
-                    refreshCustomESP()
-                end
-            end
-        end)
-
-        print("[Watchdog] ESP refresh started: generator 1s, others 3s")
-    end
-
-    -- ========== INISIALISASI ==========
+    -- Inisialisasi nilai slider dan toggle
     setSpeedFromPercent(speedPercent)
     updateToggleUI(tpwalkActive)
 
-    -- Refresh pertama kali
-    task.wait(0.1)
-    if type(refreshCustomESP) == "function" then refreshCustomESP() end
+    -- Refresh ESP pertama kali
+    if type(refreshCustomESP) == "function" then
+        refreshCustomESP()
+    end
 
-    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk loaded")
+    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded (watchdog active)")
+
+    -- Pastikan aboutContent terlihat
+    aboutContent.Visible = true
 end
+
 -- ============================================================================
 -- settings content 
 -- ============================================================================

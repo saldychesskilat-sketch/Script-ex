@@ -4414,6 +4414,28 @@ local movementState = {
     enabled = false
 }
 
+-- Set default custom ESP ke OFF (jika belum pernah diatur)
+if not config.espCustom then
+    config.espCustom = {
+        generator = { enabled = false, color = Color3.fromRGB(255, 165, 0) },
+        gate      = { enabled = false, color = Color3.fromRGB(255, 255, 255) },
+        pallet    = { enabled = false, color = Color3.fromRGB(173, 216, 230) },
+        hook      = { enabled = false, color = Color3.fromRGB(0, 128, 128) },
+        scp       = { enabled = false, color = Color3.fromRGB(150, 0, 255) },
+        windows   = { enabled = false, color = Color3.fromRGB(105, 105, 105) },
+        killer    = { enabled = false, color = config.highlightColorKiller or Color3.fromRGB(255, 0, 0) },
+        survivor  = { enabled = false, color = config.highlightColorSurvivor or Color3.fromRGB(0, 0, 255) },
+        line      = { enabled = false, color = Color3.fromRGB(255, 255, 255) },
+    }
+end
+
+-- Pastikan semua toggle memiliki default false jika belum diset
+for key, _ in pairs(config.espCustom) do
+    if config.espCustom[key].enabled == nil then
+        config.espCustom[key].enabled = false
+    end
+end
+
 local function createAboutContent()
     if aboutContent then
         aboutContent:Destroy()
@@ -4674,12 +4696,16 @@ local function createAboutContent()
     espTitle.TextXAlignment = Enum.TextXAlignment.Left
     espTitle.Parent = espInner
 
+    -- ============================================================
+    -- FUNCTION: CREATE TOGGLE ROW (dengan switch style seperti TPWalk)
+    -- ============================================================
     local function createToggleRow(parent, labelText, stateKey, colorKey)
         local row = Instance.new("Frame")
-        row.Size = UDim2.new(1,0,0,26)
+        row.Size = UDim2.new(1,0,0,28)
         row.BackgroundTransparency = 1
         row.Parent = parent
 
+        -- Label
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(0.45,0,1,0)
         label.Position = UDim2.new(0,2,0,0)
@@ -4691,9 +4717,10 @@ local function createAboutContent()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = row
 
+        -- Switch (seperti toggle TPWalk, tapi lebih kecil)
         local switch = Instance.new("TextButton")
-        switch.Size = UDim2.new(0,36,0,16)
-        switch.Position = UDim2.new(0.55,0,0.5,-8)
+        switch.Size = UDim2.new(0,40,0,18)
+        switch.Position = UDim2.new(0.55,0,0.5,-9)
         switch.BackgroundColor3 = config.espCustom[stateKey].enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
         switch.Text = config.espCustom[stateKey].enabled and "ON" or "OFF"
         switch.TextColor3 = Color3.fromRGB(255,255,255)
@@ -4706,6 +4733,14 @@ local function createAboutContent()
         switchCorner.CornerRadius = UDim.new(1,0)
         switchCorner.Parent = switch
 
+        -- Stroke tipis (mirip TPWalk)
+        local switchStroke = Instance.new("UIStroke")
+        switchStroke.Color = config.espCustom[stateKey].enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
+        switchStroke.Thickness = 0.8
+        switchStroke.Transparency = 0.3
+        switchStroke.Parent = switch
+
+        -- Color preview (lingkaran kecil)
         local colorPreview = Instance.new("Frame")
         colorPreview.Size = UDim2.new(0,12,0,12)
         colorPreview.Position = UDim2.new(0.78,0,0.5,-6)
@@ -4716,6 +4751,7 @@ local function createAboutContent()
         previewCorner.CornerRadius = UDim.new(1,0)
         previewCorner.Parent = colorPreview
 
+        -- Button color picker
         local colorBtn = Instance.new("TextButton")
         colorBtn.Size = UDim2.new(0,14,0,14)
         colorBtn.Position = UDim2.new(0.86,0,0.5,-7)
@@ -4730,20 +4766,18 @@ local function createAboutContent()
         btnCorner.CornerRadius = UDim.new(0,4)
         btnCorner.Parent = colorBtn
 
+        -- Event toggle
         switch.MouseButton1Click:Connect(function()
             local newState = not config.espCustom[stateKey].enabled
             config.espCustom[stateKey].enabled = newState
             switch.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
             switch.Text = newState and "ON" or "OFF"
+            switchStroke.Color = newState and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
             refreshCustomESP()
         end)
 
-        -- ============================================================
-        -- COLOR PICKER MODERN (Color Wheel + Brightness Slider)
-        -- Menggunakan asset color wheel yang valid dan universal di Roblox
-        -- ============================================================
+        -- Event color picker (sama seperti sebelumnya)
         colorBtn.MouseButton1Click:Connect(function()
-            -- Tutup popup sebelumnya jika ada
             local existingPopup = game.CoreGui:FindFirstChild("ColorPickerPopup")
             if existingPopup then existingPopup:Destroy() end
 
@@ -4783,25 +4817,21 @@ local function createAboutContent()
             popupTitle.TextSize = 12
             popupTitle.Parent = popupFrame
 
-            -- Container utama
             local mainContainer = Instance.new("Frame")
             mainContainer.Size = UDim2.new(1,-20,1,-40)
             mainContainer.Position = UDim2.new(0,10,0,32)
             mainContainer.BackgroundTransparency = 1
             mainContainer.Parent = popupFrame
 
-            -- Color Wheel (ImageLabel dengan asset valid)
             local wheelSize = 180
             local wheel = Instance.new("ImageLabel")
             wheel.Size = UDim2.new(0, wheelSize, 0, wheelSize)
             wheel.Position = UDim2.new(0,0,0,0)
             wheel.BackgroundTransparency = 1
-            -- Gunakan asset color wheel yang valid dan universal di Roblox
             wheel.Image = "rbxassetid://10527434971"
             wheel.ScaleType = Enum.ScaleType.Fit
             wheel.Parent = mainContainer
 
-            -- Brightness slider (vertikal)
             local brightnessSlider = Instance.new("Frame")
             brightnessSlider.Size = UDim2.new(0, 16, 0, wheelSize)
             brightnessSlider.Position = UDim2.new(0, wheelSize + 10, 0, 0)
@@ -4812,7 +4842,6 @@ local function createAboutContent()
             bSliderCorner.CornerRadius = UDim.new(1,0)
             bSliderCorner.Parent = brightnessSlider
 
-            -- Gradient brightness (hitam di bawah, putih di atas)
             local bGradient = Instance.new("UIGradient")
             bGradient.Rotation = 270
             bGradient.Color = ColorSequence.new({
@@ -4821,7 +4850,6 @@ local function createAboutContent()
             })
             bGradient.Parent = brightnessSlider
 
-            -- Thumb brightness
             local bThumb = Instance.new("TextButton")
             bThumb.Size = UDim2.new(0, 20, 0, 12)
             bThumb.Position = UDim2.new(-2, 0, 0.8, -6)
@@ -4834,7 +4862,6 @@ local function createAboutContent()
             bThumbCorner.CornerRadius = UDim.new(1,0)
             bThumbCorner.Parent = bThumb
 
-            -- Preview warna
             local preview = Instance.new("Frame")
             preview.Size = UDim2.new(0, 30, 0, 30)
             preview.Position = UDim2.new(1, -30, 0.5, -15)
@@ -4849,14 +4876,12 @@ local function createAboutContent()
             previewStroke.Transparency = 0.3
             previewStroke.Parent = preview
 
-            -- State
             local currentColor = config.espCustom[colorKey].color
             local h, s, v = Color3.toHSV(currentColor)
             local isDraggingWheel = false
             local isDraggingBrightness = false
             local popupAlive = true
 
-            -- Fungsi update warna
             local function updateColor(newH, newS, newV)
                 h = newH or h
                 s = newS or s
@@ -4869,7 +4894,6 @@ local function createAboutContent()
                 refreshCustomESP()
             end
 
-            -- Fungsi update posisi thumb brightness
             local function updateBrightnessThumb(val)
                 val = math.clamp(val, 0, 1)
                 v = val
@@ -4877,7 +4901,6 @@ local function createAboutContent()
                 updateColor(nil, nil, val)
             end
 
-            -- Event untuk color wheel
             local function getWheelColor(mouseX, mouseY)
                 local relX = (mouseX - wheel.AbsolutePosition.X) / wheel.AbsoluteSize.X
                 local relY = (mouseY - wheel.AbsolutePosition.Y) / wheel.AbsoluteSize.Y
@@ -4902,7 +4925,6 @@ local function createAboutContent()
                 end
             end)
 
-            -- Event untuk brightness slider
             local function getBrightnessValue(mouseY)
                 local relY = (mouseY - brightnessSlider.AbsolutePosition.Y) / brightnessSlider.AbsoluteSize.Y
                 relY = math.clamp(relY, 0, 1)
@@ -4927,7 +4949,6 @@ local function createAboutContent()
                 end
             end)
 
-            -- Tutup saat drag selesai (lepas mouse/touch)
             local function endDrag()
                 isDraggingWheel = false
                 isDraggingBrightness = false
@@ -4938,7 +4959,6 @@ local function createAboutContent()
                 end
             end)
 
-            -- Klik di luar popup untuk menutup
             local function checkClickOutside(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     local pos = input.Position
@@ -4951,7 +4971,6 @@ local function createAboutContent()
             end
             local outsideConn = game:GetService("UserInputService").InputBegan:Connect(checkClickOutside)
 
-            -- Animasi keluar saat destroy
             local function fadeOutDestroy()
                 popupAlive = false
                 local tweenOut = TweenService:Create(popupFrame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
@@ -4965,7 +4984,6 @@ local function createAboutContent()
                 end)
             end
 
-            -- Cleanup koneksi
             local function cleanupPopup()
                 if wheelMoveConn then wheelMoveConn:Disconnect() end
                 if bMoveConn then bMoveConn:Disconnect() end
@@ -4975,7 +4993,6 @@ local function createAboutContent()
 
             popup.Destroying:Connect(cleanupPopup)
 
-            -- Override destroy agar animasi keluar
             local oldDestroy = popup.Destroy
             popup.Destroy = function(self)
                 if popupAlive then
@@ -4985,7 +5002,6 @@ local function createAboutContent()
                 end
             end
 
-            -- Tombol close (opsional, tetap ada)
             local closePopupBtn = Instance.new("TextButton")
             closePopupBtn.Size = UDim2.new(0, 40, 0, 20)
             closePopupBtn.Position = UDim2.new(1, -48, 0, 4)
@@ -5003,7 +5019,6 @@ local function createAboutContent()
                 popup:Destroy()
             end)
 
-            -- Inisialisasi posisi thumb brightness berdasarkan warna saat ini
             local initVal = Color3.toHSV(config.espCustom[colorKey].color)
             bThumb.Position = UDim2.new(-2, 0, 1 - (initVal or 0.5), -6)
         end)
@@ -5136,10 +5151,22 @@ local function createAboutContent()
         refreshCustomESP()
     end
 
-    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
-    print("[CustomESP] Custom ESP settings loaded")
-end
+    -- ========== WATCHDOG: Refresh ESP secara periodik (setiap 3 detik) ==========
+    -- Ini untuk memastikan ESP tetap hidup meskipun cutscene atau pindah sidebar
+    local watchdogConn
+    watchdogConn = RunService.Heartbeat:Connect(function()
+        if type(refreshCustomESP) == "function" then
+            refreshCustomESP()
+        end
+    end)
+    -- Simpan koneksi watchdog agar bisa di-cleanup
+    aboutContent.Destroying:Connect(function()
+        if watchdogConn then watchdogConn:Disconnect() end
+    end)
 
+    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
+    print("[CustomESP] Custom ESP settings loaded (default OFF, watchdog active)")
+end
 
 -- ============================================================================
 -- settings content 

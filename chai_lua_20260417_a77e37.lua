@@ -5171,12 +5171,12 @@ local function createAboutContent()
                 if type(updateAllGeneratorProgress) == "function" then
                     updateAllGeneratorProgress()
                 end
-                task.wait(1)
+                task.wait(0.5)
                 -- Refresh semua ESP setiap 3 detik (agar tidak terlalu berat)
                 if type(refreshCustomESP) == "function" then
                     refreshCustomESP()
                 end
-                task.wait(2)
+                task.wait(3)
             end
         end)
     end

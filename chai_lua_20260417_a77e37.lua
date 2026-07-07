@@ -5159,8 +5159,24 @@ local function createAboutContent()
 
     print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded")
-end
 
+    -- ========== WATCHDOG: Refresh ESP setiap 1 detik (real-time) ==========
+    local watchdogTask = nil
+    watchdogTask = task.spawn(function()
+        while aboutContent and aboutContent.Parent do
+            task.wait(1)
+            if type(refreshCustomESP) == "function" then
+                refreshCustomESP()
+            end
+        end
+    end)
+
+    aboutContent.Destroying:Connect(function()
+        if watchdogTask then task.cancel(watchdogTask) end
+    end)
+
+    print("[CustomESP] Watchdog active: ESP refresh every 1 second")
+end
 
 -- ============================================================================
 -- settings content 

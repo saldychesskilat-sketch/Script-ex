@@ -4461,6 +4461,12 @@ local movementState = {
     enabled = false
 }
 
+-- Watchdog global (tetap berjalan meski sidebar ABOUT di-destroy)
+if not _G.watchdogActive then
+    _G.watchdogActive = false
+    _G.watchdogTask = nil
+end
+
 local function createAboutContent()
     if aboutContent then
         aboutContent:Destroy()
@@ -4527,7 +4533,7 @@ local function createAboutContent()
         end
     end
 
-    -- Buat GUI
+    -- Buat GUI ABOUT
     aboutContent = Instance.new("Frame")
     aboutContent.Size = UDim2.new(1,0,1,0)
     aboutContent.BackgroundTransparency = 1
@@ -4722,7 +4728,7 @@ local function createAboutContent()
     espTitle.Parent = espInner
 
     -- ============================================================
-    -- CREATE TOGGLE ROW (switch style seperti TPWalk)
+    -- FUNCTION: CREATE TOGGLE ROW (switch style seperti TPWalk)
     -- ============================================================
     local function createToggleRow(parent, labelText, stateKey, colorKey)
         local row = Instance.new("Frame")
@@ -4730,6 +4736,7 @@ local function createAboutContent()
         row.BackgroundTransparency = 1
         row.Parent = parent
 
+        -- Label
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(0.45,0,1,0)
         label.Position = UDim2.new(0,2,0,0)
@@ -4741,6 +4748,7 @@ local function createAboutContent()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = row
 
+        -- Switch (seperti TPWalk, dengan stroke dan circle)
         local switch = Instance.new("TextButton")
         switch.Size = UDim2.new(0,40,0,20)
         switch.Position = UDim2.new(0.55,0,0.5,-10)
@@ -4753,12 +4761,14 @@ local function createAboutContent()
         switchCorner.CornerRadius = UDim.new(1,0)
         switchCorner.Parent = switch
 
+        -- Stroke (mirip TPWalk)
         local switchStroke = Instance.new("UIStroke")
         switchStroke.Color = config.espCustom[stateKey].enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
         switchStroke.Thickness = 0.8
         switchStroke.Transparency = 0.3
         switchStroke.Parent = switch
 
+        -- Circle indicator (mirip TPWalk)
         local circle = Instance.new("Frame")
         circle.Size = UDim2.new(0,16,0,16)
         circle.Position = config.espCustom[stateKey].enabled and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
@@ -4769,6 +4779,7 @@ local function createAboutContent()
         circleCorner.CornerRadius = UDim.new(1,0)
         circleCorner.Parent = circle
 
+        -- Label ON/OFF di samping switch
         local stateLabel = Instance.new("TextLabel")
         stateLabel.Size = UDim2.new(0,20,0,16)
         stateLabel.Position = UDim2.new(1, -24, 0.5, -8)
@@ -4780,6 +4791,7 @@ local function createAboutContent()
         stateLabel.TextXAlignment = Enum.TextXAlignment.Left
         stateLabel.Parent = row
 
+        -- Color preview
         local colorPreview = Instance.new("Frame")
         colorPreview.Size = UDim2.new(0,12,0,12)
         colorPreview.Position = UDim2.new(0.78,0,0.5,-6)
@@ -4790,6 +4802,7 @@ local function createAboutContent()
         previewCorner.CornerRadius = UDim.new(1,0)
         previewCorner.Parent = colorPreview
 
+        -- Color picker button
         local colorBtn = Instance.new("TextButton")
         colorBtn.Size = UDim2.new(0,14,0,14)
         colorBtn.Position = UDim2.new(0.86,0,0.5,-7)
@@ -4804,6 +4817,7 @@ local function createAboutContent()
         btnCorner.CornerRadius = UDim.new(0,4)
         btnCorner.Parent = colorBtn
 
+        -- Event toggle
         switch.MouseButton1Click:Connect(function()
             local newState = not config.espCustom[stateKey].enabled
             config.espCustom[stateKey].enabled = newState
@@ -4815,8 +4829,9 @@ local function createAboutContent()
             refreshCustomESP()
         end)
 
+        -- Event color picker (modern dengan slider RGB berwarna)
         colorBtn.MouseButton1Click:Connect(function()
-            -- Color picker modern (sama seperti sebelumnya, tidak diubah)
+            -- Tutup popup sebelumnya
             local existingPopup = game.CoreGui:FindFirstChild("ColorPickerPopup")
             if existingPopup then existingPopup:Destroy() end
 
@@ -4838,6 +4853,7 @@ local function createAboutContent()
             popupStroke.Transparency = 0.4
             popupStroke.Parent = popupFrame
 
+            -- Animasi muncul
             popupFrame.Size = UDim2.new(0, 240, 0, 190)
             popupFrame.Position = UDim2.new(0.5,-120,0.5,-95)
             local tweenIn = TweenService:Create(popupFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -4860,6 +4876,7 @@ local function createAboutContent()
             local gVal = currentColor.G * 255
             local bVal = currentColor.B * 255
 
+            -- Preview warna di bawah title
             local previewContainer = Instance.new("Frame")
             previewContainer.Size = UDim2.new(1,-20,0,30)
             previewContainer.Position = UDim2.new(0,10,0,32)
@@ -4880,6 +4897,7 @@ local function createAboutContent()
             previewColorStroke.Transparency = 0.3
             previewColorStroke.Parent = previewColor
 
+            -- Hex value label
             local hexLabel = Instance.new("TextLabel")
             hexLabel.Size = UDim2.new(0,60,0,16)
             hexLabel.Position = UDim2.new(0.5,30,0.5,-8)
@@ -4891,6 +4909,7 @@ local function createAboutContent()
             hexLabel.TextXAlignment = Enum.TextXAlignment.Left
             hexLabel.Parent = previewContainer
 
+            -- Fungsi update semua elemen color
             local function updateAllColors(newR, newG, newB)
                 newR = math.clamp(newR, 0, 255)
                 newG = math.clamp(newG, 0, 255)
@@ -4906,6 +4925,7 @@ local function createAboutContent()
                 refreshCustomESP()
             end
 
+            -- Helper: membuat slider berwarna dengan gradien
             local function createColorSlider(parent, y, labelText, initial, colorGradient, callback)
                 local holder = Instance.new("Frame")
                 holder.Size = UDim2.new(1,-20,0,30)
@@ -5007,6 +5027,7 @@ local function createAboutContent()
                 end)
             end
 
+            -- Buat slider R, G, B dengan gradien warna
             createColorSlider(popupFrame, 66, "R", rVal, ColorSequence.new({
                 ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
                 ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
@@ -5028,6 +5049,7 @@ local function createAboutContent()
                 updateAllColors(rVal, gVal, val)
             end)
 
+            -- Click outside untuk close (tanpa tombol close)
             local function checkClickOutside(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     local pos = input.Position
@@ -5167,7 +5189,7 @@ local function createAboutContent()
         updateToggleUI(not tpwalkActive)
     end)
 
-    -- ========== HANDLE RESPAWN & CLEANUP ==========
+    -- ========== HANDLE RESPAWN ==========
     characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
     aboutContent.Destroying:Connect(function()
@@ -5188,9 +5210,42 @@ local function createAboutContent()
 
     print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded")
-end
 
-    
+    -- ========== WATCHDOG GLOBAL (background refresh) ==========
+    -- Hanya jalankan jika belum ada watchdog yang berjalan
+    if not _G.watchdogActive then
+        _G.watchdogActive = true
+        _G.watchdogTask = task.spawn(function()
+            local genTimer = 0
+            local espTimer = 0
+            while _G.watchdogActive do
+                task.wait(1)
+                genTimer = genTimer + 1
+                espTimer = espTimer + 1
+
+                -- Refresh generator progress setiap 1 detik
+                if genTimer >= 1 then
+                    genTimer = 0
+                    if type(updateAllGeneratorProgress) == "function" then
+                        updateAllGeneratorProgress()
+                    end
+                end
+
+                -- Refresh ESP lainnya setiap 3 detik
+                if espTimer >= 3 then
+                    espTimer = 0
+                    if type(refreshCustomESP) == "function" then
+                        refreshCustomESP()
+                    end
+                end
+            end
+        end)
+        print("[CustomESP] Background watchdog started (gen=1s, esp=3s)")
+    end
+
+    -- Saat sidebar about dihancurkan, jangan matikan watchdog (tetap berjalan di background)
+    -- Tapi kita tetap perlu cleanup koneksi lokal (slider, dll) yang sudah dilakukan di aboutContent.Destroying
+end
 
 -- ============================================================================
 -- settings content 
@@ -6407,31 +6462,6 @@ local function createGUI()
   
     mainFrame.BackgroundTransparency = 0.3
     TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
-
-    -- ============================================================
-    -- WATCHDOG REFRESH ESP (berjalan terus di latar belakang)
-    -- ============================================================
-    -- Generator progress refresh setiap 1 detik
-    task.spawn(function()
-        while screenGui and screenGui.Parent do
-            task.wait(1)
-            if type(updateAllGeneratorProgress) == "function" then
-                pcall(updateAllGeneratorProgress)
-            end
-        end
-    end)
-
-    -- ESP refresh setiap 3 detik
-    task.spawn(function()
-        while screenGui and screenGui.Parent do
-            task.wait(3)
-            if type(refreshCustomESP) == "function" then
-                pcall(refreshCustomESP)
-            end
-        end
-    end)
-
-    print("[GUI] ESP watchdog active: Generator every 1s, ESP every 3s")
 end
  
 -- ============================================================================

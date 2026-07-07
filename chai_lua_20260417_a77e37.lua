@@ -489,20 +489,14 @@ if not config.espCustom then
     }
 end
 
--- Fungsi untuk mendapatkan warna objek berdasarkan jenis dan status enabled
-local function getObjectColor(objType)
-    local custom = config.espCustom[objType]
-    if custom and custom.enabled then
-        return custom.color
-    end
-    return nil
-end
-
--- Fungsi untuk mengecek apakah suatu objek di-ESP
-local function isObjectESPEnabled(objType)
-    local custom = config.espCustom[objType]
-    return custom and custom.enabled or false
-end
+local ObjectColors = {
+    Generator = config.espCustom.generator.color,
+    Gate      = config.espCustom.gate.color,
+    Pallet    = config.espCustom.pallet.color,
+    Hook      = config.espCustom.hook.color,
+    SCP       = config.espCustom.scp.color,
+    Windows   = config.espCustom.windows.color,
+}
 
 -- Variabel ESP
 espHighlights = espHighlights or {}
@@ -517,7 +511,6 @@ espPeriodicScanConn = nil
 lastObjectScanTime = 0
 OBJECT_SCAN_INTERVAL = 2
 
--- Helper untuk mendapatkan nilai dari objek (attribute atau child value)
 local function getGameValue(obj, name)
     if not obj then return nil end
     local attr = obj:GetAttribute(name)
@@ -530,9 +523,6 @@ local function getGameValue(obj, name)
     return nil
 end
 
--- ============================================================================
--- FUNGSI UNTUK MEMBUAT HIGHLIGHT
--- ============================================================================
 local function applyHighlight(object, color)
     local h = object:FindFirstChild("CyberHeroes_Highlight")
     if not h then
@@ -554,7 +544,6 @@ local function applyHighlight(object, color)
     return h
 end
 
--- Membuat BillboardGui untuk progress generator
 local function createProgressBillboard(generator, percent, color)
     local billboard = generator:FindFirstChild("GenBitchHook")
     if not billboard then
@@ -582,7 +571,6 @@ local function createProgressBillboard(generator, percent, color)
     return billboard
 end
 
--- Update progress generator
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
@@ -600,11 +588,10 @@ local function updateGeneratorProgress(generator)
         if bill then bill:Destroy() end
         return true
     end
-    local color = getObjectColor("generator") or Color3.fromRGB(255, 165, 0)
     local cp = math.clamp(percent, 0, 100)
     local finalColor
     if cp < 50 then
-        finalColor = color:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
+        finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
     else
         finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
     end
@@ -613,7 +600,6 @@ local function updateGeneratorProgress(generator)
     return false
 end
 
--- Update semua progress generator
 local function updateAllGeneratorProgress()
     for obj, _ in pairs(generatorEspHighlights) do
         if obj and obj.Parent and (obj.Name == "Generator") then
@@ -623,7 +609,7 @@ local function updateAllGeneratorProgress()
 end
 
 -- ============================================================================
--- PLAYER ESP
+-- PLAYER ESP (dengan Custom ESP support)
 -- ============================================================================
 local function createHighlightForPlayer(player)
     if espHighlights[player.UserId] then
@@ -641,8 +627,11 @@ local function createHighlightForPlayer(player)
     local character = player.Character
     if not character then return end
 
-    local MAX_DISTANCE = 2000
+    local killerEnabled = config.espCustom.killer.enabled
+    local survivorEnabled = config.espCustom.survivor.enabled
+    local lineEnabled = config.espCustom.line.enabled
 
+    local MAX_DISTANCE = 2000
     local function getTargetRole()
         if player.Team then
             local teamName = player.Team.Name:lower()
@@ -664,24 +653,11 @@ local function createHighlightForPlayer(player)
     local function getCurrentColor()
         local role = getTargetRole()
         if role == "Killer" then
-            local killerColor = config.espCustom.killer and config.espCustom.killer.color or config.highlightColorKiller
-            return killerColor
+            return config.espCustom.killer.color
         elseif role == "Survivor" then
-            local survivorColor = config.espCustom.survivor and config.espCustom.survivor.color or config.highlightColorSurvivor
-            return survivorColor
+            return config.espCustom.survivor.color
         else
             return Color3.fromRGB(255, 255, 255)
-        end
-    end
-
-    local function isPlayerESPEnabled()
-        local role = getTargetRole()
-        if role == "Killer" then
-            return config.espCustom.killer and config.espCustom.killer.enabled or false
-        elseif role == "Survivor" then
-            return config.espCustom.survivor and config.espCustom.survivor.enabled or false
-        else
-            return true
         end
     end
 
@@ -707,14 +683,13 @@ local function createHighlightForPlayer(player)
         if not localRootPart then return false end
         local role = getTargetRole()
         if role == "Spectator" then return false end
-        if not config.espCustom.line or not config.espCustom.line.enabled then return false end
+        if role == "Killer" and not killerEnabled then return false end
+        if role == "Survivor" and not survivorEnabled then return false end
         local dist = getDistanceToPlayer()
         return dist <= MAX_DISTANCE
     end
 
     local currentColor = getCurrentColor()
-    local isEnabled = isPlayerESPEnabled()
-
     local highlight = Instance.new("Highlight")
     highlight.Name = "CyberHeroes_ESP"
     highlight.FillColor = currentColor
@@ -723,7 +698,7 @@ local function createHighlightForPlayer(player)
     highlight.OutlineTransparency = 0.2
     highlight.Adornee = character
     highlight.Parent = character
-    highlight.Enabled = isEnabled
+    highlight.Enabled = shouldBeamActive()
 
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "CyberHeroes_DistanceTag"
@@ -732,7 +707,7 @@ local function createHighlightForPlayer(player)
     billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = character
-    billboard.Enabled = isEnabled
+    billboard.Enabled = shouldBeamActive()
 
     local distLabel = Instance.new("TextLabel")
     distLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -773,12 +748,11 @@ local function createHighlightForPlayer(player)
     beam.Width1 = 0.2
     beam.FaceCamera = false
     beam.Parent = workspace
-    beam.Enabled = shouldBeamActive() and isEnabled
+    beam.Enabled = shouldBeamActive() and lineEnabled
 
     local function updateVisibility()
-        local active = isEnabled
-        local lineActive = shouldBeamActive() and active
-        beam.Enabled = lineActive
+        local active = shouldBeamActive()
+        beam.Enabled = active and lineEnabled
         highlight.Enabled = active or (getTargetRole() == "Spectator")
         billboard.Enabled = active
     end
@@ -852,16 +826,16 @@ local function createHighlightForPlayer(player)
 end
 
 -- ============================================================================
--- OBJECT ESP
+-- OBJECT ESP (dengan Custom ESP support)
 -- ============================================================================
 local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
-    local objKey = objType:lower()
-    if not isObjectESPEnabled(objKey) then return end
-    local color = getObjectColor(objKey) or Color3.fromRGB(255, 255, 255)
+    local key = objType:lower()
+    if not config.espCustom[key] then return end
+    if not config.espCustom[key].enabled then return end
+    local color = config.espCustom[key].color
     local highlight = applyHighlight(obj, color)
     generatorEspHighlights[obj] = highlight
-
     if objType == "Generator" then
         updateGeneratorProgress(obj)
     end
@@ -898,10 +872,11 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "SCP")
         elseif name == "Pallet" or name == "Palletwrong" then
             createObjectESP(obj, "Pallet")
-        elseif name == "Windows" or name:lower():find("window") then
+        elseif name == "Windows" or name:lower():find("windows") then
             createObjectESP(obj, "Windows")
         end
     end
+    print("[ESP] Object ESP refreshed with custom settings")
 end
 
 local function onDescendantAdded(instance)
@@ -917,7 +892,7 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "SCP")
     elseif name == "Pallet" or name == "Palletwrong" then
         createObjectESP(instance, "Pallet")
-    elseif name == "Windows" or name:lower():find("window") then
+    elseif name == "Windows" or name:lower():find("windows") then
         createObjectESP(instance, "Windows")
     end
 end
@@ -938,24 +913,10 @@ local function periodicObjectScan()
 end
 
 -- ============================================================================
--- REFRESH CUSTOM ESP (dipanggil dari sidebar)
--- ============================================================================
-local function refreshCustomESP()
-    if not config.espEnabled then return end
-    refreshAllObjectESP()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            createHighlightForPlayer(player)
-        end
-    end
-end
-
--- ============================================================================
--- START ESP
+-- START / STOP / UPDATE ESP
 -- ============================================================================
 local function startESP()
     if espConnection then return end
-
     if espDescendantAddedConn then espDescendantAddedConn:Disconnect() end
     if espDescendantRemovingConn then espDescendantRemovingConn:Disconnect() end
     if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
@@ -996,9 +957,7 @@ local function startESP()
 
     espDescendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
     espDescendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
-
     refreshAllObjectESP()
-
     espPeriodicScanConn = RunService.Heartbeat:Connect(periodicObjectScan)
     espProgressUpdateConn = RunService.Heartbeat:Connect(function()
         if config.espEnabled then
@@ -1028,12 +987,9 @@ local function startESP()
         end
     end)
 
-    print("[ESP] ESP started with custom support")
+    print("[ESP] ESP started with custom settings")
 end
 
--- ============================================================================
--- STOP ESP
--- ============================================================================
 local function stopESP()
     if espConnection then
         espConnection:Disconnect()
@@ -1053,19 +1009,26 @@ local function stopESP()
     end
     espHighlights = {}
     clearObjectESP()
-
     print("[ESP] ESP stopped")
 end
 
--- ============================================================================
--- UPDATE ALL ESP
--- ============================================================================
 local function updateAllESP()
     if config.espEnabled then
         startESP()
     else
         stopESP()
     end
+end
+
+-- Fungsi refresh custom ESP (dipanggil dari GUI saat toggle/warna berubah)
+local function refreshCustomESP()
+    refreshAllObjectESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            createHighlightForPlayer(player)
+        end
+    end
+    print("[ESP] Custom ESP refreshed")
 end
 -- ============================================================================
 -- CATATAN: Kode di atas menggantikan seluruh bagian ESP SYSTEM dalam script utama.
@@ -4451,26 +4414,12 @@ local movementState = {
     enabled = false
 }
 
--- Inisialisasi config.espCustom jika belum ada (dilakukan di ESP script, tapi untuk amannya)
-if not config.espCustom then
-    config.espCustom = {
-        generator = { enabled = true, color = Color3.fromRGB(255, 165, 0) },
-        gate      = { enabled = true, color = Color3.fromRGB(255, 255, 255) },
-        pallet    = { enabled = true, color = Color3.fromRGB(173, 216, 230) },
-        hook      = { enabled = true, color = Color3.fromRGB(0, 128, 128) },
-        scp       = { enabled = true, color = Color3.fromRGB(150, 0, 255) },
-        windows   = { enabled = true, color = Color3.fromRGB(105, 105, 105) },
-        killer    = { enabled = true, color = config.highlightColorKiller or Color3.fromRGB(255, 0, 0) },
-        survivor  = { enabled = true, color = config.highlightColorSurvivor or Color3.fromRGB(0, 0, 255) },
-        line      = { enabled = true, color = Color3.fromRGB(255, 255, 255) },
-    }
-end
-
 local function createAboutContent()
     if aboutContent then
         aboutContent:Destroy()
     end
 
+    -- Konstanta range kecepatan (min 0.1, max 20.0)
     local MIN_SPEED = 0.1
     local MAX_SPEED = 20.0
 
@@ -4483,6 +4432,7 @@ local function createAboutContent()
         return ((speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)) * 100
     end
 
+    -- Ambil state dari luar
     local currentSpeed = movementState.speed
     local speedPercent = movementState.percent
     if speedPercent == 0 and currentSpeed > 0 then
@@ -4508,7 +4458,6 @@ local function createAboutContent()
             local humanoid = char:FindFirstChildOfClass("Humanoid")
             if not hrp or not humanoid then return end
             if humanoid.Health <= 0 then return end
-
             local moveDirection = humanoid.MoveDirection
             if moveDirection.Magnitude > 0 then
                 local delta = moveDirection.Unit * currentSpeed * dt
@@ -4693,7 +4642,6 @@ local function createAboutContent()
 
     -- ========== CARD CUSTOM ESP ==========
     local espCard = Instance.new("Frame")
-    espCard.Size = UDim2.new(1,0,0,0)
     espCard.BackgroundColor3 = Color3.fromRGB(10,20,36)
     espCard.BorderSizePixel = 0
     espCard.Parent = scroll
@@ -4726,7 +4674,6 @@ local function createAboutContent()
     espTitle.TextXAlignment = Enum.TextXAlignment.Left
     espTitle.Parent = espInner
 
-    -- Helper: membuat row toggle + color picker
     local function createToggleRow(parent, labelText, stateKey, colorKey)
         local row = Instance.new("Frame")
         row.Size = UDim2.new(1,0,0,22)
@@ -4746,9 +4693,8 @@ local function createAboutContent()
         local switch = Instance.new("TextButton")
         switch.Size = UDim2.new(0,40,0,18)
         switch.Position = UDim2.new(0.7,0,0.5,-9)
-        local isEnabled = config.espCustom[stateKey] and config.espCustom[stateKey].enabled or false
-        switch.BackgroundColor3 = isEnabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
-        switch.Text = isEnabled and "ON" or "OFF"
+        switch.BackgroundColor3 = config.espCustom[stateKey].enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+        switch.Text = config.espCustom[stateKey].enabled and "ON" or "OFF"
         switch.TextColor3 = Color3.fromRGB(255,255,255)
         switch.Font = Enum.Font.GothamBold
         switch.TextSize = 8
@@ -4762,7 +4708,7 @@ local function createAboutContent()
         local colorPreview = Instance.new("Frame")
         colorPreview.Size = UDim2.new(0,14,0,14)
         colorPreview.Position = UDim2.new(0.86,0,0.5,-7)
-        colorPreview.BackgroundColor3 = config.espCustom[colorKey] and config.espCustom[colorKey].color or Color3.fromRGB(255,255,255)
+        colorPreview.BackgroundColor3 = config.espCustom[colorKey].color
         colorPreview.BorderSizePixel = 0
         colorPreview.Parent = row
         local previewCorner = Instance.new("UICorner")
@@ -4784,16 +4730,11 @@ local function createAboutContent()
         btnCorner.Parent = colorBtn
 
         switch.MouseButton1Click:Connect(function()
-            if not config.espCustom[stateKey] then
-                config.espCustom[stateKey] = { enabled = false, color = Color3.fromRGB(255,255,255) }
-            end
             local newState = not config.espCustom[stateKey].enabled
             config.espCustom[stateKey].enabled = newState
             switch.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
             switch.Text = newState and "ON" or "OFF"
-            if type(refreshCustomESP) == "function" then
-                refreshCustomESP()
-            end
+            refreshCustomESP()
         end)
 
         colorBtn.MouseButton1Click:Connect(function()
@@ -4823,12 +4764,12 @@ local function createAboutContent()
             popupTitle.TextSize = 12
             popupTitle.Parent = popupFrame
 
-            local currentColor = config.espCustom[colorKey] and config.espCustom[colorKey].color or Color3.fromRGB(255,255,255)
+            local currentColor = config.espCustom[colorKey].color
             local rVal = currentColor.R * 255
             local gVal = currentColor.G * 255
             local bVal = currentColor.B * 255
 
-            local function createColorSlider(parent, y, lblText, initial, callback)
+            local function createColorSlider(parent, y, labelText, initial, callback)
                 local holder = Instance.new("Frame")
                 holder.Size = UDim2.new(1,-20,0,22)
                 holder.Position = UDim2.new(0,10,0,y)
@@ -4838,7 +4779,7 @@ local function createAboutContent()
                 local lbl = Instance.new("TextLabel")
                 lbl.Size = UDim2.new(0.15,0,1,0)
                 lbl.BackgroundTransparency = 1
-                lbl.Text = lblText
+                lbl.Text = labelText
                 lbl.TextColor3 = Color3.fromRGB(200,200,200)
                 lbl.Font = Enum.Font.Gotham
                 lbl.TextSize = 9
@@ -4885,13 +4826,15 @@ local function createAboutContent()
                 thumb.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         dragging = true
-                        local rel = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
+                        local mouseX = input.Position.X
+                        local rel = (mouseX - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
                         update(rel * 255)
                     end
                 end)
                 bg.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        local rel = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
+                        local mouseX = input.Position.X
+                        local rel = (mouseX - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
                         update(rel * 255)
                     end
                 end)
@@ -4913,32 +4856,27 @@ local function createAboutContent()
                 return update
             end
 
-            local updateR = createColorSlider(popupFrame, 30, "R", rVal, function(val)
+            local updateR, updateG, updateB
+            updateR = createColorSlider(popupFrame, 30, "R", rVal, function(val)
                 rVal = val
                 local newColor = Color3.fromRGB(rVal, gVal, bVal)
                 config.espCustom[colorKey].color = newColor
                 colorPreview.BackgroundColor3 = newColor
-                if type(refreshCustomESP) == "function" then
-                    refreshCustomESP()
-                end
+                refreshCustomESP()
             end)
-            local updateG = createColorSlider(popupFrame, 55, "G", gVal, function(val)
+            updateG = createColorSlider(popupFrame, 55, "G", gVal, function(val)
                 gVal = val
                 local newColor = Color3.fromRGB(rVal, gVal, bVal)
                 config.espCustom[colorKey].color = newColor
                 colorPreview.BackgroundColor3 = newColor
-                if type(refreshCustomESP) == "function" then
-                    refreshCustomESP()
-                end
+                refreshCustomESP()
             end)
-            local updateB = createColorSlider(popupFrame, 80, "B", bVal, function(val)
+            updateB = createColorSlider(popupFrame, 80, "B", bVal, function(val)
                 bVal = val
                 local newColor = Color3.fromRGB(rVal, gVal, bVal)
                 config.espCustom[colorKey].color = newColor
                 colorPreview.BackgroundColor3 = newColor
-                if type(refreshCustomESP) == "function" then
-                    refreshCustomESP()
-                end
+                refreshCustomESP()
             end)
 
             local closePopup = Instance.new("TextButton")
@@ -4993,7 +4931,6 @@ local function createAboutContent()
         speedValueLabel.Text = string.format("%.1f", currentSpeed)
         movementState.speed = currentSpeed
         movementState.percent = percent
-
         local rel = percent / 100
         local trackWidth = sliderBg.AbsoluteSize.X
         local thumbSize = sliderThumb.AbsoluteSize.X
@@ -5033,13 +4970,14 @@ local function createAboutContent()
             dragging = false
         end
     end)
+
     sliderDragConnection = RunService.RenderStepped:Connect(function()
         if dragging then
             updateSliderFromMouse()
         end
     end)
 
-    -- ========== LOGIKA TOGGLE ==========
+    -- ========== LOGIKA TOGGLE TPWALK ==========
     local function updateToggleUI(state)
         tpwalkActive = state
         movementState.enabled = state
@@ -5066,6 +5004,7 @@ local function createAboutContent()
         updateToggleUI(not tpwalkActive)
     end)
 
+    -- ========== HANDLE RESPAWN & CLEANUP ==========
     characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
     aboutContent.Destroying:Connect(function()
@@ -5074,10 +5013,17 @@ local function createAboutContent()
         stopTPWalk()
     end)
 
+    -- Inisialisasi
     setSpeedFromPercent(speedPercent)
     updateToggleUI(tpwalkActive)
 
-    print("[Movement] Speed slider & TP Walk loaded")
+    -- Refresh ESP agar custom settings langsung diterapkan
+    task.wait(0.1)
+    if type(refreshCustomESP) == "function" then
+        refreshCustomESP()
+    end
+
+    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded")
 end
 

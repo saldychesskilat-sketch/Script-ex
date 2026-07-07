@@ -4461,15 +4461,11 @@ local movementState = {
     enabled = false
 }
 
--- Watchdog global (tetap berjalan meski sidebar ABOUT di-destroy)
-if not _G.watchdogActive then
-    _G.watchdogActive = false
-    _G.watchdogTask = nil
-end
-
 local function createAboutContent()
+    -- Jika sudah ada, cukup tampilkan (tidak rebuild)
     if aboutContent then
-        aboutContent:Destroy()
+        aboutContent.Visible = true
+        return
     end
 
     -- Konstanta range kecepatan (min 0.1, max 20.0)
@@ -5198,55 +5194,44 @@ local function createAboutContent()
         stopTPWalk()
     end)
 
-    -- Inisialisasi
-    setSpeedFromPercent(speedPercent)
-    updateToggleUI(tpwalkActive)
+    -- ========== WATCHDOG GLOBAL (hanya dijalankan sekali) ==========
+    if not watchdogStarted then
+        watchdogStarted = true
 
-    -- Refresh ESP agar custom settings langsung diterapkan
-    task.wait(0.1)
-    if type(refreshCustomESP) == "function" then
-        refreshCustomESP()
-    end
-
-    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
-    print("[CustomESP] Custom ESP settings loaded")
-
-    -- ========== WATCHDOG GLOBAL (background refresh) ==========
-    -- Hanya jalankan jika belum ada watchdog yang berjalan
-    if not _G.watchdogActive then
-        _G.watchdogActive = true
-        _G.watchdogTask = task.spawn(function()
-            local genTimer = 0
-            local espTimer = 0
-            while _G.watchdogActive do
+        -- Loop 1: Generator progress setiap 1 detik
+        task.spawn(function()
+            while true do
                 task.wait(1)
-                genTimer = genTimer + 1
-                espTimer = espTimer + 1
-
-                -- Refresh generator progress setiap 1 detik
-                if genTimer >= 1 then
-                    genTimer = 0
-                    if type(updateAllGeneratorProgress) == "function" then
-                        updateAllGeneratorProgress()
-                    end
-                end
-
-                -- Refresh ESP lainnya setiap 3 detik
-                if espTimer >= 3 then
-                    espTimer = 0
-                    if type(refreshCustomESP) == "function" then
-                        refreshCustomESP()
-                    end
+                if type(updateAllGeneratorProgress) == "function" then
+                    updateAllGeneratorProgress()
                 end
             end
         end)
-        print("[CustomESP] Background watchdog started (gen=1s, esp=3s)")
+
+        -- Loop 2: Refresh ESP lainnya setiap 3 detik
+        task.spawn(function()
+            while true do
+                task.wait(3)
+                if type(refreshCustomESP) == "function" then
+                    refreshCustomESP()
+                end
+            end
+        end)
+
+        print("[Watchdog] ESP refresh started: generator 1s, others 3s")
     end
 
-    -- Saat sidebar about dihancurkan, jangan matikan watchdog (tetap berjalan di background)
-    -- Tapi kita tetap perlu cleanup koneksi lokal (slider, dll) yang sudah dilakukan di aboutContent.Destroying
-end
+    -- ========== INISIALISASI ==========
+    setSpeedFromPercent(speedPercent)
+    updateToggleUI(tpwalkActive)
 
+    -- Refresh pertama kali
+    task.wait(0.1)
+    if type(refreshCustomESP) == "function" then refreshCustomESP() end
+
+    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk loaded")
+    print("[CustomESP] Custom ESP settings loaded (watchdog active)")
+end
 -- ============================================================================
 -- settings content 
 -- ============================================================================

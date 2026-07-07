@@ -4740,6 +4740,7 @@ local function createAboutContent()
 
         -- ============================================================
         -- COLOR PICKER MODERN (Color Wheel + Brightness Slider)
+        -- Menggunakan asset color wheel yang valid dan universal di Roblox
         -- ============================================================
         colorBtn.MouseButton1Click:Connect(function()
             -- Tutup popup sebelumnya jika ada
@@ -4782,20 +4783,21 @@ local function createAboutContent()
             popupTitle.TextSize = 12
             popupTitle.Parent = popupFrame
 
-            -- Container utama (wheel + brightness + preview)
+            -- Container utama
             local mainContainer = Instance.new("Frame")
             mainContainer.Size = UDim2.new(1,-20,1,-40)
             mainContainer.Position = UDim2.new(0,10,0,32)
             mainContainer.BackgroundTransparency = 1
             mainContainer.Parent = popupFrame
 
-            -- Color Wheel (menggunakan ImageLabel dengan asset color wheel)
+            -- Color Wheel (ImageLabel dengan asset valid)
             local wheelSize = 180
             local wheel = Instance.new("ImageLabel")
             wheel.Size = UDim2.new(0, wheelSize, 0, wheelSize)
             wheel.Position = UDim2.new(0,0,0,0)
             wheel.BackgroundTransparency = 1
-            wheel.Image = "rbxassetid://12230297150" -- Color wheel texture
+            -- Gunakan asset color wheel yang valid dan universal di Roblox
+            wheel.Image = "rbxassetid://10527434971"
             wheel.ScaleType = Enum.ScaleType.Fit
             wheel.Parent = mainContainer
 
@@ -4983,7 +4985,7 @@ local function createAboutContent()
                 end
             end
 
-            -- Tombol close (opsional, tetap ada tapi dengan animasi)
+            -- Tombol close (opsional, tetap ada)
             local closePopupBtn = Instance.new("TextButton")
             closePopupBtn.Size = UDim2.new(0, 40, 0, 20)
             closePopupBtn.Position = UDim2.new(1, -48, 0, 4)
@@ -5001,13 +5003,9 @@ local function createAboutContent()
                 popup:Destroy()
             end)
 
-            -- Inisialisasi posisi thumb
+            -- Inisialisasi posisi thumb brightness berdasarkan warna saat ini
             local initVal = Color3.toHSV(config.espCustom[colorKey].color)
             bThumb.Position = UDim2.new(-2, 0, 1 - (initVal or 0.5), -6)
-
-            -- Set posisi wheel berdasarkan HSV awal (tidak bisa langsung, karena wheel image tidak support)
-            -- Tapi pengguna bisa langsung memilih warna dari posisi default
-
         end)
 
         return row
@@ -5141,6 +5139,7 @@ local function createAboutContent()
     print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded")
 end
+
 
 -- ============================================================================
 -- settings content 

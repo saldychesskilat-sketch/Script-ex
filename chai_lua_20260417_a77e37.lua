@@ -4522,6 +4522,9 @@ local function createAboutContent()
     scroll.BorderSizePixel = 0
     scroll.CanvasSize = UDim2.new(0,0,0,0)
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.ScrollBarThickness = 3  -- Buat scrollbar tipis (default 8-12)
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(255,255,255) -- Warna putih, bisa diubah ke abu-abu
+    scroll.ScrollBarImageTransparency = 0.5 -- Sedikit transparan agar tidak terlalu mencolok
     scroll.Parent = card
     local scrollLayout = Instance.new("UIListLayout")
     scrollLayout.Padding = UDim.new(0,12)

@@ -4404,6 +4404,54 @@ end
 -- ============================================================================
 -- ABOUT CONTENT
 -- ============================================================================
+-- ============================================================
+-- WATCHDOG UNTUK ESP (berjalan di luar createAboutContent)
+-- ============================================================
+local espWatchdogTask = nil
+local espWatchdogActive = false
+
+local function startESPWatchdog()
+    if espWatchdogTask then return end
+    espWatchdogActive = true
+    espWatchdogTask = task.spawn(function()
+        local espTimer = 0
+        while espWatchdogActive do
+            task.wait(1)
+            -- Cek apakah ESP aktif
+            if config.espEnabled then
+                -- Generator progress setiap 1 detik
+                if type(updateAllGeneratorProgress) == "function" then
+                    updateAllGeneratorProgress()
+                end
+                -- ESP lainnya setiap 3 detik
+                espTimer = espTimer + 1
+                if espTimer >= 3 then
+                    espTimer = 0
+                    if type(refreshCustomESP) == "function" then
+                        refreshCustomESP()
+                    end
+                end
+            else
+                -- Jika ESP dimatikan, tetap loop tapi tidak lakukan refresh
+                espTimer = 0
+            end
+        end
+    end)
+    print("[CustomESP] Watchdog started: Generator every 1s, ESP every 3s")
+end
+
+local function stopESPWatchdog()
+    espWatchdogActive = false
+    if espWatchdogTask then
+        task.cancel(espWatchdogTask)
+        espWatchdogTask = nil
+    end
+    print("[CustomESP] Watchdog stopped")
+end
+
+-- ============================================================
+-- CREATE ABOUT CONTENT (dengan watchdog di luar)
+-- ============================================================
 local aboutContent = nil
 
 -- State movement disimpan di luar fungsi agar persist saat pindah sidebar
@@ -4682,7 +4730,6 @@ local function createAboutContent()
         row.BackgroundTransparency = 1
         row.Parent = parent
 
-        -- Label
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(0.45,0,1,0)
         label.Position = UDim2.new(0,2,0,0)
@@ -4694,7 +4741,6 @@ local function createAboutContent()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = row
 
-        -- Switch (seperti TPWalk, dengan stroke dan circle)
         local switch = Instance.new("TextButton")
         switch.Size = UDim2.new(0,40,0,20)
         switch.Position = UDim2.new(0.55,0,0.5,-10)
@@ -4707,14 +4753,12 @@ local function createAboutContent()
         switchCorner.CornerRadius = UDim.new(1,0)
         switchCorner.Parent = switch
 
-        -- Stroke (mirip TPWalk)
         local switchStroke = Instance.new("UIStroke")
         switchStroke.Color = config.espCustom[stateKey].enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
         switchStroke.Thickness = 0.8
         switchStroke.Transparency = 0.3
         switchStroke.Parent = switch
 
-        -- Circle indicator (mirip TPWalk)
         local circle = Instance.new("Frame")
         circle.Size = UDim2.new(0,16,0,16)
         circle.Position = config.espCustom[stateKey].enabled and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
@@ -4725,7 +4769,6 @@ local function createAboutContent()
         circleCorner.CornerRadius = UDim.new(1,0)
         circleCorner.Parent = circle
 
-        -- Label ON/OFF di samping switch
         local stateLabel = Instance.new("TextLabel")
         stateLabel.Size = UDim2.new(0,20,0,16)
         stateLabel.Position = UDim2.new(1, -24, 0.5, -8)
@@ -4737,7 +4780,6 @@ local function createAboutContent()
         stateLabel.TextXAlignment = Enum.TextXAlignment.Left
         stateLabel.Parent = row
 
-        -- Color preview
         local colorPreview = Instance.new("Frame")
         colorPreview.Size = UDim2.new(0,12,0,12)
         colorPreview.Position = UDim2.new(0.78,0,0.5,-6)
@@ -4748,7 +4790,6 @@ local function createAboutContent()
         previewCorner.CornerRadius = UDim.new(1,0)
         previewCorner.Parent = colorPreview
 
-        -- Color picker button
         local colorBtn = Instance.new("TextButton")
         colorBtn.Size = UDim2.new(0,14,0,14)
         colorBtn.Position = UDim2.new(0.86,0,0.5,-7)
@@ -4763,7 +4804,6 @@ local function createAboutContent()
         btnCorner.CornerRadius = UDim.new(0,4)
         btnCorner.Parent = colorBtn
 
-        -- Event toggle
         switch.MouseButton1Click:Connect(function()
             local newState = not config.espCustom[stateKey].enabled
             config.espCustom[stateKey].enabled = newState
@@ -4777,7 +4817,6 @@ local function createAboutContent()
 
         -- Event color picker (modern dengan slider RGB berwarna)
         colorBtn.MouseButton1Click:Connect(function()
-            -- Tutup popup sebelumnya
             local existingPopup = game.CoreGui:FindFirstChild("ColorPickerPopup")
             if existingPopup then existingPopup:Destroy() end
 
@@ -4799,7 +4838,6 @@ local function createAboutContent()
             popupStroke.Transparency = 0.4
             popupStroke.Parent = popupFrame
 
-            -- Animasi muncul
             popupFrame.Size = UDim2.new(0, 240, 0, 190)
             popupFrame.Position = UDim2.new(0.5,-120,0.5,-95)
             local tweenIn = TweenService:Create(popupFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
@@ -4822,7 +4860,6 @@ local function createAboutContent()
             local gVal = currentColor.G * 255
             local bVal = currentColor.B * 255
 
-            -- Preview warna di bawah title
             local previewContainer = Instance.new("Frame")
             previewContainer.Size = UDim2.new(1,-20,0,30)
             previewContainer.Position = UDim2.new(0,10,0,32)
@@ -4843,7 +4880,6 @@ local function createAboutContent()
             previewColorStroke.Transparency = 0.3
             previewColorStroke.Parent = previewColor
 
-            -- Hex value label
             local hexLabel = Instance.new("TextLabel")
             hexLabel.Size = UDim2.new(0,60,0,16)
             hexLabel.Position = UDim2.new(0.5,30,0.5,-8)
@@ -4855,7 +4891,6 @@ local function createAboutContent()
             hexLabel.TextXAlignment = Enum.TextXAlignment.Left
             hexLabel.Parent = previewContainer
 
-            -- Fungsi update semua elemen color
             local function updateAllColors(newR, newG, newB)
                 newR = math.clamp(newR, 0, 255)
                 newG = math.clamp(newG, 0, 255)
@@ -4871,7 +4906,6 @@ local function createAboutContent()
                 refreshCustomESP()
             end
 
-            -- Helper: membuat slider berwarna dengan gradien
             local function createColorSlider(parent, y, labelText, initial, colorGradient, callback)
                 local holder = Instance.new("Frame")
                 holder.Size = UDim2.new(1,-20,0,30)
@@ -4907,7 +4941,6 @@ local function createAboutContent()
                 bg.BorderSizePixel = 0
                 bg.Parent = holder
 
-                -- Gradien warna pada background
                 local grad = Instance.new("UIGradient")
                 grad.Color = colorGradient
                 grad.Parent = bg
@@ -4974,7 +5007,6 @@ local function createAboutContent()
                 end)
             end
 
-            -- Buat slider R, G, B dengan gradien warna
             createColorSlider(popupFrame, 66, "R", rVal, ColorSequence.new({
                 ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
                 ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
@@ -4996,7 +5028,6 @@ local function createAboutContent()
                 updateAllColors(rVal, gVal, val)
             end)
 
-            -- Click outside untuk close (tanpa tombol close)
             local function checkClickOutside(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     local pos = input.Position
@@ -5009,12 +5040,10 @@ local function createAboutContent()
             end
             local outsideConn = game:GetService("UserInputService").InputBegan:Connect(checkClickOutside)
 
-            -- Animasi keluar
             popup.Destroying:Connect(function()
                 outsideConn:Disconnect()
             end)
 
-            -- Animasi keluar saat destroy
             local oldDestroy = popup.Destroy
             popup.Destroy = function(self)
                 local tweenOut = TweenService:Create(popupFrame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
@@ -5145,6 +5174,7 @@ local function createAboutContent()
         if sliderDragConnection then sliderDragConnection:Disconnect() end
         if characterAddedConn then characterAddedConn:Disconnect() end
         stopTPWalk()
+        -- Jangan hentikan watchdog di sini, karena watchdog berjalan di luar
     end)
 
     -- Inisialisasi
@@ -5160,27 +5190,9 @@ local function createAboutContent()
     print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded")
 
-    -- ========== WATCHDOG: Refresh ESP & Progress setiap 1 detik (real-time) ==========
-    local watchdogTask = nil
-    watchdogTask = task.spawn(function()
-        while aboutContent and aboutContent.Parent do
-            task.wait(1)
-            -- Update progress generator terlebih dahulu (seperti toggle ON/OFF)
-            if type(updateAllGeneratorProgress) == "function" then
-                updateAllGeneratorProgress()
-            end
-            -- Refresh semua ESP (termasuk object & player)
-            if type(refreshCustomESP) == "function" then
-                refreshCustomESP()
-            end
-        end
-    end)
-
-    aboutContent.Destroying:Connect(function()
-        if watchdogTask then task.cancel(watchdogTask) end
-    end)
-
-    print("[CustomESP] Watchdog active: ESP + Generator Progress refresh every 1 second")
+    -- ========== START WATCHDOG (jika belum berjalan) ==========
+    startESPWatchdog()
+    print("[CustomESP] Watchdog active: Generator every 1s, ESP every 3s")
 end
 
 -- ============================================================================

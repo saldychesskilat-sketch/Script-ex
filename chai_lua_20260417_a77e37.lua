@@ -6330,7 +6330,7 @@ local function createGUI()
         end
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
+        if aboutContent then aboutContent.Visible = false end
 
         createHomeContent()
     end)
@@ -6345,7 +6345,7 @@ local function createGUI()
         if homeContent then homeContent:Destroy() end
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
+        if aboutContent then aboutContent.Visible = false end
 
         -- Buat ulang featuresContainer jika belum ada
         if not featuresContainer then
@@ -6366,7 +6366,7 @@ local function createGUI()
         end
         if homeContent then homeContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
+        if aboutContent then aboutContent.Visible = false end
 
         createSettingsContent()
     end)
@@ -6384,7 +6384,7 @@ local function createGUI()
         end
         if homeContent then homeContent:Destroy() end
         if settingsContent then settingsContent:Destroy() end
-        if aboutContent then aboutContent:Destroy() end
+        if aboutContent then aboutContent.Visible = false end
 
         createInfoContent()
     end)
@@ -6404,7 +6404,11 @@ local function createGUI()
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
 
+        if aboutContent then
+        aboutContent.Visible = true
+    else
         createAboutContent()
+    end
     end)
 
     makeDraggable(mainFrame)

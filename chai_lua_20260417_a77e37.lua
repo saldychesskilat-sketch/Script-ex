@@ -4795,7 +4795,7 @@ local function createAboutContent()
             wheel.Size = UDim2.new(0, wheelSize, 0, wheelSize)
             wheel.Position = UDim2.new(0,0,0,0)
             wheel.BackgroundTransparency = 1
-            wheel.Image = "rbxassetid://12230297150" -- Color wheel texture
+            wheel.Image = "rbxassetid://83951361092461" -- Color wheel texture
             wheel.ScaleType = Enum.ScaleType.Fit
             wheel.Parent = mainContainer
 

@@ -4676,28 +4676,31 @@ local function createAboutContent()
 
     local function createToggleRow(parent, labelText, stateKey, colorKey)
         local row = Instance.new("Frame")
-        row.Size = UDim2.new(1,0,0,22)
+        row.Size = UDim2.new(1,0,0,26)  -- tinggi row lebih besar agar tidak berdempetan
         row.BackgroundTransparency = 1
         row.Parent = parent
 
+        -- Label
         local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(0.5,0,1,0)
+        label.Size = UDim2.new(0.45,0,1,0)
+        label.Position = UDim2.new(0,2,0,0)
         label.BackgroundTransparency = 1
         label.Text = labelText
         label.TextColor3 = Color3.fromRGB(200,200,200)
         label.Font = Enum.Font.Gotham
-        label.TextSize = 10
+        label.TextSize = 9
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = row
 
+        -- Switch (ON/OFF)
         local switch = Instance.new("TextButton")
-        switch.Size = UDim2.new(0,40,0,18)
-        switch.Position = UDim2.new(0.7,0,0.5,-9)
+        switch.Size = UDim2.new(0,36,0,16)
+        switch.Position = UDim2.new(0.55,0,0.5,-8)
         switch.BackgroundColor3 = config.espCustom[stateKey].enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
         switch.Text = config.espCustom[stateKey].enabled and "ON" or "OFF"
         switch.TextColor3 = Color3.fromRGB(255,255,255)
         switch.Font = Enum.Font.GothamBold
-        switch.TextSize = 8
+        switch.TextSize = 7
         switch.BorderSizePixel = 0
         switch.AutoButtonColor = false
         switch.Parent = row
@@ -4705,9 +4708,10 @@ local function createAboutContent()
         switchCorner.CornerRadius = UDim.new(1,0)
         switchCorner.Parent = switch
 
+        -- Color preview (lingkaran kecil)
         local colorPreview = Instance.new("Frame")
-        colorPreview.Size = UDim2.new(0,14,0,14)
-        colorPreview.Position = UDim2.new(0.86,0,0.5,-7)
+        colorPreview.Size = UDim2.new(0,12,0,12)
+        colorPreview.Position = UDim2.new(0.78,0,0.5,-6)
         colorPreview.BackgroundColor3 = config.espCustom[colorKey].color
         colorPreview.BorderSizePixel = 0
         colorPreview.Parent = row
@@ -4715,14 +4719,15 @@ local function createAboutContent()
         previewCorner.CornerRadius = UDim.new(1,0)
         previewCorner.Parent = colorPreview
 
+        -- Button untuk membuka color picker (sedikit lebih kecil)
         local colorBtn = Instance.new("TextButton")
-        colorBtn.Size = UDim2.new(0,16,0,16)
-        colorBtn.Position = UDim2.new(0.93,0,0.5,-8)
+        colorBtn.Size = UDim2.new(0,14,0,14)
+        colorBtn.Position = UDim2.new(0.86,0,0.5,-7)
         colorBtn.BackgroundColor3 = Color3.fromRGB(40,50,70)
         colorBtn.Text = "🎨"
         colorBtn.TextColor3 = Color3.fromRGB(255,255,255)
         colorBtn.Font = Enum.Font.Gotham
-        colorBtn.TextSize = 12
+        colorBtn.TextSize = 10
         colorBtn.BorderSizePixel = 0
         colorBtn.Parent = row
         local btnCorner = Instance.new("UICorner")
@@ -4879,14 +4884,15 @@ local function createAboutContent()
                 refreshCustomESP()
             end)
 
+            -- Tombol close popup lebih kecil
             local closePopup = Instance.new("TextButton")
-            closePopup.Size = UDim2.new(0,50,0,20)
-            closePopup.Position = UDim2.new(0.5,-25,1,-28)
+            closePopup.Size = UDim2.new(0,40,0,18)
+            closePopup.Position = UDim2.new(0.5,-20,1,-24)
             closePopup.BackgroundColor3 = Color3.fromRGB(180,50,50)
             closePopup.Text = "CLOSE"
             closePopup.TextColor3 = Color3.fromRGB(255,255,255)
             closePopup.Font = Enum.Font.GothamBold
-            closePopup.TextSize = 9
+            closePopup.TextSize = 8
             closePopup.BorderSizePixel = 0
             closePopup.Parent = popupFrame
             Instance.new("UICorner",closePopup).CornerRadius = UDim.new(0,4)

@@ -470,122 +470,141 @@ local function stopAutoTask()
     print("[AutoTask] Auto task stopped")
 end
 -- ============================================================================
--- ESP SYSTEM (PLAYER + OBJECTS) - UPGRADED: SCP ENTITY + MORE TRANSPARENT
 -- ============================================================================
-local ObjectColors = {  
-    Generator = Color3.fromRGB(255, 165, 0),   
-    Gate      = Color3.fromRGB(255, 255, 255),  
-    Pallet    = Color3.fromRGB(173, 216, 230),    
-    Hook      = Color3.fromRGB(0, 128, 128),  
-    SCP       = Color3.fromRGB(150, 0, 255),      -- Warna ungu untuk SCP entity
-    Windows   = Color3.fromRGB(105, 105, 105)       -- Warna biru untuk Window
-}
-  
--- Variabel ESP (global untuk script utama)  
-espHighlights = espHighlights or {}              -- player ESP  
-generatorEspHighlights = generatorEspHighlights or {}  -- object ESP  
-espConnection = nil  
-espDescendantAddedConn = nil  
-espDescendantRemovingConn = nil  
-espPlayerAddedConn = nil  
-espPlayerRemovingConn = nil  
-espProgressUpdateConn = nil  
-espPeriodicScanConn = nil  
-lastObjectScanTime = 0  
-OBJECT_SCAN_INTERVAL = 2  
-  
--- Helper untuk mendapatkan nilai dari objek (attribute atau child value)  
-local function getGameValue(obj, name)  
-    if not obj then return nil end  
-    local attr = obj:GetAttribute(name)  
-    if attr ~= nil then return attr end  
-    local child = obj:FindFirstChild(name)  
-    if child then  
-        local success, val = pcall(function() return child.Value end)  
-        if success then return val end  
-    end  
-    return nil  
-end  
-  
--- ============================================================================  
--- FUNGSI UNTUK MEMBUAT HIGHLIGHT (LEBIH TRANSPARAN, OUTLINE TETAP JELAS)  
--- ============================================================================  
-local function applyHighlight(object, color)  
-    local h = object:FindFirstChild("CyberHeroes_Highlight")  
-    if not h then  
-        h = Instance.new("Highlight")  
-        h.Name = "CyberHeroes_Highlight"  
-        h.FillColor = color  
-        h.OutlineColor = color  
-        h.FillTransparency = 1  
-        h.OutlineTransparency = 0.2  
-        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop  
-        h.Parent = object  
-    else  
-        h.FillColor = color  
-        h.OutlineColor = color  
-        h.FillTransparency = 1  
-        h.OutlineTransparency = 0.2  
-    end  
-    h.Adornee = object  
-    return h  
-end  
-  
--- Membuat BillboardGui untuk progress generator  
-local function createProgressBillboard(generator, percent, color)  
-    local billboard = generator:FindFirstChild("GenBitchHook")  
-    if not billboard then  
-        billboard = Instance.new("BillboardGui")  
-        billboard.Name = "GenBitchHook"  
-        billboard.AlwaysOnTop = true  
-        billboard.Size = UDim2.new(0, 100, 0, 20)  
-        billboard.StudsOffset = Vector3.new(0, 2, 0)  
-        billboard.Parent = generator  
-  
-        local label = Instance.new("TextLabel")  
-        label.Name = "ProgressText"  
-        label.Size = UDim2.new(1, 0, 1, 0)  
-        label.BackgroundTransparency = 1  
-        label.TextStrokeTransparency = 0  
-        label.TextStrokeColor3 = Color3.new(0,0,0)  
-        label.Font = Enum.Font.GothamBold  
-        label.TextSize = 12  
-        label.Parent = billboard  
-    end  
-    local label = billboard:FindFirstChild("ProgressText")  
-    if label then  
-        label.Text = string.format("[%.1f%%]", percent)  
-        label.TextColor3 = color  
-    end  
-    return billboard  
-end  
-  
--- Update progress generator (warna gradien + hilangkan jika sudah 100%)  
+-- ESP SYSTEM (PLAYER + OBJECTS) - WITH CUSTOM ESP SUPPORT
+-- ============================================================================
+
+-- Inisialisasi config.espCustom jika belum ada
+if not config.espCustom then
+    config.espCustom = {
+        generator = { enabled = true, color = Color3.fromRGB(255, 165, 0) },
+        gate      = { enabled = true, color = Color3.fromRGB(255, 255, 255) },
+        pallet    = { enabled = true, color = Color3.fromRGB(173, 216, 230) },
+        hook      = { enabled = true, color = Color3.fromRGB(0, 128, 128) },
+        scp       = { enabled = true, color = Color3.fromRGB(150, 0, 255) },
+        windows   = { enabled = true, color = Color3.fromRGB(105, 105, 105) },
+        killer    = { enabled = true, color = config.highlightColorKiller or Color3.fromRGB(255, 0, 0) },
+        survivor  = { enabled = true, color = config.highlightColorSurvivor or Color3.fromRGB(0, 0, 255) },
+        line      = { enabled = true, color = Color3.fromRGB(255, 255, 255) },
+    }
+end
+
+-- Fungsi untuk mendapatkan warna objek berdasarkan jenis dan status enabled
+local function getObjectColor(objType)
+    local custom = config.espCustom[objType]
+    if custom and custom.enabled then
+        return custom.color
+    end
+    return nil
+end
+
+-- Fungsi untuk mengecek apakah suatu objek di-ESP
+local function isObjectESPEnabled(objType)
+    local custom = config.espCustom[objType]
+    return custom and custom.enabled or false
+end
+
+-- Variabel ESP
+espHighlights = espHighlights or {}
+generatorEspHighlights = generatorEspHighlights or {}
+espConnection = nil
+espDescendantAddedConn = nil
+espDescendantRemovingConn = nil
+espPlayerAddedConn = nil
+espPlayerRemovingConn = nil
+espProgressUpdateConn = nil
+espPeriodicScanConn = nil
+lastObjectScanTime = 0
+OBJECT_SCAN_INTERVAL = 2
+
+-- Helper untuk mendapatkan nilai dari objek (attribute atau child value)
+local function getGameValue(obj, name)
+    if not obj then return nil end
+    local attr = obj:GetAttribute(name)
+    if attr ~= nil then return attr end
+    local child = obj:FindFirstChild(name)
+    if child then
+        local success, val = pcall(function() return child.Value end)
+        if success then return val end
+    end
+    return nil
+end
+
+-- ============================================================================
+-- FUNGSI UNTUK MEMBUAT HIGHLIGHT
+-- ============================================================================
+local function applyHighlight(object, color)
+    local h = object:FindFirstChild("CyberHeroes_Highlight")
+    if not h then
+        h = Instance.new("Highlight")
+        h.Name = "CyberHeroes_Highlight"
+        h.FillColor = color
+        h.OutlineColor = color
+        h.FillTransparency = 1
+        h.OutlineTransparency = 0.2
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = object
+    else
+        h.FillColor = color
+        h.OutlineColor = color
+        h.FillTransparency = 1
+        h.OutlineTransparency = 0.2
+    end
+    h.Adornee = object
+    return h
+end
+
+-- Membuat BillboardGui untuk progress generator
+local function createProgressBillboard(generator, percent, color)
+    local billboard = generator:FindFirstChild("GenBitchHook")
+    if not billboard then
+        billboard = Instance.new("BillboardGui")
+        billboard.Name = "GenBitchHook"
+        billboard.AlwaysOnTop = true
+        billboard.Size = UDim2.new(0, 100, 0, 20)
+        billboard.StudsOffset = Vector3.new(0, 2, 0)
+        billboard.Parent = generator
+        local label = Instance.new("TextLabel")
+        label.Name = "ProgressText"
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.TextStrokeTransparency = 0
+        label.TextStrokeColor3 = Color3.new(0,0,0)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 12
+        label.Parent = billboard
+    end
+    local label = billboard:FindFirstChild("ProgressText")
+    if label then
+        label.Text = string.format("[%.1f%%]", percent)
+        label.TextColor3 = color
+    end
+    return billboard
+end
+
+-- Update progress generator
 local function updateGeneratorProgress(generator)
     if not generator or not generator.Parent then return true end
     local percent = getGameValue(generator, "RepairProgress") or getGameValue(generator, "Progress") or 0
     if percent >= 100 then
-        -- Jangan hapus highlight, tapi ubah menjadi hijau permanen
         local h = generator:FindFirstChild("CyberHeroes_Highlight")
         if h then
             h.FillColor = Color3.fromRGB(0, 255, 0)
             h.OutlineColor = Color3.fromRGB(0, 255, 0)
-            -- Pastikan transparansi tetap sama
             h.FillTransparency = 1
             h.OutlineTransparency = 0.2
         else
-            -- Jika highlight belum ada (misal baru pertama kali terdeteksi sudah 100%), buat
             applyHighlight(generator, Color3.fromRGB(0, 255, 0))
         end
-        -- Hapus billboard progress saja
         local bill = generator:FindFirstChild("GenBitchHook")
         if bill then bill:Destroy() end
         return true
     end
+    local color = getObjectColor("generator") or Color3.fromRGB(255, 165, 0)
     local cp = math.clamp(percent, 0, 100)
     local finalColor
     if cp < 50 then
-        finalColor = ObjectColors.Generator:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
+        finalColor = color:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
     else
         finalColor = Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
     end
@@ -593,431 +612,460 @@ local function updateGeneratorProgress(generator)
     createProgressBillboard(generator, percent, finalColor)
     return false
 end
-  
--- Update semua progress generator (dipanggil periodic)  
-local function updateAllGeneratorProgress()  
-    for obj, _ in pairs(generatorEspHighlights) do  
-        if obj and obj.Parent and (obj.Name == "Generator") then  
-            updateGeneratorProgress(obj)  
-        end  
-    end  
-end  
-  
--- ============================================================================  
--- PLAYER ESP (dengan deteksi killer/survivor, jarak, status) - LEBIH TRANSPARAN  
--- ============================================================================  
-local function createHighlightForPlayer(player)
-	if espHighlights[player.UserId] then
-		if espHighlights[player.UserId].Highlight then espHighlights[player.UserId].Highlight:Destroy() end
-		if espHighlights[player.UserId].Billboard then espHighlights[player.UserId].Billboard:Destroy() end
-		if espHighlights[player.UserId].TeamChanged then espHighlights[player.UserId].TeamChanged:Disconnect() end
-		if espHighlights[player.UserId].DistanceUpdate then espHighlights[player.UserId].DistanceUpdate:Disconnect() end
-		if espHighlights[player.UserId].Beam then espHighlights[player.UserId].Beam:Destroy() end
-		if espHighlights[player.UserId].StartAttachment then espHighlights[player.UserId].StartAttachment:Destroy() end
-		if espHighlights[player.UserId].EndAttachment then espHighlights[player.UserId].EndAttachment:Destroy() end
-		if espHighlights[player.UserId].TargetCharAdded then espHighlights[player.UserId].TargetCharAdded:Disconnect() end
-		if espHighlights[player.UserId].LocalCharAdded then espHighlights[player.UserId].LocalCharAdded:Disconnect() end
-		espHighlights[player.UserId] = nil
-	end
-	local character = player.Character
-	if not character then return end
-	local MAX_DISTANCE = 2000
-	local function getTargetRole()
-		if player.Team then
-			local teamName = player.Team.Name:lower()
-			if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-				return "Killer"
-			elseif teamName:find("survivor") then
-				return "Survivor"
-			elseif teamName:find("spectator") or teamName == "" then
-				return "Spectator"
-			end
-		end
-		local tool = character:FindFirstChildWhichIsA("Tool")
-		if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
-			return "Killer"
-		end
-		return "Spectator"
-	end
-	local function getCurrentColor()
-		local role = getTargetRole()
-		if role == "Killer" then
-			return config.highlightColorKiller
-		elseif role == "Survivor" then
-			return config.highlightColorSurvivor
-		else -- Spectator
-			return Color3.fromRGB(255, 255, 255)
-		end
-	end
-	local function isLocalPlayerInGame()
-		local team = localPlayer.Team
-		if not team then return false end
-		local teamName = team.Name:lower()
-		return teamName == "survivors" or teamName == "killers" or teamName:find("survivor") or teamName:find("killer")
-	end
-	local function getDistanceToPlayer()
-		if not localRootPart or not player.Character then return math.huge end
-		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-		if not targetRoot then return math.huge end
-		return (localRootPart.Position - targetRoot.Position).Magnitude
-	end
-	local function shouldBeamActive()
-		if not isLocalPlayerInGame() then return false end
-		if not localPlayer.Character or not player.Character then return false end
-		local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-		if not targetRoot then return false end
-		if not localRootPart then return false end
-		local role = getTargetRole()
-		if role == "Spectator" then return false end
-		local dist = getDistanceToPlayer()
-		return dist <= MAX_DISTANCE
-	end
-	local currentColor = getCurrentColor()
-	local highlight = Instance.new("Highlight")
-	highlight.Name = "CyberHeroes_ESP"
-	highlight.FillColor = currentColor
-	highlight.OutlineColor = currentColor
-	highlight.FillTransparency = 1
-	highlight.OutlineTransparency = 0.2
-	highlight.Adornee = character
-	highlight.Parent = character
-	highlight.Enabled = shouldBeamActive()
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "CyberHeroes_DistanceTag"
-	billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
-	billboard.Size = UDim2.new(0, 15, 0, 15)
-	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Parent = character
-	billboard.Enabled = shouldBeamActive()
-	local distLabel = Instance.new("TextLabel")
-	distLabel.Size = UDim2.new(1, 0, 1, 0)
-	distLabel.BackgroundTransparency = 1
-	distLabel.Text = "0 Studs"
-	distLabel.TextColor3 = currentColor
-	distLabel.TextStrokeTransparency = 0.5
-	distLabel.TextScaled = true
-	distLabel.Font = Enum.Font.GothamBold
-	distLabel.Parent = billboard
-	local startAttachment = Instance.new("Attachment")
-	startAttachment.Name = "CyberHeroes_LineStart"
-	startAttachment.Position = Vector3.new(0, 0.5, 0)
-	local endAttachment = Instance.new("Attachment")
-	endAttachment.Name = "CyberHeroes_LineEnd"
-	endAttachment.Position = Vector3.new(0, 0.5, 0)
-	local function updateAttachments()
-		local startParent = localRootPart or (localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart"))
-		if startParent and startParent ~= startAttachment.Parent then
-			startAttachment.Parent = startParent
-		end
-		local endParent = player.Character and player.Character:FindFirstChild("HumanoidRootPart") or player.Character
-		if endParent and endParent ~= endAttachment.Parent then
-			endAttachment.Parent = endParent
-		end
-	end
-	updateAttachments()
-	local beam = Instance.new("Beam")
-	beam.Name = "CyberHeroes_Line"
-	beam.Attachment0 = startAttachment
-	beam.Attachment1 = endAttachment
-	beam.Color = ColorSequence.new(currentColor)
-	beam.Transparency = NumberSequence.new(0.5)
-	beam.Width0 = 0.2
-	beam.Width1 = 0.2
-	beam.FaceCamera = false
-	beam.Parent = workspace
-	beam.Enabled = shouldBeamActive()
-	local function updateVisibility()
-		local active = shouldBeamActive()
-		beam.Enabled = active
-		highlight.Enabled = active or (getTargetRole() == "Spectator")
-		billboard.Enabled = active
-	end
-	local function updateBeamColor()
-		local newColor = getCurrentColor()
-		if highlight.FillColor ~= newColor then
-			highlight.FillColor = newColor
-			highlight.OutlineColor = newColor
-		end
-		if distLabel.TextColor3 ~= newColor then
-			distLabel.TextColor3 = newColor
-		end
-		if beam.Color ~= ColorSequence.new(newColor) then
-			beam.Color = ColorSequence.new(newColor)
-		end
-		updateVisibility()
-	end
-	local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
-	updateBeamColor()
-	local function updateDistance()
-		local dist = getDistanceToPlayer()
-		local role = getTargetRole()
-		if role == "Spectator" then
-			distLabel.Text = "Spectator"
-		elseif dist <= MAX_DISTANCE then
-			distLabel.Text = string.format("%.1f Studs", dist)
-		else
-			distLabel.Text = ">2000 Studs"
-		end
-	end
-	local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
-	updateDistance()
-	local function onCharacterRespawn()
-		task.wait(0.5)
-		updateAttachments()
-		billboard.Adornee = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
-		highlight.Adornee = player.Character
-		updateBeamColor()
-	end
-	local targetCharAddedConn = player.CharacterAdded:Connect(onCharacterRespawn)
-	local function onLocalCharacterChanged()
-		task.wait(0.5)
-		updateAttachments()
-		updateBeamColor()
-	end
-	local localCharAddedConn = localPlayer.CharacterAdded:Connect(onLocalCharacterChanged)
-	local teamChangedConn
-	if player.Team then
-		teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function() end)
-	end
-	espHighlights[player.UserId] = {
-		Highlight = highlight,
-		Billboard = billboard,
-		DistLabel = distLabel,
-		TeamChanged = teamChangedConn,
-		DistanceUpdate = distUpdateConn,
-		Beam = beam,
-		StartAttachment = startAttachment,
-		EndAttachment = endAttachment,
-		BeamUpdate = beamUpdateConn,
-		TargetCharAdded = targetCharAddedConn,
-		LocalCharAdded = localCharAddedConn,
-	}
+
+-- Update semua progress generator
+local function updateAllGeneratorProgress()
+    for obj, _ in pairs(generatorEspHighlights) do
+        if obj and obj.Parent and (obj.Name == "Generator") then
+            updateGeneratorProgress(obj)
+        end
+    end
 end
--- ============================================================================  
--- OBJECT ESP (Generator, Hook, Gate, Pallet, Window, SCP)  
--- ============================================================================  
-local function createObjectESP(obj, objType)  
-    if generatorEspHighlights[obj] then return end  
-    local color  
-    if objType == "Generator" then  
-        color = ObjectColors.Generator  
-    elseif objType == "Hook" then  
-        color = ObjectColors.Hook  
-    elseif objType == "Gate" then  
-        color = ObjectColors.Gate  
-    elseif objType == "Pallet" then  
-        color = ObjectColors.Pallet  
-    elseif objType == "SCP" then  
-        color = ObjectColors.SCP  
-    elseif objType == "Windows" then  
-        color = ObjectColors.Windows  
-    end  
-    local highlight = applyHighlight(obj, color)  
-    generatorEspHighlights[obj] = highlight  
-  
-    if objType == "Generator" then  
-        updateGeneratorProgress(obj)  
-    end  
-end  
-  
-local function removeObjectESP(obj)  
-    local highlight = generatorEspHighlights[obj]  
-    if highlight then highlight:Destroy() end  
-    generatorEspHighlights[obj] = nil  
-    local bill = obj:FindFirstChild("GenBitchHook")  
-    if bill then bill:Destroy() end  
-end  
-  
-local function clearObjectESP()  
-    for obj, highlight in pairs(generatorEspHighlights) do  
-        if highlight then highlight:Destroy() end  
-        local bill = obj:FindFirstChild("GenBitchHook")  
-        if bill then bill:Destroy() end  
-    end  
-    generatorEspHighlights = {}  
-end  
-  
-local function refreshAllObjectESP()  
-    clearObjectESP()  
-    for _, obj in ipairs(workspace:GetDescendants()) do  
-        local name = obj.Name  
-        if name == "Generator" then  
-            createObjectESP(obj, "Generator")  
-        elseif name == "Hook" then  
-            createObjectESP(obj, "Hook")  
-        elseif name == "Gate" then  
-            createObjectESP(obj, "Gate")  
-        elseif name:lower():find("scp") then  
-            createObjectESP(obj, "SCP")  
-        elseif name == "Pallet" or name == "Palletwrong" then  
-            createObjectESP(obj, "Pallet")  
-        elseif name == "Windows" or name:lower():find("Windows") then  
-            createObjectESP(obj, "Windows")  
-        end  
-    end  
-    print("[ESP] Object ESP refreshed (including Windows)")  
-end  
-  
-local function onDescendantAdded(instance)  
-    if not config.espEnabled then return end  
-    local name = instance.Name  
-    if name == "Generator" then  
-        createObjectESP(instance, "Generator")  
-    elseif name == "Hook" then  
-        createObjectESP(instance, "Hook")  
-    elseif name == "Gate" then  
-        createObjectESP(instance, "Gate")  
-    elseif name:lower():find("scp") then  
-        createObjectESP(instance, "SCP")  
-    elseif name == "Pallet" or name == "Palletwrong" then  
-        createObjectESP(instance, "Pallet")  
-    elseif name == "Windows" or name:lower():find("Windows") then  
-        createObjectESP(instance, "Windows")  
-    end  
-end  
-  
-local function onDescendantRemoving(instance)  
-    if generatorEspHighlights[instance] then  
-        removeObjectESP(instance)  
-    end  
-end  
-  
-local function periodicObjectScan()  
-    if not config.espEnabled then return end  
-    local now = tick()  
-    if now - lastObjectScanTime >= OBJECT_SCAN_INTERVAL then  
-        lastObjectScanTime = now  
-        refreshAllObjectESP()  
-    end  
-end  
-  
--- ============================================================================  
--- START ESP (mengaktifkan semua komponen)  
--- ============================================================================  
-local function startESP()  
-    if espConnection then return end  -- sudah berjalan  
-  
-    -- Bersihkan koneksi lama jika ada  
-    if espDescendantAddedConn then espDescendantAddedConn:Disconnect() end  
-    if espDescendantRemovingConn then espDescendantRemovingConn:Disconnect() end  
-    if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end  
-    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end  
-    if espProgressUpdateConn then espProgressUpdateConn:Disconnect() end  
-    if espPeriodicScanConn then espPeriodicScanConn:Disconnect() end  
-  
-    -- Player ESP events  
-    espPlayerAddedConn = Players.PlayerAdded:Connect(function(player)  
-        if config.espEnabled then  
-            task.wait(1)  
-            createHighlightForPlayer(player)  
-        end  
-    end)  
-    espPlayerRemovingConn = Players.PlayerRemoving:Connect(function(player)  
-        if espHighlights[player.UserId] then  
-            if espHighlights[player.UserId].Highlight then  
-                espHighlights[player.UserId].Highlight:Destroy()  
-            end  
-            if espHighlights[player.UserId].Billboard then  
-                espHighlights[player.UserId].Billboard:Destroy()  
-            end  
-            if espHighlights[player.UserId].TeamChanged then  
-                espHighlights[player.UserId].TeamChanged:Disconnect()  
-            end  
-            espHighlights[player.UserId] = nil  
-        end  
-    end)  
-  
-    for _, player in ipairs(Players:GetPlayers()) do  
-        if player ~= localPlayer then  
-            player.CharacterAdded:Connect(function()  
-                if config.espEnabled then  
-                    createHighlightForPlayer(player)  
-                end  
-            end)  
-        end  
-    end  
-  
-    -- Object ESP events  
-    espDescendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)  
-    espDescendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)  
-  
-    -- Scan awal  
-    refreshAllObjectESP()  
-  
-    -- Periodic scan untuk memastikan semua objek terdeteksi  
-    espPeriodicScanConn = RunService.Heartbeat:Connect(periodicObjectScan)  
-  
-    -- Periodic update progress generator (real-time)  
-    espProgressUpdateConn = RunService.Heartbeat:Connect(function()  
-        if config.espEnabled then  
-            updateAllGeneratorProgress()  
-        end  
-    end)  
-  
-    -- Loop untuk menjaga player ESP tetap up-to-date  
-    espConnection = RunService.Heartbeat:Connect(function()  
-        if config.espEnabled then  
-            for _, player in ipairs(Players:GetPlayers()) do  
-                if player ~= localPlayer then  
-                    local currentChar = player.Character  
-                    local stored = espHighlights[player.UserId]  
-                    if not stored or not stored.Highlight or stored.Highlight.Adornee ~= currentChar then  
-                        createHighlightForPlayer(player)  
-                    end  
-                end  
-            end  
-        else  
-            -- Jika ESP dimatikan, bersihkan semua  
-            for _, data in pairs(espHighlights) do  
-                if data.Highlight then data.Highlight:Destroy() end  
-                if data.Billboard then data.Billboard:Destroy() end  
-                if data.TeamChanged then data.TeamChanged:Disconnect() end  
-            end  
-            espHighlights = {}  
-            clearObjectESP()  
-        end  
-    end)  
-  
-    print("[ESP] ESP started (player + object ESP with real-time progress, including SCP entities)")  
-end  
-  
--- ============================================================================  
--- STOP ESP (membersihkan semua)  
--- ============================================================================  
-local function stopESP()  
-    if espConnection then  
-        espConnection:Disconnect()  
-        espConnection = nil  
-    end  
-    if espDescendantAddedConn then espDescendantAddedConn:Disconnect() end  
-    if espDescendantRemovingConn then espDescendantRemovingConn:Disconnect() end  
-    if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end  
-    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end  
-    if espProgressUpdateConn then espProgressUpdateConn:Disconnect() end  
-    if espPeriodicScanConn then espPeriodicScanConn:Disconnect() end  
-  
-    -- Bersihkan semua highlight dan billboard  
-    for _, data in pairs(espHighlights) do  
-        if data.Highlight then data.Highlight:Destroy() end  
-        if data.Billboard then data.Billboard:Destroy() end  
-        if data.TeamChanged then data.TeamChanged:Disconnect() end  
-    end  
-    espHighlights = {}  
-    clearObjectESP()  
-  
-    print("[ESP] ESP stopped")  
-end  
-  
--- ============================================================================  
--- UPDATE ALL ESP (dipanggil saat config.espEnabled berubah melalui GUI)  
--- ============================================================================  
-local function updateAllESP()  
-    if config.espEnabled then  
-        startESP()  
-    else  
-        stopESP()  
-    end  
+
+-- ============================================================================
+-- PLAYER ESP
+-- ============================================================================
+local function createHighlightForPlayer(player)
+    if espHighlights[player.UserId] then
+        if espHighlights[player.UserId].Highlight then espHighlights[player.UserId].Highlight:Destroy() end
+        if espHighlights[player.UserId].Billboard then espHighlights[player.UserId].Billboard:Destroy() end
+        if espHighlights[player.UserId].TeamChanged then espHighlights[player.UserId].TeamChanged:Disconnect() end
+        if espHighlights[player.UserId].DistanceUpdate then espHighlights[player.UserId].DistanceUpdate:Disconnect() end
+        if espHighlights[player.UserId].Beam then espHighlights[player.UserId].Beam:Destroy() end
+        if espHighlights[player.UserId].StartAttachment then espHighlights[player.UserId].StartAttachment:Destroy() end
+        if espHighlights[player.UserId].EndAttachment then espHighlights[player.UserId].EndAttachment:Destroy() end
+        if espHighlights[player.UserId].TargetCharAdded then espHighlights[player.UserId].TargetCharAdded:Disconnect() end
+        if espHighlights[player.UserId].LocalCharAdded then espHighlights[player.UserId].LocalCharAdded:Disconnect() end
+        espHighlights[player.UserId] = nil
+    end
+    local character = player.Character
+    if not character then return end
+
+    local MAX_DISTANCE = 2000
+
+    local function getTargetRole()
+        if player.Team then
+            local teamName = player.Team.Name:lower()
+            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                return "Killer"
+            elseif teamName:find("survivor") then
+                return "Survivor"
+            elseif teamName:find("spectator") or teamName == "" then
+                return "Spectator"
+            end
+        end
+        local tool = character:FindFirstChildWhichIsA("Tool")
+        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+            return "Killer"
+        end
+        return "Spectator"
+    end
+
+    local function getCurrentColor()
+        local role = getTargetRole()
+        if role == "Killer" then
+            local killerColor = config.espCustom.killer and config.espCustom.killer.color or config.highlightColorKiller
+            return killerColor
+        elseif role == "Survivor" then
+            local survivorColor = config.espCustom.survivor and config.espCustom.survivor.color or config.highlightColorSurvivor
+            return survivorColor
+        else
+            return Color3.fromRGB(255, 255, 255)
+        end
+    end
+
+    local function isPlayerESPEnabled()
+        local role = getTargetRole()
+        if role == "Killer" then
+            return config.espCustom.killer and config.espCustom.killer.enabled or false
+        elseif role == "Survivor" then
+            return config.espCustom.survivor and config.espCustom.survivor.enabled or false
+        else
+            return true
+        end
+    end
+
+    local function isLocalPlayerInGame()
+        local team = localPlayer.Team
+        if not team then return false end
+        local teamName = team.Name:lower()
+        return teamName == "survivors" or teamName == "killers" or teamName:find("survivor") or teamName:find("killer")
+    end
+
+    local function getDistanceToPlayer()
+        if not localRootPart or not player.Character then return math.huge end
+        local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return math.huge end
+        return (localRootPart.Position - targetRoot.Position).Magnitude
+    end
+
+    local function shouldBeamActive()
+        if not isLocalPlayerInGame() then return false end
+        if not localPlayer.Character or not player.Character then return false end
+        local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+        if not targetRoot then return false end
+        if not localRootPart then return false end
+        local role = getTargetRole()
+        if role == "Spectator" then return false end
+        if not config.espCustom.line or not config.espCustom.line.enabled then return false end
+        local dist = getDistanceToPlayer()
+        return dist <= MAX_DISTANCE
+    end
+
+    local currentColor = getCurrentColor()
+    local isEnabled = isPlayerESPEnabled()
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "CyberHeroes_ESP"
+    highlight.FillColor = currentColor
+    highlight.OutlineColor = currentColor
+    highlight.FillTransparency = 1
+    highlight.OutlineTransparency = 0.2
+    highlight.Adornee = character
+    highlight.Parent = character
+    highlight.Enabled = isEnabled
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "CyberHeroes_DistanceTag"
+    billboard.Adornee = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    billboard.Size = UDim2.new(0, 15, 0, 15)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = character
+    billboard.Enabled = isEnabled
+
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Size = UDim2.new(1, 0, 1, 0)
+    distLabel.BackgroundTransparency = 1
+    distLabel.Text = "0 Studs"
+    distLabel.TextColor3 = currentColor
+    distLabel.TextStrokeTransparency = 0.5
+    distLabel.TextScaled = true
+    distLabel.Font = Enum.Font.GothamBold
+    distLabel.Parent = billboard
+
+    local startAttachment = Instance.new("Attachment")
+    startAttachment.Name = "CyberHeroes_LineStart"
+    startAttachment.Position = Vector3.new(0, 0.5, 0)
+    local endAttachment = Instance.new("Attachment")
+    endAttachment.Name = "CyberHeroes_LineEnd"
+    endAttachment.Position = Vector3.new(0, 0.5, 0)
+
+    local function updateAttachments()
+        local startParent = localRootPart or (localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart"))
+        if startParent and startParent ~= startAttachment.Parent then
+            startAttachment.Parent = startParent
+        end
+        local endParent = player.Character and player.Character:FindFirstChild("HumanoidRootPart") or player.Character
+        if endParent and endParent ~= endAttachment.Parent then
+            endAttachment.Parent = endParent
+        end
+    end
+    updateAttachments()
+
+    local beam = Instance.new("Beam")
+    beam.Name = "CyberHeroes_Line"
+    beam.Attachment0 = startAttachment
+    beam.Attachment1 = endAttachment
+    beam.Color = ColorSequence.new(currentColor)
+    beam.Transparency = NumberSequence.new(0.5)
+    beam.Width0 = 0.2
+    beam.Width1 = 0.2
+    beam.FaceCamera = false
+    beam.Parent = workspace
+    beam.Enabled = shouldBeamActive() and isEnabled
+
+    local function updateVisibility()
+        local active = isEnabled
+        local lineActive = shouldBeamActive() and active
+        beam.Enabled = lineActive
+        highlight.Enabled = active or (getTargetRole() == "Spectator")
+        billboard.Enabled = active
+    end
+
+    local function updateBeamColor()
+        local newColor = getCurrentColor()
+        if highlight.FillColor ~= newColor then
+            highlight.FillColor = newColor
+            highlight.OutlineColor = newColor
+        end
+        if distLabel.TextColor3 ~= newColor then
+            distLabel.TextColor3 = newColor
+        end
+        if beam.Color ~= ColorSequence.new(newColor) then
+            beam.Color = ColorSequence.new(newColor)
+        end
+        updateVisibility()
+    end
+
+    local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
+    updateBeamColor()
+
+    local function updateDistance()
+        local dist = getDistanceToPlayer()
+        local role = getTargetRole()
+        if role == "Spectator" then
+            distLabel.Text = "Spectator"
+        elseif dist <= MAX_DISTANCE then
+            distLabel.Text = string.format("%.1f Studs", dist)
+        else
+            distLabel.Text = ">2000 Studs"
+        end
+    end
+    local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
+    updateDistance()
+
+    local function onCharacterRespawn()
+        task.wait(0.5)
+        updateAttachments()
+        billboard.Adornee = player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart")
+        highlight.Adornee = player.Character
+        updateBeamColor()
+    end
+    local targetCharAddedConn = player.CharacterAdded:Connect(onCharacterRespawn)
+
+    local function onLocalCharacterChanged()
+        task.wait(0.5)
+        updateAttachments()
+        updateBeamColor()
+    end
+    local localCharAddedConn = localPlayer.CharacterAdded:Connect(onLocalCharacterChanged)
+
+    local teamChangedConn
+    if player.Team then
+        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function() end)
+    end
+
+    espHighlights[player.UserId] = {
+        Highlight = highlight,
+        Billboard = billboard,
+        DistLabel = distLabel,
+        TeamChanged = teamChangedConn,
+        DistanceUpdate = distUpdateConn,
+        Beam = beam,
+        StartAttachment = startAttachment,
+        EndAttachment = endAttachment,
+        BeamUpdate = beamUpdateConn,
+        TargetCharAdded = targetCharAddedConn,
+        LocalCharAdded = localCharAddedConn,
+    }
+end
+
+-- ============================================================================
+-- OBJECT ESP
+-- ============================================================================
+local function createObjectESP(obj, objType)
+    if generatorEspHighlights[obj] then return end
+    local objKey = objType:lower()
+    if not isObjectESPEnabled(objKey) then return end
+    local color = getObjectColor(objKey) or Color3.fromRGB(255, 255, 255)
+    local highlight = applyHighlight(obj, color)
+    generatorEspHighlights[obj] = highlight
+
+    if objType == "Generator" then
+        updateGeneratorProgress(obj)
+    end
+end
+
+local function removeObjectESP(obj)
+    local highlight = generatorEspHighlights[obj]
+    if highlight then highlight:Destroy() end
+    generatorEspHighlights[obj] = nil
+    local bill = obj:FindFirstChild("GenBitchHook")
+    if bill then bill:Destroy() end
+end
+
+local function clearObjectESP()
+    for obj, highlight in pairs(generatorEspHighlights) do
+        if highlight then highlight:Destroy() end
+        local bill = obj:FindFirstChild("GenBitchHook")
+        if bill then bill:Destroy() end
+    end
+    generatorEspHighlights = {}
+end
+
+local function refreshAllObjectESP()
+    clearObjectESP()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        local name = obj.Name
+        if name == "Generator" then
+            createObjectESP(obj, "Generator")
+        elseif name == "Hook" then
+            createObjectESP(obj, "Hook")
+        elseif name == "Gate" then
+            createObjectESP(obj, "Gate")
+        elseif name:lower():find("scp") then
+            createObjectESP(obj, "SCP")
+        elseif name == "Pallet" or name == "Palletwrong" then
+            createObjectESP(obj, "Pallet")
+        elseif name == "Windows" or name:lower():find("window") then
+            createObjectESP(obj, "Windows")
+        end
+    end
+end
+
+local function onDescendantAdded(instance)
+    if not config.espEnabled then return end
+    local name = instance.Name
+    if name == "Generator" then
+        createObjectESP(instance, "Generator")
+    elseif name == "Hook" then
+        createObjectESP(instance, "Hook")
+    elseif name == "Gate" then
+        createObjectESP(instance, "Gate")
+    elseif name:lower():find("scp") then
+        createObjectESP(instance, "SCP")
+    elseif name == "Pallet" or name == "Palletwrong" then
+        createObjectESP(instance, "Pallet")
+    elseif name == "Windows" or name:lower():find("window") then
+        createObjectESP(instance, "Windows")
+    end
+end
+
+local function onDescendantRemoving(instance)
+    if generatorEspHighlights[instance] then
+        removeObjectESP(instance)
+    end
+end
+
+local function periodicObjectScan()
+    if not config.espEnabled then return end
+    local now = tick()
+    if now - lastObjectScanTime >= OBJECT_SCAN_INTERVAL then
+        lastObjectScanTime = now
+        refreshAllObjectESP()
+    end
+end
+
+-- ============================================================================
+-- REFRESH CUSTOM ESP (dipanggil dari sidebar)
+-- ============================================================================
+local function refreshCustomESP()
+    if not config.espEnabled then return end
+    refreshAllObjectESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            createHighlightForPlayer(player)
+        end
+    end
+end
+
+-- ============================================================================
+-- START ESP
+-- ============================================================================
+local function startESP()
+    if espConnection then return end
+
+    if espDescendantAddedConn then espDescendantAddedConn:Disconnect() end
+    if espDescendantRemovingConn then espDescendantRemovingConn:Disconnect() end
+    if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
+    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end
+    if espProgressUpdateConn then espProgressUpdateConn:Disconnect() end
+    if espPeriodicScanConn then espPeriodicScanConn:Disconnect() end
+
+    espPlayerAddedConn = Players.PlayerAdded:Connect(function(player)
+        if config.espEnabled then
+            task.wait(1)
+            createHighlightForPlayer(player)
+        end
+    end)
+    espPlayerRemovingConn = Players.PlayerRemoving:Connect(function(player)
+        if espHighlights[player.UserId] then
+            if espHighlights[player.UserId].Highlight then
+                espHighlights[player.UserId].Highlight:Destroy()
+            end
+            if espHighlights[player.UserId].Billboard then
+                espHighlights[player.UserId].Billboard:Destroy()
+            end
+            if espHighlights[player.UserId].TeamChanged then
+                espHighlights[player.UserId].TeamChanged:Disconnect()
+            end
+            espHighlights[player.UserId] = nil
+        end
+    end)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            player.CharacterAdded:Connect(function()
+                if config.espEnabled then
+                    createHighlightForPlayer(player)
+                end
+            end)
+        end
+    end
+
+    espDescendantAddedConn = workspace.DescendantAdded:Connect(onDescendantAdded)
+    espDescendantRemovingConn = workspace.DescendantRemoving:Connect(onDescendantRemoving)
+
+    refreshAllObjectESP()
+
+    espPeriodicScanConn = RunService.Heartbeat:Connect(periodicObjectScan)
+    espProgressUpdateConn = RunService.Heartbeat:Connect(function()
+        if config.espEnabled then
+            updateAllGeneratorProgress()
+        end
+    end)
+
+    espConnection = RunService.Heartbeat:Connect(function()
+        if config.espEnabled then
+            for _, player in ipairs(Players:GetPlayers()) do
+                if player ~= localPlayer then
+                    local currentChar = player.Character
+                    local stored = espHighlights[player.UserId]
+                    if not stored or not stored.Highlight or stored.Highlight.Adornee ~= currentChar then
+                        createHighlightForPlayer(player)
+                    end
+                end
+            end
+        else
+            for _, data in pairs(espHighlights) do
+                if data.Highlight then data.Highlight:Destroy() end
+                if data.Billboard then data.Billboard:Destroy() end
+                if data.TeamChanged then data.TeamChanged:Disconnect() end
+            end
+            espHighlights = {}
+            clearObjectESP()
+        end
+    end)
+
+    print("[ESP] ESP started with custom support")
+end
+
+-- ============================================================================
+-- STOP ESP
+-- ============================================================================
+local function stopESP()
+    if espConnection then
+        espConnection:Disconnect()
+        espConnection = nil
+    end
+    if espDescendantAddedConn then espDescendantAddedConn:Disconnect() end
+    if espDescendantRemovingConn then espDescendantRemovingConn:Disconnect() end
+    if espPlayerAddedConn then espPlayerAddedConn:Disconnect() end
+    if espPlayerRemovingConn then espPlayerRemovingConn:Disconnect() end
+    if espProgressUpdateConn then espProgressUpdateConn:Disconnect() end
+    if espPeriodicScanConn then espPeriodicScanConn:Disconnect() end
+
+    for _, data in pairs(espHighlights) do
+        if data.Highlight then data.Highlight:Destroy() end
+        if data.Billboard then data.Billboard:Destroy() end
+        if data.TeamChanged then data.TeamChanged:Disconnect() end
+    end
+    espHighlights = {}
+    clearObjectESP()
+
+    print("[ESP] ESP stopped")
+end
+
+-- ============================================================================
+-- UPDATE ALL ESP
+-- ============================================================================
+local function updateAllESP()
+    if config.espEnabled then
+        startESP()
+    else
+        stopESP()
+    end
 end
 -- ============================================================================
 -- CATATAN: Kode di atas menggantikan seluruh bagian ESP SYSTEM dalam script utama.
@@ -4398,32 +4446,43 @@ local aboutContent = nil
 
 -- State movement disimpan di luar fungsi agar persist saat pindah sidebar
 local movementState = {
-    speed = 16.0,      -- kecepatan aktual (default 16.0)
-    percent = 79.9,    -- persen setara 16.0 dalam range 0.1-20.0 (dihitung otomatis nanti)
+    speed = 16.0,
+    percent = 79.9,
     enabled = false
 }
+
+-- Inisialisasi config.espCustom jika belum ada (dilakukan di ESP script, tapi untuk amannya)
+if not config.espCustom then
+    config.espCustom = {
+        generator = { enabled = true, color = Color3.fromRGB(255, 165, 0) },
+        gate      = { enabled = true, color = Color3.fromRGB(255, 255, 255) },
+        pallet    = { enabled = true, color = Color3.fromRGB(173, 216, 230) },
+        hook      = { enabled = true, color = Color3.fromRGB(0, 128, 128) },
+        scp       = { enabled = true, color = Color3.fromRGB(150, 0, 255) },
+        windows   = { enabled = true, color = Color3.fromRGB(105, 105, 105) },
+        killer    = { enabled = true, color = config.highlightColorKiller or Color3.fromRGB(255, 0, 0) },
+        survivor  = { enabled = true, color = config.highlightColorSurvivor or Color3.fromRGB(0, 0, 255) },
+        line      = { enabled = true, color = Color3.fromRGB(255, 255, 255) },
+    }
+end
 
 local function createAboutContent()
     if aboutContent then
         aboutContent:Destroy()
     end
 
-    -- Konstanta range kecepatan (min 0.1, max 20.0)
     local MIN_SPEED = 0.1
     local MAX_SPEED = 20.0
 
-    -- Fungsi mengonversi persen ke kecepatan (dengan pembulatan 1 desimal)
     local function percentToSpeed(percent)
         local speed = MIN_SPEED + ((MAX_SPEED - MIN_SPEED) * (percent / 100))
         return math.floor(speed * 10 + 0.5) / 10
     end
 
-    -- Fungsi mengonversi kecepatan ke persen
     local function speedToPercent(speed)
         return ((speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED)) * 100
     end
 
-    -- Ambil state dari luar (jika pertama kali, hitung percent dari speed)
     local currentSpeed = movementState.speed
     local speedPercent = movementState.percent
     if speedPercent == 0 and currentSpeed > 0 then
@@ -4436,7 +4495,6 @@ local function createAboutContent()
     local characterAddedConn = nil
     local sliderDragConnection = nil
 
-    -- TP Walk berbasis CFrame (Humanoid.MoveDirection)
     local function startTPWalk()
         if tpwalkConnection then
             tpwalkConnection:Disconnect()
@@ -4479,7 +4537,6 @@ local function createAboutContent()
     aboutContent.BackgroundTransparency = 1
     aboutContent.Parent = contentPanel
 
-    -- Card utama
     local card = Instance.new("Frame")
     card.Size = UDim2.new(1,-12,1,-12)
     card.Position = UDim2.new(0,6,0,6)
@@ -4492,7 +4549,6 @@ local function createAboutContent()
     cardStroke.Transparency = 0.5
     cardStroke.Parent = card
 
-    -- ScrollingFrame
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1,0,1,0)
     scroll.BackgroundTransparency = 1
@@ -4557,7 +4613,6 @@ local function createAboutContent()
     speedValueLabel.TextXAlignment = Enum.TextXAlignment.Right
     speedValueLabel.Parent = speedCard
 
-    -- Track slider
     local sliderBg = Instance.new("Frame")
     sliderBg.Size = UDim2.new(0.68,0,0,6)
     sliderBg.Position = UDim2.new(0,14,0,64)
@@ -4636,15 +4691,306 @@ local function createAboutContent()
     switchCircle.Parent = toggleSwitch
     Instance.new("UICorner",switchCircle).CornerRadius = UDim.new(1,0)
 
+    -- ========== CARD CUSTOM ESP ==========
+    local espCard = Instance.new("Frame")
+    espCard.Size = UDim2.new(1,0,0,0)
+    espCard.BackgroundColor3 = Color3.fromRGB(10,20,36)
+    espCard.BorderSizePixel = 0
+    espCard.Parent = scroll
+    Instance.new("UICorner",espCard).CornerRadius = UDim.new(0,8)
+    local espStroke = Instance.new("UIStroke")
+    espStroke.Color = Color3.fromRGB(0,180,255)
+    espStroke.Transparency = 0.4
+    espStroke.Parent = espCard
+
+    local espInner = Instance.new("Frame")
+    espInner.Size = UDim2.new(1,-16,0,0)
+    espInner.Position = UDim2.new(0,8,0,8)
+    espInner.BackgroundTransparency = 1
+    espInner.Parent = espCard
+
+    local espLayout = Instance.new("UIListLayout")
+    espLayout.Padding = UDim.new(0,6)
+    espLayout.FillDirection = Enum.FillDirection.Vertical
+    espLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    espLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    espLayout.Parent = espInner
+
+    local espTitle = Instance.new("TextLabel")
+    espTitle.Size = UDim2.new(1,0,0,24)
+    espTitle.BackgroundTransparency = 1
+    espTitle.Text = "CUSTOM ESP"
+    espTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    espTitle.Font = Enum.Font.GothamBold
+    espTitle.TextSize = 14
+    espTitle.TextXAlignment = Enum.TextXAlignment.Left
+    espTitle.Parent = espInner
+
+    -- Helper: membuat row toggle + color picker
+    local function createToggleRow(parent, labelText, stateKey, colorKey)
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1,0,0,22)
+        row.BackgroundTransparency = 1
+        row.Parent = parent
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(0.5,0,1,0)
+        label.BackgroundTransparency = 1
+        label.Text = labelText
+        label.TextColor3 = Color3.fromRGB(200,200,200)
+        label.Font = Enum.Font.Gotham
+        label.TextSize = 10
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = row
+
+        local switch = Instance.new("TextButton")
+        switch.Size = UDim2.new(0,40,0,18)
+        switch.Position = UDim2.new(0.7,0,0.5,-9)
+        local isEnabled = config.espCustom[stateKey] and config.espCustom[stateKey].enabled or false
+        switch.BackgroundColor3 = isEnabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+        switch.Text = isEnabled and "ON" or "OFF"
+        switch.TextColor3 = Color3.fromRGB(255,255,255)
+        switch.Font = Enum.Font.GothamBold
+        switch.TextSize = 8
+        switch.BorderSizePixel = 0
+        switch.AutoButtonColor = false
+        switch.Parent = row
+        local switchCorner = Instance.new("UICorner")
+        switchCorner.CornerRadius = UDim.new(1,0)
+        switchCorner.Parent = switch
+
+        local colorPreview = Instance.new("Frame")
+        colorPreview.Size = UDim2.new(0,14,0,14)
+        colorPreview.Position = UDim2.new(0.86,0,0.5,-7)
+        colorPreview.BackgroundColor3 = config.espCustom[colorKey] and config.espCustom[colorKey].color or Color3.fromRGB(255,255,255)
+        colorPreview.BorderSizePixel = 0
+        colorPreview.Parent = row
+        local previewCorner = Instance.new("UICorner")
+        previewCorner.CornerRadius = UDim.new(1,0)
+        previewCorner.Parent = colorPreview
+
+        local colorBtn = Instance.new("TextButton")
+        colorBtn.Size = UDim2.new(0,16,0,16)
+        colorBtn.Position = UDim2.new(0.93,0,0.5,-8)
+        colorBtn.BackgroundColor3 = Color3.fromRGB(40,50,70)
+        colorBtn.Text = "🎨"
+        colorBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        colorBtn.Font = Enum.Font.Gotham
+        colorBtn.TextSize = 12
+        colorBtn.BorderSizePixel = 0
+        colorBtn.Parent = row
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0,4)
+        btnCorner.Parent = colorBtn
+
+        switch.MouseButton1Click:Connect(function()
+            if not config.espCustom[stateKey] then
+                config.espCustom[stateKey] = { enabled = false, color = Color3.fromRGB(255,255,255) }
+            end
+            local newState = not config.espCustom[stateKey].enabled
+            config.espCustom[stateKey].enabled = newState
+            switch.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+            switch.Text = newState and "ON" or "OFF"
+            if type(refreshCustomESP) == "function" then
+                refreshCustomESP()
+            end
+        end)
+
+        colorBtn.MouseButton1Click:Connect(function()
+            local popup = Instance.new("ScreenGui")
+            popup.Name = "ColorPickerPopup"
+            popup.ResetOnSpawn = false
+            popup.Parent = game.CoreGui
+
+            local popupFrame = Instance.new("Frame")
+            popupFrame.Size = UDim2.new(0,200,0,120)
+            popupFrame.Position = UDim2.new(0.5,-100,0.5,-60)
+            popupFrame.BackgroundColor3 = Color3.fromRGB(20,30,45)
+            popupFrame.BorderSizePixel = 0
+            popupFrame.Parent = popup
+            Instance.new("UICorner",popupFrame).CornerRadius = UDim.new(0,8)
+            local popupStroke = Instance.new("UIStroke")
+            popupStroke.Color = Color3.fromRGB(0,180,255)
+            popupStroke.Transparency = 0.4
+            popupStroke.Parent = popupFrame
+
+            local popupTitle = Instance.new("TextLabel")
+            popupTitle.Size = UDim2.new(1,0,0,24)
+            popupTitle.BackgroundTransparency = 1
+            popupTitle.Text = "Warna " .. labelText
+            popupTitle.TextColor3 = Color3.fromRGB(0,220,255)
+            popupTitle.Font = Enum.Font.GothamBold
+            popupTitle.TextSize = 12
+            popupTitle.Parent = popupFrame
+
+            local currentColor = config.espCustom[colorKey] and config.espCustom[colorKey].color or Color3.fromRGB(255,255,255)
+            local rVal = currentColor.R * 255
+            local gVal = currentColor.G * 255
+            local bVal = currentColor.B * 255
+
+            local function createColorSlider(parent, y, lblText, initial, callback)
+                local holder = Instance.new("Frame")
+                holder.Size = UDim2.new(1,-20,0,22)
+                holder.Position = UDim2.new(0,10,0,y)
+                holder.BackgroundTransparency = 1
+                holder.Parent = parent
+
+                local lbl = Instance.new("TextLabel")
+                lbl.Size = UDim2.new(0.15,0,1,0)
+                lbl.BackgroundTransparency = 1
+                lbl.Text = lblText
+                lbl.TextColor3 = Color3.fromRGB(200,200,200)
+                lbl.Font = Enum.Font.Gotham
+                lbl.TextSize = 9
+                lbl.TextXAlignment = Enum.TextXAlignment.Left
+                lbl.Parent = holder
+
+                local valLabel = Instance.new("TextLabel")
+                valLabel.Size = UDim2.new(0.15,0,1,0)
+                valLabel.Position = UDim2.new(0.15,0,0,0)
+                valLabel.BackgroundTransparency = 1
+                valLabel.Text = tostring(math.floor(initial))
+                valLabel.TextColor3 = Color3.fromRGB(0,220,255)
+                valLabel.Font = Enum.Font.GothamBold
+                valLabel.TextSize = 9
+                valLabel.TextXAlignment = Enum.TextXAlignment.Left
+                valLabel.Parent = holder
+
+                local bg = Instance.new("Frame")
+                bg.Size = UDim2.new(0.6,0,0,4)
+                bg.Position = UDim2.new(0.35,0,0.5,-2)
+                bg.BackgroundColor3 = Color3.fromRGB(40,50,70)
+                bg.BorderSizePixel = 0
+                bg.Parent = holder
+                Instance.new("UICorner",bg).CornerRadius = UDim.new(1,0)
+
+                local thumb = Instance.new("TextButton")
+                thumb.Size = UDim2.new(0,10,0,10)
+                thumb.Position = UDim2.new(initial/255, -5, 0.5, -5)
+                thumb.BackgroundColor3 = Color3.fromRGB(0,200,255)
+                thumb.AutoButtonColor = false
+                thumb.Text = ""
+                thumb.BorderSizePixel = 0
+                thumb.Parent = bg
+                Instance.new("UICorner",thumb).CornerRadius = UDim.new(1,0)
+
+                local dragging = false
+                local function update(val)
+                    val = math.clamp(val, 0, 255)
+                    valLabel.Text = tostring(math.floor(val))
+                    thumb.Position = UDim2.new(val/255, -5, 0.5, -5)
+                    callback(val)
+                end
+
+                thumb.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        local rel = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
+                        update(rel * 255)
+                    end
+                end)
+                bg.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        local rel = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
+                        update(rel * 255)
+                    end
+                end)
+                local moveConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
+                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        local rel = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
+                        update(rel * 255)
+                    end
+                end)
+                local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = false
+                    end
+                end)
+                popup.Destroying:Connect(function()
+                    moveConn:Disconnect()
+                    endConn:Disconnect()
+                end)
+                return update
+            end
+
+            local updateR = createColorSlider(popupFrame, 30, "R", rVal, function(val)
+                rVal = val
+                local newColor = Color3.fromRGB(rVal, gVal, bVal)
+                config.espCustom[colorKey].color = newColor
+                colorPreview.BackgroundColor3 = newColor
+                if type(refreshCustomESP) == "function" then
+                    refreshCustomESP()
+                end
+            end)
+            local updateG = createColorSlider(popupFrame, 55, "G", gVal, function(val)
+                gVal = val
+                local newColor = Color3.fromRGB(rVal, gVal, bVal)
+                config.espCustom[colorKey].color = newColor
+                colorPreview.BackgroundColor3 = newColor
+                if type(refreshCustomESP) == "function" then
+                    refreshCustomESP()
+                end
+            end)
+            local updateB = createColorSlider(popupFrame, 80, "B", bVal, function(val)
+                bVal = val
+                local newColor = Color3.fromRGB(rVal, gVal, bVal)
+                config.espCustom[colorKey].color = newColor
+                colorPreview.BackgroundColor3 = newColor
+                if type(refreshCustomESP) == "function" then
+                    refreshCustomESP()
+                end
+            end)
+
+            local closePopup = Instance.new("TextButton")
+            closePopup.Size = UDim2.new(0,50,0,20)
+            closePopup.Position = UDim2.new(0.5,-25,1,-28)
+            closePopup.BackgroundColor3 = Color3.fromRGB(180,50,50)
+            closePopup.Text = "CLOSE"
+            closePopup.TextColor3 = Color3.fromRGB(255,255,255)
+            closePopup.Font = Enum.Font.GothamBold
+            closePopup.TextSize = 9
+            closePopup.BorderSizePixel = 0
+            closePopup.Parent = popupFrame
+            Instance.new("UICorner",closePopup).CornerRadius = UDim.new(0,4)
+            closePopup.MouseButton1Click:Connect(function()
+                popup:Destroy()
+            end)
+        end)
+
+        return row
+    end
+
+    local espCategories = {
+        { key = "generator", label = "Generator" },
+        { key = "gate",      label = "Gate" },
+        { key = "pallet",    label = "Pallet" },
+        { key = "hook",      label = "Hook" },
+        { key = "scp",       label = "SCP" },
+        { key = "windows",   label = "Windows" },
+        { key = "killer",    label = "Killer ESP" },
+        { key = "survivor",  label = "Survivor ESP" },
+        { key = "line",      label = "ESP Line" },
+    }
+
+    for _, cat in ipairs(espCategories) do
+        createToggleRow(espInner, cat.label, cat.key, cat.key)
+    end
+
+    local function updateEspCardHeight()
+        local contentHeight = espLayout.AbsoluteContentSize.Y
+        espCard.Size = UDim2.new(1,0,0,contentHeight + 16)
+    end
+    espLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateEspCardHeight)
+    task.wait(0.05)
+    updateEspCardHeight()
+
     -- ========== LOGIKA SLIDER ==========
     local dragging = false
-
     local function setSpeedFromPercent(percent)
         percent = math.clamp(percent, 0, 100)
         speedPercent = percent
         currentSpeed = percentToSpeed(percent)
         speedValueLabel.Text = string.format("%.1f", currentSpeed)
-        -- Simpan ke state global
         movementState.speed = currentSpeed
         movementState.percent = percent
 
@@ -4687,8 +5033,6 @@ local function createAboutContent()
             dragging = false
         end
     end)
-
-    -- RenderStepped connection disimpan untuk cleanup
     sliderDragConnection = RunService.RenderStepped:Connect(function()
         if dragging then
             updateSliderFromMouse()
@@ -4722,21 +5066,19 @@ local function createAboutContent()
         updateToggleUI(not tpwalkActive)
     end)
 
-    -- ========== HANDLE RESPAWN ==========
     characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-    -- ========== CLEANUP ==========
     aboutContent.Destroying:Connect(function()
         if sliderDragConnection then sliderDragConnection:Disconnect() end
         if characterAddedConn then characterAddedConn:Disconnect() end
         stopTPWalk()
     end)
 
-    -- Inisialisasi nilai slider dan toggle
     setSpeedFromPercent(speedPercent)
     updateToggleUI(tpwalkActive)
 
-    print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
+    print("[Movement] Speed slider & TP Walk loaded")
+    print("[CustomESP] Custom ESP settings loaded")
 end
 
 -- ============================================================================

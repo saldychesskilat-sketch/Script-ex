@@ -5160,11 +5160,16 @@ local function createAboutContent()
     print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded")
 
-    -- ========== WATCHDOG: Refresh ESP setiap 1 detik (real-time) ==========
+    -- ========== WATCHDOG: Refresh ESP & Progress setiap 1 detik (real-time) ==========
     local watchdogTask = nil
     watchdogTask = task.spawn(function()
         while aboutContent and aboutContent.Parent do
             task.wait(1)
+            -- Update progress generator terlebih dahulu (seperti toggle ON/OFF)
+            if type(updateAllGeneratorProgress) == "function" then
+                updateAllGeneratorProgress()
+            end
+            -- Refresh semua ESP (termasuk object & player)
             if type(refreshCustomESP) == "function" then
                 refreshCustomESP()
             end
@@ -5175,7 +5180,7 @@ local function createAboutContent()
         if watchdogTask then task.cancel(watchdogTask) end
     end)
 
-    print("[CustomESP] Watchdog active: ESP refresh every 1 second")
+    print("[CustomESP] Watchdog active: ESP + Generator Progress refresh every 1 second")
 end
 
 -- ============================================================================

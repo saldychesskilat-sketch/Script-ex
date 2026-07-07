@@ -6245,7 +6245,7 @@ local function createGUI()
         local features = {
             {name="autoWinEnabled", text="AUTO WIN"},
             {name="autoTaskEnabled", text="AUTO TASK"},
-            {name="espEnabled", text="ESP"},
+            {name="espEnabled", text="ESP All"},
             {name="speedBoostEnabled", text="Play AI"},
             {name="stealthEnabled", text="STEALTH"},
             {name="godModeEnabled", text="GOD MODE"},

@@ -4722,7 +4722,7 @@ local function createAboutContent()
     espTitle.Parent = espInner
 
     -- ============================================================
-    -- FUNCTION: CREATE TOGGLE ROW (switch style seperti TPWalk)
+    -- CREATE TOGGLE ROW (switch style seperti TPWalk)
     -- ============================================================
     local function createToggleRow(parent, labelText, stateKey, colorKey)
         local row = Instance.new("Frame")
@@ -4815,8 +4815,8 @@ local function createAboutContent()
             refreshCustomESP()
         end)
 
-        -- Event color picker (modern dengan slider RGB berwarna)
         colorBtn.MouseButton1Click:Connect(function()
+            -- Color picker modern (sama seperti sebelumnya, tidak diubah)
             local existingPopup = game.CoreGui:FindFirstChild("ColorPickerPopup")
             if existingPopup then existingPopup:Destroy() end
 
@@ -5174,7 +5174,6 @@ local function createAboutContent()
         if sliderDragConnection then sliderDragConnection:Disconnect() end
         if characterAddedConn then characterAddedConn:Disconnect() end
         stopTPWalk()
-        -- Jangan hentikan watchdog di sini, karena watchdog berjalan di luar
     end)
 
     -- Inisialisasi
@@ -5189,11 +5188,9 @@ local function createAboutContent()
 
     print("[Movement] Speed slider (0.1-20.0, step 0.1) & TP Walk (persistent state)")
     print("[CustomESP] Custom ESP settings loaded")
-
-    -- ========== START WATCHDOG (jika belum berjalan) ==========
-    startESPWatchdog()
-    print("[CustomESP] Watchdog active: Generator every 1s, ESP every 3s")
 end
+
+    
 
 -- ============================================================================
 -- settings content 
@@ -6408,9 +6405,34 @@ local function createGUI()
         end  
     end)  
   
-    mainFrame.BackgroundTransparency = 0.3  
-    TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()  
-end  
+    mainFrame.BackgroundTransparency = 0.3
+    TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
+
+    -- ============================================================
+    -- WATCHDOG REFRESH ESP (berjalan terus di latar belakang)
+    -- ============================================================
+    -- Generator progress refresh setiap 1 detik
+    task.spawn(function()
+        while screenGui and screenGui.Parent do
+            task.wait(1)
+            if type(updateAllGeneratorProgress) == "function" then
+                pcall(updateAllGeneratorProgress)
+            end
+        end
+    end)
+
+    -- ESP refresh setiap 3 detik
+    task.spawn(function()
+        while screenGui and screenGui.Parent do
+            task.wait(3)
+            if type(refreshCustomESP) == "function" then
+                pcall(refreshCustomESP)
+            end
+        end
+    end)
+
+    print("[GUI] ESP watchdog active: Generator every 1s, ESP every 3s")
+end
  
 -- ============================================================================
 -- RESTORE FEATURE STATES FUNCTION (LENGKAP)

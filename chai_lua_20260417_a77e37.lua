@@ -4424,16 +4424,10 @@ local movementState = {
 }
 
 local function createAboutContent()
-    -- Jika aboutContent sudah ada, hanya tampilkan dan refresh, jangan buat ulang
-    if aboutContent and aboutContent.Parent then
-        aboutContent.Visible = true
-        if type(refreshCustomESP) == "function" then
-            refreshCustomESP()
-        end
-        if type(updateAllGeneratorProgress) == "function" then
-            updateAllGeneratorProgress()
-        end
-        return
+    -- Hapus About lama agar selalu dibuat ulang
+    if aboutContent then
+        aboutContent:Destroy()
+        aboutContent = nil
     end
 
     -- Konstanta range kecepatan (min 0.1, max 20.0)
@@ -6705,12 +6699,8 @@ local function createGUI()
         if homeContent then homeContent:Destroy() end
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
-
-        if aboutContent then
-        aboutContent.Visible = true
-    else
+        
         createAboutContent()
-    end
     end)
 
     makeDraggable(mainFrame)

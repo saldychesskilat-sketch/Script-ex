@@ -4414,7 +4414,7 @@ end
 -- ============================================================================
 -- ABOUT CONTENT
 -- ============================================================================
- local aboutContent = nil
+local aboutContent = nil
 
 -- State movement disimpan di luar fungsi agar persist saat pindah sidebar
 local movementState = {
@@ -4424,10 +4424,17 @@ local movementState = {
 }
 
 local function createAboutContent()
-    -- Hapus About lama agar selalu dibuat ulang
-    if aboutContent then
-        aboutContent:Destroy()
-        aboutContent = nil
+    -- Jika aboutContent sudah ada, hanya tampilkan dan refresh, jangan buat ulang
+    if aboutContent and aboutContent.Parent then
+        aboutContent.Visible = true
+        -- Refresh ESP dan progress saat ditampilkan kembali
+        if type(refreshCustomESP) == "function" then
+            refreshCustomESP()
+        end
+        if type(updateAllGeneratorProgress) == "function" then
+            updateAllGeneratorProgress()
+        end
+        return
     end
 
     -- Konstanta range kecepatan (min 0.1, max 20.0)
@@ -4689,51 +4696,9 @@ local function createAboutContent()
     espTitle.Parent = espInner
 
     -- ============================================================
-    -- Fungsi sinkronisasi UI Custom ESP (agar real-time)
-    -- ============================================================
-    local function syncCustomESPUI()
-        for _, row in ipairs(espInner:GetChildren()) do
-            if row:IsA("Frame") then
-                local switch = row:FindFirstChild("Switch")
-                local stateLabel = row:FindFirstChild("StateLabel")
-                if switch and stateLabel then
-                    -- Cari stateKey dari atribut atau dari label
-                    local label = row:FindFirstChild("Label")
-                    if label then
-                        local labelText = label.Text
-                        local stateKey = nil
-                        for key, cat in ipairs(espCategories) do
-                            if cat.label == labelText then
-                                stateKey = cat.key
-                                break
-                            end
-                        end
-                        if stateKey and config.espCustom[stateKey] then
-                            local state = config.espCustom[stateKey].enabled
-                            switch.BackgroundColor3 = state and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
-                            local switchStroke = switch:FindFirstChild("UIStroke")
-                            if switchStroke then
-                                switchStroke.Color = state and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
-                            end
-                            local circle = switch:FindFirstChild("Circle")
-                            if circle then
-                                circle.Position = state and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
-                            end
-                            stateLabel.Text = state and "ON" or "OFF"
-                            stateLabel.TextColor3 = state and Color3.fromRGB(0,220,255) or Color3.fromRGB(150,150,150)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- ============================================================
     -- FUNCTION: CREATE TOGGLE ROW (switch style seperti TPWalk)
     -- ============================================================
-    local espCategories = {}
     local function createToggleRow(parent, labelText, stateKey, colorKey)
-        table.insert(espCategories, { key = stateKey, label = labelText })
         local row = Instance.new("Frame")
         row.Size = UDim2.new(1,0,0,28)
         row.BackgroundTransparency = 1
@@ -4741,7 +4706,6 @@ local function createAboutContent()
 
         -- Label
         local label = Instance.new("TextLabel")
-        label.Name = "Label"
         label.Size = UDim2.new(0.45,0,1,0)
         label.Position = UDim2.new(0,2,0,0)
         label.BackgroundTransparency = 1
@@ -4752,9 +4716,8 @@ local function createAboutContent()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = row
 
-        -- Switch
+        -- Switch (seperti TPWalk, dengan stroke dan circle)
         local switch = Instance.new("TextButton")
-        switch.Name = "Switch"
         switch.Size = UDim2.new(0,40,0,20)
         switch.Position = UDim2.new(0.55,0,0.5,-10)
         switch.BackgroundColor3 = config.espCustom[stateKey].enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
@@ -4766,14 +4729,15 @@ local function createAboutContent()
         switchCorner.CornerRadius = UDim.new(1,0)
         switchCorner.Parent = switch
 
+        -- Stroke (mirip TPWalk)
         local switchStroke = Instance.new("UIStroke")
         switchStroke.Color = config.espCustom[stateKey].enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
         switchStroke.Thickness = 0.8
         switchStroke.Transparency = 0.3
         switchStroke.Parent = switch
 
+        -- Circle indicator (mirip TPWalk)
         local circle = Instance.new("Frame")
-        circle.Name = "Circle"
         circle.Size = UDim2.new(0,16,0,16)
         circle.Position = config.espCustom[stateKey].enabled and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
         circle.BackgroundColor3 = Color3.fromRGB(255,255,255)
@@ -4783,8 +4747,8 @@ local function createAboutContent()
         circleCorner.CornerRadius = UDim.new(1,0)
         circleCorner.Parent = circle
 
+        -- Label ON/OFF di samping switch
         local stateLabel = Instance.new("TextLabel")
-        stateLabel.Name = "StateLabel"
         stateLabel.Size = UDim2.new(0,20,0,16)
         stateLabel.Position = UDim2.new(1, -24, 0.5, -8)
         stateLabel.BackgroundTransparency = 1
@@ -4795,6 +4759,7 @@ local function createAboutContent()
         stateLabel.TextXAlignment = Enum.TextXAlignment.Left
         stateLabel.Parent = row
 
+        -- Color preview
         local colorPreview = Instance.new("Frame")
         colorPreview.Size = UDim2.new(0,12,0,12)
         colorPreview.Position = UDim2.new(0.78,0,0.5,-6)
@@ -4805,6 +4770,7 @@ local function createAboutContent()
         previewCorner.CornerRadius = UDim.new(1,0)
         previewCorner.Parent = colorPreview
 
+        -- Color picker button
         local colorBtn = Instance.new("TextButton")
         colorBtn.Size = UDim2.new(0,14,0,14)
         colorBtn.Position = UDim2.new(0.86,0,0.5,-7)
@@ -4819,6 +4785,7 @@ local function createAboutContent()
         btnCorner.CornerRadius = UDim.new(0,4)
         btnCorner.Parent = colorBtn
 
+        -- Event toggle
         switch.MouseButton1Click:Connect(function()
             local newState = not config.espCustom[stateKey].enabled
             config.espCustom[stateKey].enabled = newState
@@ -4830,8 +4797,9 @@ local function createAboutContent()
             refreshCustomESP()
         end)
 
-        -- Color picker dengan Hue + RGB
+        -- Event color picker (Hue + Brightness slider)
         colorBtn.MouseButton1Click:Connect(function()
+            -- Tutup popup sebelumnya
             local existingPopup = game.CoreGui:FindFirstChild("ColorPickerPopup")
             if existingPopup then existingPopup:Destroy() end
 
@@ -4841,8 +4809,8 @@ local function createAboutContent()
             popup.Parent = game.CoreGui
 
             local popupFrame = Instance.new("Frame")
-            popupFrame.Size = UDim2.new(0, 280, 0, 270) -- tambah tinggi untuk Hue
-            popupFrame.Position = UDim2.new(0.5,-140,0.5,-135)
+            popupFrame.Size = UDim2.new(0, 280, 0, 200)
+            popupFrame.Position = UDim2.new(0.5,-140,0.5,-100)
             popupFrame.BackgroundColor3 = Color3.fromRGB(12,22,38)
             popupFrame.BackgroundTransparency = 0.1
             popupFrame.BorderSizePixel = 0
@@ -4853,11 +4821,12 @@ local function createAboutContent()
             popupStroke.Transparency = 0.4
             popupStroke.Parent = popupFrame
 
-            popupFrame.Size = UDim2.new(0, 240, 0, 220)
-            popupFrame.Position = UDim2.new(0.5,-120,0.5,-110)
+            -- Animasi muncul
+            popupFrame.Size = UDim2.new(0, 240, 0, 170)
+            popupFrame.Position = UDim2.new(0.5,-120,0.5,-85)
             local tweenIn = TweenService:Create(popupFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Size = UDim2.new(0, 280, 0, 270),
-                Position = UDim2.new(0.5,-140,0.5,-135)
+                Size = UDim2.new(0, 280, 0, 200),
+                Position = UDim2.new(0.5,-140,0.5,-100)
             })
             tweenIn:Play()
 
@@ -4870,13 +4839,14 @@ local function createAboutContent()
             popupTitle.TextSize = 12
             popupTitle.Parent = popupFrame
 
+            -- Ambil warna saat ini, konversi ke HSV
             local currentColor = config.espCustom[colorKey].color
-            local rVal = currentColor.R * 255
-            local gVal = currentColor.G * 255
-            local bVal = currentColor.B * 255
-            local hVal, sVal, vVal = Color3.toHSV(currentColor)
+            local h, s, v = Color3.toHSV(currentColor)
+            -- Satuan tetap 1 (full saturation)
+            local currentHue = h
+            local currentBrightness = v
 
-            -- Preview warna & hex
+            -- Preview warna di bawah title
             local previewContainer = Instance.new("Frame")
             previewContainer.Size = UDim2.new(1,-20,0,30)
             previewContainer.Position = UDim2.new(0,10,0,32)
@@ -4897,295 +4867,32 @@ local function createAboutContent()
             previewColorStroke.Transparency = 0.3
             previewColorStroke.Parent = previewColor
 
+            -- Hex value label
             local hexLabel = Instance.new("TextLabel")
             hexLabel.Size = UDim2.new(0,60,0,16)
             hexLabel.Position = UDim2.new(0.5,30,0.5,-8)
             hexLabel.BackgroundTransparency = 1
-            hexLabel.Text = string.format("#%02X%02X%02X", rVal, gVal, bVal)
+            hexLabel.Text = string.format("#%02X%02X%02X", currentColor.R*255, currentColor.G*255, currentColor.B*255)
             hexLabel.TextColor3 = Color3.fromRGB(200,200,200)
             hexLabel.Font = Enum.Font.Gotham
             hexLabel.TextSize = 9
             hexLabel.TextXAlignment = Enum.TextXAlignment.Left
             hexLabel.Parent = previewContainer
 
-            -- Flag untuk mencegah infinite loop
-            local updatingFromHue = false
-            local updatingFromRGB = false
-
-            -- Fungsi update semua elemen color
-            local function updateAllColors(newR, newG, newB)
-                newR = math.clamp(newR, 0, 255)
-                newG = math.clamp(newG, 0, 255)
-                newB = math.clamp(newB, 0, 255)
-                rVal = newR
-                gVal = newG
-                bVal = newB
-                local newColor = Color3.fromRGB(rVal, gVal, bVal)
+            -- Fungsi update warna dari Hue dan Brightness
+            local function updateColorFromHSB(newH, newB)
+                newH = math.clamp(newH, 0, 1)
+                newB = math.clamp(newB, 0, 1)
+                local newColor = Color3.fromHSV(newH, 1, newB)
                 config.espCustom[colorKey].color = newColor
                 colorPreview.BackgroundColor3 = newColor
                 previewColor.BackgroundColor3 = newColor
-                hexLabel.Text = string.format("#%02X%02X%02X", rVal, gVal, bVal)
+                hexLabel.Text = string.format("#%02X%02X%02X", newColor.R*255, newColor.G*255, newColor.B*255)
                 refreshCustomESP()
-                -- Update Hue thumb berdasarkan RGB
-                local h, s, v = Color3.toHSV(newColor)
-                hVal = h
-                -- Update posisi thumb Hue
-                local huePos = h * 360
-                local bgW = hueBg.AbsoluteSize.X
-                if bgW > 0 then
-                    local thumbW = hueThumb.AbsoluteSize.X
-                    local px = math.clamp((huePos / 360) * bgW, thumbW/2, bgW - thumbW/2)
-                    hueThumb.Position = UDim2.new(0, px - thumbW/2, 0.5, -thumbW/2)
-                end
-                -- Update RGB sliders positions
-                updateSliderUI()
             end
 
-            -- Fungsi update posisi thumb slider RGB
-            local function updateSliderUI()
-                -- Sudah otomatis via callback updateAllColors
-            end
-
-            -- Fungsi untuk slider Hue (0-360)
-            local function createHueSlider(parent, y)
-                local holder = Instance.new("Frame")
-                holder.Size = UDim2.new(1,-20,0,30)
-                holder.Position = UDim2.new(0,10,0,y)
-                holder.BackgroundTransparency = 1
-                holder.Parent = parent
-
-                local lbl = Instance.new("TextLabel")
-                lbl.Size = UDim2.new(0.08,0,1,0)
-                lbl.BackgroundTransparency = 1
-                lbl.Text = "H"
-                lbl.TextColor3 = Color3.fromRGB(200,200,200)
-                lbl.Font = Enum.Font.GothamBold
-                lbl.TextSize = 9
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
-                lbl.Parent = holder
-
-                local valLabel = Instance.new("TextLabel")
-                valLabel.Size = UDim2.new(0.12,0,1,0)
-                valLabel.Position = UDim2.new(0.08,0,0,0)
-                valLabel.BackgroundTransparency = 1
-                valLabel.Text = tostring(math.floor(hVal * 360))
-                valLabel.TextColor3 = Color3.fromRGB(0,220,255)
-                valLabel.Font = Enum.Font.GothamBold
-                valLabel.TextSize = 9
-                valLabel.TextXAlignment = Enum.TextXAlignment.Left
-                valLabel.Parent = holder
-
-                local bg = Instance.new("Frame")
-                bg.Size = UDim2.new(0.72,0,0,6)
-                bg.Position = UDim2.new(0.22,0,0.5,-3)
-                bg.BackgroundColor3 = Color3.fromRGB(40,50,70)
-                bg.BorderSizePixel = 0
-                bg.Parent = holder
-
-                -- Gradien spektrum warna
-                local grad = Instance.new("UIGradient")
-                grad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
-                    ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255,255,0)),
-                    ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0,255,0)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
-                    ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0,0,255)),
-                    ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,0,255)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
-                })
-                grad.Parent = bg
-
-                local bgCorner = Instance.new("UICorner")
-                bgCorner.CornerRadius = UDim.new(1,0)
-                bgCorner.Parent = bg
-
-                local thumb = Instance.new("TextButton")
-                thumb.Size = UDim2.new(0,12,0,12)
-                thumb.Position = UDim2.new(hVal, -6, 0.5, -6) -- hVal adalah 0-1
-                thumb.BackgroundColor3 = Color3.fromRGB(255,255,255)
-                thumb.AutoButtonColor = false
-                thumb.Text = ""
-                thumb.BorderSizePixel = 0
-                thumb.Parent = bg
-                local thumbCorner = Instance.new("UICorner")
-                thumbCorner.CornerRadius = UDim.new(1,0)
-                thumbCorner.Parent = thumb
-                local thumbStroke = Instance.new("UIStroke")
-                thumbStroke.Color = Color3.fromRGB(200,200,200)
-                thumbStroke.Thickness = 1
-                thumbStroke.Transparency = 0.5
-                thumbStroke.Parent = thumb
-
-                local dragging = false
-                local function update(val)
-                    val = math.clamp(val, 0, 1)
-                    hVal = val
-                    valLabel.Text = tostring(math.floor(val * 360))
-                    thumb.Position = UDim2.new(val, -6, 0.5, -6)
-                    -- Konversi Hue ke RGB
-                    local newColor = Color3.fromHSV(hVal, 1, 1)
-                    local r = newColor.R * 255
-                    local g = newColor.G * 255
-                    local b = newColor.B * 255
-                    updatingFromHue = true
-                    updateAllColors(r, g, b)
-                    updatingFromHue = false
-                end
-
-                thumb.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        dragging = true
-                        local mouseX = input.Position.X
-                        local rel = (mouseX - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
-                        update(rel)
-                    end
-                end)
-                bg.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        local mouseX = input.Position.X
-                        local rel = (mouseX - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
-                        update(rel)
-                    end
-                end)
-                local moveConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
-                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                        local rel = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
-                        update(rel)
-                    end
-                end)
-                local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        dragging = false
-                    end
-                end)
-
-                popup.Destroying:Connect(function()
-                    moveConn:Disconnect()
-                    endConn:Disconnect()
-                end)
-                return thumb
-            end
-
-            -- Buat slider Hue
-            local hueBg = nil
-            local hueThumb = nil
-            local function buildHueSlider()
-                local holder = Instance.new("Frame")
-                holder.Size = UDim2.new(1,-20,0,30)
-                holder.Position = UDim2.new(0,10,0,66)
-                holder.BackgroundTransparency = 1
-                holder.Parent = popupFrame
-
-                local lbl = Instance.new("TextLabel")
-                lbl.Size = UDim2.new(0.08,0,1,0)
-                lbl.BackgroundTransparency = 1
-                lbl.Text = "H"
-                lbl.TextColor3 = Color3.fromRGB(200,200,200)
-                lbl.Font = Enum.Font.GothamBold
-                lbl.TextSize = 9
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
-                lbl.Parent = holder
-
-                local valLabel = Instance.new("TextLabel")
-                valLabel.Size = UDim2.new(0.12,0,1,0)
-                valLabel.Position = UDim2.new(0.08,0,0,0)
-                valLabel.BackgroundTransparency = 1
-                valLabel.Text = tostring(math.floor(hVal * 360))
-                valLabel.TextColor3 = Color3.fromRGB(0,220,255)
-                valLabel.Font = Enum.Font.GothamBold
-                valLabel.TextSize = 9
-                valLabel.TextXAlignment = Enum.TextXAlignment.Left
-                valLabel.Parent = holder
-
-                hueBg = Instance.new("Frame")
-                hueBg.Size = UDim2.new(0.72,0,0,6)
-                hueBg.Position = UDim2.new(0.22,0,0.5,-3)
-                hueBg.BackgroundColor3 = Color3.fromRGB(40,50,70)
-                hueBg.BorderSizePixel = 0
-                hueBg.Parent = holder
-                local grad = Instance.new("UIGradient")
-                grad.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,0,0)),
-                    ColorSequenceKeypoint.new(0.167, Color3.fromRGB(255,255,0)),
-                    ColorSequenceKeypoint.new(0.333, Color3.fromRGB(0,255,0)),
-                    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0,255,255)),
-                    ColorSequenceKeypoint.new(0.667, Color3.fromRGB(0,0,255)),
-                    ColorSequenceKeypoint.new(0.833, Color3.fromRGB(255,0,255)),
-                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
-                })
-                grad.Parent = hueBg
-                local bgCorner = Instance.new("UICorner")
-                bgCorner.CornerRadius = UDim.new(1,0)
-                bgCorner.Parent = hueBg
-
-                hueThumb = Instance.new("TextButton")
-                hueThumb.Size = UDim2.new(0,12,0,12)
-                hueThumb.Position = UDim2.new(hVal, -6, 0.5, -6)
-                hueThumb.BackgroundColor3 = Color3.fromRGB(255,255,255)
-                hueThumb.AutoButtonColor = false
-                hueThumb.Text = ""
-                hueThumb.BorderSizePixel = 0
-                hueThumb.Parent = hueBg
-                local thumbCorner = Instance.new("UICorner")
-                thumbCorner.CornerRadius = UDim.new(1,0)
-                thumbCorner.Parent = hueThumb
-                local thumbStroke = Instance.new("UIStroke")
-                thumbStroke.Color = Color3.fromRGB(200,200,200)
-                thumbStroke.Thickness = 1
-                thumbStroke.Transparency = 0.5
-                thumbStroke.Parent = hueThumb
-
-                local dragging = false
-                local function updateHue(val)
-                    val = math.clamp(val, 0, 1)
-                    hVal = val
-                    valLabel.Text = tostring(math.floor(val * 360))
-                    hueThumb.Position = UDim2.new(val, -6, 0.5, -6)
-                    local newColor = Color3.fromHSV(hVal, 1, 1)
-                    local r = newColor.R * 255
-                    local g = newColor.G * 255
-                    local b = newColor.B * 255
-                    updatingFromHue = true
-                    updateAllColors(r, g, b)
-                    updatingFromHue = false
-                end
-
-                hueThumb.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        dragging = true
-                        local mouseX = input.Position.X
-                        local rel = (mouseX - hueBg.AbsolutePosition.X) / hueBg.AbsoluteSize.X
-                        updateHue(rel)
-                    end
-                end)
-                hueBg.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        local mouseX = input.Position.X
-                        local rel = (mouseX - hueBg.AbsolutePosition.X) / hueBg.AbsoluteSize.X
-                        updateHue(rel)
-                    end
-                end)
-                local moveConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
-                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                        local rel = (input.Position.X - hueBg.AbsolutePosition.X) / hueBg.AbsoluteSize.X
-                        updateHue(rel)
-                    end
-                end)
-                local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        dragging = false
-                    end
-                end)
-                popup.Destroying:Connect(function()
-                    moveConn:Disconnect()
-                    endConn:Disconnect()
-                end)
-            end
-
-            buildHueSlider()
-
-            -- Buat slider R, G, B dengan posisi Y yang disesuaikan (102, 138, 174)
-            local function createColorSlider(parent, y, labelText, initial, colorGradient, callback)
+            -- Helper: membuat slider dengan gradien dan thumb
+            local function createSlider(parent, y, labelText, initial, minVal, maxVal, colorGradient, callback)
                 local holder = Instance.new("Frame")
                 holder.Size = UDim2.new(1,-20,0,30)
                 holder.Position = UDim2.new(0,10,0,y)
@@ -5206,7 +4913,7 @@ local function createAboutContent()
                 valLabel.Size = UDim2.new(0.12,0,1,0)
                 valLabel.Position = UDim2.new(0.08,0,0,0)
                 valLabel.BackgroundTransparency = 1
-                valLabel.Text = tostring(math.floor(initial))
+                valLabel.Text = tostring(math.floor(initial * 100))
                 valLabel.TextColor3 = Color3.fromRGB(0,220,255)
                 valLabel.Font = Enum.Font.GothamBold
                 valLabel.TextSize = 9
@@ -5219,16 +4926,19 @@ local function createAboutContent()
                 bg.BackgroundColor3 = Color3.fromRGB(40,50,70)
                 bg.BorderSizePixel = 0
                 bg.Parent = holder
+
+                -- Gradien warna pada background
                 local grad = Instance.new("UIGradient")
                 grad.Color = colorGradient
                 grad.Parent = bg
+
                 local bgCorner = Instance.new("UICorner")
                 bgCorner.CornerRadius = UDim.new(1,0)
                 bgCorner.Parent = bg
 
                 local thumb = Instance.new("TextButton")
                 thumb.Size = UDim2.new(0,12,0,12)
-                thumb.Position = UDim2.new(initial/255, -6, 0.5, -6)
+                thumb.Position = UDim2.new(initial, -6, 0.5, -6)
                 thumb.BackgroundColor3 = Color3.fromRGB(255,255,255)
                 thumb.AutoButtonColor = false
                 thumb.Text = ""
@@ -5245,9 +4955,9 @@ local function createAboutContent()
 
                 local dragging = false
                 local function update(val)
-                    val = math.clamp(val, 0, 255)
-                    valLabel.Text = tostring(math.floor(val))
-                    thumb.Position = UDim2.new(val/255, -6, 0.5, -6)
+                    val = math.clamp(val, 0, 1)
+                    valLabel.Text = tostring(math.floor(val * 100))
+                    thumb.Position = UDim2.new(val, -6, 0.5, -6)
                     callback(val)
                 end
 
@@ -5256,20 +4966,20 @@ local function createAboutContent()
                         dragging = true
                         local mouseX = input.Position.X
                         local rel = (mouseX - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
-                        update(rel * 255)
+                        update(rel)
                     end
                 end)
                 bg.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                         local mouseX = input.Position.X
                         local rel = (mouseX - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
-                        update(rel * 255)
+                        update(rel)
                     end
                 end)
                 local moveConn = game:GetService("UserInputService").InputChanged:Connect(function(input)
                     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                         local rel = (input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X
-                        update(rel * 255)
+                        update(rel)
                     end
                 end)
                 local endConn = game:GetService("UserInputService").InputEnded:Connect(function(input)
@@ -5277,46 +4987,39 @@ local function createAboutContent()
                         dragging = false
                     end
                 end)
+
                 popup.Destroying:Connect(function()
                     moveConn:Disconnect()
                     endConn:Disconnect()
                 end)
             end
 
-            createColorSlider(popupFrame, 102, "R", rVal, ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(255,0,0))
-            }), function(val)
-                if not updatingFromHue then
-                    updatingFromRGB = true
-                    updateAllColors(val, gVal, bVal)
-                    updatingFromRGB = false
-                end
+            -- Buat slider Hue (spektrum warna)
+            local hueGradient = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromHSV(0, 1, 1)),
+                ColorSequenceKeypoint.new(1/6, Color3.fromHSV(1/6, 1, 1)),
+                ColorSequenceKeypoint.new(2/6, Color3.fromHSV(2/6, 1, 1)),
+                ColorSequenceKeypoint.new(3/6, Color3.fromHSV(3/6, 1, 1)),
+                ColorSequenceKeypoint.new(4/6, Color3.fromHSV(4/6, 1, 1)),
+                ColorSequenceKeypoint.new(5/6, Color3.fromHSV(5/6, 1, 1)),
+                ColorSequenceKeypoint.new(1, Color3.fromHSV(1, 1, 1)),
+            })
+            createSlider(popupFrame, 66, "Hue", currentHue, 0, 1, hueGradient, function(val)
+                currentHue = val
+                updateColorFromHSB(currentHue, currentBrightness)
             end)
 
-            createColorSlider(popupFrame, 138, "G", gVal, ColorSequence.new({
+            -- Buat slider Brightness (hitam ke putih)
+            local brightnessGradient = ColorSequence.new({
                 ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(0,255,0))
-            }), function(val)
-                if not updatingFromHue then
-                    updatingFromRGB = true
-                    updateAllColors(rVal, val, bVal)
-                    updatingFromRGB = false
-                end
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255))
+            })
+            createSlider(popupFrame, 102, "Bright", currentBrightness, 0, 1, brightnessGradient, function(val)
+                currentBrightness = val
+                updateColorFromHSB(currentHue, currentBrightness)
             end)
 
-            createColorSlider(popupFrame, 174, "B", bVal, ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,255))
-            }), function(val)
-                if not updatingFromHue then
-                    updatingFromRGB = true
-                    updateAllColors(rVal, gVal, val)
-                    updatingFromRGB = false
-                end
-            end)
-
-            -- Click outside untuk close
+            -- Click outside untuk close (tanpa tombol close)
             local function checkClickOutside(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     local pos = input.Position
@@ -5328,15 +5031,18 @@ local function createAboutContent()
                 end
             end
             local outsideConn = game:GetService("UserInputService").InputBegan:Connect(checkClickOutside)
+
+            -- Animasi keluar
             popup.Destroying:Connect(function()
                 outsideConn:Disconnect()
             end)
 
+            -- Animasi keluar saat destroy
             local oldDestroy = popup.Destroy
             popup.Destroy = function(self)
                 local tweenOut = TweenService:Create(popupFrame, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                    Size = UDim2.new(0, 240, 0, 220),
-                    Position = UDim2.new(0.5,-120,0.5,-110),
+                    Size = UDim2.new(0, 240, 0, 170),
+                    Position = UDim2.new(0.5,-120,0.5,-85),
                     BackgroundTransparency = 0.8
                 })
                 tweenOut:Play()
@@ -5349,8 +5055,7 @@ local function createAboutContent()
         return row
     end
 
-    -- Daftar kategori (akan diisi ulang)
-    local espCategoryList = {
+    local espCategories = {
         { key = "generator", label = "Generator" },
         { key = "gate",      label = "Gate" },
         { key = "pallet",    label = "Pallet" },
@@ -5362,7 +5067,7 @@ local function createAboutContent()
         { key = "line",      label = "ESP Line" },
     }
 
-    for _, cat in ipairs(espCategoryList) do
+    for _, cat in ipairs(espCategories) do
         createToggleRow(espInner, cat.label, cat.key, cat.key)
     end
 
@@ -5456,51 +5161,13 @@ local function createAboutContent()
         updateToggleUI(not tpwalkActive)
     end)
 
-    -- ========== HANDLE RESPAWN & CLEANUP ==========
+    -- ========== HANDLE RESPAWN ==========
     characterAddedConn = localPlayer.CharacterAdded:Connect(onCharacterAdded)
 
-    -- ========== REFRESH ESP SAAT STATUS LOCALPLAYER BERUBAH ==========
-    local lastStatus = nil
-    local function getLocalPlayerStatus()
-        local team = localPlayer.Team
-        if not team then return "Spectator" end
-        local tName = team.Name:lower()
-        if tName:find("killer") then return "Killer"
-        elseif tName:find("survivor") then return "Survivor"
-        else return "Spectator" end
-    end
-
-    local function onStatusChanged()
-        local newStatus = getLocalPlayerStatus()
-        if newStatus ~= lastStatus then
-            lastStatus = newStatus
-            if type(refreshCustomESP) == "function" then
-                refreshCustomESP()
-            end
-        end
-    end
-
-    -- Pantau perubahan Team
-    if localPlayer.Team then
-        localPlayer.Team:GetPropertyChangedSignal("Name"):Connect(onStatusChanged)
-    end
-    localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
-        onStatusChanged()
-        if localPlayer.Team then
-            localPlayer.Team:GetPropertyChangedSignal("Name"):Connect(onStatusChanged)
-        end
-    end)
-
-    -- Pantau juga saat karakter muncul (respawn) yang mungkin mempengaruhi status
-    localPlayer.CharacterAdded:Connect(function()
-        task.wait(0.5)
-        onStatusChanged()
-    end)
-
-    -- ========== WATCHDOG UNTUK GENERATOR SAJA ==========
+    -- ========== GENERATOR PROGRESS UPDATE (tetap berjalan) ==========
     local function startGeneratorWatchdog()
         task.spawn(function()
-            while aboutContent and aboutContent.Parent and screenGui and screenGui.Parent do
+            while aboutContent and aboutContent.Parent do
                 if type(updateAllGeneratorProgress) == "function" then
                     updateAllGeneratorProgress()
                 end
@@ -5510,24 +5177,53 @@ local function createAboutContent()
     end
     startGeneratorWatchdog()
 
-    -- ========== SINKRONISASI UI CUSTOM ESP ==========
-    -- Fungsi ini akan dipanggil oleh refreshCustomESP (yang sudah ada)
-    -- Kita override refreshCustomESP sementara untuk menambahkan sync UI
-    local originalRefresh = refreshCustomESP
-    refreshCustomESP = function()
-        if type(originalRefresh) == "function" then
-            originalRefresh()
+    -- ========== REFRESH NON-GENERATOR ESP BERBASIS EVENT ==========
+    -- Fungsi untuk refresh ESP selain Generator (hanya panggil refreshCustomESP)
+    local function refreshNonGeneratorESP()
+        if type(refreshCustomESP) == "function" then
+            refreshCustomESP()
         end
-        syncCustomESPUI()
     end
 
-    -- Cleanup saat aboutContent dihancurkan
+    -- Deteksi perubahan status LocalPlayer (Team)
+    local function onLocalPlayerTeamChanged()
+        refreshNonGeneratorESP()
+    end
+
+    -- Deteksi perubahan karakter (respawn) yang bisa mempengaruhi status
+    local function onLocalPlayerCharacterAdded()
+        task.wait(0.5) -- tunggu sebentar agar status stabil
+        refreshNonGeneratorESP()
+    end
+
+    -- Pasang event listener
+    local teamChangedConn
+    if localPlayer.Team then
+        teamChangedConn = localPlayer:GetPropertyChangedSignal("Team"):Connect(onLocalPlayerTeamChanged)
+    else
+        -- Jika belum ada team, tunggu sampai ada
+        local teamWaitConn = localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+            if localPlayer.Team then
+                teamWaitConn:Disconnect()
+                teamChangedConn = localPlayer:GetPropertyChangedSignal("Team"):Connect(onLocalPlayerTeamChanged)
+                refreshNonGeneratorESP()
+            end
+        end)
+        -- Simpan koneksi untuk cleanup nanti
+        aboutContent.Destroying:Connect(function()
+            if teamWaitConn then teamWaitConn:Disconnect() end
+        end)
+    end
+
+    local charAddedConn = localPlayer.CharacterAdded:Connect(onLocalPlayerCharacterAdded)
+
+    -- ========== CLEANUP ==========
     aboutContent.Destroying:Connect(function()
         if sliderDragConnection then sliderDragConnection:Disconnect() end
         if characterAddedConn then characterAddedConn:Disconnect() end
+        if teamChangedConn then teamChangedConn:Disconnect() end
+        if charAddedConn then charAddedConn:Disconnect() end
         stopTPWalk()
-        -- Kembalikan refreshCustomESP ke fungsi asli (opsional)
-        refreshCustomESP = originalRefresh
     end)
 
     -- Inisialisasi nilai slider dan toggle

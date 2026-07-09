@@ -1022,22 +1022,12 @@ local function updateAllESP()
             config.espCustom[key].enabled = true
         end
         startESP()
-        -- Refresh untuk memastikan semua highlight muncul
-        refreshCustomESP()
     else
-        -- Matikan semua custom ESP
+        -- Reset semua custom ESP ke false
         for key, _ in pairs(config.espCustom) do
             config.espCustom[key].enabled = false
         end
         stopESP()
-        -- Hapus semua highlight yang tersisa secara paksa
-        for _, data in pairs(espHighlights) do
-            if data.Highlight then data.Highlight:Destroy() end
-            if data.Billboard then data.Billboard:Destroy() end
-            if data.TeamChanged then data.TeamChanged:Disconnect() end
-        end
-        espHighlights = {}
-        clearObjectESP()
     end
 end
 

@@ -674,7 +674,6 @@ local function createHighlightForPlayer(player)
     end
 
     local function shouldBeamActive()
-        if not config.espEnabled then return false end
         if not isLocalPlayerInGame() then return false end
         if not localPlayer.Character or not player.Character then return false end
         local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")

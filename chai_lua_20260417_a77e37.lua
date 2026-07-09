@@ -4424,6 +4424,10 @@ local movementState = {
 }
 
 local function createAboutContent()
+    if aboutContent then
+        aboutContent:Destroy()
+        aboutContent = nil 
+    end
     -- Konstanta range kecepatan (min 0.1, max 20.0)
     local MIN_SPEED = 0.1
     local MAX_SPEED = 20.0
@@ -6383,8 +6387,6 @@ local function createGUI()
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
         
-        -- Hancurkan aboutContent (jika ada) sebelum membuat baru
-        gridLayout.Parent = nil
         createAboutContent()
     end)
 

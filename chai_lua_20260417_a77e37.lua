@@ -4424,19 +4424,6 @@ local movementState = {
 }
 
 local function createAboutContent()
-    -- Jika aboutContent sudah ada, hanya tampilkan dan refresh, jangan buat ulang
-    if aboutContent and aboutContent.Parent then
-        aboutContent.Visible = true
-        -- Refresh ESP dan progress saat ditampilkan kembali
-        if type(refreshCustomESP) == "function" then
-            refreshCustomESP()
-        end
-        if type(updateAllGeneratorProgress) == "function" then
-            updateAllGeneratorProgress()
-        end
-        return
-    end
-
     -- Konstanta range kecepatan (min 0.1, max 20.0)
     local MIN_SPEED = 0.1
     local MAX_SPEED = 20.0
@@ -6396,6 +6383,12 @@ local function createGUI()
         if settingsContent then settingsContent:Destroy() end
         if infoContent then infoContent:Destroy() end
         
+        -- Hancurkan aboutContent (jika ada) sebelum membuat baru
+        if aboutContent then
+            aboutContent:Destroy()
+            aboutContent = nil
+        end
+        gridLayout.Parent = nil
         createAboutContent()
     end)
 

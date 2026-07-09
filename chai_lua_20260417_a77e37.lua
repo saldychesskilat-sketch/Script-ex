@@ -4791,7 +4791,7 @@ local function createAboutContent()
                 switch.BackgroundColor3 = newState and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
                 switchStroke.Color = newState and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
                 circle.Position = newState and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
-                stateLabel.Text = newState and "ON" or "OFF"
+                stateLabel.Text = newState and "" or ""
                 stateLabel.TextColor3 = newState and Color3.fromRGB(0,220,255) or Color3.fromRGB(150,150,150)
                 refreshCustomESP()
             end)

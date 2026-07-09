@@ -6384,10 +6384,6 @@ local function createGUI()
         if infoContent then infoContent:Destroy() end
         
         -- Hancurkan aboutContent (jika ada) sebelum membuat baru
-        if aboutContent then
-            aboutContent:Destroy()
-            aboutContent = nil
-        end
         gridLayout.Parent = nil
         createAboutContent()
     end)

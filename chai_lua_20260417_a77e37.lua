@@ -625,9 +625,9 @@ local function createHighlightForPlayer(player)
     local character = player.Character
     if not character then return end
 
-    local killerEnabled = config.espCustom.killer.enabled
-    local survivorEnabled = config.espCustom.survivor.enabled
-    local lineEnabled = config.espCustom.line.enabled
+    --- local killerEnabled = config.espCustom.killer.enabled
+    -- local survivorEnabled = config.espCustom.survivor.enabled
+    -- local lineEnabled = config.espCustom.line.enabled
 
     local MAX_DISTANCE = 2000
     local function getTargetRole()
@@ -681,8 +681,8 @@ local function createHighlightForPlayer(player)
         if not localRootPart then return false end
         local role = getTargetRole()
         if role == "Spectator" then return false end
-        if role == "Killer" and not killerEnabled then return false end
-        if role == "Survivor" and not survivorEnabled then return false end
+        if role == "Killer" and not config.espCustom.killer.enabled then return false end
+        if role == "Survivor" and not config.espCustom.survivor.enabled then return false end
         local dist = getDistanceToPlayer()
         return dist <= MAX_DISTANCE
     end
@@ -749,10 +749,16 @@ local function createHighlightForPlayer(player)
     beam.Enabled = shouldBeamActive() and lineEnabled
 
     local function updateVisibility()
-        local active = shouldBeamActive()
-        beam.Enabled = active and lineEnabled
+    local active = shouldBeamActive()
+    if beam then
+        beam.Enabled = active and config.espCustom.line.enabled
+    end
+    if highlight then
         highlight.Enabled = active or (getTargetRole() == "Spectator")
+    end
+    if billboard then
         billboard.Enabled = active
+    end
     end
 
     local function updateBeamColor()
@@ -929,20 +935,21 @@ local function startESP()
         end
     end)
     espPlayerRemovingConn = Players.PlayerRemoving:Connect(function(player)
-        if espHighlights[player.UserId] then
-            if espHighlights[player.UserId].Highlight then
-                espHighlights[player.UserId].Highlight:Destroy()
-            end
-            if espHighlights[player.UserId].Billboard then
-                espHighlights[player.UserId].Billboard:Destroy()
-            end
-            if espHighlights[player.UserId].TeamChanged then
-                espHighlights[player.UserId].TeamChanged:Disconnect()
-            end
-            espHighlights[player.UserId] = nil
-        end
-    end)
-
+    local data = espHighlights[player.UserId]
+    if data then
+        if data.Highlight then data.Highlight:Destroy() end
+        if data.Billboard then data.Billboard:Destroy() end
+        if data.Beam then data.Beam:Destroy() end
+        if data.StartAttachment then data.StartAttachment:Destroy() end
+        if data.EndAttachment then data.EndAttachment:Destroy() end
+        if data.TeamChanged then data.TeamChanged:Disconnect() end
+        if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
+        if data.BeamUpdate then data.BeamUpdate:Disconnect() end
+        if data.TargetCharAdded then data.TargetCharAdded:Disconnect() end
+        if data.LocalCharAdded then data.LocalCharAdded:Disconnect() end
+        espHighlights[player.UserId] = nil
+    end
+end)
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             player.CharacterAdded:Connect(function()
@@ -1001,11 +1008,18 @@ local function stopESP()
     if espPeriodicScanConn then espPeriodicScanConn:Disconnect() end
 
     for _, data in pairs(espHighlights) do
-        if data.Highlight then data.Highlight:Destroy() end
-        if data.Billboard then data.Billboard:Destroy() end
-        if data.TeamChanged then data.TeamChanged:Disconnect() end
-    end
-    espHighlights = {}
+    if data.Highlight then data.Highlight:Destroy() end
+    if data.Billboard then data.Billboard:Destroy() end
+    if data.Beam then data.Beam:Destroy() end
+    if data.StartAttachment then data.StartAttachment:Destroy() end
+    if data.EndAttachment then data.EndAttachment:Destroy() end
+    if data.TeamChanged then data.TeamChanged:Disconnect() end
+    if data.DistanceUpdate then data.DistanceUpdate:Disconnect() end
+    if data.BeamUpdate then data.BeamUpdate:Disconnect() end
+    if data.TargetCharAdded then data.TargetCharAdded:Disconnect() end
+    if data.LocalCharAdded then data.LocalCharAdded:Disconnect() end
+end
+espHighlights = {}
     clearObjectESP()
     print("[ESP] ESP stopped")
 end

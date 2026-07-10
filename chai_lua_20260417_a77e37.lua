@@ -876,8 +876,8 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "SCP")
         elseif name == "Pallet" or name == "Palletwrong" then
             createObjectESP(obj, "Pallet")
-        elseif name == "Windows" or name:lower():find("windows") then
-            createObjectESP(obj, "Windows")
+        elseif name == "Windows" or name:lower():find("inviswall") then
+            createObjectESP(obj, "inviswall")
         end
     end
     print("[ESP] Object ESP refreshed with custom settings")
@@ -896,8 +896,8 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "SCP")
     elseif name == "Pallet" or name == "Palletwrong" then
         createObjectESP(instance, "Pallet")
-    elseif name == "Windows" or name:lower():find("windows") then
-        createObjectESP(instance, "Windows")
+    elseif name == "Windows" or name:lower():find("inviswall") then
+        createObjectESP(instance, "inviswall")
     end
 end
 

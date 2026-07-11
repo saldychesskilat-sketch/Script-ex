@@ -3593,14 +3593,11 @@ local autoAimState = {
     lockStartTime = 0,
 }
 
--- Notification queue
-local notificationQueue = {}
-local notificationGui = nil
-
 local function createHomeContent()
     if homeContent then
         homeContent:Destroy()
     end
+    -- Notification queue
 
     homeContent = Instance.new("Frame")
     homeContent.Size = UDim2.new(1,0,1,0)
@@ -4173,6 +4170,9 @@ Kemi Studio
     -- ============================================================
     -- AUTO AIM CARD (BARU)
     -- ============================================================
+    local notificationQueue = {}
+    local notificationGui = nil
+    
     local autoAimCard = Instance.new("Frame")
     autoAimCard.Size = UDim2.new(1,-6,0,220)
     autoAimCard.BackgroundColor3 = Color3.fromRGB(8,20,36)

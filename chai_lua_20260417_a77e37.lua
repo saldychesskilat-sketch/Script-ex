@@ -3581,23 +3581,20 @@ local crosshairState = {
     posY = 50
 }
 
--- State Auto Aim
+-- State untuk Auto Aim (persistent)
 local autoAimState = {
     enabled = false,
-    targetMode = "Killer", -- Killer, Survivor, SCP
-    keybind = Enum.KeyCode.LeftShift,
-    isLocking = false,
+    targetType = "Killer", -- "Killer", "Survivor", "SCP"
+    keybind = Enum.KeyCode.L,
     lockDuration = 2.5,
-    currentTarget = nil,
-    targetHumanoid = nil,
-    lockStartTime = 0,
+    isLocking = false,
+    lockConnection = nil,
 }
 
 local function createHomeContent()
     if homeContent then
         homeContent:Destroy()
     end
-    -- Notification queue
 
     homeContent = Instance.new("Frame")
     homeContent.Size = UDim2.new(1,0,1,0)
@@ -3967,7 +3964,6 @@ Kemi Studio
     circleStroke.Thickness = 2
     circleStroke.Parent = circle
 
-    -- Fungsi update posisi crosshair (perbaiki dengan viewport)
     local camera = workspace.CurrentCamera
     local function updateCrosshairPosition()
         local posX = tonumber(valueX.Text) or 0
@@ -3980,7 +3976,6 @@ Kemi Studio
         center.Position = UDim2.new(0.5, offsetX, 0.5, offsetY)
     end
 
-    -- Fungsi update style visual
     local function applyStyle(style)
         crosshairState.style = style
         if style == "plus" then
@@ -4012,9 +4007,6 @@ Kemi Studio
 
     applyStyle(crosshairState.style)
 
-    -- ========================
-    -- SLIDER X & Y - REAL TIME DRAG (RenderStepped + GetMouseLocation)
-    -- ========================
     local userInput = game:GetService("UserInputService")
     local runService = game:GetService("RunService")
 
@@ -4070,7 +4062,7 @@ Kemi Studio
         end
     end)
 
-    -- Slider Y (horizontal movement)
+    -- Slider Y
     local draggingY = false
     local function setSliderY(val)
         val = math.clamp(val, 0, 100)
@@ -4091,7 +4083,7 @@ Kemi Studio
     local function updateSliderYFromMouse()
         if not draggingY then return end
         local mousePos = userInput:GetMouseLocation()
-        local bgPos = sliderYbg.AbsolutePosition.X  -- perhatikan: pakai X
+        local bgPos = sliderYbg.AbsolutePosition.X
         local bgWidth = sliderYbg.AbsoluteSize.X
         if bgWidth <= 0 then return end
         local rel = (mousePos.X - bgPos) / bgWidth
@@ -4122,7 +4114,6 @@ Kemi Studio
         end
     end)
 
-    -- Style button logic
     local function resetButtons()
         plusBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
         xBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
@@ -4147,7 +4138,6 @@ Kemi Studio
         applyStyle("o")
     end)
 
-    -- Toggle crosshair
     toggleButton.MouseButton1Click:Connect(function()
         crosshairState.enabled = not crosshairState.enabled
         crossGui.Enabled = crosshairState.enabled
@@ -4162,512 +4152,509 @@ Kemi Studio
         end
     end)
 
-    -- Inisialisasi nilai slider sesuai state
     setSliderX(crosshairState.posX)
     setSliderY(crosshairState.posY)
     updateCrosshairPosition()
 
-    -- ============================================================
-    -- AUTO AIM CARD (BARU)
-    -- ============================================================
-    local notificationQueue = {}
-    local notificationGui = nil
-    
+    -- =====================================================================
+    -- CARD AUTO AIM (BARU)
+    -- =====================================================================
     local autoAimCard = Instance.new("Frame")
-    autoAimCard.Size = UDim2.new(1,-6,0,220)
+    autoAimCard.Size = UDim2.new(1,-6,0,0) -- height will be set by content
     autoAimCard.BackgroundColor3 = Color3.fromRGB(8,20,36)
     autoAimCard.BorderSizePixel = 0
     autoAimCard.Parent = scroll
-
     Instance.new("UICorner",autoAimCard).CornerRadius = UDim.new(0,10)
-    local autoStroke = Instance.new("UIStroke")
-    autoStroke.Color = Color3.fromRGB(0,180,255)
-    autoStroke.Transparency = 0.4
-    autoStroke.Parent = autoAimCard
+    local aaStroke = Instance.new("UIStroke")
+    aaStroke.Color = Color3.fromRGB(0,180,255)
+    aaStroke.Transparency = 0.4
+    aaStroke.Parent = autoAimCard
 
-    local autoTitle = Instance.new("TextLabel")
-    autoTitle.Size = UDim2.new(1,-20,0,24)
-    autoTitle.Position = UDim2.new(0,10,0,10)
-    autoTitle.BackgroundTransparency = 1
-    autoTitle.Text = "🎯 AUTO AIM"
-    autoTitle.TextColor3 = Color3.fromRGB(0,220,255)
-    autoTitle.Font = Enum.Font.GothamBold
-    autoTitle.TextSize = 14
-    autoTitle.TextXAlignment = Enum.TextXAlignment.Left
-    autoTitle.Parent = autoAimCard
+    local aaInner = Instance.new("Frame")
+    aaInner.Size = UDim2.new(1,-16,0,0)
+    aaInner.Position = UDim2.new(0,8,0,8)
+    aaInner.BackgroundTransparency = 1
+    aaInner.Parent = autoAimCard
 
-    -- Toggle Enable/Disable Auto Aim (seperti toggle crosshair)
-    local autoToggle = Instance.new("TextButton")
-    autoToggle.Size = UDim2.new(1,-20,0,28)
-    autoToggle.Position = UDim2.new(0,10,0,38)
-    autoToggle.BackgroundColor3 = autoAimState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
-    autoToggle.Text = autoAimState.enabled and "AUTO AIM ENABLED" or "AUTO AIM DISABLED"
-    autoToggle.TextColor3 = autoAimState.enabled and Color3.fromRGB(255,255,255) or Color3.fromRGB(220,220,220)
-    autoToggle.Font = Enum.Font.GothamBold
-    autoToggle.TextSize = 11
-    autoToggle.BorderSizePixel = 0
-    autoToggle.AutoButtonColor = false
-    autoToggle.Parent = autoAimCard
-    Instance.new("UICorner",autoToggle).CornerRadius = UDim.new(0,6)
+    local aaLayout = Instance.new("UIListLayout")
+    aaLayout.Padding = UDim.new(0,6)
+    aaLayout.FillDirection = Enum.FillDirection.Vertical
+    aaLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    aaLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    aaLayout.Parent = aaInner
 
-    -- Target Selector Row
+    -- Title
+    local aaTitle = Instance.new("TextLabel")
+    aaTitle.Size = UDim2.new(1,0,0,24)
+    aaTitle.BackgroundTransparency = 1
+    aaTitle.Text = "🎯 AUTO AIM"
+    aaTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    aaTitle.Font = Enum.Font.GothamBold
+    aaTitle.TextSize = 14
+    aaTitle.TextXAlignment = Enum.TextXAlignment.Left
+    aaTitle.Parent = aaInner
+
+    -- Toggle Enable
+    local toggleRow = Instance.new("Frame")
+    toggleRow.Size = UDim2.new(1,0,0,28)
+    toggleRow.BackgroundTransparency = 1
+    toggleRow.Parent = aaInner
+
+    local toggleLabel = Instance.new("TextLabel")
+    toggleLabel.Size = UDim2.new(0.6,0,1,0)
+    toggleLabel.BackgroundTransparency = 1
+    toggleLabel.Text = "Enable Auto Aim"
+    toggleLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    toggleLabel.Font = Enum.Font.Gotham
+    toggleLabel.TextSize = 10
+    toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    toggleLabel.Parent = toggleRow
+
+    local toggleSwitch = Instance.new("TextButton")
+    toggleSwitch.Size = UDim2.new(0,44,0,22)
+    toggleSwitch.Position = UDim2.new(0.7,0,0.5,-11)
+    toggleSwitch.BackgroundColor3 = autoAimState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+    toggleSwitch.Text = ""
+    toggleSwitch.AutoButtonColor = false
+    toggleSwitch.BorderSizePixel = 0
+    toggleSwitch.Parent = toggleRow
+    local toggleSwitchCorner = Instance.new("UICorner")
+    toggleSwitchCorner.CornerRadius = UDim.new(1,0)
+    toggleSwitchCorner.Parent = toggleSwitch
+    local toggleSwitchStroke = Instance.new("UIStroke")
+    toggleSwitchStroke.Color = autoAimState.enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
+    toggleSwitchStroke.Thickness = 0.8
+    toggleSwitchStroke.Transparency = 0.3
+    toggleSwitchStroke.Parent = toggleSwitch
+
+    local switchCircle = Instance.new("Frame")
+    switchCircle.Size = UDim2.new(0,18,0,18)
+    switchCircle.Position = autoAimState.enabled and UDim2.new(1,-22,0.5,-9) or UDim2.new(0,4,0.5,-9)
+    switchCircle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    switchCircle.BorderSizePixel = 0
+    switchCircle.Parent = toggleSwitch
+    local switchCircleCorner = Instance.new("UICorner")
+    switchCircleCorner.CornerRadius = UDim.new(1,0)
+    switchCircleCorner.Parent = switchCircle
+
+    toggleSwitch.MouseButton1Click:Connect(function()
+        autoAimState.enabled = not autoAimState.enabled
+        toggleSwitch.BackgroundColor3 = autoAimState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+        toggleSwitchStroke.Color = autoAimState.enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
+        switchCircle.Position = autoAimState.enabled and UDim2.new(1,-22,0.5,-9) or UDim2.new(0,4,0.5,-9)
+    end)
+
+    -- Target Selector (Dropdown)
     local targetRow = Instance.new("Frame")
-    targetRow.Size = UDim2.new(1,-20,0,28)
-    targetRow.Position = UDim2.new(0,10,0,72)
+    targetRow.Size = UDim2.new(1,0,0,28)
     targetRow.BackgroundTransparency = 1
-    targetRow.Parent = autoAimCard
+    targetRow.Parent = aaInner
 
     local targetLabel = Instance.new("TextLabel")
-    targetLabel.Size = UDim2.new(0.3,0,1,0)
+    targetLabel.Size = UDim2.new(0.35,0,1,0)
     targetLabel.BackgroundTransparency = 1
     targetLabel.Text = "Target:"
-    targetLabel.TextColor3 = Color3.fromRGB(220,220,220)
-    targetLabel.Font = Enum.Font.GothamBold
+    targetLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    targetLabel.Font = Enum.Font.Gotham
     targetLabel.TextSize = 10
     targetLabel.TextXAlignment = Enum.TextXAlignment.Left
     targetLabel.Parent = targetRow
 
-    -- Dropdown Target Selector (menggunakan TextButton + popup)
-    local targetDropdown = Instance.new("TextButton")
-    targetDropdown.Size = UDim2.new(0.45,0,1,0)
-    targetDropdown.Position = UDim2.new(0.35,0,0,0)
-    targetDropdown.BackgroundColor3 = Color3.fromRGB(25,35,50)
-    targetDropdown.Text = autoAimState.targetMode
-    targetDropdown.TextColor3 = Color3.fromRGB(255,255,255)
-    targetDropdown.Font = Enum.Font.GothamBold
-    targetDropdown.TextSize = 10
-    targetDropdown.BorderSizePixel = 0
-    targetDropdown.AutoButtonColor = false
-    targetDropdown.Parent = targetRow
-    Instance.new("UICorner",targetDropdown).CornerRadius = UDim.new(0,4)
+    local targetDrop = Instance.new("TextButton")
+    targetDrop.Size = UDim2.new(0.4,0,1,0)
+    targetDrop.Position = UDim2.new(0.4,0,0,0)
+    targetDrop.BackgroundColor3 = Color3.fromRGB(25,35,50)
+    targetDrop.Text = autoAimState.targetType
+    targetDrop.TextColor3 = Color3.fromRGB(220,220,220)
+    targetDrop.Font = Enum.Font.GothamBold
+    targetDrop.TextSize = 9
+    targetDrop.BorderSizePixel = 0
+    targetDrop.Parent = targetRow
+    local targetDropCorner = Instance.new("UICorner")
+    targetDropCorner.CornerRadius = UDim.new(0,4)
+    targetDropCorner.Parent = targetDrop
 
-    -- Dropdown popup
-    local targetPopup = Instance.new("Frame")
-    targetPopup.Size = UDim2.new(0.45,0,0,0)
-    targetPopup.Position = UDim2.new(0.35,0,1,2)
-    targetPopup.BackgroundColor3 = Color3.fromRGB(20,30,45)
-    targetPopup.BorderSizePixel = 0
-    targetPopup.Visible = false
-    targetPopup.ClipsDescendants = true
-    targetPopup.Parent = targetRow
-    Instance.new("UICorner",targetPopup).CornerRadius = UDim.new(0,4)
+    local targetOptions = Instance.new("Frame")
+    targetOptions.Size = UDim2.new(0.4,0,0,0)
+    targetOptions.Position = UDim2.new(0.4,0,1,2)
+    targetOptions.BackgroundColor3 = Color3.fromRGB(20,30,45)
+    targetOptions.BorderSizePixel = 0
+    targetOptions.Visible = false
+    targetOptions.Parent = targetRow
+    local targetOptionsCorner = Instance.new("UICorner")
+    targetOptionsCorner.CornerRadius = UDim.new(0,4)
+    targetOptionsCorner.Parent = targetOptions
 
-    local targetOptions = {"Killer", "Survivor", "SCP"}
-    local targetButtons = {}
-    for i, opt in ipairs(targetOptions) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1,0,0,22)
-        btn.BackgroundColor3 = (opt == autoAimState.targetMode) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
-        btn.Text = opt
-        btn.TextColor3 = Color3.fromRGB(255,255,255)
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 9
-        btn.BorderSizePixel = 0
-        btn.Parent = targetPopup
-        btn.MouseButton1Click:Connect(function()
-            autoAimState.targetMode = opt
-            targetDropdown.Text = opt
-            targetPopup.Visible = false
-            targetPopup.Size = UDim2.new(0.45,0,0,0)
-            showNotification("Current Target: " .. opt)
-            -- Update highlight pada dropdown items
-            for _, b in ipairs(targetPopup:GetChildren()) do
-                if b:IsA("TextButton") then
-                    b.BackgroundColor3 = (b.Text == opt) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
+    local targetOptionsLayout = Instance.new("UIListLayout")
+    targetOptionsLayout.Padding = UDim.new(0,2)
+    targetOptionsLayout.FillDirection = Enum.FillDirection.Vertical
+    targetOptionsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    targetOptionsLayout.Parent = targetOptions
+
+    local targetTypes = {"Killer", "Survivor", "SCP"}
+    for _, t in ipairs(targetTypes) do
+        local opt = Instance.new("TextButton")
+        opt.Size = UDim2.new(1,-4,0,20)
+        opt.BackgroundColor3 = (t == autoAimState.targetType) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
+        opt.Text = t
+        opt.TextColor3 = (t == autoAimState.targetType) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
+        opt.Font = Enum.Font.Gotham
+        opt.TextSize = 9
+        opt.BorderSizePixel = 0
+        opt.Parent = targetOptions
+        opt.MouseButton1Click:Connect(function()
+            autoAimState.targetType = t
+            targetDrop.Text = t
+            for _, child in ipairs(targetOptions:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child.BackgroundColor3 = (child.Text == t) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
+                    child.TextColor3 = (child.Text == t) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
                 end
             end
+            targetOptions.Visible = false
+            targetRow.Size = UDim2.new(1,0,0,28)
+            -- show notification
+            showNotification("Target: " .. t)
         end)
-        table.insert(targetButtons, btn)
     end
 
-    targetDropdown.MouseButton1Click:Connect(function()
-        local totalHeight = #targetOptions * 22 + 4
-        targetPopup.Visible = not targetPopup.Visible
-        targetPopup.Size = targetPopup.Visible and UDim2.new(0.45,0,0,totalHeight) or UDim2.new(0.45,0,0,0)
+    targetDrop.MouseButton1Click:Connect(function()
+        targetOptions.Visible = not targetOptions.Visible
+        if targetOptions.Visible then
+            local totalHeight = #targetTypes * 22 + 4
+            targetOptions.Size = UDim2.new(0.4,0,0,totalHeight)
+            targetRow.Size = UDim2.new(1,0,0,28 + totalHeight)
+        else
+            targetRow.Size = UDim2.new(1,0,0,28)
+        end
     end)
 
-    -- Keybind Shift Target Row
+    -- Lock On Button
+    local lockRow = Instance.new("Frame")
+    lockRow.Size = UDim2.new(1,0,0,34)
+    lockRow.BackgroundTransparency = 1
+    lockRow.Parent = aaInner
+
+    local lockBtn = Instance.new("TextButton")
+    lockBtn.Size = UDim2.new(0.7,0,1,0)
+    lockBtn.Position = UDim2.new(0.15,0,0,0)
+    lockBtn.BackgroundColor3 = Color3.fromRGB(30,40,60)
+    lockBtn.Text = "LOCK ON"
+    lockBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    lockBtn.Font = Enum.Font.GothamBold
+    lockBtn.TextSize = 10
+    lockBtn.BorderSizePixel = 0
+    lockBtn.Parent = lockRow
+    local lockBtnCorner = Instance.new("UICorner")
+    lockBtnCorner.CornerRadius = UDim.new(0,4)
+    lockBtnCorner.Parent = lockBtn
+
+    lockBtn.MouseButton1Click:Connect(function()
+        if not autoAimState.enabled then
+            showNotification("Auto Aim is disabled")
+            return
+        end
+        startLockOn()
+    end)
+
+    -- Keybind Section
     local keybindRow = Instance.new("Frame")
-    keybindRow.Size = UDim2.new(1,-20,0,28)
-    keybindRow.Position = UDim2.new(0,10,0,104)
+    keybindRow.Size = UDim2.new(1,0,0,28)
     keybindRow.BackgroundTransparency = 1
-    keybindRow.Parent = autoAimCard
+    keybindRow.Parent = aaInner
 
     local keybindLabel = Instance.new("TextLabel")
-    keybindLabel.Size = UDim2.new(0.35,0,1,0)
+    keybindLabel.Size = UDim2.new(0.5,0,1,0)
     keybindLabel.BackgroundTransparency = 1
-    keybindLabel.Text = "Shift Target:"
-    keybindLabel.TextColor3 = Color3.fromRGB(220,220,220)
-    keybindLabel.Font = Enum.Font.GothamBold
-    keybindLabel.TextSize = 10
+    keybindLabel.Text = "Shift Target Keybind:"
+    keybindLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    keybindLabel.Font = Enum.Font.Gotham
+    keybindLabel.TextSize = 9
     keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
     keybindLabel.Parent = keybindRow
 
-    local keybindBox = Instance.new("TextButton")
-    keybindBox.Size = UDim2.new(0.25,0,1,0)
-    keybindBox.Position = UDim2.new(0.38,0,0,0)
-    keybindBox.BackgroundColor3 = Color3.fromRGB(25,35,50)
-    keybindBox.Text = tostring(autoAimState.keybind):gsub("Enum.KeyCode.", "")
-    keybindBox.TextColor3 = Color3.fromRGB(255,255,255)
-    keybindBox.Font = Enum.Font.GothamBold
-    keybindBox.TextSize = 9
-    keybindBox.BorderSizePixel = 0
-    keybindBox.AutoButtonColor = false
-    keybindBox.Parent = keybindRow
-    Instance.new("UICorner",keybindBox).CornerRadius = UDim.new(0,4)
+    local keybindBtn = Instance.new("TextButton")
+    keybindBtn.Size = UDim2.new(0,40,0,20)
+    keybindBtn.Position = UDim2.new(0.55,0,0.5,-10)
+    keybindBtn.BackgroundColor3 = Color3.fromRGB(30,40,60)
+    keybindBtn.Text = tostring(autoAimState.keybind.Name):gsub("KeyCode.", "")
+    keybindBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    keybindBtn.Font = Enum.Font.GothamBold
+    keybindBtn.TextSize = 8
+    keybindBtn.BorderSizePixel = 0
+    keybindBtn.Parent = keybindRow
+    local keybindBtnCorner = Instance.new("UICorner")
+    keybindBtnCorner.CornerRadius = UDim.new(0,4)
+    keybindBtnCorner.Parent = keybindBtn
 
-    local waitingForKey = false
-    keybindBox.MouseButton1Click:Connect(function()
-        if waitingForKey then return end
-        waitingForKey = true
-        keybindBox.Text = "Press any key..."
-        keybindBox.BackgroundColor3 = Color3.fromRGB(60,40,40)
-        local conn
-        conn = userInput.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if input.UserInputType == Enum.UserInputType.Keyboard then
-                waitingForKey = false
-                autoAimState.keybind = input.KeyCode
-                keybindBox.Text = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
-                keybindBox.BackgroundColor3 = Color3.fromRGB(25,35,50)
-                conn:Disconnect()
-            end
-        end)
-        task.wait(3)
-        if waitingForKey then
-            waitingForKey = false
-            keybindBox.Text = tostring(autoAimState.keybind):gsub("Enum.KeyCode.", "")
-            keybindBox.BackgroundColor3 = Color3.fromRGB(25,35,50)
-            if conn then conn:Disconnect() end
-        end
+    -- Flag for keybind capture
+    local capturingKeybind = false
+
+    keybindBtn.MouseButton1Click:Connect(function()
+        if capturingKeybind then return end
+        capturingKeybind = true
+        keybindBtn.Text = "..."
+        keybindBtn.BackgroundColor3 = Color3.fromRGB(60,40,40)
+        showNotification("Press a key for Shift Target")
     end)
 
-    -- Tombol Shortcut "Shift Target" (trigger ganti target)
-    local shiftBtn = Instance.new("TextButton")
-    shiftBtn.Size = UDim2.new(0.25,0,1,0)
-    shiftBtn.Position = UDim2.new(0.66,0,0,0)
-    shiftBtn.BackgroundColor3 = Color3.fromRGB(40,50,70)
-    shiftBtn.Text = "Shift"
-    shiftBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    shiftBtn.Font = Enum.Font.GothamBold
-    shiftBtn.TextSize = 9
-    shiftBtn.BorderSizePixel = 0
-    shiftBtn.AutoButtonColor = false
-    shiftBtn.Parent = keybindRow
-    Instance.new("UICorner",shiftBtn).CornerRadius = UDim.new(0,4)
-
-    -- Tombol Auto Aim (floating button di layar, di luar card)
-    local aimButton = Instance.new("TextButton")
-    aimButton.Size = UDim2.new(0, 60, 0, 60)
-    aimButton.Position = UDim2.new(0.85, -30, 0.85, -30)
-    aimButton.BackgroundColor3 = Color3.fromRGB(0,200,255)
-    aimButton.BackgroundTransparency = 0.3
-    aimButton.BorderSizePixel = 0
-    aimButton.Text = "🎯"
-    aimButton.TextColor3 = Color3.fromRGB(255,255,255)
-    aimButton.Font = Enum.Font.GothamBold
-    aimButton.TextSize = 22
-    aimButton.Parent = homeContent.Parent.Parent -- main GUI
-    local aimCorner = Instance.new("UICorner")
-    aimCorner.CornerRadius = UDim.new(1,0)
-    aimCorner.Parent = aimButton
-    local aimStroke = Instance.new("UIStroke")
-    aimStroke.Color = Color3.fromRGB(0,220,255)
-    aimStroke.Thickness = 1.5
-    aimStroke.Transparency = 0.4
-    aimStroke.Parent = aimButton
-
-    -- ============================================================
-    -- NOTIFICATION SYSTEM
-    -- ============================================================
+    -- Functions for auto aim
     local function showNotification(text)
-        if not notificationGui then
-            notificationGui = Instance.new("ScreenGui")
-            notificationGui.Name = "AutoAimNotification"
-            notificationGui.ResetOnSpawn = false
-            notificationGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-            notificationGui.Parent = localPlayer:WaitForChild("PlayerGui")
-        end
+        local notifGui = Instance.new("ScreenGui")
+        notifGui.Name = "AutoAimNotification"
+        notifGui.ResetOnSpawn = false
+        notifGui.Parent = playerGui
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 300, 0, 40)
-        frame.Position = UDim2.new(0.5, -150, 0.1, 0)
+        frame.Size = UDim2.new(0, 250, 0, 40)
+        frame.Position = UDim2.new(0.5, -125, 0.5, -20)
         frame.BackgroundColor3 = Color3.fromRGB(12,22,38)
-        frame.BackgroundTransparency = 0.1
+        frame.BackgroundTransparency = 0.2
         frame.BorderSizePixel = 0
-        frame.Parent = notificationGui
-        Instance.new("UICorner",frame).CornerRadius = UDim.new(0,8)
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0,180,255)
-        stroke.Thickness = 1.2
-        stroke.Transparency = 0.4
-        stroke.Parent = frame
+        frame.Parent = notifGui
+        local frameCorner = Instance.new("UICorner")
+        frameCorner.CornerRadius = UDim.new(0,8)
+        frameCorner.Parent = frame
+        local frameStroke = Instance.new("UIStroke")
+        frameStroke.Color = Color3.fromRGB(0,180,255)
+        frameStroke.Transparency = 0.4
+        frameStroke.Parent = frame
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1,0,1,0)
         label.BackgroundTransparency = 1
         label.Text = text
-        label.TextColor3 = Color3.fromRGB(0,220,255)
+        label.TextColor3 = Color3.fromRGB(255,255,255)
         label.Font = Enum.Font.GothamBold
-        label.TextSize = 14
+        label.TextSize = 12
         label.Parent = frame
 
-        frame.Position = UDim2.new(0.5, -150, 0.1, -50)
-        local tweenIn = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Position = UDim2.new(0.5, -150, 0.1, 0)
-        })
-        tweenIn:Play()
-
-        task.wait(3)
-        local tweenOut = TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Position = UDim2.new(0.5, -150, 0.1, -50),
-            BackgroundTransparency = 0.8
-        })
-        tweenOut:Play()
-        tweenOut.Completed:Connect(function()
-            frame:Destroy()
-        end)
+        frame.BackgroundTransparency = 0.8
+        TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.2}):Play()
+        task.wait(1.5)
+        TweenService:Create(frame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.8}):Play()
+        task.wait(0.2)
+        notifGui:Destroy()
     end
 
-    -- ============================================================
-    -- AUTO AIM CORE MECHANICS
-    -- ============================================================
-    local lockConnection = nil
-    local shiftTargetConnection = nil
-
-    -- Fungsi mencari target berdasarkan mode
-    local function findTarget(mode)
-        local char = localPlayer.Character
-        if not char then return nil, nil end
-        local rootPart = char:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return nil, nil end
-
-        if mode == "Killer" then
+    local function findTarget()
+        local targetType = autoAimState.targetType
+        if targetType == "Killer" then
             for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer then
-                    local pChar = player.Character
-                    if pChar then
-                        local team = player.Team
-                        if team and (team.Name:lower():find("killer") or team.Name:lower():find("monster") or team.Name:lower():find("enemy")) then
-                            local pRoot = pChar:FindFirstChild("HumanoidRootPart")
-                            if pRoot then
-                                local hum = pChar:FindFirstChildOfClass("Humanoid")
-                                if hum and hum.Health > 0 then
-                                    return pRoot, hum
-                                end
-                            end
+                if player ~= localPlayer and player.Team then
+                    local teamName = player.Team.Name:lower()
+                    if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                        local char = player.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            return char, player
                         end
                     end
                 end
             end
-            return nil, nil
-
-        elseif mode == "SCP" then
-            local bestDist = math.huge
-            local bestPart = nil
-            local bestHum = nil
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                local name = obj.Name:lower()
-                if name:find("scp") and obj:IsA("Model") then
-                    local pRoot = obj:FindFirstChild("HumanoidRootPart")
-                    if pRoot then
-                        local hum = obj:FindFirstChildOfClass("Humanoid")
-                        if hum and hum.Health > 0 then
-                            local dist = (rootPart.Position - pRoot.Position).Magnitude
-                            if dist < bestDist then
-                                bestDist = dist
-                                bestPart = pRoot
-                                bestHum = hum
-                            end
-                        end
-                    end
-                end
-            end
-            return bestPart, bestHum
-
-        elseif mode == "Survivor" then
-            local cam = workspace.CurrentCamera
-            if not cam then return nil, nil end
-            local viewport = cam.ViewportSize
+        elseif targetType == "Survivor" then
+            local camera = workspace.CurrentCamera
+            local viewport = camera.ViewportSize
             local center = Vector2.new(viewport.X/2, viewport.Y/2)
+            local bestTarget = nil
             local bestDist = math.huge
-            local bestPart = nil
-            local bestHum = nil
-
             for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer then
-                    local pChar = player.Character
-                    if pChar then
-                        local team = player.Team
-                        if team and team.Name:lower():find("survivor") then
-                            local pRoot = pChar:FindFirstChild("HumanoidRootPart")
-                            if pRoot then
-                                local hum = pChar:FindFirstChildOfClass("Humanoid")
-                                if hum and hum.Health > 0 then
-                                    local screenPos, onScreen = cam:WorldToViewportPoint(pRoot.Position)
-                                    if onScreen then
-                                        local screenPos2 = Vector2.new(screenPos.X, screenPos.Y)
-                                        local dist = (screenPos2 - center).Magnitude
-                                        if dist < bestDist then
-                                            bestDist = dist
-                                            bestPart = pRoot
-                                            bestHum = hum
-                                        end
-                                    end
+                if player ~= localPlayer and player.Team then
+                    local teamName = player.Team.Name:lower()
+                    if teamName:find("survivor") then
+                        local char = player.Character
+                        if char and char:FindFirstChild("HumanoidRootPart") then
+                            local root = char.HumanoidRootPart
+                            local screenPos, onScreen = camera:WorldToViewportPoint(root.Position)
+                            if onScreen then
+                                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                                if dist < bestDist then
+                                    bestDist = dist
+                                    bestTarget = char
                                 end
                             end
                         end
                     end
                 end
             end
-            return bestPart, bestHum
+            if bestTarget then
+                return bestTarget, nil
+            end
+        elseif targetType == "SCP" then
+            local nearest = nil
+            local nearestDist = math.huge
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") or obj:IsA("BasePart") then
+                    local name = obj.Name:lower()
+                    if name:find("scp") then
+                        local pos = obj:IsA("BasePart") and obj.Position or (obj.PrimaryPart and obj.PrimaryPart.Position)
+                        if pos and localRootPart then
+                            local dist = (localRootPart.Position - pos).Magnitude
+                            if dist < nearestDist then
+                                nearestDist = dist
+                                nearest = obj
+                            end
+                        end
+                    end
+                end
+            end
+            if nearest then
+                return nearest, nil
+            end
         end
         return nil, nil
     end
 
-    -- Fungsi lock kamera dan karakter ke target
-    local function startLock(targetPart, targetHumanoid, duration)
-        if not targetPart then return end
-        if lockConnection then return end
+    local function startLockOn()
+        if autoAimState.isLocking then return end
+        local target, player = findTarget()
+        if not target then
+            showNotification("Target not found")
+            return
+        end
+
+        local targetRoot
+        if target:IsA("BasePart") then
+            targetRoot = target
+        elseif target:IsA("Model") then
+            targetRoot = target:FindFirstChild("HumanoidRootPart") or target.PrimaryPart
+        end
+        if not targetRoot then
+            showNotification("Invalid target")
+            return
+        end
 
         autoAimState.isLocking = true
-        autoAimState.currentTarget = targetPart
-        autoAimState.targetHumanoid = targetHumanoid
-        autoAimState.lockStartTime = tick()
+        local duration = autoAimState.lockDuration
+        local startTime = tick()
+        local targetPos = targetRoot.Position
+        local humanoid = localHumanoid
+        local rootPart = localRootPart
 
-        local char = localPlayer.Character
-        if not char then
+        if not humanoid or not rootPart then
             autoAimState.isLocking = false
             return
         end
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        local rootPart = char:FindFirstChild("HumanoidRootPart")
 
-        lockConnection = runService.RenderStepped:Connect(function()
-            if not autoAimState.isLocking or not targetPart.Parent then
-                unlock()
+        -- Simpan state asli
+        local origAutoRotate = humanoid.AutoRotate
+        local origCFrame = rootPart.CFrame
+        local camera = workspace.CurrentCamera
+        local origCamCFrame = camera.CFrame
+
+        local function updateLock()
+            if not targetRoot.Parent then
+                -- target hilang
+                autoAimState.isLocking = false
                 return
             end
-            if tick() - autoAimState.lockStartTime > (duration or 2.5) then
-                unlock()
+            targetPos = targetRoot.Position
+            local footPos = rootPart.Position
+            local lookDir = (targetPos - footPos).Unit
+            local newCFrame = CFrame.lookAt(footPos, targetPos)
+            rootPart.CFrame = newCFrame
+            humanoid.AutoRotate = false
+            -- Kamera
+            local camPos = camera.CFrame.Position
+            local newCamCFrame = CFrame.lookAt(camPos, targetPos)
+            camera.CFrame = newCamCFrame
+        end
+
+        -- Loop lock
+        local lockConn
+        lockConn = RunService.RenderStepped:Connect(function()
+            if not autoAimState.isLocking then
+                lockConn:Disconnect()
                 return
             end
-            local cam = workspace.CurrentCamera
-            if not cam then return end
-
-            local targetPos = targetPart.Position
-            local currentPos = cam.CFrame.Position
-            local lookAt = CFrame.lookAt(currentPos, targetPos)
-            cam.CFrame = cam.CFrame:Lerp(lookAt, 0.15)
-
-            if humanoid and rootPart then
-                humanoid.AutoRotate = false
-                local charLook = CFrame.lookAt(rootPart.Position, targetPos)
-                rootPart.CFrame = rootPart.CFrame:Lerp(charLook, 0.15)
+            if tick() - startTime > duration then
+                -- Selesai lock
+                autoAimState.isLocking = false
+                lockConn:Disconnect()
+                -- Kembalikan kontrol
+                humanoid.AutoRotate = origAutoRotate
+                if rootPart then
+                    rootPart.CFrame = origCFrame
+                end
+                if camera then
+                    camera.CFrame = origCamCFrame
+                end
+                showNotification("Lock released")
+                return
             end
+            updateLock()
+        end)
+
+        -- Jika lock gagal karena target hilang, cleanup
+        task.delay(duration + 1, function()
+            if lockConn then lockConn:Disconnect() end
+            autoAimState.isLocking = false
         end)
     end
 
-    local function unlock()
-        if lockConnection then
-            lockConnection:Disconnect()
-            lockConnection = nil
-        end
-        autoAimState.isLocking = false
-        autoAimState.currentTarget = nil
-        autoAimState.targetHumanoid = nil
-        local char = localPlayer.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.AutoRotate = true end
-        end
-    end
-
-    -- Fungsi shift target (cyclic)
-    local function shiftTarget()
-        local modes = {"Killer", "Survivor", "SCP"}
-        local idx
-        for i, m in ipairs(modes) do
-            if m == autoAimState.targetMode then
-                idx = i
-                break
-            end
-        end
-        idx = (idx % #modes) + 1
-        autoAimState.targetMode = modes[idx]
-        targetDropdown.Text = modes[idx]
-        for _, b in ipairs(targetPopup:GetChildren()) do
-            if b:IsA("TextButton") then
-                b.BackgroundColor3 = (b.Text == modes[idx]) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
-            end
-        end
-        showNotification("Current Target: " .. modes[idx])
-    end
-
-    -- Event tombol Shift
-    shiftBtn.MouseButton1Click:Connect(shiftTarget)
-
-    -- Event Keybind Shift Target
-    if shiftTargetConnection then shiftTargetConnection:Disconnect() end
-    shiftTargetConnection = userInput.InputBegan:Connect(function(input, gameProcessed)
+    -- Keybind capture handler
+    local keybindCaptureConn
+    keybindCaptureConn = userInput.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if not autoAimState.enabled then return end
-        if input.KeyCode == autoAimState.keybind and input.UserInputType == Enum.UserInputType.Keyboard then
-            shiftTarget()
+        if capturingKeybind then
+            capturingKeybind = false
+            if input.KeyCode ~= Enum.KeyCode.Unknown then
+                autoAimState.keybind = input.KeyCode
+                keybindBtn.Text = tostring(input.KeyCode):gsub("KeyCode.", "")
+                keybindBtn.BackgroundColor3 = Color3.fromRGB(30,40,60)
+                showNotification("Keybind set to " .. keybindBtn.Text)
+            else
+                keybindBtn.Text = tostring(autoAimState.keybind):gsub("KeyCode.", "")
+                keybindBtn.BackgroundColor3 = Color3.fromRGB(30,40,60)
+                showNotification("Invalid key")
+            end
         end
     end)
 
-    -- Event toggle Auto Aim
-    autoToggle.MouseButton1Click:Connect(function()
-        autoAimState.enabled = not autoAimState.enabled
-        if autoAimState.enabled then
-            autoToggle.Text = "AUTO AIM ENABLED"
-            autoToggle.BackgroundColor3 = Color3.fromRGB(0,140,255)
-            autoToggle.TextColor3 = Color3.fromRGB(255,255,255)
-            aimButton.Visible = true
-            showNotification("Auto Aim Enabled")
-        else
-            autoToggle.Text = "AUTO AIM DISABLED"
-            autoToggle.BackgroundColor3 = Color3.fromRGB(14,24,40)
-            autoToggle.TextColor3 = Color3.fromRGB(220,220,220)
-            aimButton.Visible = false
-            unlock()
-            showNotification("Auto Aim Disabled")
+    -- Shift Target keybind handler
+    local shiftConn
+    shiftConn = userInput.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == autoAimState.keybind then
+            local types = {"Killer", "Survivor", "SCP"}
+            local idx = table.find(types, autoAimState.targetType)
+            if idx then
+                idx = idx % #types + 1
+                autoAimState.targetType = types[idx]
+                targetDrop.Text = autoAimState.targetType
+                for _, child in ipairs(targetOptions:GetChildren()) do
+                    if child:IsA("TextButton") then
+                        child.BackgroundColor3 = (child.Text == autoAimState.targetType) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
+                        child.TextColor3 = (child.Text == autoAimState.targetType) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
+                    end
+                end
+                showNotification("Target: " .. autoAimState.targetType)
+            end
         end
     end)
 
-    -- Event tombol Aim (floating)
-    aimButton.MouseButton1Click:Connect(function()
-        if not autoAimState.enabled then
-            showNotification("Auto Aim is disabled!")
-            return
-        end
-        if autoAimState.isLocking then
-            unlock()
-            showNotification("Auto Aim unlocked")
-            return
-        end
-        local targetPart, targetHum = findTarget(autoAimState.targetMode)
-        if targetPart then
-            startLock(targetPart, targetHum, 2.5)
-            showNotification("Locking: " .. autoAimState.targetMode)
-        else
-            showNotification("No target found!")
-        end
-    end)
-
-    -- Cleanup saat homeContent dihancurkan
+    -- Simpan koneksi untuk cleanup
+    local cleanupConns = {keybindCaptureConn, shiftConn}
     homeContent.Destroying:Connect(function()
-        if lockConnection then lockConnection:Disconnect() end
-        if shiftTargetConnection then shiftTargetConnection:Disconnect() end
-        if aimButton then aimButton:Destroy() end
-        if notificationGui then notificationGui:Destroy() end
+        for _, conn in ipairs(cleanupConns) do
+            if conn then conn:Disconnect() end
+        end
+        if autoAimState.lockConnection then
+            autoAimState.lockConnection:Disconnect()
+            autoAimState.lockConnection = nil
+        end
     end)
 
-    -- Inisialisasi tampilan
-    aimButton.Visible = autoAimState.enabled
+    -- Atur tinggi autoAimCard sesuai konten
+    local function updateAACardHeight()
+        local contentHeight = aaLayout.AbsoluteContentSize.Y
+        autoAimCard.Size = UDim2.new(1,-6,0,contentHeight + 16)
+    end
+    aaLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateAACardHeight)
+    task.wait(0.05)
+    updateAACardHeight()
 
-    print("[Home] Crosshair settings + Auto Aim card loaded")
+    print("[Home] Crosshair settings with position sliders loaded (state preserved, drag fixed)")
+    print("[Home] Auto Aim card added with full functionality")
 end
       
 -- ============================================================================

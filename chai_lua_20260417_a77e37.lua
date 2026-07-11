@@ -811,7 +811,9 @@ local function createHighlightForPlayer(player)
 
     local teamChangedConn
     if player.Team then
-        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function() end)
+        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()-- Re-create ESP for this player when team changes
+        createHighlightForPlayer(player)
+        end)
     end
 
     espHighlights[player.UserId] = {

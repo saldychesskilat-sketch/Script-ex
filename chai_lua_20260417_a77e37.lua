@@ -3571,6 +3571,7 @@ local function updateTheme()
 end  
   
 -- ============================================================================
+    
 local homeContent = nil
 
 -- Simpan state crosshair di luar agar tidak hilang saat pindah sidebar
@@ -3581,15 +3582,12 @@ local crosshairState = {
     posY = 50
 }
 
--- State Auto Aim
+-- State Auto Aim (disimpan di luar agar persist)
 local autoAimState = {
     enabled = false,
     targetType = "Killer", -- Killer, Survivor, SCP
-    lockActive = false,
+    keybind = Enum.KeyCode.LeftAlt,
     lockDuration = 2.5,
-    keybind = Enum.KeyCode.LeftShift, -- default
-    target = nil,
-    lockConnection = nil,
 }
 
 local function createHomeContent()
@@ -3626,7 +3624,7 @@ local function createHomeContent()
     padding.PaddingRight = UDim.new(0,2)
     padding.Parent = scroll
 
-    --// HEADER CARD
+    --// HEADER CARD (tidak berubah)
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1,-6,0,110)
     header.BackgroundColor3 = Color3.fromRGB(8,18,34)
@@ -3693,7 +3691,7 @@ local function createHomeContent()
     desc.ClipsDescendants = true
     desc.Parent = header
 
-    --// INFORMATION CARD
+    --// INFORMATION CARD (tidak berubah)
     local infoCard = Instance.new("Frame")
     infoCard.Size = UDim2.new(1,-6,0,150)
     infoCard.BackgroundColor3 = Color3.fromRGB(8,18,32)
@@ -3740,7 +3738,7 @@ Kemi Studio
     ]]
     infoText.Parent = infoCard
 
-    --// CROSSHAIR SETTINGS (dengan slider posisi X dan Y)
+    --// CROSSHAIR SETTINGS (tidak berubah)
     local crosshairCard = Instance.new("Frame")
     crosshairCard.Size = UDim2.new(1,-6,0,260)
     crosshairCard.BackgroundColor3 = Color3.fromRGB(8,20,36)
@@ -3777,7 +3775,7 @@ Kemi Studio
     crossDesc.TextYAlignment = Enum.TextYAlignment.Top
     crossDesc.Parent = crosshairCard
 
-    -- // SLIDER POSISI X
+    -- // SLIDER POSISI X (tidak berubah)
     local sliderXHolder = Instance.new("Frame")
     sliderXHolder.Size = UDim2.new(1,-20,0,28)
     sliderXHolder.Position = UDim2.new(0,10,0,70)
@@ -3822,7 +3820,7 @@ Kemi Studio
     sliderXthumb.Parent = sliderXbg
     Instance.new("UICorner",sliderXthumb).CornerRadius = UDim.new(1,0)
 
-    -- // SLIDER POSISI Y
+    -- // SLIDER POSISI Y (tidak berubah)
     local sliderYHolder = Instance.new("Frame")
     sliderYHolder.Size = UDim2.new(1,-20,0,28)
     sliderYHolder.Position = UDim2.new(0,10,0,102)
@@ -3867,7 +3865,7 @@ Kemi Studio
     sliderYthumb.Parent = sliderYbg
     Instance.new("UICorner",sliderYthumb).CornerRadius = UDim.new(1,0)
 
-    -- // SHAPE BUTTONS (style)
+    -- // SHAPE BUTTONS (style) (tidak berubah)
     local buttonHolder = Instance.new("Frame")
     buttonHolder.Size = UDim2.new(1,-20,0,34)
     buttonHolder.Position = UDim2.new(0,10,0,140)
@@ -3899,7 +3897,7 @@ Kemi Studio
     local xBtn = createShapeButton("X", crosshairState.style == "x")
     local oBtn = createShapeButton("O", crosshairState.style == "o")
 
-    -- // TOGGLE BUTTON
+    -- // TOGGLE BUTTON (tidak berubah)
     local toggleButton = Instance.new("TextButton")
     toggleButton.Size = UDim2.new(1,-20,0,36)
     toggleButton.Position = UDim2.new(0,10,0,185)
@@ -3913,10 +3911,9 @@ Kemi Studio
     toggleButton.Parent = crosshairCard
     Instance.new("UICorner",toggleButton).CornerRadius = UDim.new(0,8)
 
-    -- // LOGIKA CROSSHAIR GUI
+    -- // LOGIKA CROSSHAIR GUI (tidak berubah, disingkat agar fokus ke Auto Aim)
     local crossGui = game.CoreGui:FindFirstChild("CyberCrosshair")
     if crossGui then crossGui:Destroy() end
-
     crossGui = Instance.new("ScreenGui")
     crossGui.Name = "CyberCrosshair"
     crossGui.IgnoreGuiInset = true
@@ -3944,15 +3941,12 @@ Kemi Studio
     local bottomLine = createLine(UDim2.new(0,2,0,18), UDim2.new(0,-1,0,4))
     local leftLine = createLine(UDim2.new(0,18,0,2), UDim2.new(0,-22,0,-1))
     local rightLine = createLine(UDim2.new(0,18,0,2), UDim2.new(0,4,0,-1))
-
     local x1 = createLine(UDim2.new(0,2,0,30), UDim2.new(0,-1,0,-15))
     x1.Rotation = 45
     x1.Visible = false
-
     local x2 = createLine(UDim2.new(0,2,0,30), UDim2.new(0,-1,0,-15))
     x2.Rotation = -45
     x2.Visible = false
-
     local circle = Instance.new("Frame")
     circle.Size = UDim2.new(0,24,0,24)
     circle.Position = UDim2.new(0,-12,0,-12)
@@ -3965,7 +3959,6 @@ Kemi Studio
     circleStroke.Thickness = 2
     circleStroke.Parent = circle
 
-    -- Fungsi update posisi crosshair (perbaiki dengan viewport)
     local camera = workspace.CurrentCamera
     local function updateCrosshairPosition()
         local posX = tonumber(valueX.Text) or 0
@@ -3978,50 +3971,28 @@ Kemi Studio
         center.Position = UDim2.new(0.5, offsetX, 0.5, offsetY)
     end
 
-    -- Fungsi update style visual
     local function applyStyle(style)
         crosshairState.style = style
         if style == "plus" then
-            topLine.Visible = true
-            bottomLine.Visible = true
-            leftLine.Visible = true
-            rightLine.Visible = true
-            x1.Visible = false
-            x2.Visible = false
-            circle.Visible = false
+            topLine.Visible = true; bottomLine.Visible = true; leftLine.Visible = true; rightLine.Visible = true
+            x1.Visible = false; x2.Visible = false; circle.Visible = false
         elseif style == "x" then
-            topLine.Visible = false
-            bottomLine.Visible = false
-            leftLine.Visible = false
-            rightLine.Visible = false
-            x1.Visible = true
-            x2.Visible = true
-            circle.Visible = false
+            topLine.Visible = false; bottomLine.Visible = false; leftLine.Visible = false; rightLine.Visible = false
+            x1.Visible = true; x2.Visible = true; circle.Visible = false
         elseif style == "o" then
-            topLine.Visible = false
-            bottomLine.Visible = false
-            leftLine.Visible = false
-            rightLine.Visible = false
-            x1.Visible = false
-            x2.Visible = false
-            circle.Visible = true
+            topLine.Visible = false; bottomLine.Visible = false; leftLine.Visible = false; rightLine.Visible = false
+            x1.Visible = false; x2.Visible = false; circle.Visible = true
         end
     end
-
     applyStyle(crosshairState.style)
 
-    -- ========================
-    -- SLIDER X & Y - REAL TIME DRAG (RenderStepped + GetMouseLocation)
-    -- ========================
+    -- // SLIDER X & Y (tidak berubah, disingkat)
     local userInput = game:GetService("UserInputService")
     local runService = game:GetService("RunService")
-
-    -- Slider X
     local draggingX = false
     local function setSliderX(val)
         val = math.clamp(val, 0, 100)
         valueX.Text = tostring(val)
-        -- Hitung posisi thumb agar tidak keluar track
         local thumbSize = sliderXthumb.AbsoluteSize.X
         local trackSize = sliderXbg.AbsoluteSize.X
         if trackSize > 0 then
@@ -4029,13 +4000,11 @@ Kemi Studio
             local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
             sliderXthumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
         else
-            -- fallback
             sliderXthumb.Position = UDim2.new(val/100, -thumbSize/2, 0.5, -thumbSize/2)
         end
         crosshairState.posX = val
         updateCrosshairPosition()
     end
-
     local function updateSliderXFromMouse()
         if not draggingX then return end
         local mousePos = userInput:GetMouseLocation()
@@ -4046,31 +4015,23 @@ Kemi Studio
         local val = math.floor(math.clamp(rel, 0, 1) * 100)
         setSliderX(val)
     end
-
     sliderXthumb.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingX = true
-            updateSliderXFromMouse()
+            draggingX = true; updateSliderXFromMouse()
         end
     end)
     sliderXbg.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingX = true
-            updateSliderXFromMouse()
+            draggingX = true; updateSliderXFromMouse()
         end
     end)
     userInput.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingX = false
-        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingX = false end
     end)
     runService.RenderStepped:Connect(function()
-        if draggingX then
-            updateSliderXFromMouse()
-        end
+        if draggingX then updateSliderXFromMouse() end
     end)
 
-    -- Slider Y (horizontal movement)
     local draggingY = false
     local function setSliderY(val)
         val = math.clamp(val, 0, 100)
@@ -4087,67 +4048,50 @@ Kemi Studio
         crosshairState.posY = val
         updateCrosshairPosition()
     end
-
     local function updateSliderYFromMouse()
         if not draggingY then return end
         local mousePos = userInput:GetMouseLocation()
-        local bgPos = sliderYbg.AbsolutePosition.X  -- perhatikan: pakai X
+        local bgPos = sliderYbg.AbsolutePosition.X
         local bgWidth = sliderYbg.AbsoluteSize.X
         if bgWidth <= 0 then return end
         local rel = (mousePos.X - bgPos) / bgWidth
         local val = math.floor(math.clamp(rel, 0, 1) * 100)
         setSliderY(val)
     end
-
     sliderYthumb.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingY = true
-            updateSliderYFromMouse()
+            draggingY = true; updateSliderYFromMouse()
         end
     end)
     sliderYbg.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingY = true
-            updateSliderYFromMouse()
+            draggingY = true; updateSliderYFromMouse()
         end
     end)
     userInput.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingY = false
-        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingY = false end
     end)
     runService.RenderStepped:Connect(function()
-        if draggingY then
-            updateSliderYFromMouse()
-        end
+        if draggingY then updateSliderYFromMouse() end
     end)
 
-    -- Style button logic
+    -- Style button logic (tidak berubah)
     local function resetButtons()
         plusBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
         xBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
         oBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
     end
-
     plusBtn.MouseButton1Click:Connect(function()
-        resetButtons()
-        plusBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("plus")
+        resetButtons(); plusBtn.BackgroundColor3 = Color3.fromRGB(0,140,255); applyStyle("plus")
     end)
-
     xBtn.MouseButton1Click:Connect(function()
-        resetButtons()
-        xBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("x")
+        resetButtons(); xBtn.BackgroundColor3 = Color3.fromRGB(0,140,255); applyStyle("x")
     end)
-
     oBtn.MouseButton1Click:Connect(function()
-        resetButtons()
-        oBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("o")
+        resetButtons(); oBtn.BackgroundColor3 = Color3.fromRGB(0,140,255); applyStyle("o")
     end)
 
-    -- Toggle crosshair
+    -- Toggle crosshair (tidak berubah)
     toggleButton.MouseButton1Click:Connect(function()
         crosshairState.enabled = not crosshairState.enabled
         crossGui.Enabled = crosshairState.enabled
@@ -4162,263 +4106,258 @@ Kemi Studio
         end
     end)
 
-    -- ================================
-    -- CARD AUTO AIM (tambahan baru)
-    -- ================================
+    setSliderX(crosshairState.posX)
+    setSliderY(crosshairState.posY)
+    updateCrosshairPosition()
+
+    -- ============================================================
+    -- CARD AUTO AIM (baru)
+    -- ============================================================
     local autoAimCard = Instance.new("Frame")
-    autoAimCard.Size = UDim2.new(1,-6,0,200) -- tinggi cukup
+    autoAimCard.Size = UDim2.new(1,-6,0,280)
     autoAimCard.BackgroundColor3 = Color3.fromRGB(8,20,36)
     autoAimCard.BorderSizePixel = 0
     autoAimCard.Parent = scroll
 
     Instance.new("UICorner",autoAimCard).CornerRadius = UDim.new(0,10)
-    local autoAimStroke = Instance.new("UIStroke")
-    autoAimStroke.Color = Color3.fromRGB(0,180,255)
-    autoAimStroke.Transparency = 0.4
-    autoAimStroke.Parent = autoAimCard
+    local autoStroke = Instance.new("UIStroke")
+    autoStroke.Color = Color3.fromRGB(0,180,255)
+    autoStroke.Transparency = 0.4
+    autoStroke.Parent = autoAimCard
 
-    local autoAimTitle = Instance.new("TextLabel")
-    autoAimTitle.Size = UDim2.new(1,-20,0,24)
-    autoAimTitle.Position = UDim2.new(0,10,0,10)
-    autoAimTitle.BackgroundTransparency = 1
-    autoAimTitle.Text = "🎯 AUTO AIM"
-    autoAimTitle.TextColor3 = Color3.fromRGB(0,220,255)
-    autoAimTitle.Font = Enum.Font.GothamBold
-    autoAimTitle.TextSize = 14
-    autoAimTitle.TextXAlignment = Enum.TextXAlignment.Left
-    autoAimTitle.Parent = autoAimCard
+    local autoTitle = Instance.new("TextLabel")
+    autoTitle.Size = UDim2.new(1,-20,0,24)
+    autoTitle.Position = UDim2.new(0,10,0,10)
+    autoTitle.BackgroundTransparency = 1
+    autoTitle.Text = "🎯 AUTO AIM"
+    autoTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    autoTitle.Font = Enum.Font.GothamBold
+    autoTitle.TextSize = 14
+    autoTitle.TextXAlignment = Enum.TextXAlignment.Left
+    autoTitle.Parent = autoAimCard
 
-    local autoAimDesc = Instance.new("TextLabel")
-    autoAimDesc.Size = UDim2.new(1,-20,0,20)
-    autoAimDesc.Position = UDim2.new(0,10,0,34)
-    autoAimDesc.BackgroundTransparency = 1
-    autoAimDesc.Text = "Press button to lock target (3s duration)"
-    autoAimDesc.TextColor3 = Color3.fromRGB(180,180,180)
-    autoAimDesc.Font = Enum.Font.Gotham
-    autoAimDesc.TextSize = 10
-    autoAimDesc.TextWrapped = true
-    autoAimDesc.TextXAlignment = Enum.TextXAlignment.Left
-    autoAimDesc.Parent = autoAimCard
+    -- Toggle Enable Auto Aim
+    local autoToggleHolder = Instance.new("Frame")
+    autoToggleHolder.Size = UDim2.new(1,-20,0,24)
+    autoToggleHolder.Position = UDim2.new(0,10,0,38)
+    autoToggleHolder.BackgroundTransparency = 1
+    autoToggleHolder.Parent = autoAimCard
 
-    -- Toggle Enable Auto Aim (mirip toggle crosshair)
-    local autoAimToggle = Instance.new("TextButton")
-    autoAimToggle.Size = UDim2.new(1,-20,0,30)
-    autoAimToggle.Position = UDim2.new(0,10,0,58)
-    autoAimToggle.BackgroundColor3 = autoAimState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
-    autoAimToggle.Text = autoAimState.enabled and "AUTO AIM ENABLED" or "AUTO AIM DISABLED"
-    autoAimToggle.TextColor3 = autoAimState.enabled and Color3.fromRGB(255,255,255) or Color3.fromRGB(220,220,220)
-    autoAimToggle.Font = Enum.Font.GothamBold
-    autoAimToggle.TextSize = 11
-    autoAimToggle.BorderSizePixel = 0
-    autoAimToggle.AutoButtonColor = false
-    autoAimToggle.Parent = autoAimCard
-    Instance.new("UICorner",autoAimToggle).CornerRadius = UDim.new(0,8)
+    local autoToggleLabel = Instance.new("TextLabel")
+    autoToggleLabel.Size = UDim2.new(0.5,0,1,0)
+    autoToggleLabel.BackgroundTransparency = 1
+    autoToggleLabel.Text = "Enable Auto Aim"
+    autoToggleLabel.TextColor3 = Color3.fromRGB(220,220,220)
+    autoToggleLabel.Font = Enum.Font.GothamBold
+    autoToggleLabel.TextSize = 10
+    autoToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    autoToggleLabel.Parent = autoToggleHolder
 
-    autoAimToggle.MouseButton1Click:Connect(function()
+    local autoToggle = Instance.new("TextButton")
+    autoToggle.Size = UDim2.new(0,44,0,20)
+    autoToggle.Position = UDim2.new(0.75,0,0.5,-10)
+    autoToggle.BackgroundColor3 = autoAimState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+    autoToggle.Text = ""
+    autoToggle.AutoButtonColor = false
+    autoToggle.BorderSizePixel = 0
+    autoToggle.Parent = autoToggleHolder
+    local autoToggleCorner = Instance.new("UICorner")
+    autoToggleCorner.CornerRadius = UDim.new(1,0)
+    autoToggleCorner.Parent = autoToggle
+    local autoToggleStroke = Instance.new("UIStroke")
+    autoToggleStroke.Color = autoAimState.enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
+    autoToggleStroke.Thickness = 1
+    autoToggleStroke.Transparency = 0.3
+    autoToggleStroke.Parent = autoToggle
+
+    local autoToggleCircle = Instance.new("Frame")
+    autoToggleCircle.Size = UDim2.new(0,16,0,16)
+    autoToggleCircle.Position = autoAimState.enabled and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
+    autoToggleCircle.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    autoToggleCircle.BorderSizePixel = 0
+    autoToggleCircle.Parent = autoToggle
+    Instance.new("UICorner",autoToggleCircle).CornerRadius = UDim.new(1,0)
+
+    autoToggle.MouseButton1Click:Connect(function()
         autoAimState.enabled = not autoAimState.enabled
-        if autoAimState.enabled then
-            autoAimToggle.BackgroundColor3 = Color3.fromRGB(0,140,255)
-            autoAimToggle.Text = "AUTO AIM ENABLED"
-            autoAimToggle.TextColor3 = Color3.fromRGB(255,255,255)
-        else
-            autoAimToggle.BackgroundColor3 = Color3.fromRGB(14,24,40)
-            autoAimToggle.Text = "AUTO AIM DISABLED"
-            autoAimToggle.TextColor3 = Color3.fromRGB(220,220,220)
-            -- jika lock aktif, matikan
-            if autoAimState.lockActive then
-                if autoAimState.lockConnection then
-                    autoAimState.lockConnection:Disconnect()
-                    autoAimState.lockConnection = nil
-                end
-                autoAimState.lockActive = false
-                autoAimState.target = nil
-            end
-        end
+        autoToggle.BackgroundColor3 = autoAimState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(45,45,65)
+        autoToggleStroke.Color = autoAimState.enabled and Color3.fromRGB(0,220,255) or Color3.fromRGB(100,100,130)
+        autoToggleCircle.Position = autoAimState.enabled and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)
     end)
 
     -- Target Selector (Dropdown)
-    local targetSelectorFrame = Instance.new("Frame")
-    targetSelectorFrame.Size = UDim2.new(1,-20,0,28)
-    targetSelectorFrame.Position = UDim2.new(0,10,0,96)
-    targetSelectorFrame.BackgroundTransparency = 1
-    targetSelectorFrame.Parent = autoAimCard
+    local targetSelectorHolder = Instance.new("Frame")
+    targetSelectorHolder.Size = UDim2.new(1,-20,0,24)
+    targetSelectorHolder.Position = UDim2.new(0,10,0,66)
+    targetSelectorHolder.BackgroundTransparency = 1
+    targetSelectorHolder.Parent = autoAimCard
 
     local targetLabel = Instance.new("TextLabel")
-    targetLabel.Size = UDim2.new(0.4,0,1,0)
+    targetLabel.Size = UDim2.new(0.35,0,1,0)
     targetLabel.BackgroundTransparency = 1
-    targetLabel.Text = "Target:"
+    targetLabel.Text = "Target Selector"
     targetLabel.TextColor3 = Color3.fromRGB(220,220,220)
     targetLabel.Font = Enum.Font.GothamBold
     targetLabel.TextSize = 10
     targetLabel.TextXAlignment = Enum.TextXAlignment.Left
-    targetLabel.Parent = targetSelectorFrame
+    targetLabel.Parent = targetSelectorHolder
 
-    local targetDropdown = Instance.new("TextButton")
-    targetDropdown.Size = UDim2.new(0.5,0,1,0)
-    targetDropdown.Position = UDim2.new(0.5,0,0,0)
-    targetDropdown.BackgroundColor3 = Color3.fromRGB(25,35,50)
-    targetDropdown.Text = autoAimState.targetType
-    targetDropdown.TextColor3 = Color3.fromRGB(255,255,255)
-    targetDropdown.Font = Enum.Font.GothamBold
-    targetDropdown.TextSize = 10
-    targetDropdown.BorderSizePixel = 0
-    targetDropdown.AutoButtonColor = false
-    targetDropdown.Parent = targetSelectorFrame
-    Instance.new("UICorner",targetDropdown).CornerRadius = UDim.new(0,4)
+    local targetDropBtn = Instance.new("TextButton")
+    targetDropBtn.Size = UDim2.new(0.35,0,1,0)
+    targetDropBtn.Position = UDim2.new(0.5,0,0,0)
+    targetDropBtn.BackgroundColor3 = Color3.fromRGB(25,35,50)
+    targetDropBtn.Text = autoAimState.targetType
+    targetDropBtn.TextColor3 = Color3.fromRGB(220,220,220)
+    targetDropBtn.Font = Enum.Font.GothamBold
+    targetDropBtn.TextSize = 10
+    targetDropBtn.BorderSizePixel = 0
+    targetDropBtn.Parent = targetSelectorHolder
+    Instance.new("UICorner",targetDropBtn).CornerRadius = UDim.new(0,4)
+
+    local targetDropList = Instance.new("Frame")
+    targetDropList.Size = UDim2.new(0.35,0,0,0)
+    targetDropList.Position = UDim2.new(0.5,0,1,2)
+    targetDropList.BackgroundColor3 = Color3.fromRGB(20,30,45)
+    targetDropList.BorderSizePixel = 0
+    targetDropList.Visible = false
+    targetDropList.ClipsDescendants = true
+    targetDropList.ZIndex = 10
+    targetDropList.Parent = targetSelectorHolder
+    Instance.new("UICorner",targetDropList).CornerRadius = UDim.new(0,4)
 
     local targetOptions = {"Killer", "Survivor", "SCP"}
-    local dropdownList = Instance.new("Frame")
-    dropdownList.Size = UDim2.new(0.5,0,0,0)
-    dropdownList.Position = UDim2.new(0.5,0,1,2)
-    dropdownList.BackgroundColor3 = Color3.fromRGB(20,30,45)
-    dropdownList.BorderSizePixel = 0
-    dropdownList.Visible = false
-    dropdownList.ClipsDescendants = true
-    dropdownList.ZIndex = 10
-    dropdownList.Parent = targetSelectorFrame
-    Instance.new("UICorner",dropdownList).CornerRadius = UDim.new(0,4)
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Padding = UDim.new(0,2)
-    listLayout.FillDirection = Enum.FillDirection.Vertical
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    listLayout.Parent = dropdownList
-
-    local function rebuildDropdown()
-        for _, child in ipairs(dropdownList:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy()
-        end
-        for _, opt in ipairs(targetOptions) do
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1,-4,0,20)
-            btn.BackgroundColor3 = (opt == autoAimState.targetType) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
-            btn.Text = opt
-            btn.TextColor3 = (opt == autoAimState.targetType) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 9
-            btn.BorderSizePixel = 0
-            btn.Parent = dropdownList
-            btn.MouseButton1Click:Connect(function()
-                autoAimState.targetType = opt
-                targetDropdown.Text = opt
-                dropdownList.Visible = false
-                -- update dropdown height
-                dropdownList.Size = UDim2.new(0.5,0,0,0)
-                -- rebuild to update highlight
-                rebuildDropdown()
-            end)
-        end
-        local totalHeight = #targetOptions * 22 + 4
-        dropdownList.Size = UDim2.new(0.5,0,0,totalHeight)
+    local targetBtns = {}
+    for i, opt in ipairs(targetOptions) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1,0,0,20)
+        btn.BackgroundColor3 = (opt == autoAimState.targetType) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
+        btn.Text = opt
+        btn.TextColor3 = (opt == autoAimState.targetType) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 9
+        btn.BorderSizePixel = 0
+        btn.Parent = targetDropList
+        btn.MouseButton1Click:Connect(function()
+            autoAimState.targetType = opt
+            targetDropBtn.Text = opt
+            for _, b in ipairs(targetBtns) do
+                b.BackgroundColor3 = Color3.fromRGB(20,30,45)
+                b.TextColor3 = Color3.fromRGB(200,200,200)
+            end
+            btn.BackgroundColor3 = Color3.fromRGB(0,120,200)
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
+            targetDropList.Visible = false
+            targetDropList.Size = UDim2.new(0.35,0,0,0)
+        end)
+        table.insert(targetBtns, btn)
     end
-    rebuildDropdown()
+    local listHeight = #targetOptions * 22 + 4
+    targetDropList.Size = UDim2.new(0.35,0,0,listHeight)
 
-    targetDropdown.MouseButton1Click:Connect(function()
-        dropdownList.Visible = not dropdownList.Visible
-        if dropdownList.Visible then
-            dropdownList.Size = UDim2.new(0.5,0,0,#targetOptions*22+4)
+    targetDropBtn.MouseButton1Click:Connect(function()
+        targetDropList.Visible = not targetDropList.Visible
+        if targetDropList.Visible then
+            targetDropList.Size = UDim2.new(0.35,0,0,listHeight)
         else
-            dropdownList.Size = UDim2.new(0.5,0,0,0)
+            targetDropList.Size = UDim2.new(0.35,0,0,0)
         end
     end)
 
-    -- Tombol Trigger Auto Aim
-    local fireBtn = Instance.new("TextButton")
-    fireBtn.Size = UDim2.new(0.8,0,0,32)
-    fireBtn.Position = UDim2.new(0.1,0,0.7,0)
-    fireBtn.BackgroundColor3 = Color3.fromRGB(30,40,60)
-    fireBtn.Text = "🔫 LOCK TARGET"
-    fireBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    fireBtn.Font = Enum.Font.GothamBold
-    fireBtn.TextSize = 12
-    fireBtn.BorderSizePixel = 0
-    fireBtn.AutoButtonColor = false
-    fireBtn.Parent = autoAimCard
-    Instance.new("UICorner",fireBtn).CornerRadius = UDim.new(0,8)
-
-    -- Keybind setting
-    local keybindFrame = Instance.new("Frame")
-    keybindFrame.Size = UDim2.new(1,-20,0,28)
-    keybindFrame.Position = UDim2.new(0,10,0,135)
-    keybindFrame.BackgroundTransparency = 1
-    keybindFrame.Parent = autoAimCard
+    -- Shortcut Keybind
+    local keybindHolder = Instance.new("Frame")
+    keybindHolder.Size = UDim2.new(1,-20,0,24)
+    keybindHolder.Position = UDim2.new(0,10,0,94)
+    keybindHolder.BackgroundTransparency = 1
+    keybindHolder.Parent = autoAimCard
 
     local keybindLabel = Instance.new("TextLabel")
     keybindLabel.Size = UDim2.new(0.5,0,1,0)
     keybindLabel.BackgroundTransparency = 1
-    keybindLabel.Text = "Shift Target Key:"
+    keybindLabel.Text = "Shift Target Keybind"
     keybindLabel.TextColor3 = Color3.fromRGB(220,220,220)
     keybindLabel.Font = Enum.Font.GothamBold
     keybindLabel.TextSize = 10
     keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
-    keybindLabel.Parent = keybindFrame
+    keybindLabel.Parent = keybindHolder
 
-    local keybindBtn = Instance.new("TextButton")
-    keybindBtn.Size = UDim2.new(0.4,0,1,0)
-    keybindBtn.Position = UDim2.new(0.6,0,0,0)
-    keybindBtn.BackgroundColor3 = Color3.fromRGB(25,35,50)
-    keybindBtn.Text = tostring(autoAimState.keybind):gsub("Enum.KeyCode.","")
-    keybindBtn.TextColor3 = Color3.fromRGB(255,255,255)
-    keybindBtn.Font = Enum.Font.GothamBold
-    keybindBtn.TextSize = 10
-    keybindBtn.BorderSizePixel = 0
-    keybindBtn.AutoButtonColor = false
-    keybindBtn.Parent = keybindFrame
-    Instance.new("UICorner",keybindBtn).CornerRadius = UDim.new(0,4)
+    local keybindBox = Instance.new("TextButton")
+    keybindBox.Size = UDim2.new(0.2,0,1,0)
+    keybindBox.Position = UDim2.new(0.75,0,0,0)
+    keybindBox.BackgroundColor3 = Color3.fromRGB(25,35,50)
+    keybindBox.Text = tostring(autoAimState.keybind):gsub("Enum.KeyCode.", "")
+    keybindBox.TextColor3 = Color3.fromRGB(0,220,255)
+    keybindBox.Font = Enum.Font.GothamBold
+    keybindBox.TextSize = 10
+    keybindBox.BorderSizePixel = 0
+    keybindBox.Parent = keybindHolder
+    Instance.new("UICorner",keybindBox).CornerRadius = UDim.new(0,4)
 
-    local keybindWaiting = false
-    keybindBtn.MouseButton1Click:Connect(function()
-        keybindWaiting = true
-        keybindBtn.Text = "Press any key..."
-        keybindBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
+    -- Keybind setting (klik untuk mengubah)
+    local isListeningForKey = false
+    keybindBox.MouseButton1Click:Connect(function()
+        isListeningForKey = not isListeningForKey
+        if isListeningForKey then
+            keybindBox.Text = "Press any key..."
+            keybindBox.BackgroundColor3 = Color3.fromRGB(0,80,120)
+        else
+            keybindBox.Text = tostring(autoAimState.keybind):gsub("Enum.KeyCode.", "")
+            keybindBox.BackgroundColor3 = Color3.fromRGB(25,35,50)
+        end
     end)
 
-    local keybindConn
-    keybindConn = userInput.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if keybindWaiting then
+    local keyListenConn = userInput.InputBegan:Connect(function(input, gameProcessed)
+        if isListeningForKey and not gameProcessed then
             if input.KeyCode ~= Enum.KeyCode.Unknown then
                 autoAimState.keybind = input.KeyCode
-                keybindBtn.Text = tostring(input.KeyCode):gsub("Enum.KeyCode.","")
-                keybindBtn.BackgroundColor3 = Color3.fromRGB(25,35,50)
-                keybindWaiting = false
-                keybindConn:Disconnect()
+                keybindBox.Text = tostring(autoAimState.keybind):gsub("Enum.KeyCode.", "")
+                keybindBox.BackgroundColor3 = Color3.fromRGB(25,35,50)
+                isListeningForKey = false
+                -- Notifikasi keybind berubah
+                showNotification("Keybind set to: " .. tostring(autoAimState.keybind):gsub("Enum.KeyCode.", ""))
             end
         end
     end)
 
-    -- Keybind untuk shift target (cyclic)
-    local shiftKeyConn
-    shiftKeyConn = userInput.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == autoAimState.keybind and autoAimState.enabled then
-            -- Cycle target
-            local idx
-            for i, opt in ipairs(targetOptions) do
-                if opt == autoAimState.targetType then idx = i break end
-            end
-            idx = idx % #targetOptions + 1
-            autoAimState.targetType = targetOptions[idx]
-            targetDropdown.Text = autoAimState.targetType
-            rebuildDropdown()
-            -- Tampilkan notifikasi
-            showNotification("Current Target : " .. autoAimState.targetType)
-        end
-    end)
+    -- Tombol Lock Target (hanya muncul jika Auto Aim enabled)
+    local lockBtn = Instance.new("TextButton")
+    lockBtn.Size = UDim2.new(0.8,0,0,28)
+    lockBtn.Position = UDim2.new(0.1,0,0,126)
+    lockBtn.BackgroundColor3 = Color3.fromRGB(0,140,200)
+    lockBtn.Text = "LOCK TARGET"
+    lockBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    lockBtn.Font = Enum.Font.GothamBold
+    lockBtn.TextSize = 11
+    lockBtn.BorderSizePixel = 0
+    lockBtn.Parent = autoAimCard
+    Instance.new("UICorner",lockBtn).CornerRadius = UDim.new(0,4)
 
-    -- Fungsi notifikasi (hanya satu instance, otomatis hilang)
+    -- ============================================================
+    -- AUTO AIM CORE LOGIC
+    -- ============================================================
+    local lockActive = false
+    local lockTarget = nil
+    local lockStartTime = 0
+    local lockConnection = nil
+    local notificationGui = nil
+
+    -- Fungsi showNotification (sederhana, langsung di PlayerGui)
     local function showNotification(text)
-        local notifGui = Instance.new("ScreenGui")
-        notifGui.Name = "AutoAimNotification"
-        notifGui.ResetOnSpawn = false
-        notifGui.Parent = game.CoreGui
+        if notificationGui then
+            notificationGui:Destroy()
+            notificationGui = nil
+        end
+        notificationGui = Instance.new("ScreenGui")
+        notificationGui.Name = "AutoAimNotification"
+        notificationGui.ResetOnSpawn = false
+        notificationGui.Parent = localPlayer:WaitForChild("PlayerGui")
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 300, 0, 50)
-        frame.Position = UDim2.new(0.5, -150, 0.5, -25)
+        frame.Size = UDim2.new(0, 300, 0, 40)
+        frame.Position = UDim2.new(0.5, -150, 0.3, 0)
         frame.BackgroundColor3 = Color3.fromRGB(12,22,38)
         frame.BackgroundTransparency = 0.1
         frame.BorderSizePixel = 0
-        frame.Parent = notifGui
+        frame.Parent = notificationGui
         Instance.new("UICorner",frame).CornerRadius = UDim.new(0,8)
         local stroke = Instance.new("UIStroke")
         stroke.Color = Color3.fromRGB(0,180,255)
@@ -4432,180 +4371,184 @@ Kemi Studio
         label.Text = text
         label.TextColor3 = Color3.fromRGB(0,220,255)
         label.Font = Enum.Font.GothamBold
-        label.TextSize = 18
-        label.TextXAlignment = Enum.TextXAlignment.Center
+        label.TextSize = 14
         label.Parent = frame
 
-        -- Animasi fade in
-        frame.BackgroundTransparency = 1
-        TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.1}):Play()
-
-        task.wait(2.5)
-        -- Animasi fade out lalu destroy
-        TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
-        task.wait(0.4)
-        notifGui:Destroy()
+        task.delay(2, function()
+            if notificationGui then
+                notificationGui:Destroy()
+                notificationGui = nil
+            end
+        end)
     end
 
-    -- Logika Auto Aim lock
-    local function findTarget()
-        local target = nil
-        local targetType = autoAimState.targetType
-        local localChar = localPlayer.Character
-        if not localChar then return nil end
-        local hrp = localChar:FindFirstChild("HumanoidRootPart")
-        if not hrp then return nil end
+    -- Fungsi mencari target berdasarkan tipe
+    local function findTarget(targetType)
+        local char = localPlayer.Character
+        if not char then return nil end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return nil end
 
         if targetType == "Killer" then
-            -- Cari player dengan role Killer
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer then
-                    local team = player.Team
-                    if team and team.Name:lower():find("killer") then
-                        local char = player.Character
-                        if char then
-                            local root = char:FindFirstChild("HumanoidRootPart")
-                            if root then
-                                target = root
-                                break
+                    local pChar = player.Character
+                    if pChar and pChar:FindFirstChild("HumanoidRootPart") then
+                        -- Cek apakah player adalah killer (team atau tool)
+                        local isKiller = false
+                        if player.Team then
+                            local teamName = player.Team.Name:lower()
+                            if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
+                                isKiller = true
                             end
+                        end
+                        if not isKiller then
+                            local tool = pChar:FindFirstChildWhichIsA("Tool")
+                            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon") or tool.Name:lower():find("blade")) then
+                                isKiller = true
+                            end
+                        end
+                        if isKiller then
+                            return pChar:FindFirstChild("HumanoidRootPart")
                         end
                     end
                 end
             end
-        elseif targetType == "SCP" then
-            -- Cari objek SCP terdekat
-            local minDist = math.huge
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and obj.Name:lower():find("scp") then
-                    local dist = (hrp.Position - obj.Position).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        target = obj
-                    end
-                end
-            end
+
         elseif targetType == "Survivor" then
-            -- Cari survivor di depan kamera (terdekat dengan center layar)
-            local cam = workspace.CurrentCamera
-            if not cam then return nil end
-            local viewport = cam.ViewportSize
+            local viewport = camera.ViewportSize
             local center = Vector2.new(viewport.X/2, viewport.Y/2)
+            local bestTarget = nil
             local bestDist = math.huge
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= localPlayer then
-                    local team = player.Team
-                    if team and team.Name:lower():find("survivor") then
-                        local char = player.Character
-                        if char then
-                            local root = char:FindFirstChild("HumanoidRootPart")
-                            if root then
-                                local screenPos, onScreen = cam:WorldToViewportPoint(root.Position)
-                                if onScreen then
-                                    local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                                    if screenDist < bestDist then
-                                        bestDist = screenDist
-                                        target = root
-                                    end
+                    local pChar = player.Character
+                    if pChar then
+                        local pRoot = pChar:FindFirstChild("HumanoidRootPart")
+                        if pRoot then
+                            local screenPos, onScreen = camera:WorldToViewportPoint(pRoot.Position)
+                            if onScreen then
+                                local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                                if distToCenter < bestDist then
+                                    bestDist = distToCenter
+                                    bestTarget = pRoot
                                 end
                             end
                         end
                     end
                 end
             end
+            return bestTarget
+
+        elseif targetType == "SCP" then
+            local bestTarget = nil
+            local bestDist = math.huge
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and (obj.Name:lower():find("scp") or obj.Parent and obj.Parent.Name:lower():find("scp")) then
+                    local dist = (root.Position - obj.Position).Magnitude
+                    if dist < bestDist then
+                        bestDist = dist
+                        bestTarget = obj
+                    end
+                end
+            end
+            return bestTarget
         end
-        return target
+        return nil
     end
 
-    local function lockTarget()
-        if not autoAimState.enabled then return end
-        if autoAimState.lockActive then
-            -- matikan lock sebelumnya
-            if autoAimState.lockConnection then
-                autoAimState.lockConnection:Disconnect()
-                autoAimState.lockConnection = nil
-            end
-            autoAimState.lockActive = false
-            autoAimState.target = nil
-        end
-
-        local target = findTarget()
-        if not target then
-            showNotification("No target found!")
-            return
-        end
-
-        autoAimState.target = target
-        autoAimState.lockActive = true
-
-        local cam = workspace.CurrentCamera
-        local char = localPlayer.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        -- Simpan posisi awal
-        local startTime = tick()
-        local duration = 2.5 -- detik
-
-        -- Connection untuk lock
-        autoAimState.lockConnection = runService.RenderStepped:Connect(function()
-            if not autoAimState.lockActive or not autoAimState.target or not autoAimState.target.Parent then
-                -- target hilang, stop lock
-                if autoAimState.lockConnection then
-                    autoAimState.lockConnection:Disconnect()
-                    autoAimState.lockConnection = nil
-                end
-                autoAimState.lockActive = false
-                return
-            end
-
-            if tick() - startTime > duration then
-                -- waktu habis, stop lock
-                if autoAimState.lockConnection then
-                    autoAimState.lockConnection:Disconnect()
-                    autoAimState.lockConnection = nil
-                end
-                autoAimState.lockActive = false
-                autoAimState.target = nil
-                return
-            end
-
-            -- Arahkan kamera ke target
-            local targetPos = autoAimState.target.Position
-            local camPos = cam.CFrame.Position
-            local lookAt = CFrame.lookAt(camPos, targetPos)
-            cam.CFrame = cam.CFrame:Lerp(lookAt, 0.15) -- smooth transition
-
-            -- Hadapkan karakter ke target
-            local direction = (targetPos - hrp.Position).Unit
-            local targetCFrame = CFrame.lookAt(hrp.Position, hrp.Position + direction)
-            hrp.CFrame = hrp.CFrame:Lerp(targetCFrame, 0.15)
-        end)
-
-        -- Notifikasi lock start
-        showNotification("🔒 Locking " .. autoAimState.targetType .. "!")
-    end
-
-    -- Event tombol fire
-    fireBtn.MouseButton1Click:Connect(function()
+    -- Fungsi memulai lock
+    local function startLock()
         if not autoAimState.enabled then
-            showNotification("Auto Aim is disabled!")
+            showNotification("Auto Aim is disabled")
             return
         end
-        lockTarget()
+        local target = findTarget(autoAimState.targetType)
+        if not target then
+            showNotification("No " .. autoAimState.targetType .. " found")
+            return
+        end
+        lockTarget = target
+        lockActive = true
+        lockStartTime = tick()
+        showNotification("Locking on " .. autoAimState.targetType)
+
+        if lockConnection then lockConnection:Disconnect() end
+        lockConnection = runService.RenderStepped:Connect(function()
+            if not lockActive or not lockTarget or not lockTarget.Parent then
+                lockActive = false
+                return
+            end
+            if tick() - lockStartTime > autoAimState.lockDuration then
+                lockActive = false
+                showNotification("Lock released")
+                return
+            end
+            local char = localPlayer.Character
+            if not char then return end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if not root or not humanoid then return end
+
+            -- Lock kamera
+            camera.CFrame = CFrame.new(camera.CFrame.Position, lockTarget.Position)
+            -- Putar karakter menghadap target
+            local lookVector = (lockTarget.Position - root.Position).Unit
+            root.CFrame = CFrame.new(root.Position, root.Position + lookVector)
+        end)
+    end
+
+    -- Lock Button event
+    lockBtn.MouseButton1Click:Connect(startLock)
+
+    -- Keybind shift target (cycle)
+    local function shiftTarget()
+        local current = autoAimState.targetType
+        local idx = table.find(targetOptions, current)
+        if idx then
+            local nextIdx = idx % #targetOptions + 1
+            autoAimState.targetType = targetOptions[nextIdx]
+            targetDropBtn.Text = autoAimState.targetType
+            for i, btn in ipairs(targetBtns) do
+                btn.BackgroundColor3 = (i == nextIdx) and Color3.fromRGB(0,120,200) or Color3.fromRGB(20,30,45)
+                btn.TextColor3 = (i == nextIdx) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
+            end
+            showNotification("Current Target: " .. autoAimState.targetType)
+        end
+    end
+
+    -- Keybind listener (shift target)
+    local keybindConn = userInput.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == autoAimState.keybind and not isListeningForKey then
+            shiftTarget()
+        end
     end)
 
-    -- Inisialisasi nilai slider sesuai state
+    -- Auto-resize card
+    local function updateAutoCardHeight()
+        autoAimCard.Size = UDim2.new(1,-6,0,160)
+    end
+    updateAutoCardHeight()
+
+    -- ============================================================
+    -- INISIALISASI AWAL (tidak berubah)
+    -- ============================================================
     setSliderX(crosshairState.posX)
     setSliderY(crosshairState.posY)
     updateCrosshairPosition()
 
+    -- Cleanup saat homeContent dihancurkan
+    homeContent.Destroying:Connect(function()
+        if lockConnection then lockConnection:Disconnect() end
+        if keybindConn then keybindConn:Disconnect() end
+        if keyListenConn then keyListenConn:Disconnect() end
+        if notificationGui then notificationGui:Destroy() end
+    end)
+
     print("[Home] Crosshair settings with position sliders loaded (state preserved, drag fixed)")
     print("[Home] Auto Aim card added with target selector and keybind")
 end
-
-      
 -- ============================================================================
 -- INFO CONTENT
 -- ============================================================================

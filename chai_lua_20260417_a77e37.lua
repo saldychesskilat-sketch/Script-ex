@@ -3581,6 +3581,13 @@ local crosshairState = {
     posY = 50
 }
 
+-- State untuk Auto Aim (hanya UI placeholder)
+local autoAimState = {
+    enabled = false,
+    target = "Killer", -- Killer, Survivor, SCP
+    keybind = "None"
+}
+
 local function createHomeContent()
     if homeContent then
         homeContent:Destroy()
@@ -3729,7 +3736,7 @@ Kemi Studio
     ]]
     infoText.Parent = infoCard
 
-    --// CROSSHAIR SETTINGS (dengan slider posisi X dan Y)
+    --// CROSSHAIR SETTINGS
     local crosshairCard = Instance.new("Frame")
     crosshairCard.Size = UDim2.new(1,-6,0,260)
     crosshairCard.BackgroundColor3 = Color3.fromRGB(8,20,36)
@@ -3766,7 +3773,7 @@ Kemi Studio
     crossDesc.TextYAlignment = Enum.TextYAlignment.Top
     crossDesc.Parent = crosshairCard
 
-    -- // SLIDER POSISI X
+    -- SLIDER POSISI X
     local sliderXHolder = Instance.new("Frame")
     sliderXHolder.Size = UDim2.new(1,-20,0,28)
     sliderXHolder.Position = UDim2.new(0,10,0,70)
@@ -3811,7 +3818,7 @@ Kemi Studio
     sliderXthumb.Parent = sliderXbg
     Instance.new("UICorner",sliderXthumb).CornerRadius = UDim.new(1,0)
 
-    -- // SLIDER POSISI Y
+    -- SLIDER POSISI Y
     local sliderYHolder = Instance.new("Frame")
     sliderYHolder.Size = UDim2.new(1,-20,0,28)
     sliderYHolder.Position = UDim2.new(0,10,0,102)
@@ -3856,7 +3863,7 @@ Kemi Studio
     sliderYthumb.Parent = sliderYbg
     Instance.new("UICorner",sliderYthumb).CornerRadius = UDim.new(1,0)
 
-    -- // SHAPE BUTTONS (style)
+    -- SHAPE BUTTONS (style)
     local buttonHolder = Instance.new("Frame")
     buttonHolder.Size = UDim2.new(1,-20,0,34)
     buttonHolder.Position = UDim2.new(0,10,0,140)
@@ -3888,7 +3895,7 @@ Kemi Studio
     local xBtn = createShapeButton("X", crosshairState.style == "x")
     local oBtn = createShapeButton("O", crosshairState.style == "o")
 
-    -- // TOGGLE BUTTON
+    -- TOGGLE BUTTON
     local toggleButton = Instance.new("TextButton")
     toggleButton.Size = UDim2.new(1,-20,0,36)
     toggleButton.Position = UDim2.new(0,10,0,185)
@@ -3902,7 +3909,7 @@ Kemi Studio
     toggleButton.Parent = crosshairCard
     Instance.new("UICorner",toggleButton).CornerRadius = UDim.new(0,8)
 
-    -- // LOGIKA CROSSHAIR GUI
+    -- CROSSHAIR GUI LOGIC
     local crossGui = game.CoreGui:FindFirstChild("CyberCrosshair")
     if crossGui then crossGui:Destroy() end
 
@@ -3954,7 +3961,6 @@ Kemi Studio
     circleStroke.Thickness = 2
     circleStroke.Parent = circle
 
-    -- Fungsi update posisi crosshair (perbaiki dengan viewport)
     local camera = workspace.CurrentCamera
     local function updateCrosshairPosition()
         local posX = tonumber(valueX.Text) or 0
@@ -3967,50 +3973,30 @@ Kemi Studio
         center.Position = UDim2.new(0.5, offsetX, 0.5, offsetY)
     end
 
-    -- Fungsi update style visual
     local function applyStyle(style)
         crosshairState.style = style
         if style == "plus" then
-            topLine.Visible = true
-            bottomLine.Visible = true
-            leftLine.Visible = true
-            rightLine.Visible = true
-            x1.Visible = false
-            x2.Visible = false
-            circle.Visible = false
+            topLine.Visible = true; bottomLine.Visible = true; leftLine.Visible = true; rightLine.Visible = true
+            x1.Visible = false; x2.Visible = false; circle.Visible = false
         elseif style == "x" then
-            topLine.Visible = false
-            bottomLine.Visible = false
-            leftLine.Visible = false
-            rightLine.Visible = false
-            x1.Visible = true
-            x2.Visible = true
-            circle.Visible = false
+            topLine.Visible = false; bottomLine.Visible = false; leftLine.Visible = false; rightLine.Visible = false
+            x1.Visible = true; x2.Visible = true; circle.Visible = false
         elseif style == "o" then
-            topLine.Visible = false
-            bottomLine.Visible = false
-            leftLine.Visible = false
-            rightLine.Visible = false
-            x1.Visible = false
-            x2.Visible = false
-            circle.Visible = true
+            topLine.Visible = false; bottomLine.Visible = false; leftLine.Visible = false; rightLine.Visible = false
+            x1.Visible = false; x2.Visible = false; circle.Visible = true
         end
     end
 
     applyStyle(crosshairState.style)
 
-    -- ========================
-    -- SLIDER X & Y - REAL TIME DRAG (RenderStepped + GetMouseLocation)
-    -- ========================
+    -- SLIDER DRAG LOGIC (sama seperti sebelumnya)
     local userInput = game:GetService("UserInputService")
     local runService = game:GetService("RunService")
 
-    -- Slider X
     local draggingX = false
     local function setSliderX(val)
         val = math.clamp(val, 0, 100)
         valueX.Text = tostring(val)
-        -- Hitung posisi thumb agar tidak keluar track
         local thumbSize = sliderXthumb.AbsoluteSize.X
         local trackSize = sliderXbg.AbsoluteSize.X
         if trackSize > 0 then
@@ -4018,7 +4004,6 @@ Kemi Studio
             local px = math.clamp(rel * trackSize, thumbSize/2, trackSize - thumbSize/2)
             sliderXthumb.Position = UDim2.new(0, px - thumbSize/2, 0.5, -thumbSize/2)
         else
-            -- fallback
             sliderXthumb.Position = UDim2.new(val/100, -thumbSize/2, 0.5, -thumbSize/2)
         end
         crosshairState.posX = val
@@ -4054,12 +4039,9 @@ Kemi Studio
         end
     end)
     runService.RenderStepped:Connect(function()
-        if draggingX then
-            updateSliderXFromMouse()
-        end
+        if draggingX then updateSliderXFromMouse() end
     end)
 
-    -- Slider Y (horizontal movement)
     local draggingY = false
     local function setSliderY(val)
         val = math.clamp(val, 0, 100)
@@ -4080,7 +4062,7 @@ Kemi Studio
     local function updateSliderYFromMouse()
         if not draggingY then return end
         local mousePos = userInput:GetMouseLocation()
-        local bgPos = sliderYbg.AbsolutePosition.X  -- perhatikan: pakai X
+        local bgPos = sliderYbg.AbsolutePosition.X
         local bgWidth = sliderYbg.AbsoluteSize.X
         if bgWidth <= 0 then return end
         local rel = (mousePos.X - bgPos) / bgWidth
@@ -4106,12 +4088,10 @@ Kemi Studio
         end
     end)
     runService.RenderStepped:Connect(function()
-        if draggingY then
-            updateSliderYFromMouse()
-        end
+        if draggingY then updateSliderYFromMouse() end
     end)
 
-    -- Style button logic
+    -- Shape button logic
     local function resetButtons()
         plusBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
         xBtn.BackgroundColor3 = Color3.fromRGB(12,22,38)
@@ -4119,24 +4099,15 @@ Kemi Studio
     end
 
     plusBtn.MouseButton1Click:Connect(function()
-        resetButtons()
-        plusBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("plus")
+        resetButtons(); plusBtn.BackgroundColor3 = Color3.fromRGB(0,140,255); applyStyle("plus")
     end)
-
     xBtn.MouseButton1Click:Connect(function()
-        resetButtons()
-        xBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("x")
+        resetButtons(); xBtn.BackgroundColor3 = Color3.fromRGB(0,140,255); applyStyle("x")
     end)
-
     oBtn.MouseButton1Click:Connect(function()
-        resetButtons()
-        oBtn.BackgroundColor3 = Color3.fromRGB(0,140,255)
-        applyStyle("o")
+        resetButtons(); oBtn.BackgroundColor3 = Color3.fromRGB(0,140,255); applyStyle("o")
     end)
 
-    -- Toggle crosshair
     toggleButton.MouseButton1Click:Connect(function()
         crosshairState.enabled = not crosshairState.enabled
         crossGui.Enabled = crosshairState.enabled
@@ -4151,12 +4122,206 @@ Kemi Studio
         end
     end)
 
-    -- Inisialisasi nilai slider sesuai state
     setSliderX(crosshairState.posX)
     setSliderY(crosshairState.posY)
     updateCrosshairPosition()
 
+    -- ============================================================
+    -- AUTO AIM CARD (UI PLACEHOLDER - TANPA LOGIKA)
+    -- ============================================================
+    local autoAimCard = Instance.new("Frame")
+    autoAimCard.Size = UDim2.new(1,-6,0,200)
+    autoAimCard.BackgroundColor3 = Color3.fromRGB(8,20,36)
+    autoAimCard.BorderSizePixel = 0
+    autoAimCard.Parent = scroll
+
+    Instance.new("UICorner",autoAimCard).CornerRadius = UDim.new(0,10)
+    local aaStroke = Instance.new("UIStroke")
+    aaStroke.Color = Color3.fromRGB(0,180,255)
+    aaStroke.Transparency = 0.4
+    aaStroke.Parent = autoAimCard
+
+    local aaTitle = Instance.new("TextLabel")
+    aaTitle.Size = UDim2.new(1,-20,0,24)
+    aaTitle.Position = UDim2.new(0,10,0,10)
+    aaTitle.BackgroundTransparency = 1
+    aaTitle.Text = "🎯 AUTO AIM"
+    aaTitle.TextColor3 = Color3.fromRGB(0,220,255)
+    aaTitle.Font = Enum.Font.GothamBold
+    aaTitle.TextSize = 14
+    aaTitle.TextXAlignment = Enum.TextXAlignment.Left
+    aaTitle.Parent = autoAimCard
+
+    local aaDesc = Instance.new("TextLabel")
+    aaDesc.Size = UDim2.new(1,-20,0,16)
+    aaDesc.Position = UDim2.new(0,10,0,34)
+    aaDesc.BackgroundTransparency = 1
+    aaDesc.Text = "Enable auto aim and select target type."
+    aaDesc.TextColor3 = Color3.fromRGB(180,180,180)
+    aaDesc.Font = Enum.Font.Gotham
+    aaDesc.TextSize = 10
+    aaDesc.TextXAlignment = Enum.TextXAlignment.Left
+    aaDesc.TextYAlignment = Enum.TextYAlignment.Top
+    aaDesc.Parent = autoAimCard
+
+    -- Toggle Auto Aim (seperti crosshair toggle)
+    local aaToggle = Instance.new("TextButton")
+    aaToggle.Size = UDim2.new(1,-20,0,30)
+    aaToggle.Position = UDim2.new(0,10,0,56)
+    aaToggle.BackgroundColor3 = autoAimState.enabled and Color3.fromRGB(0,140,255) or Color3.fromRGB(14,24,40)
+    aaToggle.Text = autoAimState.enabled and "AUTO AIM ENABLED" or "AUTO AIM DISABLED"
+    aaToggle.TextColor3 = autoAimState.enabled and Color3.fromRGB(255,255,255) or Color3.fromRGB(220,220,220)
+    aaToggle.Font = Enum.Font.GothamBold
+    aaToggle.TextSize = 11
+    aaToggle.BorderSizePixel = 0
+    aaToggle.AutoButtonColor = false
+    aaToggle.Parent = autoAimCard
+    Instance.new("UICorner",aaToggle).CornerRadius = UDim.new(0,8)
+
+    -- Target Selector (drop-down/sidelist)
+    local targetSection = Instance.new("Frame")
+    targetSection.Size = UDim2.new(1,-20,0,26)
+    targetSection.Position = UDim2.new(0,10,0,92)
+    targetSection.BackgroundTransparency = 1
+    targetSection.Parent = autoAimCard
+
+    local targetLabel = Instance.new("TextLabel")
+    targetLabel.Size = UDim2.new(0.3,0,1,0)
+    targetLabel.BackgroundTransparency = 1
+    targetLabel.Text = "Target"
+    targetLabel.TextColor3 = Color3.fromRGB(220,220,220)
+    targetLabel.Font = Enum.Font.GothamBold
+    targetLabel.TextSize = 10
+    targetLabel.TextXAlignment = Enum.TextXAlignment.Left
+    targetLabel.Parent = targetSection
+
+    -- Dropdown utama (tombol untuk menampilkan pilihan)
+    local targetDropdown = Instance.new("TextButton")
+    targetDropdown.Size = UDim2.new(0.45,0,1,0)
+    targetDropdown.Position = UDim2.new(0.35,0,0,0)
+    targetDropdown.BackgroundColor3 = Color3.fromRGB(25,35,50)
+    targetDropdown.Text = autoAimState.target
+    targetDropdown.TextColor3 = Color3.fromRGB(220,220,220)
+    targetDropdown.Font = Enum.Font.GothamBold
+    targetDropdown.TextSize = 10
+    targetDropdown.BorderSizePixel = 0
+    targetDropdown.AutoButtonColor = false
+    targetDropdown.Parent = targetSection
+    Instance.new("UICorner",targetDropdown).CornerRadius = UDim.new(0,4)
+
+    -- Container untuk daftar pilihan (akan muncul saat dropdown diklik)
+    local targetList = Instance.new("Frame")
+    targetList.Size = UDim2.new(0.45,0,0,0)
+    targetList.Position = UDim2.new(0.35,0,1,2)
+    targetList.BackgroundColor3 = Color3.fromRGB(20,30,45)
+    targetList.BorderSizePixel = 0
+    targetList.Visible = false
+    targetList.ClipsDescendants = true
+    targetList.ZIndex = 10
+    targetList.Parent = targetSection
+    Instance.new("UICorner",targetList).CornerRadius = UDim.new(0,4)
+
+    local targetOptions = {"Killer", "Survivor", "SCP"}
+    local targetButtons = {}
+    for i, opt in ipairs(targetOptions) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1,-4,0,20)
+        btn.Position = UDim2.new(0,2,0,(i-1)*22+2)
+        btn.BackgroundColor3 = (opt == autoAimState.target) and Color3.fromRGB(0,140,255) or Color3.fromRGB(20,30,45)
+        btn.Text = opt
+        btn.TextColor3 = (opt == autoAimState.target) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
+        btn.Font = Enum.Font.Gotham
+        btn.TextSize = 9
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.Parent = targetList
+        Instance.new("UICorner",btn).CornerRadius = UDim.new(0,3)
+        table.insert(targetButtons, btn)
+        btn.MouseButton1Click:Connect(function()
+            autoAimState.target = opt
+            targetDropdown.Text = opt
+            targetList.Visible = false
+            targetList.Size = UDim2.new(0.45,0,0,0)
+            -- Update warna tombol
+            for _, b in ipairs(targetButtons) do
+                b.BackgroundColor3 = (b.Text == opt) and Color3.fromRGB(0,140,255) or Color3.fromRGB(20,30,45)
+                b.TextColor3 = (b.Text == opt) and Color3.fromRGB(255,255,255) or Color3.fromRGB(200,200,200)
+            end
+        end)
+    end
+    local totalHeight = #targetOptions * 22 + 4
+    targetList.Size = UDim2.new(0.45,0,0,totalHeight)
+
+    targetDropdown.MouseButton1Click:Connect(function()
+        targetList.Visible = not targetList.Visible
+        if targetList.Visible then
+            targetList.Size = UDim2.new(0.45,0,0,totalHeight)
+        else
+            targetList.Size = UDim2.new(0.45,0,0,0)
+        end
+    end)
+
+    -- Shortcut section
+    local shortcutSection = Instance.new("Frame")
+    shortcutSection.Size = UDim2.new(1,-20,0,50)
+    shortcutSection.Position = UDim2.new(0,10,0,124)
+    shortcutSection.BackgroundTransparency = 1
+    shortcutSection.Parent = autoAimCard
+
+    local shortcutLabel = Instance.new("TextLabel")
+    shortcutLabel.Size = UDim2.new(0.3,0,1,0)
+    shortcutLabel.BackgroundTransparency = 1
+    shortcutLabel.Text = "Shortcut"
+    shortcutLabel.TextColor3 = Color3.fromRGB(220,220,220)
+    shortcutLabel.Font = Enum.Font.GothamBold
+    shortcutLabel.TextSize = 10
+    shortcutLabel.TextXAlignment = Enum.TextXAlignment.Left
+    shortcutLabel.Parent = shortcutSection
+
+    -- Shift Target button
+    local shiftBtn = Instance.new("TextButton")
+    shiftBtn.Size = UDim2.new(0.3,0,0.7,0)
+    shiftBtn.Position = UDim2.new(0.35,0,0.15,0)
+    shiftBtn.BackgroundColor3 = Color3.fromRGB(30,40,60)
+    shiftBtn.Text = "Shift Target"
+    shiftBtn.TextColor3 = Color3.fromRGB(220,220,220)
+    shiftBtn.Font = Enum.Font.GothamBold
+    shiftBtn.TextSize = 9
+    shiftBtn.BorderSizePixel = 0
+    shiftBtn.AutoButtonColor = false
+    shiftBtn.Parent = shortcutSection
+    Instance.new("UICorner",shiftBtn).CornerRadius = UDim.new(0,4)
+
+    -- Keybind box (placeholder untuk custom key)
+    local keybindBox = Instance.new("TextButton")
+    keybindBox.Size = UDim2.new(0.2,0,0.7,0)
+    keybindBox.Position = UDim2.new(0.68,0,0.15,0)
+    keybindBox.BackgroundColor3 = Color3.fromRGB(25,35,50)
+    keybindBox.Text = autoAimState.keybind or "None"
+    keybindBox.TextColor3 = Color3.fromRGB(200,200,200)
+    keybindBox.Font = Enum.Font.GothamBold
+    keybindBox.TextSize = 9
+    keybindBox.BorderSizePixel = 0
+    keybindBox.AutoButtonColor = false
+    keybindBox.Parent = shortcutSection
+    Instance.new("UICorner",keybindBox).CornerRadius = UDim.new(0,4)
+
+    -- Toggle Auto Aim event (placeholder)
+    aaToggle.MouseButton1Click:Connect(function()
+        autoAimState.enabled = not autoAimState.enabled
+        if autoAimState.enabled then
+            aaToggle.Text = "AUTO AIM ENABLED"
+            aaToggle.BackgroundColor3 = Color3.fromRGB(0,140,255)
+            aaToggle.TextColor3 = Color3.fromRGB(255,255,255)
+        else
+            aaToggle.Text = "AUTO AIM DISABLED"
+            aaToggle.BackgroundColor3 = Color3.fromRGB(14,24,40)
+            aaToggle.TextColor3 = Color3.fromRGB(220,220,220)
+        end
+    end)
+
     print("[Home] Crosshair settings with position sliders loaded (state preserved, drag fixed)")
+    print("[Home] Auto Aim UI placeholder added (no logic yet)")
 end
 -- ============================================================================
 -- INFO CONTENT

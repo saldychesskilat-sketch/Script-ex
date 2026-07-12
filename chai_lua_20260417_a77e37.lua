@@ -3417,8 +3417,9 @@ local autoAimState = {
     lockActive = false,
     lockConn = nil,
     lockTimer = nil,
-    aimingConn = nil,        -- koneksi untuk AttributeChangedSignal("Aiming")
-    charAddedConn = nil,     -- untuk respawn karakter
+    mouseDownConn = nil,     -- koneksi untuk InputBegan MouseButton2
+    mouseUpConn = nil,       -- koneksi untuk InputEnded MouseButton2
+    keyConn = nil,
     guiRef = nil,
     isActive = false
 }
@@ -3428,7 +3429,7 @@ local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
 
-    -- ========== HELPER FUNCTIONS ==========
+    -- ========== HELPER FUNCTIONS (tidak berubah) ==========
     local function getNearestTarget(mode)
         if not localRootPart then return nil end
         local localPos = localRootPart.Position
@@ -3741,54 +3742,49 @@ local function startAutoAim()
         return gui
     end
 
-    -- ========== DETEKSI STATE AIM DARI GAME ==========
-    local function onAimingChanged()
-        if not config.autoAimEnabled then return end
-        local char = localPlayer.Character
-        if not char then return end
-        local aiming = char:GetAttribute("Aiming")
-        if aiming then
-            -- Aim aktif (tombol aksi ditekan)
-            local target = getNearestTarget(autoAimState.targetMode)
-            if target and target.Object then
-                lockToTarget(target)
-            end
-        else
-            -- Aim tidak aktif (tombol aksi dilepas atau proses selesai)
-            -- Hentikan lock yang sedang berjalan
-            if autoAimState.lockActive then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then
-                    autoAimState.lockConn:Disconnect()
-                    autoAimState.lockConn = nil
-                end
-                if autoAimState.lockTimer then
-                    task.cancel(autoAimState.lockTimer)
-                    autoAimState.lockTimer = nil
-                end
-                if localHumanoid then
-                    localHumanoid.AutoRotate = true
-                end
-            end
-        end
-    end
+    -- ========== DETEKSI INPUT MOUSE BUTTON 2 (KLIK KANAN) ==========
+    local function setupMouseButton2Detection()
+        if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
+        if autoAimState.mouseUpConn then autoAimState.mouseUpConn:Disconnect() end
 
-    local function setupAimStateDetection()
-        if autoAimState.aimingConn then autoAimState.aimingConn:Disconnect() end
-        -- Ambil karakter awal
-        local char = localPlayer.Character
-        if char then
-            autoAimState.aimingConn = char:GetAttributeChangedSignal("Aiming"):Connect(onAimingChanged)
-        end
-        -- Juga pantau respawn
-        if autoAimState.charAddedConn then autoAimState.charAddedConn:Disconnect() end
-        autoAimState.charAddedConn = localPlayer.CharacterAdded:Connect(function(newChar)
-            if autoAimState.aimingConn then autoAimState.aimingConn:Disconnect() end
-            autoAimState.aimingConn = newChar:GetAttributeChangedSignal("Aiming"):Connect(onAimingChanged)
+        -- Saat klik kanan ditekan (MouseButton2)
+        autoAimState.mouseDownConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not config.autoAimEnabled then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                -- Cari target sesuai mode
+                local target = getNearestTarget(autoAimState.targetMode)
+                if target and target.Object then
+                    lockToTarget(target)
+                end
+            end
+        end)
+
+        -- Saat klik kanan dilepas (MouseButton2)
+        autoAimState.mouseUpConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not config.autoAimEnabled then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                -- Hentikan lock yang sedang berjalan
+                if autoAimState.lockActive then
+                    autoAimState.lockActive = false
+                    if autoAimState.lockConn then
+                        autoAimState.lockConn:Disconnect()
+                        autoAimState.lockConn = nil
+                    end
+                    if autoAimState.lockTimer then
+                        task.cancel(autoAimState.lockTimer)
+                        autoAimState.lockTimer = nil
+                    end
+                    if localHumanoid then
+                        localHumanoid.AutoRotate = true
+                    end
+                end
+            end
         end)
     end
 
-    -- ========== KEYBIND UNTUK MODE (tetap ada) ==========
+    -- ========== KEYBIND UNTUK MODE (tetap) ==========
     local function setupKeybindDetection()
         if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
         autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -3820,7 +3816,7 @@ local function startAutoAim()
 
     -- ========== AKTIVASI ==========
     createAutoAimGUI()
-    setupAimStateDetection()
+    setupMouseButton2Detection()
     setupKeybindDetection()
 
     -- Koneksi utama (placeholder)
@@ -3837,13 +3833,13 @@ local function stopAutoAim()
     autoAimConnection:Disconnect()
     autoAimConnection = nil
 
-    if autoAimState.aimingConn then
-        autoAimState.aimingConn:Disconnect()
-        autoAimState.aimingConn = nil
+    if autoAimState.mouseDownConn then
+        autoAimState.mouseDownConn:Disconnect()
+        autoAimState.mouseDownConn = nil
     end
-    if autoAimState.charAddedConn then
-        autoAimState.charAddedConn:Disconnect()
-        autoAimState.charAddedConn = nil
+    if autoAimState.mouseUpConn then
+        autoAimState.mouseUpConn:Disconnect()
+        autoAimState.mouseUpConn = nil
     end
     if autoAimState.keyConn then
         autoAimState.keyConn:Disconnect()

@@ -3421,7 +3421,10 @@ local autoAimState = {
     mouseUpConn = nil,       -- koneksi untuk InputEnded MouseButton2
     keyConn = nil,
     guiRef = nil,
-    isActive = false
+    isActive = false,
+    mobileButton = nil,      -- tombol untuk mobile
+    mobileButtonGui = nil,   -- ScreenGui untuk tombol mobile
+    mobileHoldTimer = nil,   -- timer untuk melepas lock di mobile
 }
 
 -- Fungsi startAutoAim yang baru (menggantikan yang lama)
@@ -3429,7 +3432,7 @@ local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
 
-    -- ========== HELPER FUNCTIONS (tidak berubah) ==========
+    -- ========== HELPER FUNCTIONS ==========
     local function getNearestTarget(mode)
         if not localRootPart then return nil end
         local localPos = localRootPart.Position
@@ -3742,7 +3745,85 @@ local function startAutoAim()
         return gui
     end
 
-    -- ========== DETEKSI INPUT MOUSE BUTTON 2 (KLIK KANAN) ==========
+    -- ========== TOMBOL MOBILE (LOCK BUTTON) ==========
+    local function setupMobileButton()
+        -- Hancurkan tombol lama jika ada
+        if autoAimState.mobileButtonGui then
+            autoAimState.mobileButtonGui:Destroy()
+            autoAimState.mobileButtonGui = nil
+            autoAimState.mobileButton = nil
+        end
+
+        -- Buat ScreenGui khusus untuk tombol mobile
+        local mobileGui = Instance.new("ScreenGui")
+        mobileGui.Name = "AutoAimMobileButton"
+        mobileGui.ResetOnSpawn = false
+        mobileGui.Parent = game:GetService("CoreGui")
+
+        -- Buat tombol bulat dengan tema CyberHeroes
+        local button = Instance.new("TextButton")
+        button.Name = "LockButton"
+        button.Size = UDim2.new(0, 60, 0, 60)
+        button.Position = UDim2.new(0.63, -30, 0.73, -30)  -- posisi UDim2.new(0.63, 0, 0.73, 0) dengan offset untuk center
+        button.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+        button.BackgroundTransparency = 0.3
+        button.BorderSizePixel = 0
+        button.Text = "🔒"
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 24
+        button.Parent = mobileGui
+        button.AutoButtonColor = false
+
+        -- Buat sudut bulat
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(1, 0)
+        btnCorner.Parent = button
+
+        -- Stroke (border neon)
+        local btnStroke = Instance.new("UIStroke")
+        btnStroke.Color = Color3.fromRGB(0, 220, 255)
+        btnStroke.Thickness = 1.5
+        btnStroke.Transparency = 0.4
+        btnStroke.Parent = button
+
+        -- Simpan referensi
+        autoAimState.mobileButtonGui = mobileGui
+        autoAimState.mobileButton = button
+
+        -- Event klik tombol (sama seperti MouseButton2 di PC)
+        button.MouseButton1Click:Connect(function()
+            if not config.autoAimEnabled then return end
+            local target = getNearestTarget(autoAimState.targetMode)
+            if target and target.Object then
+                lockToTarget(target)
+                -- Timer otomatis untuk melepas lock setelah 2 detik (karena mobile tidak ada mouse up)
+                if autoAimState.mobileHoldTimer then
+                    task.cancel(autoAimState.mobileHoldTimer)
+                    autoAimState.mobileHoldTimer = nil
+                end
+                autoAimState.mobileHoldTimer = task.spawn(function()
+                    task.wait(2.5)  -- sama dengan durasi lock
+                    if autoAimState.lockActive then
+                        autoAimState.lockActive = false
+                        if autoAimState.lockConn then
+                            autoAimState.lockConn:Disconnect()
+                            autoAimState.lockConn = nil
+                        end
+                        if autoAimState.lockTimer then
+                            task.cancel(autoAimState.lockTimer)
+                            autoAimState.lockTimer = nil
+                        end
+                        if localHumanoid then
+                            localHumanoid.AutoRotate = true
+                        end
+                    end
+                end)
+            end
+        end)
+    end
+
+    -- ========== DETEKSI INPUT MOUSE BUTTON 2 (PC) ==========
     local function setupMouseButton2Detection()
         if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
         if autoAimState.mouseUpConn then autoAimState.mouseUpConn:Disconnect() end
@@ -3784,7 +3865,7 @@ local function startAutoAim()
         end)
     end
 
-    -- ========== KEYBIND UNTUK MODE (tetap) ==========
+    -- ========== KEYBIND UNTUK MODE ==========
     local function setupKeybindDetection()
         if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
         autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -3818,6 +3899,7 @@ local function startAutoAim()
     createAutoAimGUI()
     setupMouseButton2Detection()
     setupKeybindDetection()
+    setupMobileButton()  -- Tombol untuk mobile
 
     -- Koneksi utama (placeholder)
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
@@ -3853,6 +3935,18 @@ local function stopAutoAim()
         task.cancel(autoAimState.lockTimer)
         autoAimState.lockTimer = nil
     end
+    if autoAimState.mobileHoldTimer then
+        task.cancel(autoAimState.mobileHoldTimer)
+        autoAimState.mobileHoldTimer = nil
+    end
+
+    -- Hancurkan tombol mobile
+    if autoAimState.mobileButtonGui then
+        autoAimState.mobileButtonGui:Destroy()
+        autoAimState.mobileButtonGui = nil
+        autoAimState.mobileButton = nil
+    end
+
     autoAimState.lockActive = false
 
     if autoAimState.guiRef then
@@ -3867,6 +3961,7 @@ local function stopAutoAim()
     autoAimState.isActive = false
     print("[AutoAim] Auto aim stopped")
 end
+
 -- ============================================================================
 -- FEATURE 16: TELEPORT TO NEAREST SURVIVOR (unchanged)
 -- ============================================================================

@@ -3411,17 +3411,14 @@ end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================
--- ============================================================================
--- AUTO AIM SYSTEM (Enhanced with 3 modes, action-lock, keybind shift)
--- ============================================================================
 -- Variabel state yang hanya digunakan di dalam closure start/stop
 local autoAimState = {
     targetMode = "Killer",   -- Killer, Survivor, SCP
     lockActive = false,
     lockConn = nil,
     lockTimer = nil,
-    clickConn = nil,
-    keyConn = nil,
+    aimingConn = nil,        -- koneksi untuk AttributeChangedSignal("Aiming")
+    charAddedConn = nil,     -- untuk respawn karakter
     guiRef = nil,
     isActive = false
 }
@@ -3744,59 +3741,54 @@ local function startAutoAim()
         return gui
     end
 
-    -- ========== DETEKSI TOMBOL AKSI (diperbaiki) ==========
-    local function setupActionButtonDetection()
-        if autoAimState.clickConn then autoAimState.clickConn:Disconnect() end
-
-        autoAimState.clickConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not config.autoAimEnabled then return end
-
-            local isClick = (input.UserInputType == Enum.UserInputType.MouseButton1) or (input.UserInputType == Enum.UserInputType.Touch)
-            if not isClick then return end
-
-            local pos = input.Position
-            local guiObj = GuiService:GetGuiObjectAtPosition(pos)
-            if not guiObj then return end
-
-            if not (guiObj:IsA("TextButton") or guiObj:IsA("ImageButton")) then return end
-            if not (guiObj.Visible and guiObj.Active) then return end
-
-            local playerGui = localPlayer:FindFirstChild("PlayerGui")
-            if not playerGui then return end
-
-            -- Cari semua tombol di dalam folder Controls
-            local actionButtons = {}
-            for _, descendant in ipairs(playerGui:GetDescendants()) do
-                if descendant:IsA("GuiButton") or descendant:IsA("ImageButton") or descendant:IsA("TextButton") then
-                    local parent = descendant.Parent
-                    while parent do
-                        if parent.Name == "Controls" then
-                            table.insert(actionButtons, descendant)
-                            break
-                        end
-                        parent = parent.Parent
-                    end
+    -- ========== DETEKSI STATE AIM DARI GAME ==========
+    local function onAimingChanged()
+        if not config.autoAimEnabled then return end
+        local char = localPlayer.Character
+        if not char then return end
+        local aiming = char:GetAttribute("Aiming")
+        if aiming then
+            -- Aim aktif (tombol aksi ditekan)
+            local target = getNearestTarget(autoAimState.targetMode)
+            if target and target.Object then
+                lockToTarget(target)
+            end
+        else
+            -- Aim tidak aktif (tombol aksi dilepas atau proses selesai)
+            -- Hentikan lock yang sedang berjalan
+            if autoAimState.lockActive then
+                autoAimState.lockActive = false
+                if autoAimState.lockConn then
+                    autoAimState.lockConn:Disconnect()
+                    autoAimState.lockConn = nil
+                end
+                if autoAimState.lockTimer then
+                    task.cancel(autoAimState.lockTimer)
+                    autoAimState.lockTimer = nil
+                end
+                if localHumanoid then
+                    localHumanoid.AutoRotate = true
                 end
             end
+        end
+    end
 
-            local isActionButton = false
-            for _, btn in ipairs(actionButtons) do
-                if btn == guiObj then
-                    isActionButton = true
-                    break
-                end
-            end
-
-            if isActionButton then
-                local target = getNearestTarget(autoAimState.targetMode)
-                if target and target.Object then
-                    lockToTarget(target)
-                end
-            end
+    local function setupAimStateDetection()
+        if autoAimState.aimingConn then autoAimState.aimingConn:Disconnect() end
+        -- Ambil karakter awal
+        local char = localPlayer.Character
+        if char then
+            autoAimState.aimingConn = char:GetAttributeChangedSignal("Aiming"):Connect(onAimingChanged)
+        end
+        -- Juga pantau respawn
+        if autoAimState.charAddedConn then autoAimState.charAddedConn:Disconnect() end
+        autoAimState.charAddedConn = localPlayer.CharacterAdded:Connect(function(newChar)
+            if autoAimState.aimingConn then autoAimState.aimingConn:Disconnect() end
+            autoAimState.aimingConn = newChar:GetAttributeChangedSignal("Aiming"):Connect(onAimingChanged)
         end)
     end
 
+    -- ========== KEYBIND UNTUK MODE (tetap ada) ==========
     local function setupKeybindDetection()
         if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
         autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -3828,9 +3820,10 @@ local function startAutoAim()
 
     -- ========== AKTIVASI ==========
     createAutoAimGUI()
-    setupActionButtonDetection()
+    setupAimStateDetection()
     setupKeybindDetection()
 
+    -- Koneksi utama (placeholder)
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 
     autoAimState.isActive = true
@@ -3844,9 +3837,13 @@ local function stopAutoAim()
     autoAimConnection:Disconnect()
     autoAimConnection = nil
 
-    if autoAimState.clickConn then
-        autoAimState.clickConn:Disconnect()
-        autoAimState.clickConn = nil
+    if autoAimState.aimingConn then
+        autoAimState.aimingConn:Disconnect()
+        autoAimState.aimingConn = nil
+    end
+    if autoAimState.charAddedConn then
+        autoAimState.charAddedConn:Disconnect()
+        autoAimState.charAddedConn = nil
     end
     if autoAimState.keyConn then
         autoAimState.keyConn:Disconnect()

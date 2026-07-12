@@ -3410,7 +3410,7 @@ local function stopAutoSkillCheck()
 end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
--- ============================================================================
+
 -- Variabel state yang hanya digunakan di dalam closure start/stop
 local autoAimState = {
     targetMode = "Killer",   -- Killer, Survivor, SCP
@@ -3425,6 +3425,7 @@ local autoAimState = {
     mobileButton = nil,      -- tombol untuk mobile
     mobileButtonGui = nil,   -- ScreenGui untuk tombol mobile
     mobileHoldTimer = nil,   -- timer untuk melepas lock di mobile
+    mobileLockEnabled = false, -- toggle mobile lock button
 }
 
 -- Fungsi startAutoAim yang baru (menggantikan yang lama)
@@ -3521,7 +3522,7 @@ local function startAutoAim()
         return nil
     end
 
-    local function lockToTarget(targetInfo)
+    local function lockToTarget(targetInfo, duration)
         if not targetInfo or not targetInfo.Object then return end
         if not camera or not localRootPart or not localHumanoid then return end
 
@@ -3529,7 +3530,7 @@ local function startAutoAim()
         if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
 
         autoAimState.lockActive = true
-        local duration = 2.5
+        duration = duration or 2.5  -- default 2.5 detik untuk PC
 
         autoAimState.lockConn = RunService.RenderStepped:Connect(function()
             if not autoAimState.lockActive then
@@ -3627,8 +3628,8 @@ local function startAutoAim()
         gui.ResetOnSpawn = false
         gui.Parent = game:GetService("CoreGui")
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 100)
-        frame.Position = UDim2.new(0.5, -110, 0.5, -50)
+        frame.Size = UDim2.new(0, 220, 0, 140)  -- tinggi ditambah untuk toggle mobile
+        frame.Position = UDim2.new(0.5, -110, 0.5, -70)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
         frame.BorderSizePixel = 0
@@ -3674,8 +3675,11 @@ local function startAutoAim()
         closeBtn.Parent = header
         Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
         closeBtn.MouseButton1Click:Connect(function()
-            config.autoAimEnabled = false
-            stopAutoAim()
+            -- Hanya tutup GUI pengaturan, jangan matikan Auto Aim
+            if autoAimState.guiRef then
+                autoAimState.guiRef:Destroy()
+                autoAimState.guiRef = nil
+            end
         end)
 
         local content = Instance.new("Frame")
@@ -3699,7 +3703,7 @@ local function startAutoAim()
 
         local switchModeBtn = Instance.new("TextButton")
         switchModeBtn.Size = UDim2.new(0.8, 0, 0, 20)
-        switchModeBtn.Position = UDim2.new(0.1, 0, 0.5, 0)
+        switchModeBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
         switchModeBtn.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
         switchModeBtn.Text = "Switch Target (Shift+T)"
         switchModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -3720,6 +3724,54 @@ local function startAutoAim()
             showModeNotification(autoAimState.targetMode)
         end)
 
+        -- ===== TOGGLE MOBILE LOCK BUTTON =====
+        local mobileToggleRow = Instance.new("Frame")
+        mobileToggleRow.Size = UDim2.new(1, 0, 0, 22)
+        mobileToggleRow.Position = UDim2.new(0, 0, 0.55, 0)
+        mobileToggleRow.BackgroundTransparency = 1
+        mobileToggleRow.Parent = content
+
+        local mobileLabel = Instance.new("TextLabel")
+        mobileLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        mobileLabel.BackgroundTransparency = 1
+        mobileLabel.Text = "Mobile Lock"
+        mobileLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        mobileLabel.Font = Enum.Font.Gotham
+        mobileLabel.TextSize = 10
+        mobileLabel.TextXAlignment = Enum.TextXAlignment.Left
+        mobileLabel.Parent = mobileToggleRow
+
+        local mobileSwitch = Instance.new("TextButton")
+        mobileSwitch.Size = UDim2.new(0, 36, 0, 16)
+        mobileSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
+        mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+        mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
+        mobileSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
+        mobileSwitch.Font = Enum.Font.GothamBold
+        mobileSwitch.TextSize = 7
+        mobileSwitch.BorderSizePixel = 0
+        mobileSwitch.AutoButtonColor = false
+        mobileSwitch.Parent = mobileToggleRow
+        local switchCorner = Instance.new("UICorner")
+        switchCorner.CornerRadius = UDim.new(1, 0)
+        switchCorner.Parent = mobileSwitch
+
+        mobileSwitch.MouseButton1Click:Connect(function()
+            autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
+            mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+            mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
+            if autoAimState.mobileLockEnabled then
+                setupMobileButton()
+            else
+                if autoAimState.mobileButtonGui then
+                    autoAimState.mobileButtonGui:Destroy()
+                    autoAimState.mobileButtonGui = nil
+                    autoAimState.mobileButton = nil
+                end
+            end
+        end)
+
+        -- Drag GUI
         local dragging = false
         local dragStart, frameStart
         header.InputBegan:Connect(function(input)
@@ -3754,24 +3806,26 @@ local function startAutoAim()
             autoAimState.mobileButton = nil
         end
 
+        if not autoAimState.mobileLockEnabled then return end
+
         -- Buat ScreenGui khusus untuk tombol mobile
         local mobileGui = Instance.new("ScreenGui")
         mobileGui.Name = "AutoAimMobileButton"
         mobileGui.ResetOnSpawn = false
         mobileGui.Parent = game:GetService("CoreGui")
 
-        -- Buat tombol bulat dengan tema CyberHeroes
+        -- Buat tombol bulat minimalis (putih transparan)
         local button = Instance.new("TextButton")
         button.Name = "LockButton"
-        button.Size = UDim2.new(0, 60, 0, 60)
-        button.Position = UDim2.new(0.63, -30, 0.73, -30)  -- posisi UDim2.new(0.63, 0, 0.73, 0) dengan offset untuk center
-        button.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-        button.BackgroundTransparency = 0.3
+        button.Size = UDim2.new(0, 50, 0, 50)
+        button.Position = UDim2.new(0.63, -25, 0.73, -25)
+        button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        button.BackgroundTransparency = 0.7
         button.BorderSizePixel = 0
         button.Text = "🔒"
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.TextColor3 = Color3.fromRGB(50, 50, 50)
         button.Font = Enum.Font.GothamBold
-        button.TextSize = 24
+        button.TextSize = 22
         button.Parent = mobileGui
         button.AutoButtonColor = false
 
@@ -3780,30 +3834,23 @@ local function startAutoAim()
         btnCorner.CornerRadius = UDim.new(1, 0)
         btnCorner.Parent = button
 
-        -- Stroke (border neon)
-        local btnStroke = Instance.new("UIStroke")
-        btnStroke.Color = Color3.fromRGB(0, 220, 255)
-        btnStroke.Thickness = 1.5
-        btnStroke.Transparency = 0.4
-        btnStroke.Parent = button
-
         -- Simpan referensi
         autoAimState.mobileButtonGui = mobileGui
         autoAimState.mobileButton = button
 
-        -- Event klik tombol (sama seperti MouseButton2 di PC)
+        -- Event klik tombol (sama seperti MouseButton2 di PC, durasi 1 detik)
         button.MouseButton1Click:Connect(function()
             if not config.autoAimEnabled then return end
             local target = getNearestTarget(autoAimState.targetMode)
             if target and target.Object then
-                lockToTarget(target)
-                -- Timer otomatis untuk melepas lock setelah 2 detik (karena mobile tidak ada mouse up)
+                lockToTarget(target, 1)  -- durasi 1 detik untuk mobile
+                -- Timer otomatis untuk melepas lock setelah 1 detik (karena mobile tidak ada mouse up)
                 if autoAimState.mobileHoldTimer then
                     task.cancel(autoAimState.mobileHoldTimer)
                     autoAimState.mobileHoldTimer = nil
                 end
                 autoAimState.mobileHoldTimer = task.spawn(function()
-                    task.wait(2.5)  -- sama dengan durasi lock
+                    task.wait(1)
                     if autoAimState.lockActive then
                         autoAimState.lockActive = false
                         if autoAimState.lockConn then
@@ -3828,25 +3875,21 @@ local function startAutoAim()
         if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
         if autoAimState.mouseUpConn then autoAimState.mouseUpConn:Disconnect() end
 
-        -- Saat klik kanan ditekan (MouseButton2)
         autoAimState.mouseDownConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
             if gameProcessed then return end
             if not config.autoAimEnabled then return end
             if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                -- Cari target sesuai mode
                 local target = getNearestTarget(autoAimState.targetMode)
                 if target and target.Object then
-                    lockToTarget(target)
+                    lockToTarget(target)  -- default 2.5 detik
                 end
             end
         end)
 
-        -- Saat klik kanan dilepas (MouseButton2)
         autoAimState.mouseUpConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
             if gameProcessed then return end
             if not config.autoAimEnabled then return end
             if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                -- Hentikan lock yang sedang berjalan
                 if autoAimState.lockActive then
                     autoAimState.lockActive = false
                     if autoAimState.lockConn then
@@ -3899,16 +3942,18 @@ local function startAutoAim()
     createAutoAimGUI()
     setupMouseButton2Detection()
     setupKeybindDetection()
-    setupMobileButton()  -- Tombol untuk mobile
+    -- Jika mobileLockEnabled sudah true dari state sebelumnya (misal persist), buat tombol
+    if autoAimState.mobileLockEnabled then
+        setupMobileButton()
+    end
 
-    -- Koneksi utama (placeholder)
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 
     autoAimState.isActive = true
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
 end
 
--- Fungsi stopAutoAim
+-- Fungsi stopAutoAim (tidak berubah, tetap menghancurkan semua)
 local function stopAutoAim()
     if not autoAimConnection then return end
 
@@ -3940,7 +3985,6 @@ local function stopAutoAim()
         autoAimState.mobileHoldTimer = nil
     end
 
-    -- Hancurkan tombol mobile
     if autoAimState.mobileButtonGui then
         autoAimState.mobileButtonGui:Destroy()
         autoAimState.mobileButtonGui = nil

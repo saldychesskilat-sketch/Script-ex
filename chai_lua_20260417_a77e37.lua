@@ -3411,56 +3411,270 @@ end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================
+-- ============================================================================
+-- AUTO AIM SYSTEM (Enhanced with 3 modes, action-lock, keybind shift)
+-- ============================================================================
+
+-- Konfigurasi auto aim (tambahkan ke config jika belum ada)
+config.autoAimMode = config.autoAimMode or "Killer"
+config.autoAimLock = false
+local autoAimLockTimer = nil
+local autoAimLockDuration = 2.5
+
 local function getNearestKiller()
-    local nearest = nil
-    local minDist = math.huge
+    local mode = config.autoAimMode or "Killer"
+    local target = nil
+    local bestScore = math.huge
+
     if not localRootPart then return nil end
     local localPos = localRootPart.Position
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer then
-            local char = player.Character
-            if char then
-                local isKiller = false
-                if player.Team then isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy")) end
-                if not isKiller then
-                    local tool = char:FindFirstChildWhichIsA("Tool")
-                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
+    local camera = workspace.CurrentCamera
+
+    if mode == "Killer" then
+        -- Cari killer terdekat (sama seperti asli)
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                local char = player.Character
+                if char then
+                    local isKiller = false
+                    if player.Team then
+                        isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
+                    end
+                    if not isKiller then
+                        local tool = char:FindFirstChildWhichIsA("Tool")
+                        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                            isKiller = true
+                        end
+                    end
+                    if isKiller then
+                        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                        if root then
+                            local dist = (localPos - root.Position).Magnitude
+                            if dist < bestScore then
+                                bestScore = dist
+                                target = {Player = player, Root = root, Position = root.Position}
+                            end
+                        end
+                    end
                 end
-                if isKiller then
-                    local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                    if root then
-                        local dist = (localPos - root.Position).Magnitude
-                        if dist < minDist then
-                            minDist = dist
-                            nearest = player
+            end
+        end
+
+    elseif mode == "Survivor" then
+        -- Cari survivor di depan kamera, terdekat ke tengah layar
+        if not camera then return nil end
+        local viewport = camera.ViewportSize
+        local center = Vector2.new(viewport.X/2, viewport.Y/2)
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                local char = player.Character
+                if char then
+                    local isKiller = false
+                    if player.Team then
+                        isKiller = (player.Team.Name:lower():find("killer") or player.Team.Name:lower():find("monster") or player.Team.Name:lower():find("enemy"))
+                    end
+                    if not isKiller then
+                        local tool = char:FindFirstChildWhichIsA("Tool")
+                        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                            isKiller = true
+                        end
+                    end
+                    if not isKiller then
+                        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                        if root then
+                            local screenPos, onScreen = camera:WorldToViewportPoint(root.Position)
+                            if onScreen then
+                                local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                                if screenDist < bestScore then
+                                    bestScore = screenDist
+                                    target = {Player = player, Root = root, Position = root.Position}
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+    elseif mode == "SCP" then
+        -- Cari objek SCP terdekat (nama mengandung 'scp' atau memiliki tag 'SCP')
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") or obj:IsA("Model") then
+                local name = obj.Name:lower()
+                if name:find("scp") or (obj:IsA("Model") and obj:FindFirstChild("Humanoid")) then
+                    local pos
+                    if obj:IsA("BasePart") then
+                        pos = obj.Position
+                    else
+                        local root = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
+                        if root then pos = root.Position end
+                    end
+                    if pos then
+                        local dist = (localPos - pos).Magnitude
+                        if dist < bestScore then
+                            bestScore = dist
+                            target = {Object = obj, Position = pos}
                         end
                     end
                 end
             end
         end
     end
-    return nearest
+
+    return target
 end
 
 local function startAutoAim()
     if autoAimConnection then return end
-    autoAimConnection = RunService.RenderStepped:Connect(function()
-        if not config.autoAimEnabled then return end
-        if not getLocalCharacter() or not localRootPart then return end
-        local killer = getNearestKiller()
-        if killer and killer.Character then
-            local targetRoot = killer.Character:FindFirstChild("HumanoidRootPart") or killer.Character:FindFirstChild("Torso")
-            if targetRoot then
-                local targetPos = targetRoot.Position
-                local cf = CFrame.new(camera.CFrame.Position, targetPos)
-                camera.CFrame = cf
+
+    -- Variabel lokal untuk lock timer (disimpan di closure)
+    local lockActive = false
+    local lockTimer = nil
+    local currentTarget = nil
+
+    -- Fungsi untuk menampilkan notifikasi mode
+    local function showModeNotification(mode)
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "AutoAimNotification"
+        gui.ResetOnSpawn = false
+        gui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 200, 0, 40)
+        frame.Position = UDim2.new(0.5, -100, 0.5, -20)
+        frame.BackgroundColor3 = Color3.fromRGB(10, 20, 35)
+        frame.BackgroundTransparency = 0.2
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 200, 255)
+        stroke.Transparency = 0.4
+        stroke.Parent = frame
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "Mode: " .. mode
+        label.TextColor3 = Color3.fromRGB(0, 220, 255)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 14
+        label.Parent = frame
+
+        task.delay(1.5, function()
+            gui:Destroy()
+        end)
+    end
+
+    -- Keybind untuk shift target (tombol Q atau Tab)
+    local function handleShiftInput(input)
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            if input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.Tab then
+                local modes = {"Killer", "Survivor", "SCP"}
+                local current = config.autoAimMode or "Killer"
+                local idx
+                for i, m in ipairs(modes) do
+                    if m == current then idx = i break end
+                end
+                idx = (idx % #modes) + 1
+                config.autoAimMode = modes[idx]
+                showModeNotification(modes[idx])
             end
         end
+    end
+
+    -- Keybind untuk aksi (tombol F, E, atau klik kiri mouse)
+    local function handleActionInput(input, gameProcessed)
+        if gameProcessed then return end
+        local isAction = false
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isAction = true
+        elseif input.UserInputType == Enum.UserInputType.Keyboard then
+            if input.KeyCode == Enum.KeyCode.F or input.KeyCode == Enum.KeyCode.E then
+                isAction = true
+            end
+        end
+        if isAction and config.autoAimEnabled then
+            -- Aktifkan lock
+            config.autoAimLock = true
+            if lockTimer then lockTimer:Disconnect() end
+            lockTimer = task.delay(autoAimLockDuration, function()
+                config.autoAimLock = false
+                currentTarget = nil
+            end)
+        end
+    end
+
+    -- Pasang event listener untuk input
+    local inputConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        handleActionInput(input, gameProcessed)
+        handleShiftInput(input)
     end)
-    print("[AutoAim] Auto aim started")
+
+    -- Simpan koneksi input untuk cleanup
+    local savedInputConn = inputConn
+
+    -- Main loop RenderStepped
+    autoAimConnection = RunService.RenderStepped:Connect(function()
+        if not config.autoAimEnabled then
+            if config.autoAimLock then config.autoAimLock = false end
+            if currentTarget then currentTarget = nil end
+            return
+        end
+
+        if not getLocalCharacter() or not localRootPart then return end
+
+        -- Jika lock aktif, cari target dan lock
+        if config.autoAimLock then
+            local target = getNearestKiller()
+            if target then
+                local targetPos = target.Position
+                local targetRoot = target.Root or (target.Object and target.Object:FindFirstChild("HumanoidRootPart"))
+                if targetRoot then
+                    targetPos = targetRoot.Position
+                end
+                -- Lock kamera
+                local cf = CFrame.new(camera.CFrame.Position, targetPos)
+                camera.CFrame = cf
+
+                -- Hadapkan karakter ke target
+                local hrp = localRootPart
+                if hrp then
+                    local lookAt = CFrame.new(hrp.Position, targetPos)
+                    hrp.CFrame = lookAt
+                end
+                currentTarget = target
+            else
+                -- Jika target hilang, matikan lock
+                config.autoAimLock = false
+                if lockTimer then lockTimer:Disconnect() end
+                currentTarget = nil
+            end
+        else
+            -- Jika lock tidak aktif, lepaskan kontrol? Biarkan kamera normal.
+        end
+    end)
+
+    -- Simpan koneksi tambahan
+    autoAimConnection._inputConn = savedInputConn
+    autoAimConnection._lockTimer = lockTimer
+
+    print("[AutoAim] Auto aim started (modes: Killer, Survivor, SCP)")
 end
+
 local function stopAutoAim()
-    if autoAimConnection then autoAimConnection:Disconnect(); autoAimConnection = nil end
+    if autoAimConnection then
+        -- Bersihkan koneksi input
+        if autoAimConnection._inputConn then
+            autoAimConnection._inputConn:Disconnect()
+        end
+        if autoAimConnection._lockTimer then
+            autoAimConnection._lockTimer:Disconnect()
+        end
+        autoAimConnection:Disconnect()
+        autoAimConnection = nil
+    end
+    config.autoAimLock = false
     print("[AutoAim] Auto aim stopped")
 end
 

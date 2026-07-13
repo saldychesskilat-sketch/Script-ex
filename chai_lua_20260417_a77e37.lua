@@ -3795,13 +3795,6 @@ local function startAutoAim()
             -- update visibilitas tombol tanpa destroy
             setupMobileButton()
         end)
-                if autoAimState.mobileButtonGui then
-                    autoAimState.mobileButtonGui:Destroy()
-                    autoAimState.mobileButtonGui = nil
-                    autoAimState.mobileButton = nil
-                end
-            end
-        end)
 
         -- Drag GUI
         local dragging = false

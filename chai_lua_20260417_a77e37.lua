@@ -3433,28 +3433,20 @@ local autoAimState = {
     targetCacheTime = 0,         -- waktu cache
     targetCacheDuration = 0.5,   -- cache berlaku 0.5 detik
 }
-
-
--- Fungsi startAutoAim yang baru (menggantikan yang lama)
-local function startAutoAim()
-    if autoAimConnection then return end
-    if not config.autoAimEnabled then return end
-
-    
-    -- Fungsi untuk mendapatkan role player (real-time)
-    local function getPlayerRole(player)
-        if not player then return "Spectator" end
-            if player.Team then
-            local t = player.Team.Name:lower()
-            if t:find("killer") or t:find("monster") or t:find("enemy") then
-                return "Killer"
-            elseif t:find("survivor") then
-                return "Survivor"
-            end
+-- Fungsi untuk mendapatkan role player (real-time)
+local function getPlayerRole(player)
+    if not player then return "Spectator" end
+    if player.Team then
+        local t = player.Team.Name:lower()
+        if t:find("killer") or t:find("monster") or t:find("enemy") then
+            return "Killer"
+        elseif t:find("survivor") then
+            return "Survivor"
         end
+    end
     local char = player.Character
-        if char then
-            local tool = char:FindFirstChildWhichIsA("Tool")
+    if char then
+        local tool = char:FindFirstChildWhichIsA("Tool")
         if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
             return "Killer"
         end
@@ -3463,16 +3455,24 @@ local function startAutoAim()
             return "Killer"
         end
     end
-            return "Spectator"
-    end
-    -- Fungsi untuk mengecek apakah suatu player adalah Killer (real-time
-    local function isPlayerKiller(player)
-        return getPlayerRole(player) == "Killer"
-    end
-    -- Fungsi untuk mengecek apakah suatu player adalah Survivor
-    local function isPlayerSurvivor(player)
-        return getPlayerRole(player) == "Survivor"
-    end
+    return "Spectator"
+end
+
+-- Fungsi untuk mengecek apakah suatu player adalah Killer (real-time)
+local function isPlayerKiller(player)
+    return getPlayerRole(player) == "Killer"
+end
+
+-- Fungsi untuk mengecek apakah suatu player adalah Survivor
+local function isPlayerSurvivor(player)
+    return getPlayerRole(player) == "Survivor"
+end
+
+-- Fungsi startAutoAim yang baru (menggantikan yang lama)
+local function startAutoAim()
+    if autoAimConnection then return end
+    if not config.autoAimEnabled then return end
+
     -- ========== HELPER FUNCTIONS ==========
     local function getNearestTarget(mode)
         if not localRootPart then return nil end

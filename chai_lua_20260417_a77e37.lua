@@ -3411,7 +3411,11 @@ end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================
--- Variabel state yang hanya digunakan di dalam closure start/stop
+-- ============================================================================
+-- AUTO AIM SYSTEM (Enhanced with real-time target refresh)
+-- ============================================================================
+
+-- Variabel state (global untuk seluruh script)
 local autoAimState = {
     targetMode = "Killer",   -- Killer, Survivor, SCP
     lockActive = false,
@@ -3426,525 +3430,525 @@ local autoAimState = {
     mobileButtonGui = nil,
     mobileHoldTimer = nil,
     mobileLockEnabled = false,
-    -- Referensi yang akan di-refresh
-    currentCharacter = nil,
-    currentHumanoid = nil,
-    currentRootPart = nil,
-    currentCamera = nil,
-    charAddedConn = nil,
-    teamChangedConn = nil,
-    refreshTimer = nil,
+    -- Tambahan untuk refresh target
+    currentTarget = nil,          -- hasil getNearestTarget terakhir
+    targetDirty = true,           -- true jika perlu refresh
+    refreshConnection = nil,      -- Heartbeat untuk refresh
+    playerEventConnections = {},  -- untuk cleanup
 }
 
--- Fungsi untuk refresh state (dipanggil saat karakter/role berubah)
-local function refreshAimState()
-    -- Perbarui referensi karakter
-    local char = localPlayer.Character
-    if char then
-        autoAimState.currentCharacter = char
-        autoAimState.currentHumanoid = char:FindFirstChildOfClass("Humanoid")
-        autoAimState.currentRootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-    else
-        autoAimState.currentCharacter = nil
-        autoAimState.currentHumanoid = nil
-        autoAimState.currentRootPart = nil
-    end
-    -- Perbarui kamera
-    autoAimState.currentCamera = workspace.CurrentCamera
+-- ============================================================================
+-- FUNGSI PENCARIAN TARGET (GLOBAL - DIPINDAHKAN KELUAR DARI startAutoAim)
+-- ============================================================================
+local function getNearestTarget(mode)
+    if not localRootPart then return nil end
+    local localPos = localRootPart.Position
+    local nearest = nil
+    local minDist = math.huge
 
-    -- Debug (opsional)
-    print("[AutoAim] State refreshed")
-end
-
--- Fungsi startAutoAim yang baru (menggantikan yang lama)
-local function startAutoAim()
-    if autoAimConnection then return end
-    if not config.autoAimEnabled then return end
-
-    -- ========== INITIAL STATE REFRESH ==========
-    refreshAimState()
-
-    -- ========== LISTENER PERUBAHAN KARAKTER ==========
-    if autoAimState.charAddedConn then autoAimState.charAddedConn:Disconnect() end
-    autoAimState.charAddedConn = localPlayer.CharacterAdded:Connect(function(char)
-        refreshAimState()
-        -- Jika Auto Aim aktif dan ada target mode, kita tidak perlu restart, hanya refresh state
-    end)
-
-    -- ========== LISTENER PERUBAHAN TEAM/ROLE ==========
-    if autoAimState.teamChangedConn then autoAimState.teamChangedConn:Disconnect() end
-    if localPlayer.Team then
-        autoAimState.teamChangedConn = localPlayer.Team:GetPropertyChangedSignal("Name"):Connect(function()
-            refreshAimState()
-        end)
-    end
-    -- Jika Team berubah total (misal dari nil ke Team)
-    local teamListener = localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
-        if autoAimState.teamChangedConn then autoAimState.teamChangedConn:Disconnect() end
-        if localPlayer.Team then
-            autoAimState.teamChangedConn = localPlayer.Team:GetPropertyChangedSignal("Name"):Connect(function()
-                refreshAimState()
-            end)
-        end
-        refreshAimState()
-    end)
-    -- Simpan juga untuk cleanup
-    if not autoAimState._teamListener then autoAimState._teamListener = teamListener end
-
-    -- ========== HELPER FUNCTIONS (menggunakan state yang sudah di-refresh) ==========
-    local function getNearestTarget(mode)
-        local rootPart = autoAimState.currentRootPart
-        if not rootPart then return nil end
-        local localPos = rootPart.Position
-        local nearest = nil
-        local minDist = math.huge
-
-        if mode == "Killer" then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer then
-                    local char = player.Character
-                    if char then
-                        local isKiller = false
-                        if player.Team then
-                            local t = player.Team.Name:lower()
-                            isKiller = t:find("killer") or t:find("monster") or t:find("enemy")
-                        end
-                        if not isKiller then
-                            local tool = char:FindFirstChildWhichIsA("Tool")
-                            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                        end
-                        if isKiller then
-                            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                            if targetRoot then
-                                return { Object = targetRoot, Player = player }
-                            end
+    if mode == "Killer" then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                local char = player.Character
+                if char then
+                    local isKiller = false
+                    if player.Team then
+                        local t = player.Team.Name:lower()
+                        isKiller = t:find("killer") or t:find("monster") or t:find("enemy")
+                    end
+                    if not isKiller then
+                        local tool = char:FindFirstChildWhichIsA("Tool")
+                        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
+                    end
+                    if isKiller then
+                        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                        if root then
+                            return { Object = root, Player = player }
                         end
                     end
                 end
             end
-            return nil
-        elseif mode == "Survivor" then
-            local camera = autoAimState.currentCamera
-            if not camera then return nil end
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= localPlayer then
-                    local char = player.Character
-                    if char then
-                        local isKiller = false
-                        if player.Team then
-                            local t = player.Team.Name:lower()
-                            isKiller = t:find("killer") or t:find("monster") or t:find("enemy")
-                        end
-                        if not isKiller then
-                            local tool = char:FindFirstChildWhichIsA("Tool")
-                            if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
-                        end
-                        if not isKiller then
-                            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                            if targetRoot then
-                                local dirToTarget = (targetRoot.Position - camera.CFrame.Position).Unit
-                                local dot = camera.CFrame.LookVector:Dot(dirToTarget)
-                                if dot > 0 then
-                                    local dist = (localPos - targetRoot.Position).Magnitude
-                                    if dist < minDist then
-                                        minDist = dist
-                                        nearest = { Object = targetRoot, Player = player }
-                                    end
+        end
+        return nil
+    elseif mode == "Survivor" then
+        local camera = workspace.CurrentCamera
+        if not camera then return nil end
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer then
+                local char = player.Character
+                if char then
+                    local isKiller = false
+                    if player.Team then
+                        local t = player.Team.Name:lower()
+                        isKiller = t:find("killer") or t:find("monster") or t:find("enemy")
+                    end
+                    if not isKiller then
+                        local tool = char:FindFirstChildWhichIsA("Tool")
+                        if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
+                    end
+                    if not isKiller then
+                        local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                        if root then
+                            local dirToTarget = (root.Position - camera.CFrame.Position).Unit
+                            local dot = camera.CFrame.LookVector:Dot(dirToTarget)
+                            if dot > 0 then
+                                local dist = (localPos - root.Position).Magnitude
+                                if dist < minDist then
+                                    minDist = dist
+                                    nearest = { Object = root, Player = player }
                                 end
                             end
                         end
                     end
                 end
             end
-            return nearest
-        elseif mode == "SCP" then
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") then
-                    local name = obj.Name:lower()
-                    if name:find("scp") or obj:GetAttribute("SCP") == true then
-                        local targetRoot = obj
-                        local parent = obj.Parent
-                        if parent and parent:IsA("Model") then
-                            local primary = parent:FindFirstChild("HumanoidRootPart") or parent.PrimaryPart
-                            if primary then targetRoot = primary end
-                        end
-                        local dist = (localPos - targetRoot.Position).Magnitude
-                        if dist < minDist then
-                            minDist = dist
-                            nearest = { Object = targetRoot }
-                        end
+        end
+        return nearest
+    elseif mode == "SCP" then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                local name = obj.Name:lower()
+                if name:find("scp") or obj:GetAttribute("SCP") == true then
+                    local root = obj
+                    local parent = obj.Parent
+                    if parent and parent:IsA("Model") then
+                        local primary = parent:FindFirstChild("HumanoidRootPart") or parent.PrimaryPart
+                        if primary then root = primary end
+                    end
+                    local dist = (localPos - root.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        nearest = { Object = root }
                     end
                 end
             end
-            return nearest
         end
-        return nil
+        return nearest
+    end
+    return nil
+end
+
+-- ============================================================================
+-- SISTEM REFRESH TARGET REAL-TIME (dipanggil dari Heartbeat dan event)
+-- ============================================================================
+local function refreshTarget()
+    if not config.autoAimEnabled then
+        autoAimState.currentTarget = nil
+        return
+    end
+    autoAimState.currentTarget = getNearestTarget(autoAimState.targetMode)
+    autoAimState.targetDirty = false
+end
+
+-- Fungsi untuk menandai target perlu di-refresh (dipanggil dari event)
+local function markTargetDirty()
+    autoAimState.targetDirty = true
+end
+
+-- Setup event listeners untuk deteksi perubahan status player
+local function setupTargetRefreshEvents()
+    -- Bersihkan koneksi lama
+    for _, conn in ipairs(autoAimState.playerEventConnections) do
+        pcall(function() conn:Disconnect() end)
+    end
+    autoAimState.playerEventConnections = {}
+
+    -- Fungsi untuk memasang listener pada satu player
+    local function hookPlayer(player)
+        if player == localPlayer then return end
+
+        -- Team change
+        if player.Team then
+            local teamConn = player:GetPropertyChangedSignal("Team"):Connect(markTargetDirty)
+            table.insert(autoAimState.playerEventConnections, teamConn)
+        end
+
+        -- Character added/removing
+        local charAddedConn = player.CharacterAdded:Connect(markTargetDirty)
+        table.insert(autoAimState.playerEventConnections, charAddedConn)
+
+        local charRemovingConn = player.CharacterRemoving:Connect(markTargetDirty)
+        table.insert(autoAimState.playerEventConnections, charRemovingConn)
+
+        -- Jika sudah ada karakter, pantau Humanoid Health (untuk deteksi mati)
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local healthConn = hum:GetPropertyChangedSignal("Health"):Connect(markTargetDirty)
+                table.insert(autoAimState.playerEventConnections, healthConn)
+            end
+        end
     end
 
-    local function lockToTarget(targetInfo, duration)
-        local rootPart = autoAimState.currentRootPart
-        local humanoid = autoAimState.currentHumanoid
-        local camera = autoAimState.currentCamera
-        if not targetInfo or not targetInfo.Object then return end
-        if not camera or not rootPart or not humanoid then return end
+    -- Hook semua player yang sudah ada
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            hookPlayer(player)
+        end
+    end
 
-        if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-        if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
+    -- Player baru bergabung
+    local playerAddedConn = Players.PlayerAdded:Connect(function(player)
+        hookPlayer(player)
+        markTargetDirty()
+    end)
+    table.insert(autoAimState.playerEventConnections, playerAddedConn)
 
-        autoAimState.lockActive = true
-        duration = duration or 2.5
+    -- Player keluar
+    local playerRemovingConn = Players.PlayerRemoving:Connect(markTargetDirty)
+    table.insert(autoAimState.playerEventConnections, playerRemovingConn)
 
-        autoAimState.lockConn = RunService.RenderStepped:Connect(function()
-            if not autoAimState.lockActive then
-                autoAimState.lockConn:Disconnect()
-                autoAimState.lockConn = nil
-                return
-            end
-            local targetObj = targetInfo.Object
-            if not targetObj or not targetObj.Parent then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
-            local targetPos = targetObj.Position
-            if not targetPos then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
-            local camPos = camera.CFrame.Position
-            camera.CFrame = CFrame.lookAt(camPos, targetPos)
-            if rootPart and humanoid then
-                local currentPos = rootPart.Position
-                local lookDir = (targetPos - currentPos)
-                if lookDir.Magnitude > 0.5 then
-                    rootPart.CFrame = CFrame.new(currentPos, targetPos)
-                    humanoid.AutoRotate = false
-                end
-            end
-        end)
+    -- LocalPlayer Character berubah (respawn, dll)
+    local localCharAddedConn = localPlayer.CharacterAdded:Connect(markTargetDirty)
+    table.insert(autoAimState.playerEventConnections, localCharAddedConn)
+end
 
-        autoAimState.lockTimer = task.spawn(function()
-            task.wait(duration)
+-- ============================================================================
+-- FUNGSI LOCK (menggunakan target terbaru dari cache)
+-- ============================================================================
+local function lockToTarget(targetInfo, duration)
+    if not targetInfo or not targetInfo.Object then return end
+    if not camera or not localRootPart or not localHumanoid then return end
+
+    if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+    if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
+
+    autoAimState.lockActive = true
+    duration = duration or 2.5
+
+    autoAimState.lockConn = RunService.RenderStepped:Connect(function()
+        if not autoAimState.lockActive then
+            autoAimState.lockConn:Disconnect()
+            autoAimState.lockConn = nil
+            return
+        end
+        local targetObj = targetInfo.Object
+        if not targetObj or not targetObj.Parent then
             autoAimState.lockActive = false
-            if autoAimState.lockConn then
-                autoAimState.lockConn:Disconnect()
-                autoAimState.lockConn = nil
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            return
+        end
+        local targetPos = targetObj.Position
+        if not targetPos then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            return
+        end
+        local camPos = camera.CFrame.Position
+        camera.CFrame = CFrame.lookAt(camPos, targetPos)
+        if localRootPart and localHumanoid then
+            local currentPos = localRootPart.Position
+            local lookDir = (targetPos - currentPos)
+            if lookDir.Magnitude > 0.5 then
+                localRootPart.CFrame = CFrame.new(currentPos, targetPos)
+                localHumanoid.AutoRotate = false
             end
-            if humanoid then
-                humanoid.AutoRotate = true
-            end
-        end)
-    end
+        end
+    end)
 
-    local function showModeNotification(mode)
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "AutoAimNotification"
-        gui.ResetOnSpawn = false
-        gui.Parent = game:GetService("CoreGui")
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 300, 0, 50)
-        frame.Position = UDim2.new(0.5, -150, 0.5, -25)
-        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-        frame.BackgroundTransparency = 0.3
-        frame.BorderSizePixel = 0
-        frame.Parent = gui
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 180, 255)
-        stroke.Thickness = 1
-        stroke.Transparency = 0.4
-        stroke.Parent = frame
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "Target Mode: " .. mode
-        label.TextColor3 = Color3.fromRGB(0, 220, 255)
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 14
-        label.Parent = frame
-        task.delay(2, function()
-            gui:Destroy()
-        end)
-        if autoAimState.guiRef then
-            local frame2 = autoAimState.guiRef:FindFirstChildWhichIsA("Frame")
-            if frame2 then
-                local content = frame2:FindFirstChild("Content")
-                if content then
-                    local modeLabel = content:FindFirstChild("ModeLabel")
-                    if modeLabel then
-                        modeLabel.Text = "Target: " .. mode
-                    end
+    autoAimState.lockTimer = task.spawn(function()
+        task.wait(duration)
+        autoAimState.lockActive = false
+        if autoAimState.lockConn then
+            autoAimState.lockConn:Disconnect()
+            autoAimState.lockConn = nil
+        end
+        if localHumanoid then
+            localHumanoid.AutoRotate = true
+        end
+    end)
+end
+
+-- ============================================================================
+-- FUNGSI TRIGGER LOCK (menggunakan target cache)
+-- ============================================================================
+local function triggerLock()
+    if not config.autoAimEnabled then return end
+    -- Refresh target sebelum lock (pastikan terbaru)
+    refreshTarget()
+    local target = autoAimState.currentTarget
+    if target and target.Object then
+        lockToTarget(target)  -- default duration
+    end
+end
+
+-- ============================================================================
+-- NOTIFIKASI, GUI, TOMBOL MOBILE (tidak banyak berubah)
+-- ============================================================================
+local function showModeNotification(mode)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "AutoAimNotification"
+    gui.ResetOnSpawn = false
+    gui.Parent = game:GetService("CoreGui")
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 50)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -25)
+    frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    frame.BackgroundTransparency = 0.3
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 180, 255)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.4
+    stroke.Parent = frame
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = "Target Mode: " .. mode
+    label.TextColor3 = Color3.fromRGB(0, 220, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.Parent = frame
+    task.delay(2, function()
+        gui:Destroy()
+    end)
+    if autoAimState.guiRef then
+        local frame2 = autoAimState.guiRef:FindFirstChildWhichIsA("Frame")
+        if frame2 then
+            local content = frame2:FindFirstChild("Content")
+            if content then
+                local modeLabel = content:FindFirstChild("ModeLabel")
+                if modeLabel then
+                    modeLabel.Text = "Target: " .. mode
                 end
             end
         end
     end
+end
 
-    local function createAutoAimGUI()
+local function createAutoAimGUI()
+    if autoAimState.guiRef then
+        autoAimState.guiRef:Destroy()
+        autoAimState.guiRef = nil
+    end
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "AutoAimSettings"
+    gui.ResetOnSpawn = false
+    gui.Parent = game:GetService("CoreGui")
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 220, 0, 140)
+    frame.Position = UDim2.new(0.5, -110, 0.5, -70)
+    frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+    frame.BackgroundTransparency = 0.2
+    frame.BorderSizePixel = 0
+    frame.Parent = gui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 180, 255)
+    stroke.Thickness = 1.2
+    stroke.Transparency = 0.4
+    stroke.Parent = frame
+
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 24)
+    header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
+    header.BorderSizePixel = 0
+    header.Parent = frame
+    Instance.new("UICorner", header).CornerRadius = UDim.new(0, 8)
+    local headerStroke = Instance.new("UIStroke")
+    headerStroke.Color = Color3.fromRGB(0, 180, 255)
+    headerStroke.Transparency = 0.5
+    headerStroke.Parent = header
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(0.6, 0, 1, 0)
+    title.Position = UDim2.new(0.04, 0, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "Auto Aim"
+    title.TextColor3 = Color3.fromRGB(0, 220, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 12
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = header
+
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 20, 0, 20)
+    closeBtn.Position = UDim2.new(1, -24, 0.5, -10)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 10
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Parent = header
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+    closeBtn.MouseButton1Click:Connect(function()
         if autoAimState.guiRef then
             autoAimState.guiRef:Destroy()
             autoAimState.guiRef = nil
         end
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "AutoAimSettings"
-        gui.ResetOnSpawn = false
-        gui.Parent = game:GetService("CoreGui")
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 140)
-        frame.Position = UDim2.new(0.5, -110, 0.5, -70)
-        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-        frame.BackgroundTransparency = 0.2
-        frame.BorderSizePixel = 0
-        frame.Parent = gui
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 180, 255)
-        stroke.Thickness = 1.2
-        stroke.Transparency = 0.4
-        stroke.Parent = frame
+    end)
 
-        local header = Instance.new("Frame")
-        header.Size = UDim2.new(1, 0, 0, 24)
-        header.BackgroundColor3 = Color3.fromRGB(18, 28, 44)
-        header.BorderSizePixel = 0
-        header.Parent = frame
-        Instance.new("UICorner", header).CornerRadius = UDim.new(0, 8)
-        local headerStroke = Instance.new("UIStroke")
-        headerStroke.Color = Color3.fromRGB(0, 180, 255)
-        headerStroke.Transparency = 0.5
-        headerStroke.Parent = header
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(1, -10, 1, -34)
+    content.Position = UDim2.new(0, 5, 0, 28)
+    content.BackgroundTransparency = 1
+    content.Parent = frame
+    content.Name = "Content"
 
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(0.6, 0, 1, 0)
-        title.Position = UDim2.new(0.04, 0, 0, 0)
-        title.BackgroundTransparency = 1
-        title.Text = "Auto Aim"
-        title.TextColor3 = Color3.fromRGB(0, 220, 255)
-        title.Font = Enum.Font.GothamBold
-        title.TextSize = 12
-        title.TextXAlignment = Enum.TextXAlignment.Left
-        title.Parent = header
+    local modeLabel = Instance.new("TextLabel")
+    modeLabel.Size = UDim2.new(1, 0, 0, 20)
+    modeLabel.Position = UDim2.new(0, 0, 0, 4)
+    modeLabel.BackgroundTransparency = 1
+    modeLabel.Text = "Target: " .. autoAimState.targetMode
+    modeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    modeLabel.Font = Enum.Font.Gotham
+    modeLabel.TextSize = 11
+    modeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    modeLabel.Parent = content
+    modeLabel.Name = "ModeLabel"
 
-        local closeBtn = Instance.new("TextButton")
-        closeBtn.Size = UDim2.new(0, 20, 0, 20)
-        closeBtn.Position = UDim2.new(1, -24, 0.5, -10)
-        closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        closeBtn.Text = "X"
-        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        closeBtn.Font = Enum.Font.GothamBold
-        closeBtn.TextSize = 10
-        closeBtn.BorderSizePixel = 0
-        closeBtn.Parent = header
-        Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
-        closeBtn.MouseButton1Click:Connect(function()
-            if autoAimState.guiRef then
-                autoAimState.guiRef:Destroy()
-                autoAimState.guiRef = nil
-            end
-        end)
-
-        local content = Instance.new("Frame")
-        content.Size = UDim2.new(1, -10, 1, -34)
-        content.Position = UDim2.new(0, 5, 0, 28)
-        content.BackgroundTransparency = 1
-        content.Parent = frame
-        content.Name = "Content"
-
-        local modeLabel = Instance.new("TextLabel")
-        modeLabel.Size = UDim2.new(1, 0, 0, 20)
-        modeLabel.Position = UDim2.new(0, 0, 0, 4)
-        modeLabel.BackgroundTransparency = 1
+    local switchModeBtn = Instance.new("TextButton")
+    switchModeBtn.Size = UDim2.new(0.8, 0, 0, 20)
+    switchModeBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+    switchModeBtn.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+    switchModeBtn.Text = "Switch Target (Shift+T)"
+    switchModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    switchModeBtn.Font = Enum.Font.GothamBold
+    switchModeBtn.TextSize = 10
+    switchModeBtn.BorderSizePixel = 0
+    switchModeBtn.Parent = content
+    Instance.new("UICorner", switchModeBtn).CornerRadius = UDim.new(0, 4)
+    switchModeBtn.MouseButton1Click:Connect(function()
+        local modes = {"Killer", "Survivor", "SCP"}
+        local idx
+        for i, m in ipairs(modes) do
+            if m == autoAimState.targetMode then idx = i; break end
+        end
+        idx = (idx % 3) + 1
+        autoAimState.targetMode = modes[idx]
         modeLabel.Text = "Target: " .. autoAimState.targetMode
-        modeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        modeLabel.Font = Enum.Font.Gotham
-        modeLabel.TextSize = 11
-        modeLabel.TextXAlignment = Enum.TextXAlignment.Left
-        modeLabel.Parent = content
-        modeLabel.Name = "ModeLabel"
+        showModeNotification(autoAimState.targetMode)
+        markTargetDirty() -- target mode berubah, refresh
+    end)
 
-        local switchModeBtn = Instance.new("TextButton")
-        switchModeBtn.Size = UDim2.new(0.8, 0, 0, 20)
-        switchModeBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
-        switchModeBtn.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
-        switchModeBtn.Text = "Switch Target (Shift+T)"
-        switchModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        switchModeBtn.Font = Enum.Font.GothamBold
-        switchModeBtn.TextSize = 10
-        switchModeBtn.BorderSizePixel = 0
-        switchModeBtn.Parent = content
-        Instance.new("UICorner", switchModeBtn).CornerRadius = UDim.new(0, 4)
-        switchModeBtn.MouseButton1Click:Connect(function()
-            local modes = {"Killer", "Survivor", "SCP"}
-            local idx
-            for i, m in ipairs(modes) do
-                if m == autoAimState.targetMode then idx = i; break end
-            end
-            idx = (idx % 3) + 1
-            autoAimState.targetMode = modes[idx]
-            modeLabel.Text = "Target: " .. autoAimState.targetMode
-            showModeNotification(autoAimState.targetMode)
-        end)
+    -- Mobile Lock Toggle
+    local mobileToggleRow = Instance.new("Frame")
+    mobileToggleRow.Size = UDim2.new(1, 0, 0, 22)
+    mobileToggleRow.Position = UDim2.new(0, 0, 0.55, 0)
+    mobileToggleRow.BackgroundTransparency = 1
+    mobileToggleRow.Parent = content
 
-        -- ===== TOGGLE MOBILE LOCK BUTTON =====
-        local mobileToggleRow = Instance.new("Frame")
-        mobileToggleRow.Size = UDim2.new(1, 0, 0, 22)
-        mobileToggleRow.Position = UDim2.new(0, 0, 0.55, 0)
-        mobileToggleRow.BackgroundTransparency = 1
-        mobileToggleRow.Parent = content
+    local mobileLabel = Instance.new("TextLabel")
+    mobileLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    mobileLabel.BackgroundTransparency = 1
+    mobileLabel.Text = "Mobile Lock"
+    mobileLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    mobileLabel.Font = Enum.Font.Gotham
+    mobileLabel.TextSize = 10
+    mobileLabel.TextXAlignment = Enum.TextXAlignment.Left
+    mobileLabel.Parent = mobileToggleRow
 
-        local mobileLabel = Instance.new("TextLabel")
-        mobileLabel.Size = UDim2.new(0.5, 0, 1, 0)
-        mobileLabel.BackgroundTransparency = 1
-        mobileLabel.Text = "Mobile Lock"
-        mobileLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        mobileLabel.Font = Enum.Font.Gotham
-        mobileLabel.TextSize = 10
-        mobileLabel.TextXAlignment = Enum.TextXAlignment.Left
-        mobileLabel.Parent = mobileToggleRow
+    local mobileSwitch = Instance.new("TextButton")
+    mobileSwitch.Size = UDim2.new(0, 36, 0, 16)
+    mobileSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
+    mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+    mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
+    mobileSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
+    mobileSwitch.Font = Enum.Font.GothamBold
+    mobileSwitch.TextSize = 7
+    mobileSwitch.BorderSizePixel = 0
+    mobileSwitch.AutoButtonColor = false
+    mobileSwitch.Parent = mobileToggleRow
+    local switchCorner = Instance.new("UICorner")
+    switchCorner.CornerRadius = UDim.new(1, 0)
+    switchCorner.Parent = mobileSwitch
 
-        local mobileSwitch = Instance.new("TextButton")
-        mobileSwitch.Size = UDim2.new(0, 36, 0, 16)
-        mobileSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
+    mobileSwitch.MouseButton1Click:Connect(function()
+        autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
         mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
         mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
-        mobileSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
-        mobileSwitch.Font = Enum.Font.GothamBold
-        mobileSwitch.TextSize = 7
-        mobileSwitch.BorderSizePixel = 0
-        mobileSwitch.AutoButtonColor = false
-        mobileSwitch.Parent = mobileToggleRow
-        local switchCorner = Instance.new("UICorner")
-        switchCorner.CornerRadius = UDim.new(1, 0)
-        switchCorner.Parent = mobileSwitch
-
-        mobileSwitch.MouseButton1Click:Connect(function()
-            autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
-            mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
-            mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
-            -- Toggle visibilitas tombol mobile, bukan destroy
-            if autoAimState.mobileButtonGui then
-                autoAimState.mobileButtonGui.Visible = autoAimState.mobileLockEnabled
-            end
-        end)
-
-        -- Drag GUI
-        local dragging = false
-        local dragStart, frameStart
-        header.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                dragStart = input.Position
-                frameStart = frame.Position
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local delta = input.Position - dragStart
-                frame.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
-            end
-        end)
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-
-        autoAimState.guiRef = gui
-        return gui
-    end
-
-    -- ========== TOMBOL MOBILE (LOCK BUTTON) - Dibuat SEKALI ==========
-    local function setupMobileButton()
-        -- Jika sudah ada, jangan buat ulang, hanya set visible sesuai state
+        -- Update tombol mobile tanpa menghancurkan
         if autoAimState.mobileButtonGui then
+            autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
             autoAimState.mobileButtonGui.Visible = autoAimState.mobileLockEnabled
-            return
-        end
-
-        if not autoAimState.mobileLockEnabled then return end
-
-        -- Buat ScreenGui khusus untuk tombol mobile
-        local mobileGui = Instance.new("ScreenGui")
-        mobileGui.Name = "AutoAimMobileButton"
-        mobileGui.ResetOnSpawn = false
-        mobileGui.Parent = game:GetService("CoreGui")
-        mobileGui.Visible = true
-
-        -- Buat tombol bulat minimalis (putih transparan)
-        local button = Instance.new("TextButton")
-        button.Name = "LockButton"
-        button.Size = UDim2.new(0, 50, 0, 50)
-        button.Position = UDim2.new(0.63, -25, 0.73, -25)
-        button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        button.BackgroundTransparency = 0.7
-        button.BorderSizePixel = 0
-        button.Text = "🔒"
-        button.TextColor3 = Color3.fromRGB(50, 50, 50)
-        button.Font = Enum.Font.GothamBold
-        button.TextSize = 22
-        button.Parent = mobileGui
-        button.AutoButtonColor = false
-
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(1, 0)
-        btnCorner.Parent = button
-
-        -- Simpan referensi
-        autoAimState.mobileButtonGui = mobileGui
-        autoAimState.mobileButton = button
-
-        -- Event klik tombol
-        button.MouseButton1Click:Connect(function()
-            if not config.autoAimEnabled then return end
-            local target = getNearestTarget(autoAimState.targetMode)
-            if target and target.Object then
-                lockToTarget(target, 1)
-                if autoAimState.mobileHoldTimer then
-                    task.cancel(autoAimState.mobileHoldTimer)
-                    autoAimState.mobileHoldTimer = nil
-                end
-                autoAimState.mobileHoldTimer = task.spawn(function()
-                    task.wait(1)
-                    if autoAimState.lockActive then
-                        autoAimState.lockActive = false
-                        if autoAimState.lockConn then
-                            autoAimState.lockConn:Disconnect()
-                            autoAimState.lockConn = nil
-                        end
-                        if autoAimState.lockTimer then
-                            task.cancel(autoAimState.lockTimer)
-                            autoAimState.lockTimer = nil
-                        end
-                        local hum = autoAimState.currentHumanoid
-                        if hum then
-                            hum.AutoRotate = true
-                        end
-                    end
-                end)
+        else
+            if autoAimState.mobileLockEnabled then
+                setupMobileButton()
             end
-        end)
+        end
+    end)
+
+    -- Drag GUI
+    local dragging = false
+    local dragStart, frameStart
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            frameStart = frame.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    autoAimState.guiRef = gui
+    return gui
+end
+
+-- ============================================================================
+-- TOMBOL MOBILE (dengan Visible toggle)
+-- ============================================================================
+local function setupMobileButton()
+    if autoAimState.mobileButtonGui then
+        autoAimState.mobileButtonGui:Destroy()
+        autoAimState.mobileButtonGui = nil
+        autoAimState.mobileButton = nil
     end
 
-    -- ========== DETEKSI INPUT MOUSE BUTTON 2 (PC) ==========
-    local function setupMouseButton2Detection()
-        if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
-        if autoAimState.mouseUpConn then autoAimState.mouseUpConn:Disconnect() end
+    if not autoAimState.mobileLockEnabled then return end
 
-        autoAimState.mouseDownConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not config.autoAimEnabled then return end
-            if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                local target = getNearestTarget(autoAimState.targetMode)
-                if target and target.Object then
-                    lockToTarget(target)
-                end
+    local mobileGui = Instance.new("ScreenGui")
+    mobileGui.Name = "AutoAimMobileButton"
+    mobileGui.ResetOnSpawn = false
+    mobileGui.Parent = game:GetService("CoreGui")
+
+    local button = Instance.new("TextButton")
+    button.Name = "LockButton"
+    button.Size = UDim2.new(0, 50, 0, 50)
+    button.Position = UDim2.new(0.63, -25, 0.73, -25)
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundTransparency = 0.7
+    button.BorderSizePixel = 0
+    button.Text = "🔒"
+    button.TextColor3 = Color3.fromRGB(50, 50, 50)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 22
+    button.Parent = mobileGui
+    button.AutoButtonColor = false
+
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(1, 0)
+    btnCorner.Parent = button
+
+    autoAimState.mobileButtonGui = mobileGui
+    autoAimState.mobileButton = button
+
+    button.MouseButton1Click:Connect(function()
+        if not config.autoAimEnabled then return end
+        -- Refresh target sebelum lock
+        refreshTarget()
+        local target = autoAimState.currentTarget
+        if target and target.Object then
+            lockToTarget(target, 1)  -- durasi 1 detik untuk mobile
+            if autoAimState.mobileHoldTimer then
+                task.cancel(autoAimState.mobileHoldTimer)
+                autoAimState.mobileHoldTimer = nil
             end
-        end)
-
-        autoAimState.mouseUpConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not config.autoAimEnabled then return end
-            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            autoAimState.mobileHoldTimer = task.spawn(function()
+                task.wait(1)
                 if autoAimState.lockActive then
                     autoAimState.lockActive = false
                     if autoAimState.lockConn then
@@ -3955,58 +3959,127 @@ local function startAutoAim()
                         task.cancel(autoAimState.lockTimer)
                         autoAimState.lockTimer = nil
                     end
-                    local hum = autoAimState.currentHumanoid
-                    if hum then
-                        hum.AutoRotate = true
+                    if localHumanoid then
+                        localHumanoid.AutoRotate = true
                     end
                 end
-            end
-        end)
-    end
+            end)
+        end
+    end)
+end
 
-    -- ========== KEYBIND UNTUK MODE ==========
-    local function setupKeybindDetection()
-        if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
-        autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not config.autoAimEnabled then return end
-            if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
-                local shiftDown = true
-                local releaseConn
-                releaseConn = UserInputService.InputBegan:Connect(function(subInput, subProcessed)
-                    if subProcessed then return end
-                    if shiftDown and (subInput.KeyCode == Enum.KeyCode.T or subInput.KeyCode == Enum.KeyCode.Tab) then
-                        local modes = {"Killer", "Survivor", "SCP"}
-                        local idx
-                        for i, m in ipairs(modes) do
-                            if m == autoAimState.targetMode then idx = i; break end
-                        end
-                        idx = (idx % 3) + 1
-                        autoAimState.targetMode = modes[idx]
-                        showModeNotification(autoAimState.targetMode)
-                        releaseConn:Disconnect()
+-- ============================================================================
+-- DETEKSI INPUT MOUSE BUTTON 2 & KEYBIND (menggunakan triggerLock)
+-- ============================================================================
+local function setupMouseButton2Detection()
+    if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
+    if autoAimState.mouseUpConn then autoAimState.mouseUpConn:Disconnect() end
+
+    autoAimState.mouseDownConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not config.autoAimEnabled then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            triggerLock()
+        end
+    end)
+
+    autoAimState.mouseUpConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not config.autoAimEnabled then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            if autoAimState.lockActive then
+                autoAimState.lockActive = false
+                if autoAimState.lockConn then
+                    autoAimState.lockConn:Disconnect()
+                    autoAimState.lockConn = nil
+                end
+                if autoAimState.lockTimer then
+                    task.cancel(autoAimState.lockTimer)
+                    autoAimState.lockTimer = nil
+                end
+                if localHumanoid then
+                    localHumanoid.AutoRotate = true
+                end
+            end
+        end
+    end)
+end
+
+local function setupKeybindDetection()
+    if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
+    autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not config.autoAimEnabled then return end
+        if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+            local shiftDown = true
+            local releaseConn
+            releaseConn = UserInputService.InputBegan:Connect(function(subInput, subProcessed)
+                if subProcessed then return end
+                if shiftDown and (subInput.KeyCode == Enum.KeyCode.T or subInput.KeyCode == Enum.KeyCode.Tab) then
+                    local modes = {"Killer", "Survivor", "SCP"}
+                    local idx
+                    for i, m in ipairs(modes) do
+                        if m == autoAimState.targetMode then idx = i; break end
                     end
-                end)
-                task.delay(1, function()
-                    if releaseConn then releaseConn:Disconnect() end
-                end)
-            end
-        end)
-    end
+                    idx = (idx % 3) + 1
+                    autoAimState.targetMode = modes[idx]
+                    showModeNotification(autoAimState.targetMode)
+                    markTargetDirty()
+                    releaseConn:Disconnect()
+                end
+            end)
+            task.delay(1, function()
+                if releaseConn then releaseConn:Disconnect() end
+            end)
+        end
+    end)
+end
 
-    -- ========== AKTIVASI ==========
+-- ============================================================================
+-- START / STOP AUTO AIM (pusat kontrol)
+-- ============================================================================
+local function startAutoAim()
+    if autoAimConnection then return end
+    if not config.autoAimEnabled then return end
+
+    -- Buat GUI
     createAutoAimGUI()
+
+    -- Setup input detection
     setupMouseButton2Detection()
     setupKeybindDetection()
-    setupMobileButton()  -- Sekali dibuat, visibilitas diatur oleh toggle
 
-    autoAimConnection = RunService.Heartbeat:Connect(function() end)
+    -- Setup target refresh (event + heartbeat)
+    setupTargetRefreshEvents()
 
+    -- Heartbeat untuk refresh target periodic (setiap frame atau setiap 0.1s?)
+    if autoAimState.refreshConnection then
+        autoAimState.refreshConnection:Disconnect()
+    end
+    autoAimState.refreshConnection = RunService.Heartbeat:Connect(function()
+        if not config.autoAimEnabled then
+            -- Jika dimatikan, cleanup dilakukan di stop
+            return
+        end
+        if autoAimState.targetDirty then
+            refreshTarget()
+        end
+        -- Jika target tidak dirty, kita tetap refresh sesekali (misal setiap 2 detik) untuk jaga-jaga
+        -- Tapi kita sudah punya event untuk mark dirty, jadi cukup.
+    end)
+    -- Refresh awal
+    refreshTarget()
+
+    -- Mobile button jika enabled
+    if autoAimState.mobileLockEnabled then
+        setupMobileButton()
+    end
+
+    autoAimConnection = RunService.Heartbeat:Connect(function() end) -- placeholder
     autoAimState.isActive = true
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
 end
 
--- Fungsi stopAutoAim (disesuaikan untuk cleanup)
 local function stopAutoAim()
     if not autoAimConnection then return end
 
@@ -4037,49 +4110,36 @@ local function stopAutoAim()
         task.cancel(autoAimState.mobileHoldTimer)
         autoAimState.mobileHoldTimer = nil
     end
-    if autoAimState.charAddedConn then
-        autoAimState.charAddedConn:Disconnect()
-        autoAimState.charAddedConn = nil
+    if autoAimState.refreshConnection then
+        autoAimState.refreshConnection:Disconnect()
+        autoAimState.refreshConnection = nil
     end
-    if autoAimState.teamChangedConn then
-        autoAimState.teamChangedConn:Disconnect()
-        autoAimState.teamChangedConn = nil
+    for _, conn in ipairs(autoAimState.playerEventConnections) do
+        pcall(function() conn:Disconnect() end)
     end
-    if autoAimState._teamListener then
-        autoAimState._teamListener:Disconnect()
-        autoAimState._teamListener = nil
-    end
+    autoAimState.playerEventConnections = {}
 
-    autoAimState.lockActive = false
-
-    -- Hancurkan GUI pengaturan
-    if autoAimState.guiRef then
-        autoAimState.guiRef:Destroy()
-        autoAimState.guiRef = nil
-    end
-
-    -- Hancurkan tombol mobile jika ada
     if autoAimState.mobileButtonGui then
         autoAimState.mobileButtonGui:Destroy()
         autoAimState.mobileButtonGui = nil
         autoAimState.mobileButton = nil
     end
 
-    -- Reset state
-    autoAimState.currentCharacter = nil
-    autoAimState.currentHumanoid = nil
-    autoAimState.currentRootPart = nil
-    autoAimState.currentCamera = nil
-    autoAimState.isActive = false
+    autoAimState.lockActive = false
+    autoAimState.currentTarget = nil
 
-    local hum = autoAimState.currentHumanoid
-    if hum then
-        hum.AutoRotate = true
+    if autoAimState.guiRef then
+        autoAimState.guiRef:Destroy()
+        autoAimState.guiRef = nil
     end
 
+    if localHumanoid then
+        localHumanoid.AutoRotate = true
+    end
+
+    autoAimState.isActive = false
     print("[AutoAim] Auto aim stopped")
 end
-      
 -- ============================================================================
 -- FEATURE 16: TELEPORT TO NEAREST SURVIVOR (unchanged)
 -- ============================================================================

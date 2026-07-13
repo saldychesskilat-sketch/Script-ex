@@ -3410,6 +3410,7 @@ local function stopAutoSkillCheck()
 end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
+-- ============================================================================
 
 -- Variabel state yang hanya digunakan di dalam closure start/stop
 local autoAimState = {
@@ -3417,18 +3418,21 @@ local autoAimState = {
     lockActive = false,
     lockConn = nil,
     lockTimer = nil,
-    mouseDownConn = nil,     -- koneksi untuk InputBegan MouseButton2
-    mouseUpConn = nil,       -- koneksi untuk InputEnded MouseButton2
+    mouseDownConn = nil,
+    mouseUpConn = nil,
     keyConn = nil,
     guiRef = nil,
     isActive = false,
-    mobileButton = nil,      -- tombol untuk mobile
-    mobileButtonGui = nil,   -- ScreenGui untuk tombol mobile
-    mobileHoldTimer = nil,   -- timer untuk melepas lock di mobile
-    mobileLockEnabled = false, -- toggle mobile lock button
+    mobileButton = nil,
+    mobileButtonGui = nil,
+    mobileHoldTimer = nil,
+    mobileLockEnabled = false,
+    teamChangedConn = nil,      -- koneksi untuk perubahan Team pada localPlayer
+    charAddedConn = nil,        -- koneksi untuk respawn
+    playerTeamChangedConns = {}, -- tabel untuk menyimpan koneksi perubahan Team semua player (opsional)
 }
 
--- Fungsi startAutoAim yang baru (menggantikan yang lama)
+-- Fungsi startAutoAim yang baru
 local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
@@ -3530,7 +3534,7 @@ local function startAutoAim()
         if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
 
         autoAimState.lockActive = true
-        duration = duration or 2.5  -- default 2.5 detik untuk PC
+        duration = duration or 2.5
 
         autoAimState.lockConn = RunService.RenderStepped:Connect(function()
             if not autoAimState.lockActive then
@@ -3628,7 +3632,7 @@ local function startAutoAim()
         gui.ResetOnSpawn = false
         gui.Parent = game:GetService("CoreGui")
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 140)  -- tinggi ditambah untuk toggle mobile
+        frame.Size = UDim2.new(0, 220, 0, 140)
         frame.Position = UDim2.new(0.5, -110, 0.5, -70)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
@@ -3675,7 +3679,6 @@ local function startAutoAim()
         closeBtn.Parent = header
         Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
         closeBtn.MouseButton1Click:Connect(function()
-            -- Hanya tutup GUI pengaturan, jangan matikan Auto Aim
             if autoAimState.guiRef then
                 autoAimState.guiRef:Destroy()
                 autoAimState.guiRef = nil
@@ -3760,14 +3763,10 @@ local function startAutoAim()
             autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
             mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
             mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
-            if autoAimState.mobileLockEnabled then
-                setupMobileButton()
-            else
-                if autoAimState.mobileButtonGui then
-                    autoAimState.mobileButtonGui:Destroy()
-                    autoAimState.mobileButtonGui = nil
-                    autoAimState.mobileButton = nil
-                end
+            -- Hanya ubah Visible, tidak menghancurkan/membuat ulang
+            if autoAimState.mobileButtonGui then
+                autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
+                autoAimState.mobileButton.Visible = autoAimState.mobileLockEnabled
             end
         end)
 
@@ -3799,22 +3798,20 @@ local function startAutoAim()
 
     -- ========== TOMBOL MOBILE (LOCK BUTTON) ==========
     local function setupMobileButton()
-        -- Hancurkan tombol lama jika ada
+        -- Hancurkan tombol lama jika ada (hanya jika benar-benar perlu dibuat ulang)
         if autoAimState.mobileButtonGui then
             autoAimState.mobileButtonGui:Destroy()
             autoAimState.mobileButtonGui = nil
             autoAimState.mobileButton = nil
         end
 
-        if not autoAimState.mobileLockEnabled then return end
-
-        -- Buat ScreenGui khusus untuk tombol mobile
+        -- Buat ScreenGui khusus untuk tombol mobile (hanya sekali)
         local mobileGui = Instance.new("ScreenGui")
         mobileGui.Name = "AutoAimMobileButton"
         mobileGui.ResetOnSpawn = false
         mobileGui.Parent = game:GetService("CoreGui")
+        mobileGui.Enabled = autoAimState.mobileLockEnabled
 
-        -- Buat tombol bulat minimalis (putih transparan)
         local button = Instance.new("TextButton")
         button.Name = "LockButton"
         button.Size = UDim2.new(0, 50, 0, 50)
@@ -3828,23 +3825,21 @@ local function startAutoAim()
         button.TextSize = 22
         button.Parent = mobileGui
         button.AutoButtonColor = false
+        button.Visible = autoAimState.mobileLockEnabled
 
-        -- Buat sudut bulat
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(1, 0)
         btnCorner.Parent = button
 
-        -- Simpan referensi
         autoAimState.mobileButtonGui = mobileGui
         autoAimState.mobileButton = button
 
-        -- Event klik tombol (sama seperti MouseButton2 di PC, durasi 1 detik)
         button.MouseButton1Click:Connect(function()
             if not config.autoAimEnabled then return end
+            if not autoAimState.mobileLockEnabled then return end
             local target = getNearestTarget(autoAimState.targetMode)
             if target and target.Object then
-                lockToTarget(target, 1)  -- durasi 1 detik untuk mobile
-                -- Timer otomatis untuk melepas lock setelah 1 detik (karena mobile tidak ada mouse up)
+                lockToTarget(target, 1)
                 if autoAimState.mobileHoldTimer then
                     task.cancel(autoAimState.mobileHoldTimer)
                     autoAimState.mobileHoldTimer = nil
@@ -3867,6 +3862,42 @@ local function startAutoAim()
                     end
                 end)
             end
+        end)
+    end
+
+    -- ========== DETEKSI PERUBAHAN STATUS PEMAIN (REAL-TIME) ==========
+    local function setupRoleDetection()
+        -- Pantau perubahan Team pada LocalPlayer
+        if autoAimState.teamChangedConn then autoAimState.teamChangedConn:Disconnect() end
+        autoAimState.teamChangedConn = localPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+            -- Team berubah, update role jika diperlukan
+            -- getNearestTarget akan membaca Team setiap dipanggil, jadi tidak perlu action khusus
+            -- Tapi kita bisa update notification jika ingin.
+            print("[AutoAim] LocalPlayer team changed")
+        end)
+
+        -- Pantau respawn karakter (CharacterAdded)
+        if autoAimState.charAddedConn then autoAimState.charAddedConn:Disconnect() end
+        autoAimState.charAddedConn = localPlayer.CharacterAdded:Connect(function(char)
+            -- Karakter baru, pastikan state lock direset jika ada yang tertinggal
+            if autoAimState.lockActive then
+                autoAimState.lockActive = false
+                if autoAimState.lockConn then
+                    autoAimState.lockConn:Disconnect()
+                    autoAimState.lockConn = nil
+                end
+                if autoAimState.lockTimer then
+                    task.cancel(autoAimState.lockTimer)
+                    autoAimState.lockTimer = nil
+                end
+                if localHumanoid then
+                    localHumanoid.AutoRotate = true
+                end
+            end
+            -- Update referensi localHumanoid, localRootPart jika perlu
+            localHumanoid = char:FindFirstChildOfClass("Humanoid")
+            localRootPart = char:FindFirstChild("HumanoidRootPart")
+            print("[AutoAim] Character respawned, references updated")
         end)
     end
 
@@ -3942,10 +3973,10 @@ local function startAutoAim()
     createAutoAimGUI()
     setupMouseButton2Detection()
     setupKeybindDetection()
-    -- Jika mobileLockEnabled sudah true dari state sebelumnya (misal persist), buat tombol
-    if autoAimState.mobileLockEnabled then
-        setupMobileButton()
-    end
+    setupRoleDetection() -- deteksi perubahan status pemain
+
+    -- Buat tombol mobile (hanya sekali, akan di-toggle Visible)
+    setupMobileButton()
 
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 
@@ -3971,6 +4002,14 @@ local function stopAutoAim()
     if autoAimState.keyConn then
         autoAimState.keyConn:Disconnect()
         autoAimState.keyConn = nil
+    end
+    if autoAimState.teamChangedConn then
+        autoAimState.teamChangedConn:Disconnect()
+        autoAimState.teamChangedConn = nil
+    end
+    if autoAimState.charAddedConn then
+        autoAimState.charAddedConn:Disconnect()
+        autoAimState.charAddedConn = nil
     end
     if autoAimState.lockConn then
         autoAimState.lockConn:Disconnect()

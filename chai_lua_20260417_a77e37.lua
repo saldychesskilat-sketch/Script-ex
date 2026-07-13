@@ -3411,7 +3411,6 @@ end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================
-  
 -- Variabel state yang hanya digunakan di dalam closure start/stop
 local autoAimState = {
     targetMode = "Killer",   -- Killer, Survivor, SCP
@@ -3427,8 +3426,9 @@ local autoAimState = {
     mobileButtonGui = nil,   -- ScreenGui untuk tombol mobile
     mobileHoldTimer = nil,   -- timer untuk melepas lock di mobile
     mobileLockEnabled = false, -- toggle mobile lock button
-    teamChangeConn = nil,    -- koneksi untuk perubahan Team
-    charAddedConn = nil,     -- koneksi untuk CharacterAdded
+    charAddedConn = nil,     -- untuk deteksi respawn
+    charRemovingConn = nil,  -- untuk deteksi karakter hilang
+    targetCache = nil,       -- cache target terakhir untuk fallback
 }
 
 -- Fungsi startAutoAim yang baru (menggantikan yang lama)
@@ -3438,8 +3438,16 @@ local function startAutoAim()
 
     -- ========== HELPER FUNCTIONS ==========
     local function getNearestTarget(mode)
-        if not localRootPart then return nil end
-        local localPos = localRootPart.Position
+        -- Refresh referensi root part dan camera setiap kali dipanggil
+        local rootPart = localRootPart
+        if not rootPart then
+            local char = localPlayer.Character
+            if char then
+                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            end
+            if not rootPart then return nil end
+        end
+        local localPos = rootPart.Position
         local nearest = nil
         local minDist = math.huge
 
@@ -3458,9 +3466,9 @@ local function startAutoAim()
                             if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
                         end
                         if isKiller then
-                            local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                            if root then
-                                return { Object = root, Player = player }
+                            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                            if targetRoot then
+                                return { Object = targetRoot, Player = player }
                             end
                         end
                     end
@@ -3484,15 +3492,15 @@ local function startAutoAim()
                             if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then isKiller = true end
                         end
                         if not isKiller then
-                            local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-                            if root then
-                                local dirToTarget = (root.Position - camera.CFrame.Position).Unit
+                            local targetRoot = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                            if targetRoot then
+                                local dirToTarget = (targetRoot.Position - camera.CFrame.Position).Unit
                                 local dot = camera.CFrame.LookVector:Dot(dirToTarget)
                                 if dot > 0 then
-                                    local dist = (localPos - root.Position).Magnitude
+                                    local dist = (localPos - targetRoot.Position).Magnitude
                                     if dist < minDist then
                                         minDist = dist
-                                        nearest = { Object = root, Player = player }
+                                        nearest = { Object = targetRoot, Player = player }
                                     end
                                 end
                             end
@@ -3527,7 +3535,24 @@ local function startAutoAim()
 
     local function lockToTarget(targetInfo, duration)
         if not targetInfo or not targetInfo.Object then return end
-        if not camera or not localRootPart or not localHumanoid then return end
+        local rootPart = localRootPart
+        if not rootPart then
+            local char = localPlayer.Character
+            if char then
+                rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            end
+            if not rootPart then return end
+        end
+        local humanoid = localHumanoid
+        if not humanoid then
+            local char = localPlayer.Character
+            if char then
+                humanoid = char:FindFirstChildOfClass("Humanoid")
+            end
+            if not humanoid then return end
+        end
+        local cam = camera or workspace.CurrentCamera
+        if not cam then return end
 
         if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
         if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
@@ -3553,14 +3578,14 @@ local function startAutoAim()
                 if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
                 return
             end
-            local camPos = camera.CFrame.Position
-            camera.CFrame = CFrame.lookAt(camPos, targetPos)
-            if localRootPart and localHumanoid then
-                local currentPos = localRootPart.Position
+            local camPos = cam.CFrame.Position
+            cam.CFrame = CFrame.lookAt(camPos, targetPos)
+            if rootPart and humanoid then
+                local currentPos = rootPart.Position
                 local lookDir = (targetPos - currentPos)
                 if lookDir.Magnitude > 0.5 then
-                    localRootPart.CFrame = CFrame.new(currentPos, targetPos)
-                    localHumanoid.AutoRotate = false
+                    rootPart.CFrame = CFrame.new(currentPos, targetPos)
+                    humanoid.AutoRotate = false
                 end
             end
         end)
@@ -3572,8 +3597,8 @@ local function startAutoAim()
                 autoAimState.lockConn:Disconnect()
                 autoAimState.lockConn = nil
             end
-            if localHumanoid then
-                localHumanoid.AutoRotate = true
+            if humanoid then
+                humanoid.AutoRotate = true
             end
         end)
     end
@@ -3726,7 +3751,7 @@ local function startAutoAim()
             showModeNotification(autoAimState.targetMode)
         end)
 
-        -- ===== TOGGLE MOBILE LOCK BUTTON (MODERN SWITCH) =====
+        -- ===== TOGGLE MOBILE LOCK BUTTON (Switch iOS style) =====
         local mobileToggleRow = Instance.new("Frame")
         mobileToggleRow.Size = UDim2.new(1, 0, 0, 26)
         mobileToggleRow.Position = UDim2.new(0, 0, 0.55, 0)
@@ -3743,55 +3768,62 @@ local function startAutoAim()
         mobileLabel.TextXAlignment = Enum.TextXAlignment.Left
         mobileLabel.Parent = mobileToggleRow
 
-        -- Track switch (kapsul)
-        local switchTrack = Instance.new("Frame")
-        switchTrack.Size = UDim2.new(0, 44, 0, 22)
-        switchTrack.Position = UDim2.new(0.65, 0, 0.5, -11)
-        switchTrack.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(80, 80, 80)
-        switchTrack.BorderSizePixel = 0
-        switchTrack.Parent = mobileToggleRow
-        local trackCorner = Instance.new("UICorner")
-        trackCorner.CornerRadius = UDim.new(1, 0)
-        trackCorner.Parent = switchTrack
+        -- Container switch
+        local switchContainer = Instance.new("Frame")
+        switchContainer.Size = UDim2.new(0, 50, 0, 26)
+        switchContainer.Position = UDim2.new(0.65, 0, 0.5, -13)
+        switchContainer.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(60, 60, 70)
+        switchContainer.BorderSizePixel = 0
+        switchContainer.Parent = mobileToggleRow
+        local switchContainerCorner = Instance.new("UICorner")
+        switchContainerCorner.CornerRadius = UDim.new(1, 0)
+        switchContainerCorner.Parent = switchContainer
 
-        -- Knob bulat
-        local knob = Instance.new("TextButton")
-        knob.Size = UDim2.new(0, 18, 0, 18)
-        knob.Position = autoAimState.mobileLockEnabled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
-        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        knob.BorderSizePixel = 0
-        knob.Text = ""
-        knob.AutoButtonColor = false
-        knob.Parent = switchTrack
-        local knobCorner = Instance.new("UICorner")
-        knobCorner.CornerRadius = UDim.new(1, 0)
-        knobCorner.Parent = knob
+        -- Thumb (bulat)
+        local switchThumb = Instance.new("TextButton")
+        switchThumb.Size = UDim2.new(0, 20, 0, 20)
+        switchThumb.Position = autoAimState.mobileLockEnabled and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
+        switchThumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        switchThumb.BorderSizePixel = 0
+        switchThumb.Text = ""
+        switchThumb.Parent = switchContainer
+        local thumbCorner = Instance.new("UICorner")
+        thumbCorner.CornerRadius = UDim.new(1, 0)
+        thumbCorner.Parent = switchThumb
+        -- Tambahkan bayangan tipis
+        local thumbStroke = Instance.new("UIStroke")
+        thumbStroke.Color = Color3.fromRGB(200, 200, 200)
+        thumbStroke.Thickness = 0.5
+        thumbStroke.Transparency = 0.5
+        thumbStroke.Parent = switchThumb
 
         -- Fungsi update switch
         local function updateMobileSwitch(state)
             autoAimState.mobileLockEnabled = state
-            local targetColor = state and Color3.fromRGB(0, 150, 255) or Color3.fromRGB(80, 80, 80)
-            switchTrack.BackgroundColor3 = targetColor
-            local knobPos = state and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
-            TweenService:Create(knob, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Position = knobPos}):Play()
-            -- Tampilkan/sembunyikan tombol mobile
-            if autoAimState.mobileButtonGui then
-                autoAimState.mobileButtonGui.Enabled = state
-            elseif state then
+            switchContainer.BackgroundColor3 = state and Color3.fromRGB(0, 180, 255) or Color3.fromRGB(60, 60, 70)
+            TweenService:Create(switchThumb, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {
+                Position = state and UDim2.new(1, -22, 0.5, -10) or UDim2.new(0, 2, 0.5, -10)
+            }):Play()
+            if state then
                 setupMobileButton()
+            else
+                if autoAimState.mobileButtonGui then
+                    autoAimState.mobileButtonGui:Destroy()
+                    autoAimState.mobileButtonGui = nil
+                    autoAimState.mobileButton = nil
+                end
             end
         end
 
-        -- Event klik pada track atau knob
-        local function toggleMobileSwitch()
+        switchThumb.MouseButton1Click:Connect(function()
             updateMobileSwitch(not autoAimState.mobileLockEnabled)
-        end
-
-        knob.MouseButton1Click:Connect(toggleMobileSwitch)
-        switchTrack.MouseButton1Click:Connect(toggleMobileSwitch)
-
-        -- Inisialisasi switch sesuai state
-        updateMobileSwitch(autoAimState.mobileLockEnabled)
+        end)
+        -- Klik pada container juga bisa toggle
+        switchContainer.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                updateMobileSwitch(not autoAimState.mobileLockEnabled)
+            end
+        end)
 
         -- Drag GUI
         local dragging = false
@@ -3821,20 +3853,18 @@ local function startAutoAim()
 
     -- ========== TOMBOL MOBILE (LOCK BUTTON) ==========
     local function setupMobileButton()
-        -- Jika GUI sudah ada, cukup enable/disable sesuai state
         if autoAimState.mobileButtonGui then
-            autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
-            return
+            autoAimState.mobileButtonGui:Destroy()
+            autoAimState.mobileButtonGui = nil
+            autoAimState.mobileButton = nil
         end
 
-        -- Hanya buat jika toggle ON
         if not autoAimState.mobileLockEnabled then return end
 
         local mobileGui = Instance.new("ScreenGui")
         mobileGui.Name = "AutoAimMobileButton"
         mobileGui.ResetOnSpawn = false
         mobileGui.Parent = game:GetService("CoreGui")
-        mobileGui.Enabled = true
 
         local button = Instance.new("TextButton")
         button.Name = "LockButton"
@@ -3849,7 +3879,6 @@ local function startAutoAim()
         button.TextSize = 22
         button.Parent = mobileGui
         button.AutoButtonColor = false
-
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(1, 0)
         btnCorner.Parent = button
@@ -3878,54 +3907,19 @@ local function startAutoAim()
                             task.cancel(autoAimState.lockTimer)
                             autoAimState.lockTimer = nil
                         end
-                        if localHumanoid then
-                            localHumanoid.AutoRotate = true
+                        local humanoid = localHumanoid
+                        if not humanoid then
+                            local char = localPlayer.Character
+                            if char then
+                                humanoid = char:FindFirstChildOfClass("Humanoid")
+                            end
+                        end
+                        if humanoid then
+                            humanoid.AutoRotate = true
                         end
                     end
                 end)
             end
-        end)
-    end
-
-    -- ========== DETEKSI PERUBAHAN TEAM / ROLE ==========
-    local function onTeamChanged()
-        if autoAimState.lockActive then
-            autoAimState.lockActive = false
-            if autoAimState.lockConn then
-                autoAimState.lockConn:Disconnect()
-                autoAimState.lockConn = nil
-            end
-            if autoAimState.lockTimer then
-                task.cancel(autoAimState.lockTimer)
-                autoAimState.lockTimer = nil
-            end
-            if localHumanoid then
-                localHumanoid.AutoRotate = true
-            end
-        end
-        print("[AutoAim] Team changed, reset lock state")
-    end
-
-    local function setupTeamChangeDetection()
-        if autoAimState.teamChangeConn then autoAimState.teamChangeConn:Disconnect() end
-        autoAimState.teamChangeConn = localPlayer:GetPropertyChangedSignal("Team"):Connect(onTeamChanged)
-        if autoAimState.charAddedConn then autoAimState.charAddedConn:Disconnect() end
-        autoAimState.charAddedConn = localPlayer.CharacterAdded:Connect(function()
-            if autoAimState.lockActive then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then
-                    autoAimState.lockConn:Disconnect()
-                    autoAimState.lockConn = nil
-                end
-                if autoAimState.lockTimer then
-                    task.cancel(autoAimState.lockTimer)
-                    autoAimState.lockTimer = nil
-                end
-                if localHumanoid then
-                    localHumanoid.AutoRotate = true
-                end
-            end
-            print("[AutoAim] Character respawned, reset lock state")
         end)
     end
 
@@ -3959,8 +3953,15 @@ local function startAutoAim()
                         task.cancel(autoAimState.lockTimer)
                         autoAimState.lockTimer = nil
                     end
-                    if localHumanoid then
-                        localHumanoid.AutoRotate = true
+                    local humanoid = localHumanoid
+                    if not humanoid then
+                        local char = localPlayer.Character
+                        if char then
+                            humanoid = char:FindFirstChildOfClass("Humanoid")
+                        end
+                    end
+                    if humanoid then
+                        humanoid.AutoRotate = true
                     end
                 end
             end
@@ -3997,14 +3998,49 @@ local function startAutoAim()
         end)
     end
 
+    -- ========== REFRESH STATE SAAT KARAKTER BERUBAH ==========
+    local function refreshCharacterState()
+        -- Batalkan lock yang sedang berjalan
+        if autoAimState.lockActive then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then
+                autoAimState.lockConn:Disconnect()
+                autoAimState.lockConn = nil
+            end
+            if autoAimState.lockTimer then
+                task.cancel(autoAimState.lockTimer)
+                autoAimState.lockTimer = nil
+            end
+        end
+        -- Reset referensi target cache
+        autoAimState.targetCache = nil
+        -- Refresh localRootPart, localHumanoid, camera akan terjadi otomatis di getNearestTarget dan lockToTarget
+    end
+
+    -- Event saat karakter baru
+    if autoAimState.charAddedConn then autoAimState.charAddedConn:Disconnect() end
+    autoAimState.charAddedConn = localPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5) -- beri waktu untuk stabil
+        refreshCharacterState()
+        -- Jika mobile lock enabled, pastikan tombol tetap ada (dibuat ulang jika perlu)
+        if autoAimState.mobileLockEnabled then
+            setupMobileButton()
+        end
+    end)
+
+    -- Event saat karakter akan dihapus
+    if autoAimState.charRemovingConn then autoAimState.charRemovingConn:Disconnect() end
+    autoAimState.charRemovingConn = localPlayer.CharacterRemoving:Connect(function()
+        refreshCharacterState()
+    end)
+
     -- ========== AKTIVASI ==========
     createAutoAimGUI()
     setupMouseButton2Detection()
     setupKeybindDetection()
-    setupTeamChangeDetection()
-
-    -- Buat tombol mobile sekali saja
-    setupMobileButton()
+    if autoAimState.mobileLockEnabled then
+        setupMobileButton()
+    end
 
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 
@@ -4019,6 +4055,14 @@ local function stopAutoAim()
     autoAimConnection:Disconnect()
     autoAimConnection = nil
 
+    if autoAimState.charAddedConn then
+        autoAimState.charAddedConn:Disconnect()
+        autoAimState.charAddedConn = nil
+    end
+    if autoAimState.charRemovingConn then
+        autoAimState.charRemovingConn:Disconnect()
+        autoAimState.charRemovingConn = nil
+    end
     if autoAimState.mouseDownConn then
         autoAimState.mouseDownConn:Disconnect()
         autoAimState.mouseDownConn = nil
@@ -4043,14 +4087,6 @@ local function stopAutoAim()
         task.cancel(autoAimState.mobileHoldTimer)
         autoAimState.mobileHoldTimer = nil
     end
-    if autoAimState.teamChangeConn then
-        autoAimState.teamChangeConn:Disconnect()
-        autoAimState.teamChangeConn = nil
-    end
-    if autoAimState.charAddedConn then
-        autoAimState.charAddedConn:Disconnect()
-        autoAimState.charAddedConn = nil
-    end
 
     if autoAimState.mobileButtonGui then
         autoAimState.mobileButtonGui:Destroy()
@@ -4065,13 +4101,21 @@ local function stopAutoAim()
         autoAimState.guiRef = nil
     end
 
-    if localHumanoid then
-        localHumanoid.AutoRotate = true
+    local humanoid = localHumanoid
+    if not humanoid then
+        local char = localPlayer.Character
+        if char then
+            humanoid = char:FindFirstChildOfClass("Humanoid")
+        end
+    end
+    if humanoid then
+        humanoid.AutoRotate = true
     end
 
     autoAimState.isActive = false
     print("[AutoAim] Auto aim stopped")
 end
+
        
 -- ============================================================================
 -- FEATURE 16: TELEPORT TO NEAREST SURVIVOR (unchanged)

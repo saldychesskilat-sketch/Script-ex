@@ -3974,8 +3974,9 @@ local function startAutoAim()
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
     end
     -- Fungsi stopAutoAim (tidak berubah, tetap menghancurkan semua)
-    local function stopAutoAim()
-        if not autoAimConnection then return end
+
+local function stopAutoAim()
+    if not autoAimConnection then return end
 
     autoAimConnection:Disconnect()
     autoAimConnection = nil

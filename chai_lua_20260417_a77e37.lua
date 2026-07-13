@@ -3792,9 +3792,9 @@ local function startAutoAim()
             autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
             mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
             mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
-            if autoAimState.mobileLockEnabled then
-                setupMobileButton()
-            else
+            -- update visibilitas tombol tanpa destroy
+            setupMobileButton()
+        end)
                 if autoAimState.mobileButtonGui then
                     autoAimState.mobileButtonGui:Destroy()
                     autoAimState.mobileButtonGui = nil

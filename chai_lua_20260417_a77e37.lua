@@ -3972,8 +3972,7 @@ local function startAutoAim()
 
     autoAimState.isActive = true
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
-    end
-    -- Fungsi stopAutoAim (tidak berubah, tetap menghancurkan semua)
+end
 
 local function stopAutoAim()
     if not autoAimConnection then return end

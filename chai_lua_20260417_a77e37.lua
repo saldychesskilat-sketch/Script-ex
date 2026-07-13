@@ -3849,7 +3849,7 @@ local function startAutoAim()
         local button = Instance.new("TextButton")
         button.Name = "LockButton"
         button.Size = UDim2.new(0, 50, 0, 50)
-        button.Position = UDim2.new(0.63, 45, 0.73, -35)
+        button.Position = UDim2.new(0.63, 40, 0.73, -35)
         button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button.BackgroundTransparency = 0.7
         button.BorderSizePixel = 0

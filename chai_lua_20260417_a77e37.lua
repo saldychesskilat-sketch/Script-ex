@@ -3426,19 +3426,35 @@ local autoAimState = {
     mobileButtonGui = nil,
     mobileHoldTimer = nil,
     mobileLockEnabled = false,
+    localCharAddedConn = nil, -- koneksi untuk CharacterAdded
 }
 
--- Fungsi startAutoAim yang baru (menggantikan yang lama)
+-- Helper: dapatkan RootPart terkini
+local function getCurrentRootPart()
+    local char = localPlayer.Character
+    if char then
+        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    end
+    return nil
+end
+
+-- Helper: dapatkan Humanoid terkini
+local function getCurrentHumanoid()
+    local char = localPlayer.Character
+    if char then
+        return char:FindFirstChildOfClass("Humanoid")
+    end
+    return nil
+end
+
+-- Fungsi startAutoAim (Enhanced dengan auto-recovery setelah respawn)
 local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
 
     -- ========== HELPER FUNCTIONS ==========
     local function getNearestTarget(mode)
-        -- Ambil root part lokal terbaru
-        local localChar = localPlayer.Character
-        if not localChar then return nil end
-        local localRootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+        local localRootPart = getCurrentRootPart()
         if not localRootPart then return nil end
         local localPos = localRootPart.Position
         local nearest = nil
@@ -3461,7 +3477,10 @@ local function startAutoAim()
                         if isKiller then
                             local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
                             if root then
-                                return { Object = root, Player = player }
+                                local hum = char:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    return { Object = root, Player = player }
+                                end
                             end
                         end
                     end
@@ -3487,13 +3506,16 @@ local function startAutoAim()
                         if not isKiller then
                             local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
                             if root then
-                                local dirToTarget = (root.Position - camera.CFrame.Position).Unit
-                                local dot = camera.CFrame.LookVector:Dot(dirToTarget)
-                                if dot > 0 then
-                                    local dist = (localPos - root.Position).Magnitude
-                                    if dist < minDist then
-                                        minDist = dist
-                                        nearest = { Object = root, Player = player }
+                                local hum = char:FindFirstChildOfClass("Humanoid")
+                                if hum and hum.Health > 0 then
+                                    local dirToTarget = (root.Position - camera.CFrame.Position).Unit
+                                    local dot = camera.CFrame.LookVector:Dot(dirToTarget)
+                                    if dot > 0 then
+                                        local dist = (localPos - root.Position).Magnitude
+                                        if dist < minDist then
+                                            minDist = dist
+                                            nearest = { Object = root, Player = player }
+                                        end
                                     end
                                 end
                             end
@@ -3513,10 +3535,15 @@ local function startAutoAim()
                             local primary = parent:FindFirstChild("HumanoidRootPart") or parent.PrimaryPart
                             if primary then root = primary end
                         end
-                        local dist = (localPos - root.Position).Magnitude
-                        if dist < minDist then
-                            minDist = dist
-                            nearest = { Object = root }
+                        if root and root.Parent and root.Parent:IsA("Model") then
+                            local hum = root.Parent:FindFirstChildOfClass("Humanoid")
+                            if hum and hum.Health > 0 then
+                                local dist = (localPos - root.Position).Magnitude
+                                if dist < minDist then
+                                    minDist = dist
+                                    nearest = { Object = root }
+                                end
+                            end
                         end
                     end
                 end
@@ -3528,12 +3555,9 @@ local function startAutoAim()
 
     local function lockToTarget(targetInfo, duration)
         if not targetInfo or not targetInfo.Object then return end
-        -- Ambil referensi terbaru
-        local char = localPlayer.Character
-        if not char then return end
-        local localRootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-        local localHumanoid = char:FindFirstChildOfClass("Humanoid")
         local camera = workspace.CurrentCamera
+        local localRootPart = getCurrentRootPart()
+        local localHumanoid = getCurrentHumanoid()
         if not camera or not localRootPart or not localHumanoid then return end
 
         if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
@@ -3548,25 +3572,32 @@ local function startAutoAim()
                 autoAimState.lockConn = nil
                 return
             end
-            -- Refresh referensi setiap frame
-            local currentChar = localPlayer.Character
-            if not currentChar then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
-            local currentRoot = currentChar:FindFirstChild("HumanoidRootPart") or currentChar:FindFirstChild("Torso")
-            local currentHumanoid = currentChar:FindFirstChildOfClass("Humanoid")
-            if not currentRoot or not currentHumanoid then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
             local targetObj = targetInfo.Object
             if not targetObj or not targetObj.Parent then
                 autoAimState.lockActive = false
                 if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
                 return
+            end
+            -- Validasi target
+            if targetInfo.Player then
+                local char = targetInfo.Player.Character
+                if not char or char ~= targetObj.Parent then
+                    autoAimState.lockActive = false
+                    if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+                    return
+                end
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if not hum or hum.Health <= 0 then
+                    autoAimState.lockActive = false
+                    if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+                    return
+                end
+            elseif targetInfo.Object and targetInfo.Object.Parent then
+                if not targetInfo.Object.Parent:IsDescendantOf(workspace) then
+                    autoAimState.lockActive = false
+                    if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+                    return
+                end
             end
             local targetPos = targetObj.Position
             if not targetPos then
@@ -3574,15 +3605,24 @@ local function startAutoAim()
                 if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
                 return
             end
-            local cam = workspace.CurrentCamera
-            if not cam then return
-            local camPos = cam.CFrame.Position
-            cam.CFrame = CFrame.lookAt(camPos, targetPos)
-            local currentPos = currentRoot.Position
-            local lookDir = (targetPos - currentPos)
-            if lookDir.Magnitude > 0.5 then
-                currentRoot.CFrame = CFrame.new(currentPos, targetPos)
-                currentHumanoid.AutoRotate = false
+            -- Refresh referensi lokal setiap frame
+            local currentCam = workspace.CurrentCamera
+            local currentRoot = getCurrentRootPart()
+            local currentHumanoid = getCurrentHumanoid()
+            if not currentCam or not currentRoot or not currentHumanoid then
+                autoAimState.lockActive = false
+                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+                return
+            end
+            local camPos = currentCam.CFrame.Position
+            currentCam.CFrame = CFrame.lookAt(camPos, targetPos)
+            if currentRoot and currentHumanoid then
+                local currentPos = currentRoot.Position
+                local lookDir = (targetPos - currentPos)
+                if lookDir.Magnitude > 0.5 then
+                    currentRoot.CFrame = CFrame.new(currentPos, targetPos)
+                    currentHumanoid.AutoRotate = false
+                end
             end
         end)
 
@@ -3593,10 +3633,9 @@ local function startAutoAim()
                 autoAimState.lockConn:Disconnect()
                 autoAimState.lockConn = nil
             end
-            local currentChar = localPlayer.Character
-            if currentChar then
-                local hum = currentChar:FindFirstChildOfClass("Humanoid")
-                if hum then hum.AutoRotate = true end
+            local hum = getCurrentHumanoid()
+            if hum then
+                hum.AutoRotate = true
             end
         end)
     end
@@ -3749,7 +3788,7 @@ local function startAutoAim()
             showModeNotification(autoAimState.targetMode)
         end)
 
-        -- ===== TOGGLE MOBILE LOCK BUTTON =====
+        -- Toggle Mobile Lock Button
         local mobileToggleRow = Instance.new("Frame")
         mobileToggleRow.Size = UDim2.new(1, 0, 0, 22)
         mobileToggleRow.Position = UDim2.new(0, 0, 0.55, 0)
@@ -3879,10 +3918,9 @@ local function startAutoAim()
                             task.cancel(autoAimState.lockTimer)
                             autoAimState.lockTimer = nil
                         end
-                        local char = localPlayer.Character
-                        if char then
-                            local hum = char:FindFirstChildOfClass("Humanoid")
-                            if hum then hum.AutoRotate = true end
+                        local hum = getCurrentHumanoid()
+                        if hum then
+                            hum.AutoRotate = true
                         end
                     end
                 end)
@@ -3920,10 +3958,9 @@ local function startAutoAim()
                         task.cancel(autoAimState.lockTimer)
                         autoAimState.lockTimer = nil
                     end
-                    local char = localPlayer.Character
-                    if char then
-                        local hum = char:FindFirstChildOfClass("Humanoid")
-                        if hum then hum.AutoRotate = true end
+                    local hum = getCurrentHumanoid()
+                    if hum then
+                        hum.AutoRotate = true
                     end
                 end
             end
@@ -3960,6 +3997,32 @@ local function startAutoAim()
         end)
     end
 
+    -- ========== RESPON PERGANTIAN RONDE ==========
+    if autoAimState.localCharAddedConn then
+        autoAimState.localCharAddedConn:Disconnect()
+        autoAimState.localCharAddedConn = nil
+    end
+    autoAimState.localCharAddedConn = localPlayer.CharacterAdded:Connect(function()
+        if autoAimState.lockActive then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then
+                autoAimState.lockConn:Disconnect()
+                autoAimState.lockConn = nil
+            end
+            if autoAimState.lockTimer then
+                task.cancel(autoAimState.lockTimer)
+                autoAimState.lockTimer = nil
+            end
+            local hum = getCurrentHumanoid()
+            if hum then
+                hum.AutoRotate = true
+            end
+        end
+        if autoAimState.mobileLockEnabled then
+            setupMobileButton()
+        end
+    end)
+
     -- ========== AKTIVASI ==========
     createAutoAimGUI()
     setupMouseButton2Detection()
@@ -3974,12 +4037,17 @@ local function startAutoAim()
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
 end
 
+-- Fungsi stopAutoAim (dengan cleanup lengkap)
 local function stopAutoAim()
     if not autoAimConnection then return end
 
     autoAimConnection:Disconnect()
     autoAimConnection = nil
 
+    if autoAimState.localCharAddedConn then
+        autoAimState.localCharAddedConn:Disconnect()
+        autoAimState.localCharAddedConn = nil
+    end
     if autoAimState.mouseDownConn then
         autoAimState.mouseDownConn:Disconnect()
         autoAimState.mouseDownConn = nil
@@ -4018,18 +4086,15 @@ local function stopAutoAim()
         autoAimState.guiRef = nil
     end
 
-    local char = localPlayer.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.AutoRotate = true end
+    local hum = getCurrentHumanoid()
+    if hum then
+        hum.AutoRotate = true
     end
 
     autoAimState.isActive = false
     print("[AutoAim] Auto aim stopped")
 end
 
-
-       
 -- ============================================================================
 -- FEATURE 16: TELEPORT TO NEAREST SURVIVOR (unchanged)
 -- ============================================================================

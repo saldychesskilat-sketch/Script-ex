@@ -3792,10 +3792,16 @@ local function startAutoAim()
             autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
             mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
             mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
-            -- update visibilitas tombol tanpa destroy
-            setupMobileButton()
+        -- Update visibilitas tombol tanpa destroy
+        if autoAimState.mobileButtonGui then
+            autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
+        if autoAimState.mobileButton then
+            autoAimState.mobileButton.Visible = autoAimState.mobileLockEnabled
+        end
+            else
+                setupMobileButton()
+            end
         end)
-
         -- Drag GUI
         local dragging = false
         local dragStart, frameStart

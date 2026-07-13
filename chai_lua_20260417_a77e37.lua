@@ -3829,20 +3829,23 @@ local function startAutoAim()
         return gui
     end
 
-    -- ========== TOMBOL MOBILE (LOCK BUTTON) ==========
+    -- ========== TOMBOL MOBILE (dibuat sekali, hanya toggle visibilitas) ==========
     local function setupMobileButton()
+        -- Jika sudah ada, cukup update Enabled/Visible
         if autoAimState.mobileButtonGui then
-            autoAimState.mobileButtonGui:Destroy()
-            autoAimState.mobileButtonGui = nil
-            autoAimState.mobileButton = nil
+            autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
+            if autoAimState.mobileButton then
+                autoAimState.mobileButton.Visible = autoAimState.mobileLockEnabled
+            end
+            return
         end
 
-        if not autoAimState.mobileLockEnabled then return end
-
+        -- Buat ScreenGui khusus untuk tombol mobile
         local mobileGui = Instance.new("ScreenGui")
         mobileGui.Name = "AutoAimMobileButton"
         mobileGui.ResetOnSpawn = false
         mobileGui.Parent = game:GetService("CoreGui")
+        mobileGui.Enabled = autoAimState.mobileLockEnabled
 
         local button = Instance.new("TextButton")
         button.Name = "LockButton"
@@ -3857,6 +3860,7 @@ local function startAutoAim()
         button.TextSize = 22
         button.Parent = mobileGui
         button.AutoButtonColor = false
+        button.Visible = autoAimState.mobileLockEnabled
 
         local btnCorner = Instance.new("UICorner")
         btnCorner.CornerRadius = UDim.new(1, 0)
@@ -3865,6 +3869,7 @@ local function startAutoAim()
         autoAimState.mobileButtonGui = mobileGui
         autoAimState.mobileButton = button
 
+        -- Event klik tombol (sama seperti MouseButton2 di PC, durasi 1 detik)
         button.MouseButton1Click:Connect(function()
             if not config.autoAimEnabled then return end
             local target = getNearestTarget(autoAimState.targetMode)
@@ -3898,7 +3903,6 @@ local function startAutoAim()
             end
         end)
     end
-
     -- ========== DETEKSI INPUT MOUSE BUTTON 2 (PC) ==========
     local function setupMouseButton2Detection()
         if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
@@ -3975,9 +3979,7 @@ local function startAutoAim()
     createAutoAimGUI()
     setupMouseButton2Detection()
     setupKeybindDetection()
-    if autoAimState.mobileLockEnabled then
-        setupMobileButton()
-    end
+    setupMobileButton()  -- buat tombol sekali (jika belum ada)
 
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 

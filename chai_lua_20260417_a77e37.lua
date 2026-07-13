@@ -3430,27 +3430,27 @@ local autoAimState = {
 }
 
 -- Helper: dapatkan RootPart terkini
-local function getCurrentRootPart()
-    local char = localPlayer.Character
-    if char then
-        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-    end
-    return nil
-end
-
--- Helper: dapatkan Humanoid terkini
-local function getCurrentHumanoid()
-    local char = localPlayer.Character
-    if char then
-        return char:FindFirstChildOfClass("Humanoid")
-    end
-    return nil
-end
 
 -- Fungsi startAutoAim (Enhanced dengan auto-recovery setelah respawn)
 local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
+
+    local function getCurrentRootPart()
+    local char = localPlayer.Character
+    if char then
+        return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    end
+        return nil
+    end
+    -- Helper: dapatkan Humanoid terkini
+    local function getCurrentHumanoid()
+    local char = localPlayer.Character
+    if char then
+        return char:FindFirstChildOfClass("Humanoid")
+    end
+        return nil
+    end
 
     -- ========== HELPER FUNCTIONS ==========
     local function getNearestTarget(mode)

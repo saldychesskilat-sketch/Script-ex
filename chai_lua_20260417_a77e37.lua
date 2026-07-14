@@ -3918,7 +3918,7 @@ local function startAutoAim()
         local button1 = Instance.new("TextButton")
         button1.Name = "LockButton1"
         button1.Size = UDim2.new(0, 50, 0, 50)
-        button1.Position = UDim2.new(0, 0, 0, 0,)
+        button1.Position = UDim2.new(0.63, 85, 0.73, -75)
         button1.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button1.BackgroundTransparency = 1
         button1.BorderSizePixel = 0
@@ -3936,7 +3936,7 @@ local function startAutoAim()
         -- Tombol kedua (ukuran 100x100, posisi X digeser 50 pixel ke kanan)
         local button2 = Instance.new("TextButton")
         button2.Name = "LockButton2"
-        button2.Size = UDim2.new(0, 100, 0, 100) -- dari 100x100 menjadi 85x85
+        button2.Size = UDim2.new(0, 10, 0, 10) -- dari 100x100 menjadi 85x85
         button2.Position = UDim2.new(0.63, 160, 0.73, -30) -- turun 20 pixel (-75 -> -55)
         button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button2.BackgroundTransparency = 1

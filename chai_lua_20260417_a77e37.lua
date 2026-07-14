@@ -3944,7 +3944,7 @@ local function startAutoAim()
         button2.Text = "🔒"
         button2.TextColor3 = Color3.fromRGB(50, 50, 50)
         button2.Font = Enum.Font.GothamBold
-        button2.TextSize = 38 -- disesuaikan dengan ukuran tombol
+        button2.TextSize = 22 -- disesuaikan dengan ukuran tombol
         button2.Parent = mobileGui
         button2.AutoButtonColor = false
         button2.Visible = autoAimState.mobileLockEnabled

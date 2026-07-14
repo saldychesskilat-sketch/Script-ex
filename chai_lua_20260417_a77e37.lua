@@ -3411,31 +3411,32 @@ end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================
--- Variabel state yang hanya digunakan di dalam closure start/stop
 local autoAimState = {
     targetMode = "Killer",   -- Killer, Survivor, SCP
     lockActive = false,
     lockConn = nil,
     lockTimer = nil,
-    mouseDownConn = nil,     -- koneksi untuk InputBegan MouseButton2
-    mouseUpConn = nil,       -- koneksi untuk InputEnded MouseButton2
+    mouseDownConn = nil,
+    mouseUpConn = nil,
     keyConn = nil,
     guiRef = nil,
     isActive = false,
-    mobileButton = nil,      -- tombol untuk mobile
-    mobileButtonGui = nil,   -- ScreenGui untuk tombol mobile
-    mobileHoldTimer = nil,   -- timer untuk melepas lock di mobile
-    mobileLockEnabled = false, -- toggle mobile lock button
+    mobileButton = nil,
+    mobileButtonGui = nil,
+    mobileLockEnabled = false,
+    -- State baru untuk hold (tekan tahan)
+    holding1 = false,
+    holding2 = false,
+    holdActive = false,
+    holdConn = nil,
 }
 
--- Fungsi startAutoAim yang baru (menggantikan yang lama)
 local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
 
-    -- ========== HELPER FUNCTIONS ==========
+    -- ========== HELPER FUNCTIONS (tetap sama) ==========
     local function getNearestTarget(mode)
-        -- Ambil karakter lokal secara dinamis
         local char = localPlayer.Character
         if not char then return nil end
         local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
@@ -3543,7 +3544,6 @@ local function startAutoAim()
                 autoAimState.lockConn = nil
                 return
             end
-            -- Validasi target
             local targetObj = targetInfo.Object
             if not targetObj or not targetObj.Parent then
                 autoAimState.lockActive = false
@@ -3557,7 +3557,6 @@ local function startAutoAim()
                 return
             end
 
-            -- Ambil karakter lokal secara dinamis
             local localChar = localPlayer.Character
             if not localChar then
                 autoAimState.lockActive = false
@@ -3577,11 +3576,9 @@ local function startAutoAim()
                 return
             end
 
-            -- Lock kamera
             local camPos = camera.CFrame.Position
             camera.CFrame = CFrame.lookAt(camPos, targetPos)
 
-            -- Orientasi karakter
             local currentPos = rootPart.Position
             local lookDir = (targetPos - currentPos)
             if lookDir.Magnitude > 0.5 then
@@ -3597,7 +3594,6 @@ local function startAutoAim()
                 autoAimState.lockConn:Disconnect()
                 autoAimState.lockConn = nil
             end
-            -- Kembalikan AutoRotate pada karakter lokal jika masih ada
             local localChar = localPlayer.Character
             if localChar then
                 local humanoid = localChar:FindFirstChildOfClass("Humanoid")
@@ -3792,16 +3788,28 @@ local function startAutoAim()
             autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
             mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
             mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
-        -- Update visibilitas tombol tanpa destroy
-        if autoAimState.mobileButtonGui then
-            autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
-        if autoAimState.mobileButton then
-            autoAimState.mobileButton.Visible = autoAimState.mobileLockEnabled
-        end
+            -- Update visibilitas tombol tanpa destroy
+            if autoAimState.mobileButtonGui then
+                autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
+                if autoAimState.mobileButton1 then
+                    autoAimState.mobileButton1.Visible = autoAimState.mobileLockEnabled
+                end
+                if autoAimState.mobileButton2 then
+                    autoAimState.mobileButton2.Visible = autoAimState.mobileLockEnabled
+                end
             else
                 setupMobileButton()
             end
+            -- Jika dimatikan, hentikan hold yang aktif
+            if not autoAimState.mobileLockEnabled then
+                if autoAimState.holdActive then
+                    stopHoldLoop()
+                end
+                autoAimState.holding1 = false
+                autoAimState.holding2 = false
+            end
         end)
+
         -- Drag GUI
         local dragging = false
         local dragStart, frameStart
@@ -3828,13 +3836,73 @@ local function startAutoAim()
         return gui
     end
 
-    -- ========== TOMBOL MOBILE (dibuat sekali, hanya toggle visibilitas) ==========
+    -- ========== FUNGSI HOLD LOOP (baru) ==========
+    local function startHoldLoop()
+        if autoAimState.holdActive then return end
+        autoAimState.holdActive = true
+        autoAimState.holdConn = RunService.RenderStepped:Connect(function()
+            if not autoAimState.holdActive then
+                if autoAimState.holdConn then
+                    autoAimState.holdConn:Disconnect()
+                    autoAimState.holdConn = nil
+                end
+                return
+            end
+            local target = getNearestTarget(autoAimState.targetMode)
+            if target and target.Object then
+                local camera = workspace.CurrentCamera
+                if camera then
+                    local targetPos = target.Object.Position
+                    if targetPos then
+                        local camPos = camera.CFrame.Position
+                        camera.CFrame = CFrame.lookAt(camPos, targetPos)
+                        local localChar = localPlayer.Character
+                        if localChar then
+                            local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+                            if rootPart then
+                                local currentPos = rootPart.Position
+                                local lookDir = (targetPos - currentPos)
+                                if lookDir.Magnitude > 0.5 then
+                                    rootPart.CFrame = CFrame.new(currentPos, targetPos)
+                                    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+                                    if humanoid then
+                                        humanoid.AutoRotate = false
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    local function stopHoldLoop()
+        autoAimState.holdActive = false
+        if autoAimState.holdConn then
+            autoAimState.holdConn:Disconnect()
+            autoAimState.holdConn = nil
+        end
+        -- Kembalikan AutoRotate
+        local localChar = localPlayer.Character
+        if localChar then
+            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.AutoRotate = true
+            end
+        end
+    end
+
+    -- ========== TOMBOL MOBILE (DUA TOMBOL DENGAN HOLD) ==========
     local function setupMobileButton()
-        -- Jika sudah ada, cukup update Enabled/Visible
+        -- Jika sudah ada, update Enabled/Visible
         if autoAimState.mobileButtonGui then
             autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
-            if autoAimState.mobileButton then
-                autoAimState.mobileButton.Visible = autoAimState.mobileLockEnabled
+            if autoAimState.mobileButton1 then
+                autoAimState.mobileButton1.Visible = autoAimState.mobileLockEnabled
+            end
+            if autoAimState.mobileButton2 then
+                autoAimState.mobileButton2.Visible = autoAimState.mobileLockEnabled
             end
             return
         end
@@ -3846,62 +3914,85 @@ local function startAutoAim()
         mobileGui.Parent = game:GetService("CoreGui")
         mobileGui.Enabled = autoAimState.mobileLockEnabled
 
-        local button = Instance.new("TextButton")
-        button.Name = "LockButton"
-        button.Size = UDim2.new(0, 50, 0, 50)
-        button.Position = UDim2.new(0.63, 85, 0.73, -75)
-        button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        button.BackgroundTransparency = 0.7
-        button.BorderSizePixel = 0
-        button.Text = "🔒"
-        button.TextColor3 = Color3.fromRGB(50, 50, 50)
-        button.Font = Enum.Font.GothamBold
-        button.TextSize = 22
-        button.Parent = mobileGui
-        button.AutoButtonColor = false
-        button.Visible = autoAimState.mobileLockEnabled
+        -- Tombol pertama (ukuran 50x50)
+        local button1 = Instance.new("TextButton")
+        button1.Name = "LockButton1"
+        button1.Size = UDim2.new(0, 50, 0, 50)
+        button1.Position = UDim2.new(0.63, 85, 0.73, -75)
+        button1.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        button1.BackgroundTransparency = 0.7
+        button1.BorderSizePixel = 0
+        button1.Text = "🔒"
+        button1.TextColor3 = Color3.fromRGB(50, 50, 50)
+        button1.Font = Enum.Font.GothamBold
+        button1.TextSize = 22
+        button1.Parent = mobileGui
+        button1.AutoButtonColor = false
+        button1.Visible = autoAimState.mobileLockEnabled
+        local btnCorner1 = Instance.new("UICorner")
+        btnCorner1.CornerRadius = UDim.new(1, 0)
+        btnCorner1.Parent = button1
 
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(1, 0)
-        btnCorner.Parent = button
+        -- Tombol kedua (ukuran 100x100, posisi X digeser 50 pixel ke kanan)
+        local button2 = Instance.new("TextButton")
+        button2.Name = "LockButton2"
+        button2.Size = UDim2.new(0, 100, 0, 100)
+        button2.Position = UDim2.new(0.63, 135, 0.73, -75)  -- offset X +50
+        button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        button2.BackgroundTransparency = 0.7
+        button2.BorderSizePixel = 0
+        button2.Text = "🔒"
+        button2.TextColor3 = Color3.fromRGB(50, 50, 50)
+        button2.Font = Enum.Font.GothamBold
+        button2.TextSize = 44   -- lebih besar agar proporsional
+        button2.Parent = mobileGui
+        button2.AutoButtonColor = false
+        button2.Visible = autoAimState.mobileLockEnabled
+        local btnCorner2 = Instance.new("UICorner")
+        btnCorner2.CornerRadius = UDim.new(1, 0)
+        btnCorner2.Parent = button2
 
         autoAimState.mobileButtonGui = mobileGui
-        autoAimState.mobileButton = button
+        autoAimState.mobileButton1 = button1
+        autoAimState.mobileButton2 = button2
 
-        -- Event klik tombol (sama seperti MouseButton2 di PC, durasi 1 detik)
-        button.MouseButton1Click:Connect(function()
-            if not config.autoAimEnabled then return end
-            local target = getNearestTarget(autoAimState.targetMode)
-            if target and target.Object then
-                lockToTarget(target, 1)
-                if autoAimState.mobileHoldTimer then
-                    task.cancel(autoAimState.mobileHoldTimer)
-                    autoAimState.mobileHoldTimer = nil
+        -- Event hold untuk tombol 1
+        button1.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                autoAimState.holding1 = true
+                if not autoAimState.holdActive then
+                    startHoldLoop()
                 end
-                autoAimState.mobileHoldTimer = task.spawn(function()
-                    task.wait(1)
-                    if autoAimState.lockActive then
-                        autoAimState.lockActive = false
-                        if autoAimState.lockConn then
-                            autoAimState.lockConn:Disconnect()
-                            autoAimState.lockConn = nil
-                        end
-                        if autoAimState.lockTimer then
-                            task.cancel(autoAimState.lockTimer)
-                            autoAimState.lockTimer = nil
-                        end
-                        local localChar = localPlayer.Character
-                        if localChar then
-                            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                            if humanoid then
-                                humanoid.AutoRotate = true
-                            end
-                        end
-                    end
-                end)
+            end
+        end)
+        button1.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                autoAimState.holding1 = false
+                if not autoAimState.holding2 then
+                    stopHoldLoop()
+                end
+            end
+        end)
+
+        -- Event hold untuk tombol 2
+        button2.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                autoAimState.holding2 = true
+                if not autoAimState.holdActive then
+                    startHoldLoop()
+                end
+            end
+        end)
+        button2.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                autoAimState.holding2 = false
+                if not autoAimState.holding1 then
+                    stopHoldLoop()
+                end
             end
         end)
     end
+
     -- ========== DETEKSI INPUT MOUSE BUTTON 2 (PC) ==========
     local function setupMouseButton2Detection()
         if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
@@ -3978,13 +4069,14 @@ local function startAutoAim()
     createAutoAimGUI()
     setupMouseButton2Detection()
     setupKeybindDetection()
-    setupMobileButton()  -- buat tombol sekali (jika belum ada)
+    setupMobileButton()  -- buat tombol (jika belum ada)
 
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 
     autoAimState.isActive = true
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
 end
+              
 
 -- Fungsi stopAutoAim (tidak berubah, tetap menghancurkan semua)
 local function stopAutoAim()

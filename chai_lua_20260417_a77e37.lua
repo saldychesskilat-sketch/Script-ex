@@ -3936,15 +3936,15 @@ local function startAutoAim()
         -- Tombol kedua (ukuran 100x100, posisi X digeser 50 pixel ke kanan)
         local button2 = Instance.new("TextButton")
         button2.Name = "LockButton2"
-        button2.Size = UDim2.new(0, 100, 0, 100)
-        button2.Position = UDim2.new(0.63, 135, 0.73, -75)  -- offset X +50
+        button2.Size = UDim2.new(0, 85, 0, 85) -- dari 100x100 menjadi 85x85
+        button2.Position = UDim2.new(0.63, 135, 0.73, -55) -- turun 20 pixel (-75 -> -55)
         button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button2.BackgroundTransparency = 0.7
         button2.BorderSizePixel = 0
         button2.Text = "🔒"
         button2.TextColor3 = Color3.fromRGB(50, 50, 50)
         button2.Font = Enum.Font.GothamBold
-        button2.TextSize = 44   -- lebih besar agar proporsional
+        button2.TextSize = 38 -- disesuaikan dengan ukuran tombol
         button2.Parent = mobileGui
         button2.AutoButtonColor = false
         button2.Visible = autoAimState.mobileLockEnabled

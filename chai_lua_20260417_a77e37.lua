@@ -3762,7 +3762,7 @@ local function startAutoAim()
         local mobileLabel = Instance.new("TextLabel")
         mobileLabel.Size = UDim2.new(0.5, 0, 1, 0)
         mobileLabel.BackgroundTransparency = 1
-        mobileLabel.Text = "Mobile Lock"
+        mobileLabel.Text = "Version mobile"
         mobileLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
         mobileLabel.Font = Enum.Font.Gotham
         mobileLabel.TextSize = 10

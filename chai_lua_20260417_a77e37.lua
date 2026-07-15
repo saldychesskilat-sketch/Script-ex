@@ -1497,7 +1497,7 @@ local teleportConnection = nil
 
 -- Konfigurasi jarak trigger teleport (dapat diubah)
 if config.teleportTriggerDistance == nil then
-    config.teleportTriggerDistance = 10   -- jarak dalam studs untuk memicu teleport
+    config.teleportTriggerDistance = 12   -- jarak dalam studs untuk memicu teleport
 end
 if config.teleportBehindDistance == nil then
     config.teleportBehindDistance = 15    -- jarak teleport ke belakang killer

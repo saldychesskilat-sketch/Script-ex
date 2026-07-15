@@ -1491,146 +1491,32 @@ end
 -- Menggunakan salinan fungsi stealth internal (tidak konflik dengan fitur Stealth asli)
 -- ============================================================================
 
--- Variabel untuk koneksi god mode (health regen + stealth trigger)
+-- Variabel untuk koneksi god mode (health regen + teleport)
 local godModeConnection = nil
-local stealthDistanceConnection = nil
+local teleportConnection = nil
 
--- Konfigurasi jarak trigger stealth (dapat diubah via config)
-if config.stealthTriggerDistance == nil then
-    config.stealthTriggerDistance = 20   -- jarak dalam studs
+-- Konfigurasi jarak trigger teleport (dapat diubah)
+if config.teleportTriggerDistance == nil then
+    config.teleportTriggerDistance = 10   -- jarak dalam studs untuk memicu teleport
 end
+if config.teleportBehindDistance == nil then
+    config.teleportBehindDistance = 15    -- jarak teleport ke belakang killer
+end
+
+-- Cooldown untuk mencegah spam teleport
+local lastTeleportTime = 0
+local TELEPORT_COOLDOWN = 0.5  -- detik
 
 -- ============================================================================
--- FUNGSI STEALTH INTERNAL GOD MODE (SALINAN DENGAN NAMA VARIABEL UNIK)
+-- FUNGSI UTAMA: Teleportasi ke belakang killer terdekat
 -- ============================================================================
-local god_currentSeat = nil
-local god_seatWeld = nil
-local god_isSeatActive = false
-local god_seatTeleportPosition = Vector3.new(-25.95, 400, 3537.55)
-local god_voidLevelYThreshold = -50
-local god_seatReturnHeartbeatConnection = nil
-local god_isInvisible = false
-
-local function god_startSeatReturnHeartbeat()
-    if god_seatReturnHeartbeatConnection then
-        god_seatReturnHeartbeatConnection:Disconnect()
-        god_seatReturnHeartbeatConnection = nil
-    end
-    god_seatReturnHeartbeatConnection = RunService.Heartbeat:Connect(function()
-        -- kosong, bisa diisi jika diperlukan
-    end)
-end
-
-local function god_stopSeatReturnHeartbeat()
-    if god_seatReturnHeartbeatConnection then
-        god_seatReturnHeartbeatConnection:Disconnect()
-        god_seatReturnHeartbeatConnection = nil
-    end
-end
-
-local function god_setCharacterTransparency(transparency)
-    if not localCharacter then return end
-    for _, part in ipairs(localCharacter:GetDescendants()) do
-        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-            part.Transparency = transparency
-        end
-    end
-end
-
-local function god_makeInvisible()
-    if not config.godModeEnabled then return end
-    if god_isInvisible then return end
-    if not localCharacter then return end
-
-    local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then
-        print("[GodMode] Cannot make invisible: No HumanoidRootPart")
-        return
-    end
-    local originalCFrame = humanoidRootPart.CFrame
-    local upPosition = originalCFrame.Position + Vector3.new(0, -90, 0)
-    pcall(function() humanoidRootPart.CFrame = CFrame.new(upPosition) end)
-    task.wait(0.05)
-
-    if god_currentSeat then
-        pcall(function() god_currentSeat:Destroy() end)
-        god_currentSeat = nil
-        god_seatWeld = nil
-    end
-    god_stopSeatReturnHeartbeat()
-    god_isSeatActive = false
-
-    local savedpos = humanoidRootPart.CFrame
-    pcall(function() localCharacter:MoveTo(god_seatTeleportPosition) end)
-    task.wait(0.05)
-
-    if not localCharacter:FindFirstChild("HumanoidRootPart") or 
-       localCharacter.HumanoidRootPart.Position.Y < god_voidLevelYThreshold then
-        pcall(function() localCharacter:MoveTo(savedpos) end)
-        print("[GodMode] Teleport to seat failed (void). Aborting.")
-        pcall(function() humanoidRootPart.CFrame = originalCFrame end)
-        return
-    end
-
-    local Seat = Instance.new('Seat')
-    Seat.Name = 'CyberHeroes_GodSeat'
-    Seat.Anchored = false
-    Seat.CanCollide = false
-    Seat.Transparency = 1
-    Seat.Position = god_seatTeleportPosition
-    Seat.Parent = workspace
-
-    local torso = localCharacter:FindFirstChild("Torso") or localCharacter:FindFirstChild("UpperTorso")
-    if torso then
-        god_seatWeld = Instance.new("Weld")
-        god_seatWeld.Part0 = Seat
-        god_seatWeld.Part1 = torso
-        god_seatWeld.Parent = Seat
-        task.wait()
-        pcall(function() Seat.CFrame = savedpos end)
-        god_currentSeat = Seat
-        god_startSeatReturnHeartbeat()
-        god_isSeatActive = true
-    else
-        Seat:Destroy()
-        print("[GodMode] Cannot make invisible: No torso found")
-        pcall(function() humanoidRootPart.CFrame = originalCFrame end)
-        return
-    end
-
-    god_setCharacterTransparency(0.75)
-    god_isInvisible = true
-    pcall(function() humanoidRootPart.CFrame = originalCFrame end)
-    print("[GodMode] Stealth activated (distance ≤ " .. config.stealthTriggerDistance .. " studs)")
-end
-
-local function god_makeVisible()
-    if not god_isInvisible then return end
-    if not localCharacter then return end
-
-    if god_currentSeat then
-        pcall(function() god_currentSeat:Destroy() end)
-        god_currentSeat = nil
-        god_seatWeld = nil
-    end
-    god_stopSeatReturnHeartbeat()
-    god_isSeatActive = false
-
-    god_setCharacterTransparency(0)
-    god_isInvisible = false
-    print("[GodMode] Stealth deactivated (distance > " .. config.stealthTriggerDistance .. " studs)")
-end
-
--- ============================================================================
--- FUNGSI UNTUK MENGECEK JARAK KILLER DAN MENGGUNAKAN STEALTH
--- ============================================================================
-local function god_checkKillerDistanceAndToggleStealth()
-    if not config.godModeEnabled then return end
+local function teleportBehindNearestKiller()
     if not getLocalCharacter() or not localRootPart then return end
-
     local localPos = localRootPart.Position
-    local nearestKillerDistance = math.huge
+    local nearestKiller = nil
+    local nearestDist = math.huge
 
+    -- Cari killer terdekat
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
             local char = player.Character
@@ -1652,8 +1538,9 @@ local function god_checkKillerDistanceAndToggleStealth()
                     local root = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
                     if root then
                         local dist = (localPos - root.Position).Magnitude
-                        if dist < nearestKillerDistance then
-                            nearestKillerDistance = dist
+                        if dist < nearestDist then
+                            nearestDist = dist
+                            nearestKiller = root
                         end
                     end
                 end
@@ -1661,14 +1548,35 @@ local function god_checkKillerDistanceAndToggleStealth()
         end
     end
 
-    -- Stealth aktif jika jarak killer ≤ threshold, nonaktif jika > threshold
-    if nearestKillerDistance <= config.stealthTriggerDistance then
-        if not god_isInvisible then
-            god_makeInvisible()
-        end
-    else
-        if god_isInvisible then
-            god_makeVisible()   -- <- otomatis mati saat jarak > threshold
+    -- Jika tidak ada killer atau jarak > trigger distance, abaikan
+    if not nearestKiller then return end
+    if nearestDist > config.teleportTriggerDistance then return end
+
+    -- Cek cooldown
+    local now = tick()
+    if now - lastTeleportTime < TELEPORT_COOLDOWN then return end
+    lastTeleportTime = now
+
+    -- Hitung posisi belakang killer
+    local killerPos = nearestKiller.Position
+    local killerLook = nearestKiller.CFrame.LookVector  -- arah depan killer
+    local behindPos = killerPos - killerLook * config.teleportBehindDistance
+
+    -- Pastikan tidak jatuh ke void (opsional)
+    if behindPos.Y < -50 then
+        behindPos = Vector3.new(behindPos.X, 5, behindPos.Z)  -- amankan tinggi
+    end
+
+    -- Teleport karakter lokal ke posisi tersebut
+    local char = localPlayer.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = CFrame.new(behindPos)
+            -- Reset velocity agar tidak melayang
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            print("[GodMode] Teleported behind killer at distance", nearestDist)
         end
     end
 end
@@ -1679,21 +1587,22 @@ end
 local function startGodMode()
     if godModeConnection then return end
 
-    -- Health regen
+    -- Health regen + teleport checker dalam satu koneksi
     godModeConnection = RunService.Heartbeat:Connect(function()
         if not config.godModeEnabled then return end
         if not getLocalCharacter() or not localHumanoid then return end
+
+        -- Health regen
         local maxHealth = localHumanoid.MaxHealth
         if localHumanoid.Health < maxHealth then
             localHumanoid.Health = maxHealth
         end
+
+        -- Teleport checker (hanya jika ada killer terdekat)
+        teleportBehindNearestKiller()
     end)
 
-    -- Stealth trigger berdasarkan jarak killer
-    if stealthDistanceConnection then stealthDistanceConnection:Disconnect() end
-    stealthDistanceConnection = RunService.Heartbeat:Connect(god_checkKillerDistanceAndToggleStealth)
-
-    print("[GodMode] Activated: Health regen + Stealth (auto on/off when killer ≤ " .. config.stealthTriggerDistance .. " studs)")
+    print("[GodMode] Activated: Health regen + Teleport behind killer when within " .. config.teleportTriggerDistance .. " studs")
 end
 
 local function stopGodMode()
@@ -1701,14 +1610,7 @@ local function stopGodMode()
         godModeConnection:Disconnect()
         godModeConnection = nil
     end
-    if stealthDistanceConnection then
-        stealthDistanceConnection:Disconnect()
-        stealthDistanceConnection = nil
-    end
-    if god_isInvisible then
-        god_makeVisible()   -- pastikan stealth dimatikan saat god mode berhenti
-    end
-    print("[GodMode] Deactivated: Health regen and stealth stopped")
+    print("[GodMode] Deactivated: Health regen and teleport stopped")
 end
 
 -- ============================================================================

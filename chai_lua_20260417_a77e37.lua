@@ -1493,14 +1493,13 @@ end
 
 -- Variabel untuk koneksi god mode (health regen + teleport)
 local godModeConnection = nil
-local teleportConnection = nil
 
 -- Konfigurasi jarak trigger teleport (dapat diubah)
 if config.teleportTriggerDistance == nil then
-    config.teleportTriggerDistance = 15  -- jarak dalam studs untuk memicu teleport
+    config.teleportTriggerDistance = 15   -- jarak dalam studs untuk memicu teleport
 end
-if config.teleportBehindDistance == nil then
-    config.teleportBehindDistance = 16    -- jarak teleport ke belakang killer
+if config.teleportAwayDistance == nil then
+    config.teleportAwayDistance = 16      -- jarak teleport mundur menjauhi killer
 end
 
 -- Cooldown untuk mencegah spam teleport
@@ -1508,9 +1507,9 @@ local lastTeleportTime = 0
 local TELEPORT_COOLDOWN = 0.5  -- detik
 
 -- ============================================================================
--- FUNGSI UTAMA: Teleportasi ke belakang killer terdekat
+-- FUNGSI UTAMA: Teleportasi mundur menjauhi killer terdekat
 -- ============================================================================
-local function teleportBehindNearestKiller()
+local function teleportAwayFromNearestKiller()
     if not getLocalCharacter() or not localRootPart then return end
     local localPos = localRootPart.Position
     local nearestKiller = nil
@@ -1557,26 +1556,26 @@ local function teleportBehindNearestKiller()
     if now - lastTeleportTime < TELEPORT_COOLDOWN then return end
     lastTeleportTime = now
 
-    -- Hitung posisi belakang killer
+    -- Hitung arah dari killer ke player
     local killerPos = nearestKiller.Position
-    local killerLook = nearestKiller.CFrame.LookVector  -- arah depan killer
-    local behindPos = killerPos - killerLook * config.teleportBehindDistance
+    local dirAway = (localPos - killerPos).Unit  -- arah menjauhi killer
+    local newPos = localPos + dirAway * config.teleportAwayDistance
 
-    -- Pastikan tidak jatuh ke void (opsional)
-    if behindPos.Y < -50 then
-        behindPos = Vector3.new(behindPos.X, 5, behindPos.Z)  -- amankan tinggi
+    -- Pastikan tidak jatuh ke void
+    if newPos.Y < -50 then
+        newPos = Vector3.new(newPos.X, 5, newPos.Z)
     end
 
-    -- Teleport karakter lokal ke posisi tersebut
+    -- Teleport karakter lokal ke posisi baru
     local char = localPlayer.Character
     if char then
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if hrp then
-            hrp.CFrame = CFrame.new(behindPos)
+            hrp.CFrame = CFrame.new(newPos)
             -- Reset velocity agar tidak melayang
             hrp.AssemblyLinearVelocity = Vector3.zero
             hrp.AssemblyAngularVelocity = Vector3.zero
-            print("[GodMode] Teleported behind killer at distance", nearestDist)
+            print("[GodMode] Teleported away from killer, distance:", nearestDist)
         end
     end
 end
@@ -1598,11 +1597,11 @@ local function startGodMode()
             localHumanoid.Health = maxHealth
         end
 
-        -- Teleport checker (hanya jika ada killer terdekat)
-        teleportBehindNearestKiller()
+        -- Teleport checker (jika ada killer terdekat dalam radius)
+        teleportAwayFromNearestKiller()
     end)
 
-    print("[GodMode] Activated: Health regen + Teleport behind killer when within " .. config.teleportTriggerDistance .. " studs")
+    print("[GodMode] Activated: Health regen + Teleport away from killer when within " .. config.teleportTriggerDistance .. " studs")
 end
 
 local function stopGodMode()
@@ -1612,7 +1611,6 @@ local function stopGodMode()
     end
     print("[GodMode] Deactivated: Health regen and teleport stopped")
 end
-
 -- ============================================================================
 
 -- FEATURE 7: AUTO PARRY / AUTO BLOCK (FIXED - USING CORRECT REMOTE EVENT)        

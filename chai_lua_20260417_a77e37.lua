@@ -3785,18 +3785,24 @@ local function startAutoAim()
 
     -- ========== FUNGSI INF SHOT ==========
     local function getInfRemotes()
-       local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-       if not remotes then return nil, nil end
-       local items = remotes:FindFirstChild("Items")
-       if not items then return nil, nil end
-       local twist = items:FindFirstChild("Twist of Fate")
-       if not twist then return nil, nil end
-       local fireRemote = twist:FindFirstChild("Fire")
-       local resultRemote = twist:FindFirstChild("Result")
-       return fireRemote, resultRemote
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if not remotes then return nil, nil end
+        local items = remotes:FindFirstChild("Items")
+        if not items then return nil, nil end
+        local twist = items:FindFirstChild("Twist of Fate")
+        if not twist then return nil, nil end
+        local fireRemote = twist:FindFirstChild("Fire")
+        local resultRemote = twist:FindFirstChild("Result")
+        return fireRemote, resultRemote
     end
-    
+        
     local function fireInfShot()
+        local char = localPlayer.Character
+        if not char then return end
+
+        -- Set atribut Aiming ke true sebelum mengirim remote
+        pcall(function() char:SetAttribute("Aiming", true) end)
+
         local fireRemote, resultRemote = getInfRemotes()
         if fireRemote and fireRemote:IsA("RemoteEvent") then
             pcall(function() fireRemote:FireServer() end)
@@ -3804,6 +3810,9 @@ local function startAutoAim()
         if resultRemote and resultRemote:IsA("RemoteEvent") then
             pcall(function() resultRemote:FireServer() end)
         end
+
+    -- Set atribut Aiming ke false setelah remote dikirim
+    pcall(function() char:SetAttribute("Aiming", false) end)
     end
 
     -- ========== FUNGSI HOLD LOOP ==========

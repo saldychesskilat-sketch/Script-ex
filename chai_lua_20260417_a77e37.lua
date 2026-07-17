@@ -3784,26 +3784,25 @@ local function startAutoAim()
     end
 
     -- ========== FUNGSI INF SHOT ==========
-    local function getInfRemote()
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if remotes then
-            local items = remotes:FindFirstChild("Items")
-            if items then
-                local twist = items:FindFirstChild("Twist of Fate")
-                if twist then
-                    return twist:FindFirstChild("Fire")
-                end
-            end
-        end
-        return nil
+    local function getInfRemotes()
+       local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+       if not remotes then return nil, nil end
+       local items = remotes:FindFirstChild("Items")
+       if not items then return nil, nil end
+       local twist = items:FindFirstChild("Twist of Fate")
+       if not twist then return nil, nil end
+       local fireRemote = twist:FindFirstChild("Fire")
+       local resultRemote = twist:FindFirstChild("Result")
+       return fireRemote, resultRemote
     end
-
+    
     local function fireInfShot()
-        local remote = getInfRemote()
-        if remote and remote:IsA("RemoteEvent") then
-            pcall(function() remote:FireServer() end)
-            -- Jika perlu argumen, bisa tambahkan:
-            -- pcall(function() remote:FireServer("Fire") end)
+        local fireRemote, resultRemote = getInfRemotes()
+        if fireRemote and fireRemote:IsA("RemoteEvent") then
+            pcall(function() fireRemote:FireServer() end)
+        end
+        if resultRemote and resultRemote:IsA("RemoteEvent") then
+            pcall(function() resultRemote:FireServer() end)
         end
     end
 

@@ -3920,7 +3920,7 @@ local function startAutoAim()
         -- Tombol kedua (ukuran 85x85, posisi X digeser)
         local button2 = Instance.new("TextButton")
         button2.Name = "LockButton2"
-        button2.Size = UDim2.new(0, 85, 0, 85)
+        button2.Size = UDim2.new(0, 1, 0, 1)
         button2.Position = UDim2.new(0.63, 160, 0.73, -55)
         button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button2.BackgroundTransparency = 1

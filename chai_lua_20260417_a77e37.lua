@@ -3729,7 +3729,7 @@ local function startAutoAim()
         local infLabel = Instance.new("TextLabel")
         infLabel.Size = UDim2.new(0.5, 0, 1, 0)
         infLabel.BackgroundTransparency = 1
-        infLabel.Text = "Inf Shot (bypass)"
+        infLabel.Text = "Never Miss"
         infLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
         infLabel.Font = Enum.Font.Gotham
         infLabel.TextSize = 10
@@ -3782,9 +3782,8 @@ local function startAutoAim()
         autoAimState.guiRef = gui
         return gui
     end
-
-    -- ========== FUNGSI INF SHOT ==========
-    local function getInfRemotes()
+    -- ========== FUNGSI NEVER MISS (DETECTION + REMOTE) ==========
+    local function getFireRemotes()
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
         if not remotes then return nil, nil end
         local items = remotes:FindFirstChild("Items")
@@ -3795,24 +3794,50 @@ local function startAutoAim()
         local resultRemote = twist:FindFirstChild("Result")
         return fireRemote, resultRemote
     end
-        
     local function fireInfShot()
         local char = localPlayer.Character
         if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
 
-        -- Set atribut Aiming ke true sebelum mengirim remote
-        pcall(function() char:SetAttribute("Aiming", true) end)
+        -- Cari target terdekat sesuai mode
+        local targetInfo = getNearestTarget(autoAimState.targetMode)
+        if not targetInfo or not targetInfo.Object then return end
+        local targetPos = targetInfo.Object.Position
 
-        local fireRemote, resultRemote = getInfRemotes()
-        if fireRemote and fireRemote:IsA("RemoteEvent") then
-            pcall(function() fireRemote:FireServer() end)
+        -- Cek apakah ada penghalang (raycast)
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        local origin = camera.CFrame.Position
+        local direction = (targetPos - origin).Unit
+        local rayLength = (targetPos - origin).Magnitude
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.FilterDescendantsInstances = {char, targetInfo.Object.Parent} -- abaikan player sendiri dan target
+        if targetInfo.Player then
+            local targetChar = targetInfo.Player.Character
+            if targetChar then
+                table.insert(rayParams.FilterDescendantsInstances, targetChar)
+            end
         end
-        if resultRemote and resultRemote:IsA("RemoteEvent") then
-            pcall(function() resultRemote:FireServer() end)
-        end
 
-    -- Set atribut Aiming ke false setelah remote dikirim
-    pcall(function() char:SetAttribute("Aiming", false) end)
+        local hit = workspace:Raycast(origin, direction * rayLength, rayParams)
+
+        -- Jika ada penghalang (atau kita ingin force), kirim remote double
+        if hit then
+            -- Set atribut Aiming
+            pcall(function() char:SetAttribute("Aiming", true) end)
+
+            local fireRemote, resultRemote = getFireRemotes()
+            if fireRemote and fireRemote:IsA("RemoteEvent") then
+                pcall(function() fireRemote:FireServer() end)
+            end
+            if resultRemote and resultRemote:IsA("RemoteEvent") then
+                pcall(function() resultRemote:FireServer() end)
+            end
+
+            pcall(function() char:SetAttribute("Aiming", false) end)
+        end
     end
 
     -- ========== FUNGSI HOLD LOOP ==========

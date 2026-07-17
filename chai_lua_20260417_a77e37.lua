@@ -3324,11 +3324,13 @@ local autoAimState = {
     mobileButton = nil,
     mobileButtonGui = nil,
     mobileLockEnabled = false,
-    -- State baru untuk hold (tekan tahan)
+    -- State untuk hold
     holding1 = false,
     holding2 = false,
     holdActive = false,
     holdConn = nil,
+    -- Inf Shot
+    infShotEnabled = false,
 }
 
 local function startAutoAim()
@@ -3501,6 +3503,13 @@ local function startAutoAim()
                     humanoid.AutoRotate = true
                 end
             end
+            -- Inf Shot after lock ends (otomatis)
+            if autoAimState.infShotEnabled then
+                for i = 1, 5 do
+                    fireInfShot()
+                    task.wait(0.05)
+                end
+            end
         end)
     end
 
@@ -3557,8 +3566,8 @@ local function startAutoAim()
         gui.ResetOnSpawn = false
         gui.Parent = game:GetService("CoreGui")
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 140)
-        frame.Position = UDim2.new(0.5, -110, 0.5, -70)
+        frame.Size = UDim2.new(0, 220, 0, 180)  -- diperbesar untuk inf shot
+        frame.Position = UDim2.new(0.5, -110, 0.5, -90)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
         frame.BorderSizePixel = 0
@@ -3710,6 +3719,44 @@ local function startAutoAim()
             end
         end)
 
+        -- ===== TOGGLE INF SHOT =====
+        local infToggleRow = Instance.new("Frame")
+        infToggleRow.Size = UDim2.new(1, 0, 0, 22)
+        infToggleRow.Position = UDim2.new(0, 0, 0.8, 0) -- di bawah mobile toggle
+        infToggleRow.BackgroundTransparency = 1
+        infToggleRow.Parent = content
+
+        local infLabel = Instance.new("TextLabel")
+        infLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        infLabel.BackgroundTransparency = 1
+        infLabel.Text = "Inf Shot (bypass)"
+        infLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        infLabel.Font = Enum.Font.Gotham
+        infLabel.TextSize = 10
+        infLabel.TextXAlignment = Enum.TextXAlignment.Left
+        infLabel.Parent = infToggleRow
+
+        local infSwitch = Instance.new("TextButton")
+        infSwitch.Size = UDim2.new(0, 36, 0, 16)
+        infSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
+        infSwitch.BackgroundColor3 = autoAimState.infShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+        infSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
+        infSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
+        infSwitch.Font = Enum.Font.GothamBold
+        infSwitch.TextSize = 7
+        infSwitch.BorderSizePixel = 0
+        infSwitch.AutoButtonColor = false
+        infSwitch.Parent = infToggleRow
+        local infSwitchCorner = Instance.new("UICorner")
+        infSwitchCorner.CornerRadius = UDim.new(1, 0)
+        infSwitchCorner.Parent = infSwitch
+
+        infSwitch.MouseButton1Click:Connect(function()
+            autoAimState.infShotEnabled = not autoAimState.infShotEnabled
+            infSwitch.BackgroundColor3 = autoAimState.infShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+            infSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
+        end)
+
         -- Drag GUI
         local dragging = false
         local dragStart, frameStart
@@ -3736,7 +3783,31 @@ local function startAutoAim()
         return gui
     end
 
-    -- ========== FUNGSI HOLD LOOP (baru) ==========
+    -- ========== FUNGSI INF SHOT ==========
+    local function getInfRemote()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            local items = remotes:FindFirstChild("Items")
+            if items then
+                local twist = items:FindFirstChild("Twist of Fate")
+                if twist then
+                    return twist:FindFirstChild("Fire")
+                end
+            end
+        end
+        return nil
+    end
+
+    local function fireInfShot()
+        local remote = getInfRemote()
+        if remote and remote:IsA("RemoteEvent") then
+            pcall(function() remote:FireServer() end)
+            -- Jika perlu argumen, bisa tambahkan:
+            -- pcall(function() remote:FireServer("Fire") end)
+        end
+    end
+
+    -- ========== FUNGSI HOLD LOOP ==========
     local function startHoldLoop()
         if autoAimState.holdActive then return end
         autoAimState.holdActive = true
@@ -3791,11 +3862,17 @@ local function startAutoAim()
                 humanoid.AutoRotate = true
             end
         end
+        -- Inf Shot after hold ends
+        if autoAimState.infShotEnabled then
+            for i = 1, 5 do
+                fireInfShot()
+                task.wait(0.05)
+            end
+        end
     end
 
     -- ========== TOMBOL MOBILE (DUA TOMBOL DENGAN HOLD) ==========
     local function setupMobileButton()
-        -- Jika sudah ada, update Enabled/Visible
         if autoAimState.mobileButtonGui then
             autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
             if autoAimState.mobileButton1 then
@@ -3807,7 +3884,6 @@ local function startAutoAim()
             return
         end
 
-        -- Buat ScreenGui khusus untuk tombol mobile
         local mobileGui = Instance.new("ScreenGui")
         mobileGui.Name = "AutoAimMobileButton"
         mobileGui.ResetOnSpawn = false
@@ -3833,18 +3909,18 @@ local function startAutoAim()
         btnCorner1.CornerRadius = UDim.new(1, 0)
         btnCorner1.Parent = button1
 
-        -- Tombol kedua (ukuran 100x100, posisi X digeser 50 pixel ke kanan)
+        -- Tombol kedua (ukuran 85x85, posisi X digeser)
         local button2 = Instance.new("TextButton")
         button2.Name = "LockButton2"
-        button2.Size = UDim2.new(0, 10, 0, 10) -- dari 100x100 menjadi 85x85
-        button2.Position = UDim2.new(0.63, 160, 0.73, -30) -- turun 20 pixel (-75 -> -55)
+        button2.Size = UDim2.new(0, 85, 0, 85)
+        button2.Position = UDim2.new(0.63, 160, 0.73, -55)
         button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button2.BackgroundTransparency = 1
         button2.BorderSizePixel = 0
         button2.Text = ""
         button2.TextColor3 = Color3.fromRGB(50, 50, 50)
         button2.Font = Enum.Font.GothamBold
-        button2.TextSize = 22 -- disesuaikan dengan ukuran tombol
+        button2.TextSize = 22
         button2.Parent = mobileGui
         button2.AutoButtonColor = false
         button2.Visible = autoAimState.mobileLockEnabled
@@ -3856,7 +3932,6 @@ local function startAutoAim()
         autoAimState.mobileButton1 = button1
         autoAimState.mobileButton2 = button2
 
-        -- Event hold untuk tombol 1
         button1.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
                 autoAimState.holding1 = true
@@ -3874,7 +3949,6 @@ local function startAutoAim()
             end
         end)
 
-        -- Event hold untuk tombol 2
         button2.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
                 autoAimState.holding2 = true
@@ -3930,6 +4004,13 @@ local function startAutoAim()
                             humanoid.AutoRotate = true
                         end
                     end
+                    -- Inf Shot after mouse up
+                    if autoAimState.infShotEnabled then
+                        for i = 1, 5 do
+                            fireInfShot()
+                            task.wait(0.05)
+                        end
+                    end
                 end
             end
         end)
@@ -3969,7 +4050,7 @@ local function startAutoAim()
     createAutoAimGUI()
     setupMouseButton2Detection()
     setupKeybindDetection()
-    setupMobileButton()  -- buat tombol (jika belum ada)
+    setupMobileButton()
 
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 

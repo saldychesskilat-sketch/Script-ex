@@ -3406,25 +3406,42 @@ local function startAutoAim()
             end
             return nearest
         elseif mode == "SCP" then
-            for _, obj in ipairs(workspace:GetDescendants()) do
-                if obj:IsA("BasePart") then
-                    local name = obj.Name:lower()
-                    if name:find("scp") or obj:GetAttribute("SCP") == true then
-                        local root = obj
-                        local parent = obj.Parent
-                        if parent and parent:IsA("Model") then
-                            local primary = parent:FindFirstChild("HumanoidRootPart") or parent.PrimaryPart
-                            if primary then root = primary end
-                        end
-                        local dist = (localPos - root.Position).Magnitude
-                        if dist < minDist then
-                            minDist = dist
-                            nearest = { Object = root }
-                        end
+         for _, model in ipairs(workspace:GetChildren()) do
+        if model:IsA("Model") then
+            local isSCP = false
+            -- Cek atribut SCP pada model
+            if model:GetAttribute("SCP") == true then
+                isSCP = true
+            end
+            -- Cek nama model
+            if not isSCP then
+                local modelName = model.Name:lower()
+                if modelName:find("scp") then
+                    isSCP = true
+                end
+            end
+            -- Cek descendant (BasePart) yang memiliki atribut atau nama scp
+            if not isSCP then
+                for _, child in ipairs(model:GetDescendants()) do
+                    if child:IsA("BasePart") and (child.Name:lower():find("scp") or child:GetAttribute("SCP") == true) then
+                        isSCP = true
+                        break
                     end
                 end
             end
-            return nearest
+            if isSCP then
+                local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model.PrimaryPart
+                if root then
+                    local dist = (localPos - root.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        nearest = { Object = root }
+                    end
+                end
+            end
+        end
+    end
+    return nearest
         end
         return nil
     end

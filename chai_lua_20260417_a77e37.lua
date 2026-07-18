@@ -2643,9 +2643,97 @@ end
 -- Toggle tetap menggunakan config.shieldEnabled.      
 -- ============================================================================      
 
-local attackRemote = nil
+-- ============================================================================      
+-- FEATURE 9: AUTO ATTACK (RemoteEvent spam via BasicAttack) + Radius Detection + ESP      
+-- Toggle menggunakan config.shieldEnabled.      
+-- ============================================================================      
 
--- Cari RemoteEvent BasicAttack di ReplicatedStorage
+local attackRemote = nil
+local shieldConnection = nil
+local shieldESP = nil          -- Folder untuk ESP
+local shieldRadius = 9         -- Radius deteksi (bisa diubah via config nanti)
+local charAddedConn = nil      -- Koneksi untuk CharacterAdded
+
+-- ========== FUNGSI ESP ==========
+local function createShieldESP()
+    if shieldESP then
+        shieldESP:Destroy()
+        shieldESP = nil
+    end
+
+    shieldESP = Instance.new("Folder")
+    shieldESP.Name = "ShieldESP"
+    shieldESP.Parent = workspace
+
+    -- Lingkaran utama (silinder neon)
+    local mainCircle = Instance.new("Part")
+    mainCircle.Name = "MainRadius"
+    mainCircle.Shape = Enum.PartType.Cylinder
+    mainCircle.Material = Enum.Material.Neon
+    mainCircle.Size = Vector3.new(0.04, shieldRadius * 2, shieldRadius * 2)
+    mainCircle.Transparency = 0.85
+    mainCircle.Color = Color3.fromRGB(0, 200, 255)
+    mainCircle.Anchored = true
+    mainCircle.CanCollide = false
+    mainCircle.Parent = shieldESP
+
+    -- Lingkaran luar (ring)
+    local outerRing = Instance.new("Part")
+    outerRing.Name = "OuterRing"
+    outerRing.Shape = Enum.PartType.Cylinder
+    outerRing.Material = Enum.Material.Neon
+    outerRing.Size = Vector3.new(0.03, (shieldRadius * 2) + 0.3, (shieldRadius * 2) + 0.3)
+    outerRing.Transparency = 0.5
+    outerRing.Color = Color3.fromRGB(0, 220, 255)
+    outerRing.Anchored = true
+    outerRing.CanCollide = false
+    outerRing.Parent = shieldESP
+
+    return shieldESP
+end
+
+local function updateShieldESP()
+    if not shieldESP then return end
+    local char = localPlayer.Character
+    if not char then
+        -- Sembunyikan ESP jika karakter tidak ada
+        for _, part in ipairs(shieldESP:GetChildren()) do
+            part.Transparency = 1
+        end
+        return
+    end
+    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    if not rootPart then
+        for _, part in ipairs(shieldESP:GetChildren()) do
+            part.Transparency = 1
+        end
+        return
+    end
+
+    -- Tampilkan ESP
+    for _, part in ipairs(shieldESP:GetChildren()) do
+        part.Transparency = (part.Name == "MainRadius") and 0.85 or 0.5
+    end
+
+    local footPos = rootPart.Position - Vector3.new(0, 3, 0)
+    local mainCircle = shieldESP:FindFirstChild("MainRadius")
+    local outerRing = shieldESP:FindFirstChild("OuterRing")
+    if mainCircle then
+        mainCircle.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
+    end
+    if outerRing then
+        outerRing.CFrame = CFrame.new(footPos) * CFrame.Angles(0, 0, math.rad(90))
+    end
+end
+
+local function destroyShieldESP()
+    if shieldESP then
+        shieldESP:Destroy()
+        shieldESP = nil
+    end
+end
+
+-- ========== FIND REMOTE ==========
 local function findAttackRemote()
     if attackRemote and attackRemote.Parent then return attackRemote end
     local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
@@ -2668,19 +2756,39 @@ local function findAttackRemote()
     return nil
 end
 
+-- ========== FUNGSI AUTO ATTACK ==========
 local function performAutoAttack()
-    local remote = findAttackRemote()
-    if not remote then return false end
+    -- Cek toggle
+    if not config.shieldEnabled then
+        -- Jika fitur mati, hentikan loop dan hapus ESP
+        if shieldConnection then
+            shieldConnection:Disconnect()
+            shieldConnection = nil
+        end
+        destroyShieldESP()
+        if charAddedConn then
+            charAddedConn:Disconnect()
+            charAddedConn = nil
+        end
+        return
+    end
 
-    -- Cek radius dan cari survivor terdekat
-    if not localRootPart then return false end
-    local localPos = localRootPart.Position
-    local ATTACK_RADIUS = 9  -- bisa diubah atau diambil dari config nanti
+    local remote = findAttackRemote()
+    if not remote then return end
+
+    -- Ambil karakter lokal secara dinamis
+    local char = localPlayer.Character
+    if not char then return end
+    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    if not rootPart then return end
+    local localPos = rootPart.Position
+
+    -- Cari survivor terdekat dalam radius
     local targetFound = false
+    local ATTACK_RADIUS = shieldRadius  -- bisa dibuat config nanti
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
-            -- Cek apakah player adalah survivor (bukan killer/monster/enemy)
             local isSurvivor = true
             if player.Team then
                 local teamName = player.Team.Name:lower()
@@ -2701,8 +2809,11 @@ local function performAutoAttack()
         end
     end
 
+    -- Update ESP posisi (selalu update meskipun tidak ada target)
+    updateShieldESP()
+
     if not targetFound then
-        return false
+        return
     end
 
     -- Jika ada target, spam remote
@@ -2711,27 +2822,46 @@ local function performAutoAttack()
         remote:FireServer("BasicAttack")
         remote:FireServer(localPlayer)
     end)
-    return true
 end
--- Variabel koneksi (tetap di luar untuk start/stop)
-local shieldConnection = nil
 
--- Start auto attack (dipanggil saat toggle ON)
+-- ========== START / STOP ==========
 local function startShieldMonitor()
     if shieldConnection then return end
+
+    -- Buat ESP
+    createShieldESP()
+
+    -- Koneksi untuk karakter baru (respawn / pindah map)
+    if not charAddedConn then
+        charAddedConn = localPlayer.CharacterAdded:Connect(function()
+            -- Update ESP saat karakter baru muncul
+            updateShieldESP()
+        end)
+    end
+
+    -- Mulai loop Heartbeat
     shieldConnection = RunService.Heartbeat:Connect(performAutoAttack)
-    print("[AutoAttack] Started (Radius Mode)")
+
+    print("[AutoAttack] Started (Radius Mode with ESP)")
 end
 
--- Stop auto attack (dipanggil saat toggle OFF)
 local function stopShieldMonitor()
     if shieldConnection then
         shieldConnection:Disconnect()
         shieldConnection = nil
     end
-    -- Panggil performAutoAttack sekali untuk menghancurkan ESP
-    performAutoAttack()
+    if charAddedConn then
+        charAddedConn:Disconnect()
+        charAddedConn = nil
+    end
+    destroyShieldESP()
     print("[AutoAttack] Stopped")
+end
+
+-- ========== INISIALISASI AWAL ==========
+-- Jika script dimuat ulang dan toggle aktif, jalankan start
+if config.shieldEnabled then
+    startShieldMonitor()
 end
 -- ============================================================================
 -- FEATURE 10: TPWALK (2x speed boost + CFrame dash) - ONLY WHEN MOVING (CONTROLLED)

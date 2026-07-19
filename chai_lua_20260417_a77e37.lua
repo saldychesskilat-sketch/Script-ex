@@ -3711,47 +3711,55 @@ local function startAutoAim()
         end
     end
 
-    -- ========== FUNGSI BYPASS SHOT (BARU) ==========
+    -- ========== FUNGSI BYPASS SHOT ==========
     local function fireBypassShot()
-        local char = localPlayer.Character
-        if not char then return end
-        local camera = workspace.CurrentCamera
-        if not camera then return end
+    local char = localPlayer.Character
+    if not char then return end
+    local camera = workspace.CurrentCamera
+    if not camera then return end
 
-        -- Cari item "Bullets" di Character atau Backpack
-        local item = char:FindFirstChild("Bullets")
-        if not item then
-            local backpack = localPlayer:FindFirstChild("Backpack")
-            if backpack then
-                item = backpack:FindFirstChild("Bullets")
+    -- Cari item "Bullets" di Character atau Backpack
+    local item = char:FindFirstChild("Bullets")
+    if not item then
+        local backpack = localPlayer:FindFirstChild("Backpack")
+        if backpack then
+            item = backpack:FindFirstChild("Bullets")
+        end
+    end
+    if not item then
+        -- fallback: cari tool apapun yang namanya mengandung "Bullets" atau "bullet"
+        for _, child in ipairs(char:GetChildren()) do
+            if child:IsA("Tool") and child.Name:lower():find("bullet") then
+                item = child
+                break
             end
         end
-        if not item then
-            -- fallback: cari tool apapun yang namanya mengandung "Bullets" atau "bullet"
-            for _, child in ipairs(char:GetChildren()) do
+        if not item and backpack then
+            for _, child in ipairs(backpack:GetChildren()) do
                 if child:IsA("Tool") and child.Name:lower():find("bullet") then
                     item = child
                     break
                 end
             end
-            if not item and backpack then
-                for _, child in ipairs(backpack:GetChildren()) do
-                    if child:IsA("Tool") and child.Name:lower():find("bullet") then
-                        item = child
-                        break
-                    end
-                end
-            end
-        end
-        if not item then return end
-
-        local lookVector = camera.CFrame.LookVector
-        local fireRemote = getFireRemotes() -- kita ambil fireRemote
-        if fireRemote and fireRemote:IsA("RemoteEvent") then
-            pcall(function() fireRemote:FireServer(item, lookVector) end)
         end
     end
+    if not item then return end
 
+    -- Cari remote Fire di ReplicatedStorage.Remotes.Items["Twist of Fate"]
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then return end
+    local items = remotes:FindFirstChild("Items")
+    if not items then return end
+    local twist = items:FindFirstChild("Twist of Fate")
+    if not twist then return end
+    local fireRemote = twist:FindFirstChild("Fire")
+    if not fireRemote or not fireRemote:IsA("RemoteEvent") then return end
+
+    local lookVector = camera.CFrame.LookVector
+    pcall(function()
+        fireRemote:FireServer(item, lookVector)
+    end)
+    end
     -- ========== FUNGSI HOLD LOOP (tidak diubah) ==========
     local function startHoldLoop()
         if autoAimState.holdActive then return end

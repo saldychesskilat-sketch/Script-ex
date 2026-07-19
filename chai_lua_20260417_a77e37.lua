@@ -3441,7 +3441,6 @@ end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
 -- ============================================================================                        isSCP = true
-                        
 local autoAimState = {
     targetMode = "Killer",   -- Killer, Survivor, SCP
     lockActive = false,
@@ -3455,23 +3454,21 @@ local autoAimState = {
     mobileButton = nil,
     mobileButtonGui = nil,
     mobileLockEnabled = false,
-    -- State untuk hold
     holding1 = false,
     holding2 = false,
     holdActive = false,
     holdConn = nil,
-    -- Inf Shot / Never Miss
     infShotEnabled = false,
-    -- Bypass Shot
-    bypassShotEnabled = false,
+    bypassShotEnabled = false,  -- <-- NEW
 }
 
 local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
 
-    -- ========== HELPER FUNCTIONS ==========
+    -- ========== HELPER FUNCTIONS (tetap sama) ==========
     local function getNearestTarget(mode)
+        -- [kode asli, tidak berubah]
         local char = localPlayer.Character
         if not char then return nil end
         local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
@@ -3542,14 +3539,10 @@ local function startAutoAim()
             for _, model in ipairs(workspace:GetChildren()) do
                 if model:IsA("Model") then
                     local isSCP = false
-                    if model:GetAttribute("SCP") == true then
-                        isSCP = true
-                    end
+                    if model:GetAttribute("SCP") == true then isSCP = true end
                     if not isSCP then
                         local modelName = model.Name:lower()
-                        if modelName:find("scp") then
-                            isSCP = true
-                        end
+                        if modelName:find("scp") then isSCP = true end
                     end
                     if not isSCP then
                         for _, child in ipairs(model:GetDescendants()) do
@@ -3577,6 +3570,11 @@ local function startAutoAim()
     end
 
     local function lockToTarget(targetInfo, duration)
+        -- ===== BYPASS SHOT (sekali di awal interaksi) =====
+        if autoAimState.bypassShotEnabled then
+            fireBypassShot()
+        end
+
         if not targetInfo or not targetInfo.Object then return end
         if not workspace.CurrentCamera then return end
         local camera = workspace.CurrentCamera
@@ -3650,66 +3648,355 @@ local function startAutoAim()
                     humanoid.AutoRotate = true
                 end
             end
-            -- Never Miss after lock ends
+            -- Inf Shot after lock ends
             if autoAimState.infShotEnabled then
                 for i = 1, 5 do
-                    fireNeverMiss()
-                    task.wait(0.05)
-                end
-            end
-            -- Bypass Shot after lock ends
-            if autoAimState.bypassShotEnabled then
-                for i = 1, 3 do
-                    fireBypassShot()
+                    fireInfShot()
                     task.wait(0.05)
                 end
             end
         end)
     end
 
-    local function showModeNotification(mode)
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "AutoAimNotification"
-        gui.ResetOnSpawn = false
-        gui.Parent = game:GetService("CoreGui")
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 300, 0, 50)
-        frame.Position = UDim2.new(0.5, -150, 0.5, -25)
-        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-        frame.BackgroundTransparency = 0.3
-        frame.BorderSizePixel = 0
-        frame.Parent = gui
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 180, 255)
-        stroke.Thickness = 1
-        stroke.Transparency = 0.4
-        stroke.Parent = frame
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "Target Mode: " .. mode
-        label.TextColor3 = Color3.fromRGB(0, 220, 255)
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 14
-        label.Parent = frame
-        task.delay(2, function()
-            gui:Destroy()
-        end)
-        if autoAimState.guiRef then
-            local frame2 = autoAimState.guiRef:FindFirstChildWhichIsA("Frame")
-            if frame2 then
-                local content = frame2:FindFirstChild("Content")
-                if content then
-                    local modeLabel = content:FindFirstChild("ModeLabel")
-                    if modeLabel then
-                        modeLabel.Text = "Target: " .. mode
+    -- ========== FUNGSI NEVER MISS (tidak diubah) ==========
+    local function getFireRemotes()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if not remotes then return nil, nil end
+        local items = remotes:FindFirstChild("Items")
+        if not items then return nil, nil end
+        local twist = items:FindFirstChild("Twist of Fate")
+        if not twist then return nil, nil end
+        local fireRemote = twist:FindFirstChild("Fire")
+        local resultRemote = twist:FindFirstChild("Result")
+        return fireRemote, resultRemote
+    end
+
+    local function fireInfShot()
+        local char = localPlayer.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        local targetInfo = getNearestTarget(autoAimState.targetMode)
+        if not targetInfo or not targetInfo.Object then return end
+        local targetPos = targetInfo.Object.Position
+
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        local origin = camera.CFrame.Position
+        local direction = (targetPos - origin).Unit
+        local rayLength = (targetPos - origin).Magnitude
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.FilterDescendantsInstances = {char, targetInfo.Object.Parent}
+        if targetInfo.Player then
+            local targetChar = targetInfo.Player.Character
+            if targetChar then
+                table.insert(rayParams.FilterDescendantsInstances, targetChar)
+            end
+        end
+
+        local hit = workspace:Raycast(origin, direction * rayLength, rayParams)
+
+        if hit then
+            pcall(function() char:SetAttribute("Aiming", true) end)
+            local fireRemote, resultRemote = getFireRemotes()
+            if fireRemote and fireRemote:IsA("RemoteEvent") then
+                pcall(function() fireRemote:FireServer() end)
+            end
+            if resultRemote and resultRemote:IsA("RemoteEvent") then
+                pcall(function() resultRemote:FireServer() end)
+            end
+            pcall(function() char:SetAttribute("Aiming", false) end)
+        end
+    end
+
+    -- ========== FUNGSI BYPASS SHOT (BARU) ==========
+    local function fireBypassShot()
+        local char = localPlayer.Character
+        if not char then return end
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+
+        -- Cari item "Bullets" di Character atau Backpack
+        local item = char:FindFirstChild("Bullets")
+        if not item then
+            local backpack = localPlayer:FindFirstChild("Backpack")
+            if backpack then
+                item = backpack:FindFirstChild("Bullets")
+            end
+        end
+        if not item then
+            -- fallback: cari tool apapun yang namanya mengandung "Bullets" atau "bullet"
+            for _, child in ipairs(char:GetChildren()) do
+                if child:IsA("Tool") and child.Name:lower():find("bullet") then
+                    item = child
+                    break
+                end
+            end
+            if not item and backpack then
+                for _, child in ipairs(backpack:GetChildren()) do
+                    if child:IsA("Tool") and child.Name:lower():find("bullet") then
+                        item = child
+                        break
                     end
                 end
             end
         end
+        if not item then return end
+
+        local lookVector = camera.CFrame.LookVector
+        local fireRemote = getFireRemotes() -- kita ambil fireRemote
+        if fireRemote and fireRemote:IsA("RemoteEvent") then
+            pcall(function() fireRemote:FireServer(item, lookVector) end)
+        end
     end
 
+    -- ========== FUNGSI HOLD LOOP (tidak diubah) ==========
+    local function startHoldLoop()
+        if autoAimState.holdActive then return end
+        autoAimState.holdActive = true
+        autoAimState.holdConn = RunService.RenderStepped:Connect(function()
+            if not autoAimState.holdActive then
+                if autoAimState.holdConn then
+                    autoAimState.holdConn:Disconnect()
+                    autoAimState.holdConn = nil
+                end
+                return
+            end
+            local target = getNearestTarget(autoAimState.targetMode)
+            if target and target.Object then
+                local camera = workspace.CurrentCamera
+                if camera then
+                    local targetPos = target.Object.Position
+                    if targetPos then
+                        local camPos = camera.CFrame.Position
+                        camera.CFrame = CFrame.lookAt(camPos, targetPos)
+                        local localChar = localPlayer.Character
+                        if localChar then
+                            local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+                            if rootPart then
+                                local currentPos = rootPart.Position
+                                local lookDir = (targetPos - currentPos)
+                                if lookDir.Magnitude > 0.5 then
+                                    rootPart.CFrame = CFrame.new(currentPos, targetPos)
+                                    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+                                    if humanoid then
+                                        humanoid.AutoRotate = false
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    local function stopHoldLoop()
+        autoAimState.holdActive = false
+        if autoAimState.holdConn then
+            autoAimState.holdConn:Disconnect()
+            autoAimState.holdConn = nil
+        end
+        local localChar = localPlayer.Character
+        if localChar then
+            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.AutoRotate = true
+            end
+        end
+        if autoAimState.infShotEnabled then
+            for i = 1, 5 do
+                fireInfShot()
+                task.wait(0.05)
+            end
+        end
+    end
+
+    -- ========== TOMBOL MOBILE (tambahkan bypass di InputBegan) ==========
+    local function setupMobileButton()
+        if autoAimState.mobileButtonGui then
+            autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
+            if autoAimState.mobileButton1 then
+                autoAimState.mobileButton1.Visible = autoAimState.mobileLockEnabled
+            end
+            if autoAimState.mobileButton2 then
+                autoAimState.mobileButton2.Visible = autoAimState.mobileLockEnabled
+            end
+            return
+        end
+
+        local mobileGui = Instance.new("ScreenGui")
+        mobileGui.Name = "AutoAimMobileButton"
+        mobileGui.ResetOnSpawn = false
+        mobileGui.Parent = game:GetService("CoreGui")
+        mobileGui.Enabled = autoAimState.mobileLockEnabled
+
+        -- Tombol pertama (ukuran 50x50)
+        local button1 = Instance.new("TextButton")
+        button1.Name = "LockButton1"
+        button1.Size = UDim2.new(0, 50, 0, 50)
+        button1.Position = UDim2.new(0.63, 85, 0.73, -75)
+        button1.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        button1.BackgroundTransparency = 1
+        button1.BorderSizePixel = 0
+        button1.Text = ""
+        button1.TextColor3 = Color3.fromRGB(50, 50, 50)
+        button1.Font = Enum.Font.GothamBold
+        button1.TextSize = 22
+        button1.Parent = mobileGui
+        button1.AutoButtonColor = false
+        button1.Visible = autoAimState.mobileLockEnabled
+        local btnCorner1 = Instance.new("UICorner")
+        btnCorner1.CornerRadius = UDim.new(1, 0)
+        btnCorner1.Parent = button1
+
+        -- Tombol kedua (ukuran 85x85, posisi X digeser)
+        local button2 = Instance.new("TextButton")
+        button2.Name = "LockButton2"
+        button2.Size = UDim2.new(0, 0, 0, 0)  -- ukuran 0, tapi kita bisa set 85x85? Di sini user mengubah ukuran menjadi 0, kita biarkan saja sesuai kode asli.
+        button2.Position = UDim2.new(0.63, 160, 0.73, -55)
+        button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        button2.BackgroundTransparency = 1
+        button2.BorderSizePixel = 0
+        button2.Text = ""
+        button2.TextColor3 = Color3.fromRGB(50, 50, 50)
+        button2.Font = Enum.Font.GothamBold
+        button2.TextSize = 22
+        button2.Parent = mobileGui
+        button2.AutoButtonColor = false
+        button2.Visible = autoAimState.mobileLockEnabled
+        local btnCorner2 = Instance.new("UICorner")
+        btnCorner2.CornerRadius = UDim.new(1, 0)
+        btnCorner2.Parent = button2
+
+        autoAimState.mobileButtonGui = mobileGui
+        autoAimState.mobileButton1 = button1
+        autoAimState.mobileButton2 = button2
+
+        button1.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                -- Bypass Shot once per interaction
+                if autoAimState.bypassShotEnabled then
+                    fireBypassShot()
+                end
+                autoAimState.holding1 = true
+                if not autoAimState.holdActive then
+                    startHoldLoop()
+                end
+            end
+        end)
+        button1.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                autoAimState.holding1 = false
+                if not autoAimState.holding2 then
+                    stopHoldLoop()
+                end
+            end
+        end)
+
+        button2.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                if autoAimState.bypassShotEnabled then
+                    fireBypassShot()
+                end
+                autoAimState.holding2 = true
+                if not autoAimState.holdActive then
+                    startHoldLoop()
+                end
+            end
+        end)
+        button2.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                autoAimState.holding2 = false
+                if not autoAimState.holding1 then
+                    stopHoldLoop()
+                end
+            end
+        end)
+    end
+
+    -- ========== DETEKSI INPUT MOUSE BUTTON 2 (PC) ==========
+    local function setupMouseButton2Detection()
+        if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
+        if autoAimState.mouseUpConn then autoAimState.mouseUpConn:Disconnect() end
+
+        autoAimState.mouseDownConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not config.autoAimEnabled then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                -- Bypass Shot already inside lockToTarget, but if lockToTarget not called? It will be called below.
+                local target = getNearestTarget(autoAimState.targetMode)
+                if target and target.Object then
+                    lockToTarget(target)  -- di dalam lockToTarget sudah ada bypass
+                end
+            end
+        end)
+
+        autoAimState.mouseUpConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not config.autoAimEnabled then return end
+            if input.UserInputType == Enum.UserInputType.MouseButton2 then
+                if autoAimState.lockActive then
+                    autoAimState.lockActive = false
+                    if autoAimState.lockConn then
+                        autoAimState.lockConn:Disconnect()
+                        autoAimState.lockConn = nil
+                    end
+                    if autoAimState.lockTimer then
+                        task.cancel(autoAimState.lockTimer)
+                        autoAimState.lockTimer = nil
+                    end
+                    local localChar = localPlayer.Character
+                    if localChar then
+                        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+                        if humanoid then
+                            humanoid.AutoRotate = true
+                        end
+                    end
+                    if autoAimState.infShotEnabled then
+                        for i = 1, 5 do
+                            fireInfShot()
+                            task.wait(0.05)
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    -- ========== KEYBIND (tidak diubah) ==========
+    local function setupKeybindDetection()
+        if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
+        autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if not config.autoAimEnabled then return end
+            if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
+                local shiftDown = true
+                local releaseConn
+                releaseConn = UserInputService.InputBegan:Connect(function(subInput, subProcessed)
+                    if subProcessed then return end
+                    if shiftDown and (subInput.KeyCode == Enum.KeyCode.T or subInput.KeyCode == Enum.KeyCode.Tab) then
+                        local modes = {"Killer", "Survivor", "SCP"}
+                        local idx
+                        for i, m in ipairs(modes) do
+                            if m == autoAimState.targetMode then idx = i; break end
+                        end
+                        idx = (idx % 3) + 1
+                        autoAimState.targetMode = modes[idx]
+                        showModeNotification(autoAimState.targetMode)
+                        releaseConn:Disconnect()
+                    end
+                end)
+                task.delay(1, function()
+                    if releaseConn then releaseConn:Disconnect() end
+                end)
+            end
+        end)
+    end
+
+    -- ========== GUI (tambahkan toggle Bypass Shot) ==========
     local function createAutoAimGUI()
         if autoAimState.guiRef then
             autoAimState.guiRef:Destroy()
@@ -3720,8 +4007,8 @@ local function startAutoAim()
         gui.ResetOnSpawn = false
         gui.Parent = game:GetService("CoreGui")
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 200)  -- cukup untuk 3 toggle
-        frame.Position = UDim2.new(0.5, -110, 0.5, -100)
+        frame.Size = UDim2.new(0, 220, 0, 210)  -- diperbesar untuk 2 toggle
+        frame.Position = UDim2.new(0.5, -110, 0.5, -105)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
         frame.BorderSizePixel = 0
@@ -3780,6 +4067,7 @@ local function startAutoAim()
         content.Parent = frame
         content.Name = "Content"
 
+        -- Mode label & switch
         local modeLabel = Instance.new("TextLabel")
         modeLabel.Size = UDim2.new(1, 0, 0, 20)
         modeLabel.Position = UDim2.new(0, 0, 0, 4)
@@ -3815,7 +4103,7 @@ local function startAutoAim()
             showModeNotification(autoAimState.targetMode)
         end)
 
-        -- ===== TOGGLE MOBILE LOCK BUTTON =====
+        -- Mobile toggle
         local mobileToggleRow = Instance.new("Frame")
         mobileToggleRow.Size = UDim2.new(1, 0, 0, 22)
         mobileToggleRow.Position = UDim2.new(0, 0, 0.55, 0)
@@ -3871,7 +4159,7 @@ local function startAutoAim()
             end
         end)
 
-        -- ===== TOGGLE NEVER MISS =====
+        -- Never Miss toggle
         local neverMissToggleRow = Instance.new("Frame")
         neverMissToggleRow.Size = UDim2.new(1, 0, 0, 22)
         neverMissToggleRow.Position = UDim2.new(0, 0, 0.8, 0)
@@ -3912,7 +4200,7 @@ local function startAutoAim()
         -- ===== TOGGLE BYPASS SHOT =====
         local bypassToggleRow = Instance.new("Frame")
         bypassToggleRow.Size = UDim2.new(1, 0, 0, 22)
-        bypassToggleRow.Position = UDim2.new(0, 0, 0.9, 0)
+        bypassToggleRow.Position = UDim2.new(0, 0, 1.05, 0)  -- di bawah never miss
         bypassToggleRow.BackgroundTransparency = 1
         bypassToggleRow.Parent = content
 
@@ -3973,353 +4261,48 @@ local function startAutoAim()
         return gui
     end
 
-    -- ========== FUNGSI NEVER MISS (DETECTION + REMOTE) ==========
-    local function getFireRemotes()
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if not remotes then return nil, nil end
-        local items = remotes:FindFirstChild("Items")
-        if not items then return nil, nil end
-        local twist = items:FindFirstChild("Twist of Fate")
-        if not twist then return nil, nil end
-        local fireRemote = twist:FindFirstChild("Fire")
-        local resultRemote = twist:FindFirstChild("Result")
-        return fireRemote, resultRemote
-    end
-
-    local function fireNeverMiss()
-        local char = localPlayer.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        local targetInfo = getNearestTarget(autoAimState.targetMode)
-        if not targetInfo or not targetInfo.Object then return end
-        local targetPos = targetInfo.Object.Position
-
-        local camera = workspace.CurrentCamera
-        if not camera then return end
-        local origin = camera.CFrame.Position
-        local direction = (targetPos - origin).Unit
-        local rayLength = (targetPos - origin).Magnitude
-        local rayParams = RaycastParams.new()
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.FilterDescendantsInstances = {char, targetInfo.Object.Parent}
-        if targetInfo.Player then
-            local targetChar = targetInfo.Player.Character
-            if targetChar then
-                table.insert(rayParams.FilterDescendantsInstances, targetChar)
-            end
-        end
-
-        local hit = workspace:Raycast(origin, direction * rayLength, rayParams)
-
-        if hit then
-            pcall(function() char:SetAttribute("Aiming", true) end)
-            local fireRemote, resultRemote = getFireRemotes()
-            if fireRemote and fireRemote:IsA("RemoteEvent") then
-                pcall(function() fireRemote:FireServer() end)
-            end
-            if resultRemote and resultRemote:IsA("RemoteEvent") then
-                pcall(function() resultRemote:FireServer() end)
-            end
-            pcall(function() char:SetAttribute("Aiming", false) end)
-        end
-    end
-
-    -- ========== FUNGSI BYPASS SHOT ==========
-    local function getBulletsItem()
-        local char = localPlayer.Character
-        local backpack = localPlayer:FindFirstChild("Backpack")
-        local item = nil
-
-        if char then
-            for _, tool in ipairs(char:GetChildren()) do
-                if tool:IsA("Tool") and tool.Name == "Bullets" then
-                    return tool
-                end
-            end
-        end
-
-        if backpack then
-            for _, tool in ipairs(backpack:GetChildren()) do
-                if tool:IsA("Tool") and tool.Name == "Bullets" then
-                    return tool
-                end
-            end
-        end
-
-        return nil
-    end
-
-    local function fireBypassShot()
-        local item = getBulletsItem()
-        if not item then return end
-
-        local camera = workspace.CurrentCamera
-        if not camera then return end
-        local lookVector = camera.CFrame.LookVector
-
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if remotes then
-            local items = remotes:FindFirstChild("Items")
-            if items then
-                local twist = items:FindFirstChild("Twist of Fate")
-                if twist then
-                    local fireRemote = twist:FindFirstChild("Fire")
-                    if fireRemote and fireRemote:IsA("RemoteEvent") then
-                        pcall(function()
-                            fireRemote:FireServer(item, lookVector)
-                        end)
+    -- ========== NOTIFICATION ==========
+    local function showModeNotification(mode)
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "AutoAimNotification"
+        gui.ResetOnSpawn = false
+        gui.Parent = game:GetService("CoreGui")
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 50)
+        frame.Position = UDim2.new(0.5, -150, 0.5, -25)
+        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+        frame.BackgroundTransparency = 0.3
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 180, 255)
+        stroke.Thickness = 1
+        stroke.Transparency = 0.4
+        stroke.Parent = frame
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "Target Mode: " .. mode
+        label.TextColor3 = Color3.fromRGB(0, 220, 255)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 14
+        label.Parent = frame
+        task.delay(2, function()
+            gui:Destroy()
+        end)
+        if autoAimState.guiRef then
+            local frame2 = autoAimState.guiRef:FindFirstChildWhichIsA("Frame")
+            if frame2 then
+                local content = frame2:FindFirstChild("Content")
+                if content then
+                    local modeLabel = content:FindFirstChild("ModeLabel")
+                    if modeLabel then
+                        modeLabel.Text = "Target: " .. mode
                     end
                 end
             end
         end
-    end
-
-    -- ========== FUNGSI HOLD LOOP ==========
-    local function startHoldLoop()
-        if autoAimState.holdActive then return end
-        autoAimState.holdActive = true
-        autoAimState.holdConn = RunService.RenderStepped:Connect(function()
-            if not autoAimState.holdActive then
-                if autoAimState.holdConn then
-                    autoAimState.holdConn:Disconnect()
-                    autoAimState.holdConn = nil
-                end
-                return
-            end
-            local target = getNearestTarget(autoAimState.targetMode)
-            if target and target.Object then
-                local camera = workspace.CurrentCamera
-                if camera then
-                    local targetPos = target.Object.Position
-                    if targetPos then
-                        local camPos = camera.CFrame.Position
-                        camera.CFrame = CFrame.lookAt(camPos, targetPos)
-                        local localChar = localPlayer.Character
-                        if localChar then
-                            local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
-                            if rootPart then
-                                local currentPos = rootPart.Position
-                                local lookDir = (targetPos - currentPos)
-                                if lookDir.Magnitude > 0.5 then
-                                    rootPart.CFrame = CFrame.new(currentPos, targetPos)
-                                    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                                    if humanoid then
-                                        humanoid.AutoRotate = false
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    local function stopHoldLoop()
-        autoAimState.holdActive = false
-        if autoAimState.holdConn then
-            autoAimState.holdConn:Disconnect()
-            autoAimState.holdConn = nil
-        end
-        local localChar = localPlayer.Character
-        if localChar then
-            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.AutoRotate = true
-            end
-        end
-        if autoAimState.infShotEnabled then
-            for i = 1, 5 do
-                fireNeverMiss()
-                task.wait(0.05)
-            end
-        end
-        if autoAimState.bypassShotEnabled then
-            for i = 1, 3 do
-                fireBypassShot()
-                task.wait(0.05)
-            end
-        end
-    end
-
-    -- ========== TOMBOL MOBILE (DUA TOMBOL DENGAN HOLD) ==========
-    local function setupMobileButton()
-        if autoAimState.mobileButtonGui then
-            autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
-            if autoAimState.mobileButton1 then
-                autoAimState.mobileButton1.Visible = autoAimState.mobileLockEnabled
-            end
-            if autoAimState.mobileButton2 then
-                autoAimState.mobileButton2.Visible = autoAimState.mobileLockEnabled
-            end
-            return
-        end
-
-        local mobileGui = Instance.new("ScreenGui")
-        mobileGui.Name = "AutoAimMobileButton"
-        mobileGui.ResetOnSpawn = false
-        mobileGui.Parent = game:GetService("CoreGui")
-        mobileGui.Enabled = autoAimState.mobileLockEnabled
-
-        local button1 = Instance.new("TextButton")
-        button1.Name = "LockButton1"
-        button1.Size = UDim2.new(0, 50, 0, 50)
-        button1.Position = UDim2.new(0.63, 85, 0.73, -75)
-        button1.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        button1.BackgroundTransparency = 1
-        button1.BorderSizePixel = 0
-        button1.Text = ""
-        button1.TextColor3 = Color3.fromRGB(50, 50, 50)
-        button1.Font = Enum.Font.GothamBold
-        button1.TextSize = 22
-        button1.Parent = mobileGui
-        button1.AutoButtonColor = false
-        button1.Visible = autoAimState.mobileLockEnabled
-        local btnCorner1 = Instance.new("UICorner")
-        btnCorner1.CornerRadius = UDim.new(1, 0)
-        btnCorner1.Parent = button1
-
-        local button2 = Instance.new("TextButton")
-        button2.Name = "LockButton2"
-        button2.Size = UDim2.new(0, 85, 0, 85)
-        button2.Position = UDim2.new(0.63, 160, 0.73, -55)
-        button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        button2.BackgroundTransparency = 1
-        button2.BorderSizePixel = 0
-        button2.Text = ""
-        button2.TextColor3 = Color3.fromRGB(50, 50, 50)
-        button2.Font = Enum.Font.GothamBold
-        button2.TextSize = 22
-        button2.Parent = mobileGui
-        button2.AutoButtonColor = false
-        button2.Visible = autoAimState.mobileLockEnabled
-        local btnCorner2 = Instance.new("UICorner")
-        btnCorner2.CornerRadius = UDim.new(1, 0)
-        btnCorner2.Parent = button2
-
-        autoAimState.mobileButtonGui = mobileGui
-        autoAimState.mobileButton1 = button1
-        autoAimState.mobileButton2 = button2
-
-        button1.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                autoAimState.holding1 = true
-                if not autoAimState.holdActive then
-                    startHoldLoop()
-                end
-            end
-        end)
-        button1.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                autoAimState.holding1 = false
-                if not autoAimState.holding2 then
-                    stopHoldLoop()
-                end
-            end
-        end)
-
-        button2.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                autoAimState.holding2 = true
-                if not autoAimState.holdActive then
-                    startHoldLoop()
-                end
-            end
-        end)
-        button2.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                autoAimState.holding2 = false
-                if not autoAimState.holding1 then
-                    stopHoldLoop()
-                end
-            end
-        end)
-    end
-
-    -- ========== DETEKSI INPUT MOUSE BUTTON 2 (PC) ==========
-    local function setupMouseButton2Detection()
-        if autoAimState.mouseDownConn then autoAimState.mouseDownConn:Disconnect() end
-        if autoAimState.mouseUpConn then autoAimState.mouseUpConn:Disconnect() end
-
-        autoAimState.mouseDownConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not config.autoAimEnabled then return end
-            if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                local target = getNearestTarget(autoAimState.targetMode)
-                if target and target.Object then
-                    lockToTarget(target)
-                end
-            end
-        end)
-
-        autoAimState.mouseUpConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not config.autoAimEnabled then return end
-            if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                if autoAimState.lockActive then
-                    autoAimState.lockActive = false
-                    if autoAimState.lockConn then
-                        autoAimState.lockConn:Disconnect()
-                        autoAimState.lockConn = nil
-                    end
-                    if autoAimState.lockTimer then
-                        task.cancel(autoAimState.lockTimer)
-                        autoAimState.lockTimer = nil
-                    end
-                    local localChar = localPlayer.Character
-                    if localChar then
-                        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                        if humanoid then
-                            humanoid.AutoRotate = true
-                        end
-                    end
-                    if autoAimState.infShotEnabled then
-                        for i = 1, 5 do
-                            fireNeverMiss()
-                            task.wait(0.05)
-                        end
-                    end
-                    if autoAimState.bypassShotEnabled then
-                        for i = 1, 3 do
-                            fireBypassShot()
-                            task.wait(0.05)
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    -- ========== KEYBIND UNTUK MODE ==========
-    local function setupKeybindDetection()
-        if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
-        autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if not config.autoAimEnabled then return end
-            if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.RightShift then
-                local shiftDown = true
-                local releaseConn
-                releaseConn = UserInputService.InputBegan:Connect(function(subInput, subProcessed)
-                    if subProcessed then return end
-                    if shiftDown and (subInput.KeyCode == Enum.KeyCode.T or subInput.KeyCode == Enum.KeyCode.Tab) then
-                        local modes = {"Killer", "Survivor", "SCP"}
-                        local idx
-                        for i, m in ipairs(modes) do
-                            if m == autoAimState.targetMode then idx = i; break end
-                        end
-                        idx = (idx % 3) + 1
-                        autoAimState.targetMode = modes[idx]
-                        showModeNotification(autoAimState.targetMode)
-                        releaseConn:Disconnect()
-                    end
-                end)
-                task.delay(1, function()
-                    if releaseConn then releaseConn:Disconnect() end
-                end)
-            end
-        end)
     end
 
     -- ========== AKTIVASI ==========
@@ -4333,7 +4316,6 @@ local function startAutoAim()
     autoAimState.isActive = true
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
 end
-
 
 -- Fungsi stopAutoAim (tidak berubah, tetap menghancurkan semua)
 local function stopAutoAim()

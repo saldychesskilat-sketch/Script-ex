@@ -3440,7 +3440,8 @@ local function stopAutoSkillCheck()
 end
 -- ============================================================================
 -- FEATURE 15: AUTO AIM (unchanged)
--- ============================================================================
+-- ============================================================================                        isSCP = true
+                        
 local autoAimState = {
     targetMode = "Killer",   -- Killer, Survivor, SCP
     lockActive = false,
@@ -3459,15 +3460,17 @@ local autoAimState = {
     holding2 = false,
     holdActive = false,
     holdConn = nil,
-    -- Inf Shot
+    -- Inf Shot / Never Miss
     infShotEnabled = false,
+    -- Bypass Shot
+    bypassShotEnabled = false,
 }
 
 local function startAutoAim()
     if autoAimConnection then return end
     if not config.autoAimEnabled then return end
 
-    -- ========== HELPER FUNCTIONS (tetap sama) ==========
+    -- ========== HELPER FUNCTIONS ==========
     local function getNearestTarget(mode)
         local char = localPlayer.Character
         if not char then return nil end
@@ -3536,42 +3539,39 @@ local function startAutoAim()
             end
             return nearest
         elseif mode == "SCP" then
-         for _, model in ipairs(workspace:GetChildren()) do
-        if model:IsA("Model") then
-            local isSCP = false
-            -- Cek atribut SCP pada model
-            if model:GetAttribute("SCP") == true then
-                isSCP = true
-            end
-            -- Cek nama model
-            if not isSCP then
-                local modelName = model.Name:lower()
-                if modelName:find("scp") then
-                    isSCP = true
-                end
-            end
-            -- Cek descendant (BasePart) yang memiliki atribut atau nama scp
-            if not isSCP then
-                for _, child in ipairs(model:GetDescendants()) do
-                    if child:IsA("BasePart") and (child.Name:lower():find("scp") or child:GetAttribute("SCP") == true) then
+            for _, model in ipairs(workspace:GetChildren()) do
+                if model:IsA("Model") then
+                    local isSCP = false
+                    if model:GetAttribute("SCP") == true then
                         isSCP = true
-                        break
+                    end
+                    if not isSCP then
+                        local modelName = model.Name:lower()
+                        if modelName:find("scp") then
+                            isSCP = true
+                        end
+                    end
+                    if not isSCP then
+                        for _, child in ipairs(model:GetDescendants()) do
+                            if child:IsA("BasePart") and (child.Name:lower():find("scp") or child:GetAttribute("SCP") == true) then
+                                isSCP = true
+                                break
+                            end
+                        end
+                    end
+                    if isSCP then
+                        local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model.PrimaryPart
+                        if root then
+                            local dist = (localPos - root.Position).Magnitude
+                            if dist < minDist then
+                                minDist = dist
+                                nearest = { Object = root }
+                            end
+                        end
                     end
                 end
             end
-            if isSCP then
-                local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model.PrimaryPart
-                if root then
-                    local dist = (localPos - root.Position).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        nearest = { Object = root }
-                    end
-                end
-            end
-        end
-    end
-    return nearest
+            return nearest
         end
         return nil
     end
@@ -3650,10 +3650,17 @@ local function startAutoAim()
                     humanoid.AutoRotate = true
                 end
             end
-            -- Inf Shot after lock ends (otomatis)
+            -- Never Miss after lock ends
             if autoAimState.infShotEnabled then
                 for i = 1, 5 do
-                    fireInfShot()
+                    fireNeverMiss()
+                    task.wait(0.05)
+                end
+            end
+            -- Bypass Shot after lock ends
+            if autoAimState.bypassShotEnabled then
+                for i = 1, 3 do
+                    fireBypassShot()
                     task.wait(0.05)
                 end
             end
@@ -3713,8 +3720,8 @@ local function startAutoAim()
         gui.ResetOnSpawn = false
         gui.Parent = game:GetService("CoreGui")
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 180)  -- diperbesar untuk inf shot
-        frame.Position = UDim2.new(0.5, -110, 0.5, -90)
+        frame.Size = UDim2.new(0, 220, 0, 200)  -- cukup untuk 3 toggle
+        frame.Position = UDim2.new(0.5, -110, 0.5, -100)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
         frame.BorderSizePixel = 0
@@ -3844,7 +3851,6 @@ local function startAutoAim()
             autoAimState.mobileLockEnabled = not autoAimState.mobileLockEnabled
             mobileSwitch.BackgroundColor3 = autoAimState.mobileLockEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
             mobileSwitch.Text = autoAimState.mobileLockEnabled and "ON" or "OFF"
-            -- Update visibilitas tombol tanpa destroy
             if autoAimState.mobileButtonGui then
                 autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
                 if autoAimState.mobileButton1 then
@@ -3856,7 +3862,6 @@ local function startAutoAim()
             else
                 setupMobileButton()
             end
-            -- Jika dimatikan, hentikan hold yang aktif
             if not autoAimState.mobileLockEnabled then
                 if autoAimState.holdActive then
                     stopHoldLoop()
@@ -3866,42 +3871,80 @@ local function startAutoAim()
             end
         end)
 
-        -- ===== TOGGLE INF SHOT =====
-        local infToggleRow = Instance.new("Frame")
-        infToggleRow.Size = UDim2.new(1, 0, 0, 22)
-        infToggleRow.Position = UDim2.new(0, 0, 0.8, 0) -- di bawah mobile toggle
-        infToggleRow.BackgroundTransparency = 1
-        infToggleRow.Parent = content
+        -- ===== TOGGLE NEVER MISS =====
+        local neverMissToggleRow = Instance.new("Frame")
+        neverMissToggleRow.Size = UDim2.new(1, 0, 0, 22)
+        neverMissToggleRow.Position = UDim2.new(0, 0, 0.8, 0)
+        neverMissToggleRow.BackgroundTransparency = 1
+        neverMissToggleRow.Parent = content
 
-        local infLabel = Instance.new("TextLabel")
-        infLabel.Size = UDim2.new(0.5, 0, 1, 0)
-        infLabel.BackgroundTransparency = 1
-        infLabel.Text = "Never Miss"
-        infLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        infLabel.Font = Enum.Font.Gotham
-        infLabel.TextSize = 10
-        infLabel.TextXAlignment = Enum.TextXAlignment.Left
-        infLabel.Parent = infToggleRow
+        local neverMissLabel = Instance.new("TextLabel")
+        neverMissLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        neverMissLabel.BackgroundTransparency = 1
+        neverMissLabel.Text = "Never Miss"
+        neverMissLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        neverMissLabel.Font = Enum.Font.Gotham
+        neverMissLabel.TextSize = 10
+        neverMissLabel.TextXAlignment = Enum.TextXAlignment.Left
+        neverMissLabel.Parent = neverMissToggleRow
 
-        local infSwitch = Instance.new("TextButton")
-        infSwitch.Size = UDim2.new(0, 36, 0, 16)
-        infSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
-        infSwitch.BackgroundColor3 = autoAimState.infShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
-        infSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
-        infSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
-        infSwitch.Font = Enum.Font.GothamBold
-        infSwitch.TextSize = 7
-        infSwitch.BorderSizePixel = 0
-        infSwitch.AutoButtonColor = false
-        infSwitch.Parent = infToggleRow
-        local infSwitchCorner = Instance.new("UICorner")
-        infSwitchCorner.CornerRadius = UDim.new(1, 0)
-        infSwitchCorner.Parent = infSwitch
+        local neverMissSwitch = Instance.new("TextButton")
+        neverMissSwitch.Size = UDim2.new(0, 36, 0, 16)
+        neverMissSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
+        neverMissSwitch.BackgroundColor3 = autoAimState.infShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+        neverMissSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
+        neverMissSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
+        neverMissSwitch.Font = Enum.Font.GothamBold
+        neverMissSwitch.TextSize = 7
+        neverMissSwitch.BorderSizePixel = 0
+        neverMissSwitch.AutoButtonColor = false
+        neverMissSwitch.Parent = neverMissToggleRow
+        local neverMissSwitchCorner = Instance.new("UICorner")
+        neverMissSwitchCorner.CornerRadius = UDim.new(1, 0)
+        neverMissSwitchCorner.Parent = neverMissSwitch
 
-        infSwitch.MouseButton1Click:Connect(function()
+        neverMissSwitch.MouseButton1Click:Connect(function()
             autoAimState.infShotEnabled = not autoAimState.infShotEnabled
-            infSwitch.BackgroundColor3 = autoAimState.infShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
-            infSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
+            neverMissSwitch.BackgroundColor3 = autoAimState.infShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+            neverMissSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
+        end)
+
+        -- ===== TOGGLE BYPASS SHOT =====
+        local bypassToggleRow = Instance.new("Frame")
+        bypassToggleRow.Size = UDim2.new(1, 0, 0, 22)
+        bypassToggleRow.Position = UDim2.new(0, 0, 0.9, 0)
+        bypassToggleRow.BackgroundTransparency = 1
+        bypassToggleRow.Parent = content
+
+        local bypassLabel = Instance.new("TextLabel")
+        bypassLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        bypassLabel.BackgroundTransparency = 1
+        bypassLabel.Text = "Bypass Shot"
+        bypassLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        bypassLabel.Font = Enum.Font.Gotham
+        bypassLabel.TextSize = 10
+        bypassLabel.TextXAlignment = Enum.TextXAlignment.Left
+        bypassLabel.Parent = bypassToggleRow
+
+        local bypassSwitch = Instance.new("TextButton")
+        bypassSwitch.Size = UDim2.new(0, 36, 0, 16)
+        bypassSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
+        bypassSwitch.BackgroundColor3 = autoAimState.bypassShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+        bypassSwitch.Text = autoAimState.bypassShotEnabled and "ON" or "OFF"
+        bypassSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
+        bypassSwitch.Font = Enum.Font.GothamBold
+        bypassSwitch.TextSize = 7
+        bypassSwitch.BorderSizePixel = 0
+        bypassSwitch.AutoButtonColor = false
+        bypassSwitch.Parent = bypassToggleRow
+        local bypassSwitchCorner = Instance.new("UICorner")
+        bypassSwitchCorner.CornerRadius = UDim.new(1, 0)
+        bypassSwitchCorner.Parent = bypassSwitch
+
+        bypassSwitch.MouseButton1Click:Connect(function()
+            autoAimState.bypassShotEnabled = not autoAimState.bypassShotEnabled
+            bypassSwitch.BackgroundColor3 = autoAimState.bypassShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+            bypassSwitch.Text = autoAimState.bypassShotEnabled and "ON" or "OFF"
         end)
 
         -- Drag GUI
@@ -3929,6 +3972,7 @@ local function startAutoAim()
         autoAimState.guiRef = gui
         return gui
     end
+
     -- ========== FUNGSI NEVER MISS (DETECTION + REMOTE) ==========
     local function getFireRemotes()
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
@@ -3941,18 +3985,17 @@ local function startAutoAim()
         local resultRemote = twist:FindFirstChild("Result")
         return fireRemote, resultRemote
     end
-    local function fireInfShot()
+
+    local function fireNeverMiss()
         local char = localPlayer.Character
         if not char then return end
         local hrp = char:FindFirstChild("HumanoidRootPart")
         if not hrp then return end
 
-        -- Cari target terdekat sesuai mode
         local targetInfo = getNearestTarget(autoAimState.targetMode)
         if not targetInfo or not targetInfo.Object then return end
         local targetPos = targetInfo.Object.Position
 
-        -- Cek apakah ada penghalang (raycast)
         local camera = workspace.CurrentCamera
         if not camera then return end
         local origin = camera.CFrame.Position
@@ -3960,7 +4003,7 @@ local function startAutoAim()
         local rayLength = (targetPos - origin).Magnitude
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.FilterDescendantsInstances = {char, targetInfo.Object.Parent} -- abaikan player sendiri dan target
+        rayParams.FilterDescendantsInstances = {char, targetInfo.Object.Parent}
         if targetInfo.Player then
             local targetChar = targetInfo.Player.Character
             if targetChar then
@@ -3970,11 +4013,8 @@ local function startAutoAim()
 
         local hit = workspace:Raycast(origin, direction * rayLength, rayParams)
 
-        -- Jika ada penghalang (atau kita ingin force), kirim remote double
         if hit then
-            -- Set atribut Aiming
             pcall(function() char:SetAttribute("Aiming", true) end)
-
             local fireRemote, resultRemote = getFireRemotes()
             if fireRemote and fireRemote:IsA("RemoteEvent") then
                 pcall(function() fireRemote:FireServer() end)
@@ -3982,8 +4022,57 @@ local function startAutoAim()
             if resultRemote and resultRemote:IsA("RemoteEvent") then
                 pcall(function() resultRemote:FireServer() end)
             end
-
             pcall(function() char:SetAttribute("Aiming", false) end)
+        end
+    end
+
+    -- ========== FUNGSI BYPASS SHOT ==========
+    local function getBulletsItem()
+        local char = localPlayer.Character
+        local backpack = localPlayer:FindFirstChild("Backpack")
+        local item = nil
+
+        if char then
+            for _, tool in ipairs(char:GetChildren()) do
+                if tool:IsA("Tool") and tool.Name == "Bullets" then
+                    return tool
+                end
+            end
+        end
+
+        if backpack then
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") and tool.Name == "Bullets" then
+                    return tool
+                end
+            end
+        end
+
+        return nil
+    end
+
+    local function fireBypassShot()
+        local item = getBulletsItem()
+        if not item then return end
+
+        local camera = workspace.CurrentCamera
+        if not camera then return end
+        local lookVector = camera.CFrame.LookVector
+
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            local items = remotes:FindFirstChild("Items")
+            if items then
+                local twist = items:FindFirstChild("Twist of Fate")
+                if twist then
+                    local fireRemote = twist:FindFirstChild("Fire")
+                    if fireRemote and fireRemote:IsA("RemoteEvent") then
+                        pcall(function()
+                            fireRemote:FireServer(item, lookVector)
+                        end)
+                    end
+                end
+            end
         end
     end
 
@@ -4034,7 +4123,6 @@ local function startAutoAim()
             autoAimState.holdConn:Disconnect()
             autoAimState.holdConn = nil
         end
-        -- Kembalikan AutoRotate
         local localChar = localPlayer.Character
         if localChar then
             local humanoid = localChar:FindFirstChildOfClass("Humanoid")
@@ -4042,10 +4130,15 @@ local function startAutoAim()
                 humanoid.AutoRotate = true
             end
         end
-        -- Inf Shot after hold ends
         if autoAimState.infShotEnabled then
             for i = 1, 5 do
-                fireInfShot()
+                fireNeverMiss()
+                task.wait(0.05)
+            end
+        end
+        if autoAimState.bypassShotEnabled then
+            for i = 1, 3 do
+                fireBypassShot()
                 task.wait(0.05)
             end
         end
@@ -4070,7 +4163,6 @@ local function startAutoAim()
         mobileGui.Parent = game:GetService("CoreGui")
         mobileGui.Enabled = autoAimState.mobileLockEnabled
 
-        -- Tombol pertama (ukuran 50x50)
         local button1 = Instance.new("TextButton")
         button1.Name = "LockButton1"
         button1.Size = UDim2.new(0, 50, 0, 50)
@@ -4089,10 +4181,9 @@ local function startAutoAim()
         btnCorner1.CornerRadius = UDim.new(1, 0)
         btnCorner1.Parent = button1
 
-        -- Tombol kedua (ukuran 85x85, posisi X digeser)
         local button2 = Instance.new("TextButton")
         button2.Name = "LockButton2"
-        button2.Size = UDim2.new(0, 0, 0, 0)
+        button2.Size = UDim2.new(0, 85, 0, 85)
         button2.Position = UDim2.new(0.63, 160, 0.73, -55)
         button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button2.BackgroundTransparency = 1
@@ -4184,10 +4275,15 @@ local function startAutoAim()
                             humanoid.AutoRotate = true
                         end
                     end
-                    -- Inf Shot after mouse up
                     if autoAimState.infShotEnabled then
                         for i = 1, 5 do
-                            fireInfShot()
+                            fireNeverMiss()
+                            task.wait(0.05)
+                        end
+                    end
+                    if autoAimState.bypassShotEnabled then
+                        for i = 1, 3 do
+                            fireBypassShot()
                             task.wait(0.05)
                         end
                     end
@@ -4237,7 +4333,7 @@ local function startAutoAim()
     autoAimState.isActive = true
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
 end
-              
+
 
 -- Fungsi stopAutoAim (tidak berubah, tetap menghancurkan semua)
 local function stopAutoAim()

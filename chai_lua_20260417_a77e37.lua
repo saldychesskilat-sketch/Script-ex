@@ -3459,7 +3459,8 @@ local autoAimState = {
     holdActive = false,
     holdConn = nil,
     infShotEnabled = false,
-    bypassShotEnabled = false,  -- <-- NEW
+    mainFrame = nil,         -- referensi ke frame utama
+    floatingButton = nil,    -- tombol floating
 }
 
 local function startAutoAim()
@@ -3468,7 +3469,6 @@ local function startAutoAim()
 
     -- ========== HELPER FUNCTIONS (tetap sama) ==========
     local function getNearestTarget(mode)
-        -- [kode asli, tidak berubah]
         local char = localPlayer.Character
         if not char then return nil end
         local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
@@ -3570,11 +3570,6 @@ local function startAutoAim()
     end
 
     local function lockToTarget(targetInfo, duration)
-        -- ===== BYPASS SHOT (sekali di awal interaksi) =====
-        if autoAimState.bypassShotEnabled then
-            fireBypassShot()
-        end
-
         if not targetInfo or not targetInfo.Object then return end
         if not workspace.CurrentCamera then return end
         local camera = workspace.CurrentCamera
@@ -3648,7 +3643,6 @@ local function startAutoAim()
                     humanoid.AutoRotate = true
                 end
             end
-            -- Inf Shot after lock ends
             if autoAimState.infShotEnabled then
                 for i = 1, 5 do
                     fireInfShot()
@@ -3658,7 +3652,7 @@ local function startAutoAim()
         end)
     end
 
-    -- ========== FUNGSI NEVER MISS (tidak diubah) ==========
+    -- ========== FUNGSI NEVER MISS ==========
     local function getFireRemotes()
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
         if not remotes then return nil, nil end
@@ -3711,56 +3705,7 @@ local function startAutoAim()
         end
     end
 
-    -- ========== FUNGSI BYPASS SHOT ==========
-    local function fireBypassShot()
-    local char = localPlayer.Character
-    if not char then return end
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-
-    -- Cari item "Bullets" di Character atau Backpack
-    local item = char:FindFirstChild("Bullets")
-    if not item then
-        local backpack = localPlayer:FindFirstChild("Backpack")
-        if backpack then
-            item = backpack:FindFirstChild("Bullets")
-        end
-    end
-    if not item then
-        -- fallback: cari tool apapun yang namanya mengandung "Bullets" atau "bullet"
-        for _, child in ipairs(char:GetChildren()) do
-            if child:IsA("Tool") and child.Name:lower():find("bullet") then
-                item = child
-                break
-            end
-        end
-        if not item and backpack then
-            for _, child in ipairs(backpack:GetChildren()) do
-                if child:IsA("Tool") and child.Name:lower():find("bullet") then
-                    item = child
-                    break
-                end
-            end
-        end
-    end
-    if not item then return end
-
-    -- Cari remote Fire di ReplicatedStorage.Remotes.Items["Twist of Fate"]
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if not remotes then return end
-    local items = remotes:FindFirstChild("Items")
-    if not items then return end
-    local twist = items:FindFirstChild("Twist of Fate")
-    if not twist then return end
-    local fireRemote = twist:FindFirstChild("Fire")
-    if not fireRemote or not fireRemote:IsA("RemoteEvent") then return end
-
-    local lookVector = camera.CFrame.LookVector
-    pcall(function()
-        fireRemote:FireServer(item, lookVector)
-    end)
-    end
-    -- ========== FUNGSI HOLD LOOP (tidak diubah) ==========
+    -- ========== FUNGSI HOLD LOOP ==========
     local function startHoldLoop()
         if autoAimState.holdActive then return end
         autoAimState.holdActive = true
@@ -3822,7 +3767,7 @@ local function startAutoAim()
         end
     end
 
-    -- ========== TOMBOL MOBILE (tambahkan bypass di InputBegan) ==========
+    -- ========== TOMBOL MOBILE ==========
     local function setupMobileButton()
         if autoAimState.mobileButtonGui then
             autoAimState.mobileButtonGui.Enabled = autoAimState.mobileLockEnabled
@@ -3841,7 +3786,6 @@ local function startAutoAim()
         mobileGui.Parent = game:GetService("CoreGui")
         mobileGui.Enabled = autoAimState.mobileLockEnabled
 
-        -- Tombol pertama (ukuran 50x50)
         local button1 = Instance.new("TextButton")
         button1.Name = "LockButton1"
         button1.Size = UDim2.new(0, 50, 0, 50)
@@ -3860,10 +3804,9 @@ local function startAutoAim()
         btnCorner1.CornerRadius = UDim.new(1, 0)
         btnCorner1.Parent = button1
 
-        -- Tombol kedua (ukuran 85x85, posisi X digeser)
         local button2 = Instance.new("TextButton")
         button2.Name = "LockButton2"
-        button2.Size = UDim2.new(0, 0, 0, 0)  -- ukuran 0, tapi kita bisa set 85x85? Di sini user mengubah ukuran menjadi 0, kita biarkan saja sesuai kode asli.
+        button2.Size = UDim2.new(0, 0, 0, 0)
         button2.Position = UDim2.new(0.63, 160, 0.73, -55)
         button2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button2.BackgroundTransparency = 1
@@ -3885,10 +3828,6 @@ local function startAutoAim()
 
         button1.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                -- Bypass Shot once per interaction
-                if autoAimState.bypassShotEnabled then
-                    fireBypassShot()
-                end
                 autoAimState.holding1 = true
                 if not autoAimState.holdActive then
                     startHoldLoop()
@@ -3906,9 +3845,6 @@ local function startAutoAim()
 
         button2.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                if autoAimState.bypassShotEnabled then
-                    fireBypassShot()
-                end
                 autoAimState.holding2 = true
                 if not autoAimState.holdActive then
                     startHoldLoop()
@@ -3934,10 +3870,9 @@ local function startAutoAim()
             if gameProcessed then return end
             if not config.autoAimEnabled then return end
             if input.UserInputType == Enum.UserInputType.MouseButton2 then
-                -- Bypass Shot already inside lockToTarget, but if lockToTarget not called? It will be called below.
                 local target = getNearestTarget(autoAimState.targetMode)
                 if target and target.Object then
-                    lockToTarget(target)  -- di dalam lockToTarget sudah ada bypass
+                    lockToTarget(target)
                 end
             end
         end)
@@ -3974,7 +3909,7 @@ local function startAutoAim()
         end)
     end
 
-    -- ========== KEYBIND (tidak diubah) ==========
+    -- ========== KEYBIND ==========
     local function setupKeybindDetection()
         if autoAimState.keyConn then autoAimState.keyConn:Disconnect() end
         autoAimState.keyConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -4004,7 +3939,94 @@ local function startAutoAim()
         end)
     end
 
-    -- ========== GUI (tambahkan toggle Bypass Shot) ==========
+    -- ========== NOTIFICATION ==========
+    local function showModeNotification(mode)
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "AutoAimNotification"
+        gui.ResetOnSpawn = false
+        gui.Parent = game:GetService("CoreGui")
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 50)
+        frame.Position = UDim2.new(0.5, -150, 0.5, -25)
+        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
+        frame.BackgroundTransparency = 0.3
+        frame.BorderSizePixel = 0
+        frame.Parent = gui
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+        local stroke = Instance.new("UIStroke")
+        stroke.Color = Color3.fromRGB(0, 180, 255)
+        stroke.Thickness = 1
+        stroke.Transparency = 0.4
+        stroke.Parent = frame
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "Target Mode: " .. mode
+        label.TextColor3 = Color3.fromRGB(0, 220, 255)
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 14
+        label.Parent = frame
+        task.delay(2, function()
+            gui:Destroy()
+        end)
+        if autoAimState.guiRef then
+            local frame2 = autoAimState.guiRef:FindFirstChildWhichIsA("Frame")
+            if frame2 then
+                local content = frame2:FindFirstChild("Content")
+                if content then
+                    local modeLabel = content:FindFirstChild("ModeLabel")
+                    if modeLabel then
+                        modeLabel.Text = "Target: " .. mode
+                    end
+                end
+            end
+        end
+    end
+
+    -- ========== FLOATING BUTTON ==========
+    local function createFloatingButton()
+        if autoAimState.floatingButton then
+            autoAimState.floatingButton:Destroy()
+            autoAimState.floatingButton = nil
+        end
+
+        local btn = Instance.new("TextButton")
+        btn.Name = "AutoAimFloating"
+        btn.Size = UDim2.new(0, 120, 0, 32)
+        btn.Position = UDim2.new(0.02, 0, 0.04, 0) -- pojok kiri atas
+        btn.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+        btn.BackgroundTransparency = 0.15
+        btn.BorderSizePixel = 0
+        btn.Text = "AIM Settings"
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 12
+        btn.AutoButtonColor = false
+        btn.Visible = false
+        btn.Parent = game:GetService("CoreGui")
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(1, 0) -- capsule
+        btnCorner.Parent = btn
+        local btnStroke = Instance.new("UIStroke")
+        btnStroke.Color = Color3.fromRGB(0, 220, 255)
+        btnStroke.Thickness = 1.2
+        btnStroke.Transparency = 0.5
+        btnStroke.Parent = btn
+
+        btn.MouseButton1Click:Connect(function()
+            -- Tampilkan GUI, sembunyikan floating
+            if autoAimState.mainFrame then
+                autoAimState.mainFrame.Visible = true
+                autoAimState.mainFrame.Parent = autoAimState.guiRef -- pastikan masih parent
+            end
+            btn.Visible = false
+        end)
+
+        autoAimState.floatingButton = btn
+        return btn
+    end
+
+    -- ========== CREATE GUI ==========
     local function createAutoAimGUI()
         if autoAimState.guiRef then
             autoAimState.guiRef:Destroy()
@@ -4014,9 +4036,10 @@ local function startAutoAim()
         gui.Name = "AutoAimSettings"
         gui.ResetOnSpawn = false
         gui.Parent = game:GetService("CoreGui")
+
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 210)  -- diperbesar untuk 2 toggle
-        frame.Position = UDim2.new(0.5, -110, 0.5, -105)
+        frame.Size = UDim2.new(0, 220, 0, 180)
+        frame.Position = UDim2.new(0.5, -110, 0.5, -90)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
         frame.BorderSizePixel = 0
@@ -4027,6 +4050,7 @@ local function startAutoAim()
         stroke.Thickness = 1.2
         stroke.Transparency = 0.4
         stroke.Parent = frame
+        autoAimState.mainFrame = frame
 
         local header = Instance.new("Frame")
         header.Size = UDim2.new(1, 0, 0, 24)
@@ -4061,10 +4085,15 @@ local function startAutoAim()
         closeBtn.BorderSizePixel = 0
         closeBtn.Parent = header
         Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+
         closeBtn.MouseButton1Click:Connect(function()
-            if autoAimState.guiRef then
-                autoAimState.guiRef:Destroy()
-                autoAimState.guiRef = nil
+            -- Sembunyikan GUI, tampilkan floating
+            frame.Visible = false
+            if autoAimState.floatingButton then
+                autoAimState.floatingButton.Visible = true
+            else
+                createFloatingButton()
+                autoAimState.floatingButton.Visible = true
             end
         end)
 
@@ -4075,7 +4104,7 @@ local function startAutoAim()
         content.Parent = frame
         content.Name = "Content"
 
-        -- Mode label & switch
+        -- Mode label
         local modeLabel = Instance.new("TextLabel")
         modeLabel.Size = UDim2.new(1, 0, 0, 20)
         modeLabel.Position = UDim2.new(0, 0, 0, 4)
@@ -4088,6 +4117,7 @@ local function startAutoAim()
         modeLabel.Parent = content
         modeLabel.Name = "ModeLabel"
 
+        -- Switch target
         local switchModeBtn = Instance.new("TextButton")
         switchModeBtn.Size = UDim2.new(0.8, 0, 0, 20)
         switchModeBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
@@ -4205,44 +4235,6 @@ local function startAutoAim()
             neverMissSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
         end)
 
-        -- ===== TOGGLE BYPASS SHOT =====
-        local bypassToggleRow = Instance.new("Frame")
-        bypassToggleRow.Size = UDim2.new(1, 0, 0, 22)
-        bypassToggleRow.Position = UDim2.new(0, 0, 1.05, 0)  -- di bawah never miss
-        bypassToggleRow.BackgroundTransparency = 1
-        bypassToggleRow.Parent = content
-
-        local bypassLabel = Instance.new("TextLabel")
-        bypassLabel.Size = UDim2.new(0.5, 0, 1, 0)
-        bypassLabel.BackgroundTransparency = 1
-        bypassLabel.Text = "Bypass Shot"
-        bypassLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-        bypassLabel.Font = Enum.Font.Gotham
-        bypassLabel.TextSize = 10
-        bypassLabel.TextXAlignment = Enum.TextXAlignment.Left
-        bypassLabel.Parent = bypassToggleRow
-
-        local bypassSwitch = Instance.new("TextButton")
-        bypassSwitch.Size = UDim2.new(0, 36, 0, 16)
-        bypassSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
-        bypassSwitch.BackgroundColor3 = autoAimState.bypassShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
-        bypassSwitch.Text = autoAimState.bypassShotEnabled and "ON" or "OFF"
-        bypassSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
-        bypassSwitch.Font = Enum.Font.GothamBold
-        bypassSwitch.TextSize = 7
-        bypassSwitch.BorderSizePixel = 0
-        bypassSwitch.AutoButtonColor = false
-        bypassSwitch.Parent = bypassToggleRow
-        local bypassSwitchCorner = Instance.new("UICorner")
-        bypassSwitchCorner.CornerRadius = UDim.new(1, 0)
-        bypassSwitchCorner.Parent = bypassSwitch
-
-        bypassSwitch.MouseButton1Click:Connect(function()
-            autoAimState.bypassShotEnabled = not autoAimState.bypassShotEnabled
-            bypassSwitch.BackgroundColor3 = autoAimState.bypassShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
-            bypassSwitch.Text = autoAimState.bypassShotEnabled and "ON" or "OFF"
-        end)
-
         -- Drag GUI
         local dragging = false
         local dragStart, frameStart
@@ -4266,51 +4258,15 @@ local function startAutoAim()
         end)
 
         autoAimState.guiRef = gui
-        return gui
-    end
-
-    -- ========== NOTIFICATION ==========
-    local function showModeNotification(mode)
-        local gui = Instance.new("ScreenGui")
-        gui.Name = "AutoAimNotification"
-        gui.ResetOnSpawn = false
-        gui.Parent = game:GetService("CoreGui")
-        local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 300, 0, 50)
-        frame.Position = UDim2.new(0.5, -150, 0.5, -25)
-        frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
-        frame.BackgroundTransparency = 0.3
-        frame.BorderSizePixel = 0
-        frame.Parent = gui
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(0, 180, 255)
-        stroke.Thickness = 1
-        stroke.Transparency = 0.4
-        stroke.Parent = frame
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, 0, 1, 0)
-        label.BackgroundTransparency = 1
-        label.Text = "Target Mode: " .. mode
-        label.TextColor3 = Color3.fromRGB(0, 220, 255)
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 14
-        label.Parent = frame
-        task.delay(2, function()
-            gui:Destroy()
-        end)
-        if autoAimState.guiRef then
-            local frame2 = autoAimState.guiRef:FindFirstChildWhichIsA("Frame")
-            if frame2 then
-                local content = frame2:FindFirstChild("Content")
-                if content then
-                    local modeLabel = content:FindFirstChild("ModeLabel")
-                    if modeLabel then
-                        modeLabel.Text = "Target: " .. mode
-                    end
-                end
-            end
+        -- Buat floating button jika belum ada
+        if not autoAimState.floatingButton then
+            createFloatingButton()
         end
+        -- Pastikan floating disembunyikan saat GUI tampil
+        if autoAimState.floatingButton then
+            autoAimState.floatingButton.Visible = false
+        end
+        return gui
     end
 
     -- ========== AKTIVASI ==========
@@ -4325,6 +4281,7 @@ local function startAutoAim()
     print("[AutoAim] Auto aim started with mode: " .. autoAimState.targetMode)
 end
 
+       
 -- Fungsi stopAutoAim (tidak berubah, tetap menghancurkan semua)
 local function stopAutoAim()
     if not autoAimConnection then return end

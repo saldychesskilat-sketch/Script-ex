@@ -3344,7 +3344,7 @@ local function InitializeAutobuy()
                     
                     if inRange then                    
                         local now = tick()
-                        if now - lastTriggerTime > 0.05 then
+                        if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
                             TriggerMobileButton()                    
@@ -3383,7 +3383,7 @@ local function startRoleWatcher()
             end
             -- Jika role Survivor dan fitur aktif, reload
             if config.autoSkillCheckEnabled and role == "Survivor" then
-                task.wait(0.5) -- beri waktu GUI baru spawn
+                task.wait(0) -- beri waktu GUI baru spawn
                 InitializeAutobuy()
             end
         end

@@ -3377,6 +3377,7 @@ local function getCurrentRole()
     return "Spectator"
 end
 
+-- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3388,31 +3389,6 @@ local function InitializeAutobuy()
         if not prompt then return end
         local check = prompt:FindFirstChild("Check")                    
         if not check then return end                    
-
-        -- === Cari remote event KingScourgeStart dan End ===
-        local kingScourgeStartRemote = nil
-        local kingScourgeEndRemote = nil
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if remotes then
-            local killerPerks = remotes:FindFirstChild("KillerPerks")
-            if killerPerks then
-                local kingscourge = killerPerks:FindFirstChild("kingscourge")
-                if kingscourge then
-                    kingScourgeStartRemote = kingscourge:FindFirstChild("KingScourgeStart")
-                    kingScourgeEndRemote = kingscourge:FindFirstChild("KingScourgeEnd")
-                end
-            end
-        end
-        -- fallback scan jika tidak ditemukan
-        if not kingScourgeStartRemote or not kingScourgeEndRemote then
-            for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-                if obj:IsA("RemoteEvent") then
-                    if obj.Name == "KingScourgeStart" then kingScourgeStartRemote = obj end
-                    if obj.Name == "KingScourgeEnd" then kingScourgeEndRemote = obj end
-                end
-            end
-        end
-
         -- Jangan cache line dan goal secara permanen, ambil ulang saat dibutuhkan
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
@@ -3424,16 +3400,7 @@ local function InitializeAutobuy()
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
-                if HeartbeatConnection then HeartbeatConnection:Disconnect() end    
-
-                -- Kirim remote event KingScourgeStart saat skillcheck muncul
-                if kingScourgeStartRemote then
-                    pcall(function()
-                        kingScourgeStartRemote:FireServer()
-                    end)
-                    print("[AutoSkillCheck] KingScourgeStart fired")
-                end
-
+                if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 -- Gunakan RenderStepped untuk respons lebih cepat
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
@@ -3479,18 +3446,10 @@ local function InitializeAutobuy()
                 HeartbeatConnection = nil     
                 triggerCount = 0
                 lastTriggerTime = 0
-                -- Kirim remote event KingScourgeEnd saat skillcheck selesai (hilang)
-                if kingScourgeEndRemote then
-                    pcall(function()
-                        kingScourgeEndRemote:FireServer()
-                    end)
-                    print("[AutoSkillCheck] KingScourgeEnd fired")
-                end
             end                    
         end)                    
     end)                    
 end
-
 -- Modifikasi startAutoSkillCheck
 local function startAutoSkillCheck()                
     if autoSkillCheckConnection then return end                

@@ -1683,7 +1683,6 @@ local function fireParryRemote(player)
             for i = 1, 2 do
                 pcall(function()
                     vim:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
-                    task.wait(0)
                     vim:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
                 end)
                 if i == 1 then task.wait(0) end

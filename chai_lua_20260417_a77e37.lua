@@ -1706,8 +1706,8 @@ local function autoParryLoop()
     -- ================================
     -- STATE (persistent, tidak bergantung GUI)
     -- ================================
-    local DETECTION_RADIUS = 9.6
-    local sliderRadius = 9.6
+    local DETECTION_RADIUS = 10
+    local sliderRadius = 10
     local loopingActive = false
     local fakeParryActive = false
     local selectedAnimIndex = 1
@@ -1818,7 +1818,7 @@ local function autoParryLoop()
             playLocalParryAnimation(ANIMATION_IDS[selectedAnimIndex])
         end)
         task.spawn(function()
-            startFreeze(1.5)
+            startFreeze(1.2)
         end)
     end
 

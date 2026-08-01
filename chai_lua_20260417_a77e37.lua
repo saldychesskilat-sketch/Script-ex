@@ -288,187 +288,276 @@ local function stopAutoWin()
     print("[AutoWin] Auto win stopped")
 end
 
-    -- ============================================================================
--- FEATURE 2: AUTO TASK (ANTI-HOOK + LEVER GOAL GATE SYSTEM) - UPGRADED
--- Menggunakan RemoteEvent: ReplicatedStorage.Remotes.Exit.LeverEvent
+
 -- ============================================================================
-local cachedLeverRemote = nil
-local leverEventConnected = false
+-- FEATURE 2: ATTACK AIM (Tombol Lock Survivor di Depan POV)
+-- ============================================================================
 
--- Cari remote event LeverEvent
-local function findLeverRemote()
-    if cachedLeverRemote and cachedLeverRemote.Parent then
-        return cachedLeverRemote
-    end
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    if remotes then
-        local exit = remotes:FindFirstChild("Exit")
-        if exit then
-            local lever = exit:FindFirstChild("LeverEvent")
-            if lever and lever:IsA("RemoteEvent") then
-                cachedLeverRemote = lever
-                print("[AutoTask] Found LeverEvent remote at correct path")
-                return lever
+local attackAimButton = nil
+local attackAimButtonGui = nil
+local attackAimInputBeganConn = nil
+local attackAimInputEndedConn = nil
+local attackAimHoldActive = false
+local attackAimLockConn = nil
+local attackAimTarget = nil
+
+-- Cari survivor terdekat yang berada di depan kamera (POV)
+local function getNearestSurvivorInFront()
+    local char = localPlayer.Character
+    if not char then return nil end
+    local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+    if not rootPart then return nil end
+    local localPos = rootPart.Position
+    local camera = workspace.CurrentCamera
+    if not camera then return nil end
+
+    local nearest = nil
+    local minDist = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            local pChar = player.Character
+            if pChar then
+                -- Cek apakah survivor (bukan killer)
+                local isKiller = false
+                if player.Team then
+                    local t = player.Team.Name:lower()
+                    if t:find("killer") or t:find("monster") or t:find("enemy") then
+                        isKiller = true
+                    end
+                end
+                if not isKiller then
+                    local tool = pChar:FindFirstChildWhichIsA("Tool")
+                    if tool and (tool.Name:lower():find("knife") or tool.Name:lower():find("weapon")) then
+                        isKiller = true
+                    end
+                end
+                if not isKiller then
+                    local targetRoot = pChar:FindFirstChild("HumanoidRootPart") or pChar:FindFirstChild("Torso")
+                    if targetRoot then
+                        -- Cek apakah target berada di depan kamera
+                        local dirToTarget = (targetRoot.Position - camera.CFrame.Position).Unit
+                        local dot = camera.CFrame.LookVector:Dot(dirToTarget)
+                        if dot > 0 then -- hanya yang di depan
+                            local dist = (localPos - targetRoot.Position).Magnitude
+                            if dist < minDist then
+                                minDist = dist
+                                nearest = targetRoot
+                            end
+                        end
+                    end
+                end
             end
         end
     end
-    -- fallback scan
-    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-        if obj:IsA("RemoteEvent") and obj.Name == "LeverEvent" then
-            cachedLeverRemote = obj
-            print("[AutoTask] Found LeverEvent via scan")
-            return obj
-        end
-    end
-    return nil
+    return nearest
 end
 
--- Aktifkan lever goal menggunakan remote event (hold simulation)
-local function activateLeverGoalViaRemote()
-    local remote = findLeverRemote()
-    if not remote then
-        print("[AutoTask] LeverEvent remote not found, fallback to manual press")
-        simulatePressE()
-        return false
-    end
-
-    -- Variasi argumen untuk memulai hold (start)
-    local startArgsList = {
-        {},             -- tanpa argumen
-        {"Start"},
-        {"Hold"},
-        {"activate"},
-        {"begin"},
-        {true},
-        {1}
-    }
-    -- Variasi argumen untuk mengakhiri hold (stop)
-    local stopArgsList = {
-        {},
-        {"Stop"},
-        {"Release"},
-        {"deactivate"},
-        {"end"},
-        {false},
-        {0}
-    }
-
-    local startSuccess = false
-    for _, args in ipairs(startArgsList) do
-        pcall(function()
-            if #args == 0 then
-                remote:FireServer()
-            else
-                remote:FireServer(unpack(args))
-            end
-            startSuccess = true
-        end)
-        if startSuccess then break end
-    end
-
-    if not startSuccess then
-        print("[AutoTask] Failed to send start hold event, fallback to manual press")
-        simulatePressE()
-        return false
-    end
-
-    -- Tunggu simulasi hold (durasi sesuai kebutuhan, misal 1.5 detik)
-    task.wait(1.5)
-
-    local stopSuccess = false
-    for _, args in ipairs(stopArgsList) do
-        pcall(function()
-            if #args == 0 then
-                remote:FireServer()
-            else
-                remote:FireServer(unpack(args))
-            end
-            stopSuccess = true
-        end)
-        if stopSuccess then break end
-    end
-
-    if stopSuccess then
-        print("[AutoTask] Lever goal activated via remote event (hold simulated)")
-    else
-        print("[AutoTask] Lever goal release may have failed, but continuing")
-    end
-
-    return true
-end
-
--- MODIFIKASI autoTaskLoop: ganti simulatePressE() dengan activateLeverGoalViaRemote()
-local function autoTaskLoop()
-    if not config.autoTaskEnabled then return end
-    if not getLocalCharacter() or not localRootPart then return end
-
-    -- Anti-hook (tidak diubah)
-    if isPlayerHooked() then
-        local killerChar = findKillerCharacter()
-        if knockbackKiller(killerChar) then
-            print("[AutoTask] Knocked back killer, releasing player")
-            activateAuto1xMode()
+-- Fungsi lock ke target (kamera + orientasi karakter)
+local function lockToSurvivor(target)
+    if not target or not target.Parent then
+        if attackAimLockConn then
+            attackAimLockConn:Disconnect()
+            attackAimLockConn = nil
         end
-        task.wait(0.5)
         return
     end
+    local camera = workspace.CurrentCamera
+    if not camera then return end
 
-    -- Buka escape dengan lever goal + gate
-    local leverGoal = findLeverGoal()
-    if leverGoal then
-        teleportToLeverGoal()
-        task.wait(0.1)
-        -- Gunakan remote event untuk interaksi lever goal
-        activateLeverGoalViaRemote()
-        task.wait(0.5)
-
-        -- Sisanya tetap menggunakan interaksi gate (ClickDetector, dll)
-        local gateFO = findGateFO()
-        if gateFO then
-            interactWithGate(gateFO)
-            print("[AutoTask] Interacted with F_O gate")
-        end
-        local rightGate = findRightGate()
-        if rightGate then
-            interactWithGate(rightGate)
-            print("[AutoTask] Interacted with RightGate")
-        end
-        local liftGate = findLiftGate()
-        if liftGate then
-            interactWithGate(liftGate)
-            print("[AutoTask] Interacted with LiftGate")
-        end
-    else
-        -- Fallback: repair generator (tetap sama)
-        local nearestGen = getNearestGeneratorOptimized()
-        if nearestGen then
-            local targetPos = nearestGen:GetPivot().Position
-            teleportTo(targetPos)
-            task.wait(0.1)
-            simulatePressE()
-            print("[AutoTask] Repaired generator")
-        end
+    if attackAimLockConn then
+        attackAimLockConn:Disconnect()
+        attackAimLockConn = nil
     end
-    task.wait(0.5)
+
+    attackAimLockConn = RunService.RenderStepped:Connect(function()
+        if not attackAimHoldActive then
+            if attackAimLockConn then
+                attackAimLockConn:Disconnect()
+                attackAimLockConn = nil
+            end
+            return
+        end
+        -- Update target setiap frame
+        local currentTarget = getNearestSurvivorInFront()
+        if currentTarget then
+            local targetPos = currentTarget.Position
+            if targetPos then
+                local camPos = camera.CFrame.Position
+                camera.CFrame = CFrame.lookAt(camPos, targetPos)
+                -- Orientasi karakter
+                local localChar = localPlayer.Character
+                if localChar then
+                    local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+                    if rootPart then
+                        local currentPos = rootPart.Position
+                        local lookDir = (targetPos - currentPos)
+                        if lookDir.Magnitude > 0.5 then
+                            rootPart.CFrame = CFrame.new(currentPos, targetPos)
+                            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+                            if humanoid then
+                                humanoid.AutoRotate = false
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
 end
 
--- Fungsi startAutoTask dan stopAutoTask tidak diubah (tetap sama)
+-- Fungsi mulai hold (dipanggil saat tombol ditekan)
+local function startAttackAimHold()
+    if attackAimHoldActive then return end
+    attackAimHoldActive = true
+    local target = getNearestSurvivorInFront()
+    if target then
+        lockToSurvivor(target)
+    end
+end
+
+-- Fungsi stop hold (dipanggil saat tombol dilepas)
+local function stopAttackAimHold()
+    attackAimHoldActive = false
+    if attackAimLockConn then
+        attackAimLockConn:Disconnect()
+        attackAimLockConn = nil
+    end
+    -- Kembalikan AutoRotate
+    local localChar = localPlayer.Character
+    if localChar then
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.AutoRotate = true
+        end
+    end
+end
+
+-- Buat tombol GUI transparan
+local function createAttackAimButton()
+    if attackAimButtonGui then
+        attackAimButtonGui:Destroy()
+        attackAimButtonGui = nil
+    end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "AttackAimButton"
+    gui.ResetOnSpawn = false
+    gui.Parent = game:GetService("CoreGui")
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 100, 0, 100)
+    button.Position = UDim2.new(0.63, 160, 0.73, -55)
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundTransparency = 1  -- transparan
+    button.BorderSizePixel = 0
+    button.Text = ""
+    button.AutoButtonColor = false
+    button.Visible = true
+    button.Parent = gui
+
+    -- Tambahkan sedikit visual untuk debugging (opsional) - border tipis
+    -- local stroke = Instance.new("UIStroke")
+    -- stroke.Color = Color3.fromRGB(0, 255, 0)
+    -- stroke.Thickness = 1
+    -- stroke.Transparency = 0.5
+    -- stroke.Parent = button
+
+    attackAimButton = button
+    attackAimButtonGui = gui
+
+    -- Pasang event input global untuk deteksi area tombol
+    if attackAimInputBeganConn then attackAimInputBeganConn:Disconnect() end
+    if attackAimInputEndedConn then attackAimInputEndedConn:Disconnect() end
+
+    attackAimInputBeganConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not config.autoTaskEnabled then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local pos = input.Position
+            local absPos = button.AbsolutePosition
+            local size = button.AbsoluteSize
+            if pos.X >= absPos.X and pos.X <= absPos.X + size.X and
+               pos.Y >= absPos.Y and pos.Y <= absPos.Y + size.Y then
+                startAttackAimHold()
+            end
+        end
+    end)
+
+    attackAimInputEndedConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if not config.autoTaskEnabled then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local pos = input.Position
+            local absPos = button.AbsolutePosition
+            local size = button.AbsoluteSize
+            if pos.X >= absPos.X and pos.X <= absPos.X + size.X and
+               pos.Y >= absPos.Y and pos.Y <= absPos.Y + size.Y then
+                stopAttackAimHold()
+            end
+        end
+    end)
+
+    print("[AttackAim] Button created at position", button.Position)
+end
+
+-- Hapus tombol dan koneksi
+local function destroyAttackAimButton()
+    if attackAimInputBeganConn then
+        attackAimInputBeganConn:Disconnect()
+        attackAimInputBeganConn = nil
+    end
+    if attackAimInputEndedConn then
+        attackAimInputEndedConn:Disconnect()
+        attackAimInputEndedConn = nil
+    end
+    if attackAimLockConn then
+        attackAimLockConn:Disconnect()
+        attackAimLockConn = nil
+    end
+    if attackAimButtonGui then
+        attackAimButtonGui:Destroy()
+        attackAimButtonGui = nil
+    end
+    attackAimButton = nil
+    attackAimHoldActive = false
+end
+
+-- Modifikasi startAutoTask (sekarang membuat tombol, tidak ada loop)
 local function startAutoTask()
     if currentTaskConnection then return end
-    currentTaskConnection = RunService.Heartbeat:Connect(autoTaskLoop)
-    print("[AutoTask] Auto task started (anti-hook + lever gate system with remote event)")
+    if not config.autoTaskEnabled then return end
+
+    -- Buat tombol
+    createAttackAimButton()
+
+    -- Hanya sebagai placeholder agar start/stop tetap konsisten
+    currentTaskConnection = RunService.Heartbeat:Connect(function() end)
+
+    print("[AttackAim] Started - Hold button to lock to nearest survivor in front")
 end
 
+-- Modifikasi stopAutoTask (hancurkan tombol)
 local function stopAutoTask()
-    if currentTaskConnection then currentTaskConnection:Disconnect(); currentTaskConnection = nil end
-    if localHumanoid and config.auto1xModeEnabled then
-        localHumanoid.WalkSpeed = config.originalWalkSpeed
-        config.auto1xModeEnabled = false
-        isAuto1xModeActive = false
+    if currentTaskConnection then
+        currentTaskConnection:Disconnect()
+        currentTaskConnection = nil
     end
-    if auto1xModeTimerConnection then auto1xModeTimerConnection:Disconnect(); auto1xModeTimerConnection = nil end
-    print("[AutoTask] Auto task stopped")
+
+    destroyAttackAimButton()
+
+    -- Kembalikan AutoRotate jika masih aktif
+    local localChar = localPlayer.Character
+    if localChar then
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.AutoRotate = true
+        end
+    end
+
+    print("[AttackAim] Stopped")
 end
+
 -- ============================================================================
 -- ============================================================================
 -- ESP SYSTEM (PLAYER + OBJECTS) - WITH CUSTOM ESP SUPPORT
@@ -7183,7 +7272,7 @@ local function createGUI()
 
         local features = {
             {name="autoWinEnabled", text="AUTO WIN"},
-            {name="autoTaskEnabled", text="AUTO TASK"},
+            {name="autoTaskEnabled", text="AIM attack"},
             {name="espEnabled", text="ESP All"},
             {name="speedBoostEnabled", text="Play AI"},
             {name="stealthEnabled", text="STEALTH"},

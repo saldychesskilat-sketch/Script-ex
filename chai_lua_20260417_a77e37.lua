@@ -3450,6 +3450,33 @@ local function InitializeAutobuy()
         end)                    
     end)                    
 end
+
+-- Watcher perubahan role (Survivor/Killer/Spectator)
+local function startRoleWatcher()
+    if roleWatcherConnection then return end
+    roleWatcherConnection = RunService.Heartbeat:Connect(function()
+        local role = getCurrentRole()
+        if role ~= currentRole then
+            currentRole = role
+            print("[AutoSkillCheck] Role changed to", role, "- reloading hooks")
+            -- Reset semua koneksi lama
+            if VisibilityConnection then
+                VisibilityConnection:Disconnect()
+                VisibilityConnection = nil
+            end
+            if HeartbeatConnection then
+                HeartbeatConnection:Disconnect()
+                HeartbeatConnection = nil
+            end
+            -- Jika role Survivor dan fitur aktif, reload
+            if config.autoSkillCheckEnabled and role == "Survivor" then
+                task.wait(0) -- beri waktu GUI baru spawn
+                InitializeAutobuy()
+            end
+        end
+    end)
+end
+
 -- Modifikasi startAutoSkillCheck
 local function startAutoSkillCheck()                
     if autoSkillCheckConnection then return end                

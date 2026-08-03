@@ -3477,8 +3477,8 @@ local function startAutoSkillCheck()
         InitializeAutobuy()
     end
     print("[AutoSkillCheck] Auto skill check started with role watcher + RenderStepped")                
-end                
-                
+end 
+
 local function stopAutoSkillCheck()                
     if autoSkillCheckConnection then 
         autoSkillCheckConnection:Disconnect() 

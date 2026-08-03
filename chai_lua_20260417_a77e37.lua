@@ -3470,7 +3470,6 @@ local function startRoleWatcher()
             end
             -- Jika role Survivor dan fitur aktif, reload
             if config.autoSkillCheckEnabled and role == "Survivor" then
-                task.wait(0) -- beri waktu GUI baru spawn
                 InitializeAutobuy()
             end
         end

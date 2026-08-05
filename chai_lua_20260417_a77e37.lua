@@ -569,7 +569,7 @@ if not config.espCustom then
         pallet    = { enabled = false, color = Color3.fromRGB(173, 216, 230) },
         hook      = { enabled = false, color = Color3.fromRGB(0, 128, 128) },
         scp       = { enabled = false, color = Color3.fromRGB(150, 0, 255) },
-        windows   = { enabled = false, color = Color3.fromRGB(105, 105, 105) },
+        Window    = { enabled = false, color = Color3.fromRGB(105, 105, 105) },
         killer    = { enabled = false, color = config.highlightColorKiller or Color3.fromRGB(255, 0, 0) },
         survivor  = { enabled = false, color = config.highlightColorSurvivor or Color3.fromRGB(0, 0, 255) },
         line      = { enabled = false, color = Color3.fromRGB(255, 255, 255) },
@@ -582,7 +582,7 @@ local ObjectColors = {
     Pallet    = config.espCustom.pallet.color,
     Hook      = config.espCustom.hook.color,
     SCP       = config.espCustom.scp.color,
-    Windows   = config.espCustom.windows.color,
+    Window    = config.espCustom.Window.color,
 }
 
 -- Variabel ESP
@@ -967,15 +967,11 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "SCP")
         elseif name == "Pallet" or name == "Palletwrong" then
             createObjectESP(obj, "Pallet")
-        elseif name == "Windows" or name:lower():find("inviswall") then
-            createObjectESP(obj, "inviswall")
-        -- Tambahan untuk Window spesifik: objek "Bottum" di dalam "Window" di "Vaults"
-        elseif name == "Bottum" and obj.Parent and obj.Parent.Name == "Window" 
-               and obj.Parent.Parent and obj.Parent.Parent.Name == "Vaults" then
+        elseif name == "Window" or name:lower():find("Window") then
             createObjectESP(obj, "Window")
         end
     end
-    print("[ESP] Object ESP refreshed with custom settings (including Windows/Bottum)")
+    print("[ESP] Object ESP refreshed with custom settings")
 end
 
 local function onDescendantAdded(instance)
@@ -991,11 +987,7 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "SCP")
     elseif name == "Pallet" or name == "Palletwrong" then
         createObjectESP(instance, "Pallet")
-    elseif name == "Windows" or name:lower():find("inviswall") then
-        createObjectESP(instance, "inviswall")
-    -- Tambahan untuk Window spesifik
-    elseif name == "Bottom" and instance.Parent and instance.Parent.Name == "Window" 
-           and instance.Parent.Parent and instance.Parent.Parent.Name == "Vaults" then
+    elseif name == "Window" or name:lower():find("Window") then
         createObjectESP(instance, "Window")
     end
 end
@@ -1014,7 +1006,6 @@ local function periodicObjectScan()
         refreshAllObjectESP()
     end
 end
-
 -- ============================================================================
 -- START / STOP / UPDATE ESP
 -- ============================================================================
@@ -6060,7 +6051,7 @@ local function createAboutContent()
         { key = "pallet",    label = "Pallet" },
         { key = "hook",      label = "Hook" },
         { key = "scp",       label = "SCP" },
-        { key = "windows",   label = "Windows" },
+        { key = "Window",    label = "Windows" },
         { key = "killer",    label = "Killer ESP" },
         { key = "survivor",  label = "Survivor ESP" },
         { key = "line",      label = "ESP Line" },

@@ -563,13 +563,15 @@ end
 -- ESP SYSTEM (PLAYER + OBJECTS) - WITH CUSTOM ESP SUPPORT
 -- ============================================================================
 if not config.espCustom then
+    -- Sebelum: config.espCustom = { ... }
+-- Tambahkan key "window" (lowercase) agar sesuai dengan objType:lower() di createObjectES
     config.espCustom = {
         generator = { enabled = false, color = Color3.fromRGB(255, 165, 0) },
         gate      = { enabled = false, color = Color3.fromRGB(255, 255, 255) },
         pallet    = { enabled = false, color = Color3.fromRGB(173, 216, 230) },
         hook      = { enabled = false, color = Color3.fromRGB(0, 128, 128) },
         scp       = { enabled = false, color = Color3.fromRGB(150, 0, 255) },
-        Window    = { enabled = false, color = Color3.fromRGB(105, 105, 105) },
+        window    = { enabled = false, color = Color3.fromRGB(105, 105, 105) },
         killer    = { enabled = false, color = config.highlightColorKiller or Color3.fromRGB(255, 0, 0) },
         survivor  = { enabled = false, color = config.highlightColorSurvivor or Color3.fromRGB(0, 0, 255) },
         line      = { enabled = false, color = Color3.fromRGB(255, 255, 255) },
@@ -582,7 +584,7 @@ local ObjectColors = {
     Pallet    = config.espCustom.pallet.color,
     Hook      = config.espCustom.hook.color,
     SCP       = config.espCustom.scp.color,
-    Window    = config.espCustom.Window.color,
+    Window    = config.espCustom.window.color,
 }
 
 -- Variabel ESP
@@ -6053,7 +6055,7 @@ local function createAboutContent()
         { key = "pallet",    label = "Pallet" },
         { key = "hook",      label = "Hook" },
         { key = "scp",       label = "SCP" },
-        { key = "Window",    label = "Windows" },
+        { key = "window",    label = "Windows" },
         { key = "killer",    label = "Killer ESP" },
         { key = "survivor",  label = "Survivor ESP" },
         { key = "line",      label = "ESP Line" },

@@ -926,14 +926,12 @@ end
 local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
 
-    -- Validasi khusus untuk Window: hanya jika player lokal dalam tim Survivor atau Killer
-    if objType == "Window" then
-        local team = localPlayer.Team
-        if not team then return end
-        local teamName = team.Name:lower()
-        if not (teamName:find("survivor") or teamName:find("killer")) then
-            return -- skip highlight jika di lobby/spectator
-        end
+    -- Validasi: hanya jika player lokal dalam tim Survivor atau Killer
+    local team = localPlayer.Team
+    if not team then return end
+    local teamName = team.Name:lower()
+    if not (teamName:find("survivor") or teamName:find("killer")) then
+        return -- skip jika di lobby/spectator
     end
 
     local key = objType:lower()

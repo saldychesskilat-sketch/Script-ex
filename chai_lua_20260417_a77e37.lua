@@ -994,7 +994,7 @@ local function onDescendantAdded(instance)
     elseif name == "Windows" or name:lower():find("inviswall") then
         createObjectESP(instance, "inviswall")
     -- Tambahan untuk Window spesifik
-    elseif name == "Bottum" and instance.Parent and instance.Parent.Name == "Window" 
+    elseif name == "Bottom" and instance.Parent and instance.Parent.Name == "Window" 
            and instance.Parent.Parent and instance.Parent.Parent.Name == "Vaults" then
         createObjectESP(instance, "Window")
     end

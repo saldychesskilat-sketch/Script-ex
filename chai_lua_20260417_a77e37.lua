@@ -563,8 +563,6 @@ end
 -- ESP SYSTEM (PLAYER + OBJECTS) - WITH CUSTOM ESP SUPPORT
 -- ============================================================================
 if not config.espCustom then
-    -- Sebelum: config.espCustom = { ... }
--- Tambahkan key "window" (lowercase) agar sesuai dengan objType:lower() di createObjectES
     config.espCustom = {
         generator = { enabled = false, color = Color3.fromRGB(255, 165, 0) },
         gate      = { enabled = false, color = Color3.fromRGB(255, 255, 255) },

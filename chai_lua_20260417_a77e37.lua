@@ -969,9 +969,13 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "Pallet")
         elseif name == "Windows" or name:lower():find("inviswall") then
             createObjectESP(obj, "inviswall")
+        -- Tambahan untuk Window spesifik: objek "Bottum" di dalam "Window" di "Vaults"
+        elseif name == "Bottum" and obj.Parent and obj.Parent.Name == "Window" 
+               and obj.Parent.Parent and obj.Parent.Parent.Name == "Vaults" then
+            createObjectESP(obj, "Window")
         end
     end
-    print("[ESP] Object ESP refreshed with custom settings")
+    print("[ESP] Object ESP refreshed with custom settings (including Windows/Bottum)")
 end
 
 local function onDescendantAdded(instance)
@@ -989,6 +993,10 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "Pallet")
     elseif name == "Windows" or name:lower():find("inviswall") then
         createObjectESP(instance, "inviswall")
+    -- Tambahan untuk Window spesifik
+    elseif name == "Bottum" and instance.Parent and instance.Parent.Name == "Window" 
+           and instance.Parent.Parent and instance.Parent.Parent.Name == "Vaults" then
+        createObjectESP(instance, "Window")
     end
 end
 

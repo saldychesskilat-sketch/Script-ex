@@ -953,6 +953,8 @@ local function clearObjectESP()
     generatorEspHighlights = {}
 end
 
+-- ========== PERBAIKAN DETEKSI WINDOW ==========
+
 local function refreshAllObjectESP()
     clearObjectESP()
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -967,7 +969,7 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "SCP")
         elseif name == "Pallet" or name == "Palletwrong" then
             createObjectESP(obj, "Pallet")
-        elseif name == "Window" or name:lower():find("Window") then
+        elseif name:lower():find("window") then  -- PERBAIKAN: lower + "window"
             createObjectESP(obj, "Window")
         end
     end
@@ -987,7 +989,7 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "SCP")
     elseif name == "Pallet" or name == "Palletwrong" then
         createObjectESP(instance, "Pallet")
-    elseif name == "Window" or name:lower():find("Window") then
+    elseif name:lower():find("window") then  -- PERBAIKAN: lower + "window"
         createObjectESP(instance, "Window")
     end
 end

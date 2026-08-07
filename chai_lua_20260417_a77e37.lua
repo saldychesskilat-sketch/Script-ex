@@ -926,12 +926,14 @@ end
 local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
 
-    -- Validasi: hanya jika player lokal dalam tim Survivor atau Killer
-    local team = localPlayer.Team
-    if not team then return end
-    local teamName = team.Name:lower()
-    if not (teamName:find("survivor") or teamName:find("killer")) then
-        return -- skip jika di lobby/spectator
+    -- Validasi khusus untuk Window: hanya jika player lokal dalam tim Survivor atau Killer
+    if objType == "Window" then
+        local team = localPlayer.Team
+        if not team then return end
+        local teamName = team.Name:lower()
+        if not (teamName:find("survivor") or teamName:find("killer")) then
+            return -- skip highlight jika di lobby/spectator
+        end
     end
 
     local key = objType:lower()
@@ -978,8 +980,8 @@ local function refreshAllObjectESP()
             createObjectESP(obj, "SCP")
         elseif name == "Pallet" or name == "Palletwrong" then
             createObjectESP(obj, "Pallet")
-        elseif name:lower():find("Window") then  -- PERBAIKAN: lower + "window"
-            createObjectESP(obj, "Window")
+        elseif name:lower():find("window") then  -- PERBAIKAN: lower + "window"
+            createObjectESP(obj, "window")
         end
     end
     print("[ESP] Object ESP refreshed with custom settings")
@@ -998,8 +1000,8 @@ local function onDescendantAdded(instance)
         createObjectESP(instance, "SCP")
     elseif name == "Pallet" or name == "Palletwrong" then
         createObjectESP(instance, "Pallet")
-    elseif name:lower():find("Window") then  -- PERBAIKAN: lower + "window"
-        createObjectESP(instance, "Window")
+    elseif name:lower():find("window") then  -- PERBAIKAN: lower + "window"
+        createObjectESP(instance, "window")
     end
 end
 

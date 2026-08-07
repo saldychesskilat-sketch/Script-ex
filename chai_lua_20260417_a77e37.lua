@@ -927,7 +927,7 @@ local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
 
     -- Validasi khusus untuk Window: hanya jika player lokal dalam tim Survivor atau Killer
-    if objType == "Vaults" then
+    if objType == "Bottom" then
         local team = localPlayer.Team
         if not team then return end
         local teamName = team.Name:lower()

@@ -923,15 +923,20 @@ end
 -- ============================================================================
 -- OBJECT ESP (dengan Custom ESP support)
 -- ============================================================================
+local function isLocalPlayerInGame()
+    local team = localPlayer.Team
+    if not team then return false end
+    local teamName = team.Name:lower()
+    return teamName:find("survivor") or teamName:find("killer")
+end
+
+-- Perbaiki createObjectESP (sudah ada validasi Window)
 local function createObjectESP(obj, objType)
     if generatorEspHighlights[obj] then return end
 
     -- Validasi khusus untuk Window: hanya jika player lokal dalam tim Survivor atau Killer
     if objType == "Bottom" then
-        local team = localPlayer.Team
-        if not team then return end
-        local teamName = team.Name:lower()
-        if not (teamName:find("survivor") or teamName:find("killer")) then
+        if not isLocalPlayerInGame() then
             return -- skip highlight jika di lobby/spectator
         end
     end

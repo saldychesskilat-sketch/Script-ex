@@ -3750,23 +3750,31 @@ local function startAutoAim()
 
     -- ========== FUNGSI FIRE REMOTE ==========
     local function getFireRemotes()
-        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-        if not remotes then return nil, nil, nil end
-        local items = remotes:FindFirstChild("Items")
-        if not items then return nil, nil, nil end
-        local twist = items:FindFirstChild("Twist of Fate")
-        if not twist then return nil, nil, nil end
-        local fireRemote = twist:FindFirstChild("Fire")
-        local resultRemote = twist:FindFirstChild("Result")
-        local character = game:GetService("Players").LocalPlayer.Character
-        local gun = character
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    if not remotes then return nil, nil, nil end
+
+    local items = remotes:FindFirstChild("Items")
+    if not items then return nil, nil, nil end
+
+    local twist = items:FindFirstChild("Twist of Fate")
+    if not twist then return nil, nil, nil end
+
+    local fireRemote = twist:FindFirstChild("Fire")
+    local resultRemote = twist:FindFirstChild("Result")
+
+    local character = game:GetService("Players").LocalPlayer.Character
+    local gun = character
         and character:FindFirstChild("Twist of Fate")
         and character["Twist of Fate"]:FindFirstChild("Right Arm")
         and character["Twist of Fate"]["Right Arm"]:FindFirstChild("gun")
-        -- Kirim dengan format yang berhasil (Opsi 15: gun + lookVector)
-        local camera = workspace.CurrentCamera
-        if fireRemote and fireRemote:IsA("RemoteEvent") and gun and camera then
+
+    -- Kirim dengan format yang berhasil (Opsi 15: gun + lookVector)
+    local camera = workspace.CurrentCamera
+    if fireRemote and fireRemote:IsA("RemoteEvent") and gun and camera then
         fireRemote:FireServer(gun, camera.CFrame.LookVector)
+    end
+
+    return fireRemote, resultRemote, gun
     end
 
     local function fireInfShot()

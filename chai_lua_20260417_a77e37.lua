@@ -3750,6 +3750,7 @@ local function startAutoAim()
 
     -- ========== FUNGSI NEVER MISS ==========
     -- ========== FUNGSI FIRE REMOTE ==========
+    -- ========== FUNGSI FIRE REMOTE ==========
     local function getFireRemotes()
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
         if not remotes then return nil, nil, nil end
@@ -3764,7 +3765,12 @@ local function startAutoAim()
         and character:FindFirstChild("Twist of Fate")
         and character["Twist of Fate"]:FindFirstChild("Right Arm")
         and character["Twist of Fate"]["Right Arm"]:FindFirstChild("gun")
-        return fireRemote, resultRemote, gun
+        -- Kirim argumen "Shoot" ke server
+        if fireRemote and fireRemote:IsA("RemoteEvent") then
+        fireRemote:FireServer("Shoot")
+    end
+
+    return fireRemote, resultRemote, gun
     end
 
     local function fireInfShot()

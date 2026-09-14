@@ -3748,8 +3748,8 @@ local function startAutoAim()
         end)
     end
 
-    -- ========== FUNGSI FIRE REMOTE ==========
-    local function getFireRemotes()
+    -- ========== FUNGSI FIRE REMOTE (format opsi 15 yang terbukti) ==========
+local function getFireRemotes()
     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
     if not remotes then return nil, nil, nil end
 
@@ -3768,54 +3768,34 @@ local function startAutoAim()
         and character["Twist of Fate"]:FindFirstChild("Right Arm")
         and character["Twist of Fate"]["Right Arm"]:FindFirstChild("gun")
 
-    -- Kirim dengan format yang berhasil (Opsi 15: gun + lookVector)
-    local camera = workspace.CurrentCamera
-    if fireRemote and fireRemote:IsA("RemoteEvent") and gun and camera then
-        fireRemote:FireServer(gun, camera.CFrame.LookVector)
-    end
-
     return fireRemote, resultRemote, gun
+end
+
+local function fireInfShot()
+    local char = localPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local targetInfo = getNearestTarget(autoAimState.targetMode)
+    if not targetInfo or not targetInfo.Object then return end
+
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+
+    -- Selalu kirim remote, tanpa cek penghalang
+    pcall(function() char:SetAttribute("Aiming", true) end)
+
+    local fireRemote, _, gun = getFireRemotes()
+    -- FORMAT OPSI 15: FireServer(gun, lookVector)
+    if fireRemote and fireRemote:IsA("RemoteEvent") and gun then
+        pcall(function()
+            fireRemote:FireServer(gun, camera.CFrame.LookVector)
+        end)
     end
 
-    local function fireInfShot()
-        local char = localPlayer.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        local targetInfo = getNearestTarget(autoAimState.targetMode)
-        if not targetInfo or not targetInfo.Object then return end
-        local targetPos = targetInfo.Object.Position
-
-        local camera = workspace.CurrentCamera
-        if not camera then return end
-        local origin = camera.CFrame.Position
-        local direction = (targetPos - origin).Unit
-        local rayLength = (targetPos - origin).Magnitude
-        local rayParams = RaycastParams.new()
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        rayParams.FilterDescendantsInstances = {char, targetInfo.Object.Parent}
-        if targetInfo.Player then
-            local targetChar = targetInfo.Player.Character
-            if targetChar then
-                table.insert(rayParams.FilterDescendantsInstances, targetChar)
-            end
-        end
-
-        local hit = workspace:Raycast(origin, direction * rayLength, rayParams)
-
-        if hit then
-            pcall(function() char:SetAttribute("Aiming", true) end)
-            local fireRemote, resultRemote = getFireRemotes()
-            if fireRemote and fireRemote:IsA("RemoteEvent") then
-                pcall(function() fireRemote:FireServer() end)
-            end
-            if resultRemote and resultRemote:IsA("RemoteEvent") then
-                pcall(function() resultRemote:FireServer() end)
-            end
-            pcall(function() char:SetAttribute("Aiming", false) end)
-        end
-    end
+    pcall(function() char:SetAttribute("Aiming", false) end)
+end
 
     -- ========== FUNGSI HOLD LOOP ==========
     local function startHoldLoop()

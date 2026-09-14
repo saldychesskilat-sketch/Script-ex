@@ -3737,7 +3737,7 @@ local function startAutoAim()
 
         -- Update posisi: jika jarak < 5, hentikan lock
         local currentDist = (rootPart.Position - targetPos).Magnitude
-        if currentDist < 5 then
+        if currentDist < 0 then
             autoAimState.lockActive = false
             if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
             if humanoid then humanoid.AutoRotate = true end
@@ -3846,7 +3846,7 @@ end
             -- Validasi jarak: hanya lock jika jarak >= 5 studs
             if rootPart then
                 local dist = (rootPart.Position - target.Object.Position).Magnitude
-                if dist < 5 then
+                if dist < 0 then
                     -- Terlalu dekat, skip camera lock
                     return
                 end

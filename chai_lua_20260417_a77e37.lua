@@ -3666,86 +3666,116 @@ local function startAutoAim()
     end
 
     local function lockToTarget(targetInfo, duration)
-        if not targetInfo or not targetInfo.Object then return end
-        if not workspace.CurrentCamera then return end
-        local camera = workspace.CurrentCamera
+    if not targetInfo or not targetInfo.Object then return end
+    if not workspace.CurrentCamera then return end
+    local camera = workspace.CurrentCamera
 
-        if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-        if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
+    -- Validasi jarak: hanya lock jika jarak >= 5 studs
+    local localChar = localPlayer.Character
+    local rootPart = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso"))
+    if rootPart then
+        local dist = (rootPart.Position - targetInfo.Object.Position).Magnitude
+        if dist < 5 then
+            -- Jarak < 5 studs, skip camera lock
+            -- Tapi bypass limit tetap dipanggil setelah durasi
+            autoAimState.lockTimer = task.spawn(function()
+                task.wait(duration or 2.5)
+                if autoAimState.infShotEnabled then
+                    for i = 1, 5 do
+                        fireInfShot()
+                        task.wait(0.05)
+                    end
+                end
+            end)
+            return
+        end
+    end
 
-        autoAimState.lockActive = true
-        duration = duration or 2.5
+    if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+    if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
 
-        autoAimState.lockConn = RunService.RenderStepped:Connect(function()
-            if not autoAimState.lockActive then
-                autoAimState.lockConn:Disconnect()
-                autoAimState.lockConn = nil
-                return
-            end
-            local targetObj = targetInfo.Object
-            if not targetObj or not targetObj.Parent then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
-            local targetPos = targetObj.Position
-            if not targetPos then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
+    autoAimState.lockActive = true
+    duration = duration or 2.5
 
-            local localChar = localPlayer.Character
-            if not localChar then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
-            local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
-            if not rootPart then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
-            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-            if not humanoid then
-                autoAimState.lockActive = false
-                if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-                return
-            end
-
-            local camPos = camera.CFrame.Position
-            camera.CFrame = CFrame.lookAt(camPos, targetPos)
-
-            local currentPos = rootPart.Position
-            local lookDir = (targetPos - currentPos)
-            if lookDir.Magnitude > 0.5 then
-                rootPart.CFrame = CFrame.new(currentPos, targetPos)
-                humanoid.AutoRotate = false
-            end
-        end)
-
-        autoAimState.lockTimer = task.spawn(function()
-            task.wait(duration)
+    autoAimState.lockConn = RunService.RenderStepped:Connect(function()
+        if not autoAimState.lockActive then
+            autoAimState.lockConn:Disconnect()
+            autoAimState.lockConn = nil
+            return
+        end
+        local targetObj = targetInfo.Object
+        if not targetObj or not targetObj.Parent then
             autoAimState.lockActive = false
-            if autoAimState.lockConn then
-                autoAimState.lockConn:Disconnect()
-                autoAimState.lockConn = nil
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            return
+        end
+        local targetPos = targetObj.Position
+        if not targetPos then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            return
+        end
+
+        local localChar = localPlayer.Character
+        if not localChar then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            return
+        end
+        local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+        if not rootPart then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            return
+        end
+        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+        if not humanoid then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            return
+        end
+
+        -- Update posisi: jika jarak < 5, hentikan lock
+        local currentDist = (rootPart.Position - targetPos).Magnitude
+        if currentDist < 5 then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            if humanoid then humanoid.AutoRotate = true end
+            return
+        end
+
+        local camPos = camera.CFrame.Position
+        camera.CFrame = CFrame.lookAt(camPos, targetPos)
+
+        local currentPos = rootPart.Position
+        local lookDir = (targetPos - currentPos)
+        if lookDir.Magnitude > 0.5 then
+            rootPart.CFrame = CFrame.new(currentPos, targetPos)
+            humanoid.AutoRotate = false
+        end
+    end)
+
+    autoAimState.lockTimer = task.spawn(function()
+        task.wait(duration)
+        autoAimState.lockActive = false
+        if autoAimState.lockConn then
+            autoAimState.lockConn:Disconnect()
+            autoAimState.lockConn = nil
+        end
+        local localChar = localPlayer.Character
+        if localChar then
+            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.AutoRotate = true
             end
-            local localChar = localPlayer.Character
-            if localChar then
-                local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid.AutoRotate = true
-                end
+        end
+        if autoAimState.infShotEnabled then
+            for i = 1, 5 do
+                fireInfShot()
+                task.wait(0.05)
             end
-            if autoAimState.infShotEnabled then
-                for i = 1, 5 do
-                    fireInfShot()
-                    task.wait(0.05)
-                end
-            end
-        end)
+        end
+    end)
     end
 
     -- ========== FUNGSI FIRE REMOTE (format opsi 15 yang terbukti) ==========
@@ -3799,43 +3829,53 @@ end
 
     -- ========== FUNGSI HOLD LOOP ==========
     local function startHoldLoop()
-        if autoAimState.holdActive then return end
-        autoAimState.holdActive = true
-        autoAimState.holdConn = RunService.RenderStepped:Connect(function()
-            if not autoAimState.holdActive then
-                if autoAimState.holdConn then
-                    autoAimState.holdConn:Disconnect()
-                    autoAimState.holdConn = nil
-                end
-                return
+    if autoAimState.holdActive then return end
+    autoAimState.holdActive = true
+    autoAimState.holdConn = RunService.RenderStepped:Connect(function()
+        if not autoAimState.holdActive then
+            if autoAimState.holdConn then
+                autoAimState.holdConn:Disconnect()
+                autoAimState.holdConn = nil
             end
-            local target = getNearestTarget(autoAimState.targetMode)
-            if target and target.Object then
-                local camera = workspace.CurrentCamera
-                if camera then
-                    local targetPos = target.Object.Position
-                    if targetPos then
-                        local camPos = camera.CFrame.Position
-                        camera.CFrame = CFrame.lookAt(camPos, targetPos)
-                        local localChar = localPlayer.Character
-                        if localChar then
-                            local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
-                            if rootPart then
-                                local currentPos = rootPart.Position
-                                local lookDir = (targetPos - currentPos)
-                                if lookDir.Magnitude > 0.5 then
-                                    rootPart.CFrame = CFrame.new(currentPos, targetPos)
-                                    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                                    if humanoid then
-                                        humanoid.AutoRotate = false
-                                    end
+            return
+        end
+        local target = getNearestTarget(autoAimState.targetMode)
+        if target and target.Object then
+            local localChar = localPlayer.Character
+            local rootPart = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso"))
+            -- Validasi jarak: hanya lock jika jarak >= 5 studs
+            if rootPart then
+                local dist = (rootPart.Position - target.Object.Position).Magnitude
+                if dist < 5 then
+                    -- Terlalu dekat, skip camera lock
+                    return
+                end
+            end
+
+            local camera = workspace.CurrentCamera
+            if camera then
+                local targetPos = target.Object.Position
+                if targetPos then
+                    local camPos = camera.CFrame.Position
+                    camera.CFrame = CFrame.lookAt(camPos, targetPos)
+                    if localChar then
+                        local rp = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+                        if rp then
+                            local currentPos = rp.Position
+                            local lookDir = (targetPos - currentPos)
+                            if lookDir.Magnitude > 0.5 then
+                                rp.CFrame = CFrame.new(currentPos, targetPos)
+                                local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+                                if humanoid then
+                                    humanoid.AutoRotate = false
                                 end
                             end
                         end
                     end
                 end
             end
-        end)
+        end
+    end)
     end
 
     local function stopHoldLoop()

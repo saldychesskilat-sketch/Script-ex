@@ -3748,8 +3748,6 @@ local function startAutoAim()
         end)
     end
 
-    -- ========== FUNGSI NEVER MISS ==========
-    -- ========== FUNGSI FIRE REMOTE ==========
     -- ========== FUNGSI FIRE REMOTE ==========
     local function getFireRemotes()
         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
@@ -3765,12 +3763,10 @@ local function startAutoAim()
         and character:FindFirstChild("Twist of Fate")
         and character["Twist of Fate"]:FindFirstChild("Right Arm")
         and character["Twist of Fate"]["Right Arm"]:FindFirstChild("gun")
-        -- Kirim argumen "Shoot" ke server
-        if fireRemote and fireRemote:IsA("RemoteEvent") then
-        fireRemote:FireServer("Shoot")
-    end
-
-    return fireRemote, resultRemote, gun
+        -- Kirim dengan format yang berhasil (Opsi 15: gun + lookVector)
+        local camera = workspace.CurrentCamera
+        if fireRemote and fireRemote:IsA("RemoteEvent") and gun and camera then
+        fireRemote:FireServer(gun, camera.CFrame.LookVector)
     end
 
     local function fireInfShot()
@@ -4315,7 +4311,7 @@ local function startAutoAim()
         local neverMissLabel = Instance.new("TextLabel")
         neverMissLabel.Size = UDim2.new(0.5, 0, 1, 0)
         neverMissLabel.BackgroundTransparency = 1
-        neverMissLabel.Text = "Never Miss"
+        neverMissLabel.Text = "bypass limit"
         neverMissLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
         neverMissLabel.Font = Enum.Font.Gotham
         neverMissLabel.TextSize = 10

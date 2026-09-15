@@ -3797,8 +3797,7 @@ local function startAutoAim()
     end)
     end
 
-    -- ========== FUNGSI FIRE REMOTE (format opsi 15 yang terbukti) ==========
-local function getFireRemotes()
+    local function getFireRemotes()
     local remotes = ReplicatedStorage:FindFirstChild("Remotes")
     if not remotes then return nil, nil, nil end
 
@@ -3812,14 +3811,51 @@ local function getFireRemotes()
     local resultRemote = twist:FindFirstChild("Result")
 
     local character = game:GetService("Players").LocalPlayer.Character
-    local gun = character
-        and character:FindFirstChild("Twist of Fate")
-        and character["Twist of Fate"]:FindFirstChild("Right Arm")
-        and character["Twist of Fate"]["Right Arm"]:FindFirstChild("gun")
+    local gun = nil
+
+    if character then
+        local tool = character:FindFirstChild("Twist of Fate")
+        if tool then
+            local rightArm = tool:FindFirstChild("Right Arm")
+
+            -- Prioritas 1: cari langsung di "Right Arm" (nama apa saja, kecuali Motor6D/Weld/Attachment)
+            if rightArm then
+                for _, child in ipairs(rightArm:GetChildren()) do
+                    if (child:IsA("MeshPart") or child:IsA("Model") or child:IsA("Part"))
+                        and not child:IsA("Motor6D")
+                        and not child:IsA("Weld")
+                        and not child:IsA("Attachment")
+                    then
+                        gun = child
+                        break
+                    end
+                end
+            end
+
+            -- Prioritas 2: cari di descendant tool kalau Right Arm kosong (skip bagian tubuh karakter)
+            if not gun then
+                for _, child in ipairs(tool:GetChildren()) do
+                    if (child:IsA("MeshPart") or child:IsA("Model") or child:IsA("Part")) then
+                        gun = child
+                        break
+                    end
+                end
+            end
+
+            -- Prioritas 3: scan descendant, cari MeshPart/Model yang bukan bagian Right Arm / Left Arm
+            if not gun then
+                for _, obj in ipairs(tool:GetDescendants()) do
+                    if obj:IsA("MeshPart") or obj:IsA("Model") then
+                        gun = obj
+                        break
+                    end
+                end
+            end
+        end
+    end
 
     return fireRemote, resultRemote, gun
-end
-
+    end
 local function fireInfShot()
     local char = localPlayer.Character
     if not char then return end
@@ -3871,31 +3907,67 @@ end
         end
     end
 
-    -- ========== ABSOLUTE FREE: AUTO LOCK + FIRE JIKA JARAK < 10 ==========
+        -- ========== ABSOLUTE FREE: AUTO LOCK + FIRE JIKA JARAK < 10 ==========
     local absoluteFreeLoop = nil
+    local absFreeSavedAutoRotate = nil
+    local absFreeSavedCharCF = nil
 
     local function startAbsoluteFreeLoop()
         if absoluteFreeLoop then return end
+
+        -- Simpan state AutoRotate awal
+        local char0 = localPlayer.Character
+        if char0 then
+            local hum0 = char0:FindFirstChildOfClass("Humanoid")
+            if hum0 then absFreeSavedAutoRotate = hum0.AutoRotate end
+        end
+
         absoluteFreeLoop = RunService.Heartbeat:Connect(function()
             if not autoAimState.absoluteFreeEnabled then return end
+
             local target = getNearestTarget(autoAimState.targetMode)
             if not target or not target.Object then return end
+
             local char = localPlayer.Character
             if not char then return end
             local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
             if not rootPart then return end
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
 
-            local dist = (rootPart.Position - target.Object.Position).Magnitude
-            if dist < 10 then
-                -- Lock camera ke target
+            -- Ambil posisi tengah badan target (HumanoidRootPart) supaya tidak flip
+            local aimPos = target.Object.Position
+            if target.Player and target.Player.Character then
+                local trp = target.Player.Character:FindFirstChild("HumanoidRootPart")
+                if trp then aimPos = trp.Position end
+            end
+
+            local dist = (rootPart.Position - aimPos).Magnitude
+            if dist >= 10 then return end
+
+            -- 1) Rotasi karakter untuk arahkan tembakan (tetap jalan walau dekat)
+            local currentPos = rootPart.Position
+            local lookDir = aimPos - currentPos
+            if lookDir.Magnitude > 0.5 then
+                rootPart.CFrame = CFrame.new(currentPos, aimPos)
+                if humanoid then humanoid.AutoRotate = false end
+            end
+
+            -- 2) Camera lock hanya jika jarak >= 4 studs (hindari flip)
+            if dist >= 4 then
                 local camera = workspace.CurrentCamera
                 if camera then
                     local camPos = camera.CFrame.Position
-                    camera.CFrame = CFrame.lookAt(camPos, target.Object.Position)
+                    local dir = aimPos - camPos
+                    local flatDir = Vector3.new(dir.X, 0, dir.Z)
+                    -- Hanya update kalau arah horizontal cukup jelas
+                    if flatDir.Magnitude > 0.5 then
+                        camera.CFrame = CFrame.lookAt(camPos, aimPos, Vector3.new(0, 1, 0))
+                    end
                 end
-                -- Fire remote terus menerus
-                pcall(fireInfShot)
             end
+
+            -- 3) Fire remote terus menerus
+            pcall(fireInfShot)
         end)
     end
 
@@ -3904,6 +3976,15 @@ end
             absoluteFreeLoop:Disconnect()
             absoluteFreeLoop = nil
         end
+        -- Restore AutoRotate
+        local char = localPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum and absFreeSavedAutoRotate ~= nil then
+                hum.AutoRotate = absFreeSavedAutoRotate
+            end
+        end
+        absFreeSavedAutoRotate = nil
     end
 
     local function startHoldLoop()

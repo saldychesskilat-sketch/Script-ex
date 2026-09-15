@@ -4213,7 +4213,7 @@ end
         gui.Parent = game:GetService("CoreGui")
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 420)
+        frame.Size = UDim2.new(0, 220, 0, 170)
         frame.Position = UDim2.new(0.5, -110, 0.5, -90)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2

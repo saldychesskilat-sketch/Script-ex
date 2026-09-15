@@ -4213,7 +4213,7 @@ end
         gui.Parent = game:GetService("CoreGui")
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 170)
+        frame.Size = UDim2.new(0, 220, 0, 190)
         frame.Position = UDim2.new(0.5, -110, 0.5, -90)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
@@ -4295,7 +4295,7 @@ end
         -- Switch target
         local switchModeBtn = Instance.new("TextButton")
         switchModeBtn.Size = UDim2.new(0.8, 0, 0, 20)
-        switchModeBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+        switchModeBtn.Position = UDim2.new(0.1, 0, 0, 26)
         switchModeBtn.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
         switchModeBtn.Text = "Switch Target (Shift+T)"
         switchModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -4319,7 +4319,7 @@ end
         -- Mobile toggle
         local mobileToggleRow = Instance.new("Frame")
         mobileToggleRow.Size = UDim2.new(1, 0, 0, 22)
-        mobileToggleRow.Position = UDim2.new(0, 0, 0.55, 0)
+        mobileToggleRow.Position = UDim2.new(0, 0, 0, 50)
         mobileToggleRow.BackgroundTransparency = 1
         mobileToggleRow.Parent = content
 
@@ -4375,7 +4375,7 @@ end
         -- Never Miss toggle
         local neverMissToggleRow = Instance.new("Frame")
         neverMissToggleRow.Size = UDim2.new(1, 0, 0, 22)
-        neverMissToggleRow.Position = UDim2.new(0, 0, 0.8, 0)
+        neverMissToggleRow.Position = UDim2.new(0, 0, 0, 74)
         neverMissToggleRow.BackgroundTransparency = 1
         neverMissToggleRow.Parent = content
 
@@ -4412,7 +4412,7 @@ end
                 -- Absolute Free toggle
         local absFreeToggleRow = Instance.new("Frame")
         absFreeToggleRow.Size = UDim2.new(1, 0, 0, 22)
-        absFreeToggleRow.Position = UDim2.new(0, 0, 1.05, 0)
+        absFreeToggleRow.Position = UDim2.new(0, 0, 0, 98)
         absFreeToggleRow.BackgroundTransparency = 1
         absFreeToggleRow.Parent = content
 

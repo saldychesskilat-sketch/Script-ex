@@ -3670,27 +3670,6 @@ local function startAutoAim()
     if not workspace.CurrentCamera then return end
     local camera = workspace.CurrentCamera
 
-    -- Validasi jarak: hanya lock jika jarak >= 5 studs
-    local localChar = localPlayer.Character
-    local rootPart = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso"))
-    if rootPart then
-        local dist = (rootPart.Position - targetInfo.Object.Position).Magnitude
-        if dist < 5 then
-            -- Jarak < 5 studs, skip camera lock
-            -- Tapi bypass limit tetap dipanggil setelah durasi
-            autoAimState.lockTimer = task.spawn(function()
-                task.wait(duration or 2.5)
-                if autoAimState.infShotEnabled then
-                    for i = 1, 5 do
-                        fireInfShot()
-                        task.wait(0.05)
-                    end
-                end
-            end)
-            return
-        end
-    end
-
     if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
     if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
 
@@ -3735,18 +3714,19 @@ local function startAutoAim()
             return
         end
 
-        -- Update posisi: jika jarak < 5, hentikan lock
+        -- Hitung jarak untuk menentukan offset kamera
         local currentDist = (rootPart.Position - targetPos).Magnitude
-        if currentDist < 0 then
-            autoAimState.lockActive = false
-            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
-            if humanoid then humanoid.AutoRotate = true end
-            return
+        local camPos = camera.CFrame.Position
+        local camCF = CFrame.lookAt(camPos, targetPos)
+
+        -- Jika jarak < 5 studs, geser kamera ke kiri (target tampak di kiri layar)
+        if currentDist < 5 then
+            camCF = camCF * CFrame.Angles(0, math.rad(-15), 0)
         end
 
-        local camPos = camera.CFrame.Position
-        camera.CFrame = CFrame.lookAt(camPos, targetPos)
+        camera.CFrame = camCF
 
+        -- Orientasi karakter tetap menghadap target
         local currentPos = rootPart.Position
         local lookDir = (targetPos - currentPos)
         if lookDir.Magnitude > 0.5 then

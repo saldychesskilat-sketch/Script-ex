@@ -3670,6 +3670,35 @@ local function startAutoAim()
     if not workspace.CurrentCamera then return end
     local camera = workspace.CurrentCamera
 
+    -- Simpan posisi awal kamera & karakter untuk dikembalikan nanti
+    local originalCamCF = camera.CFrame
+
+    local localChar = localPlayer.Character
+    if not localChar then return end
+    local rootPart = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+    if not rootPart then return end
+    local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    local originalCharCF = rootPart.CFrame
+    local originalAutoRotate = humanoid.AutoRotate
+
+    -- Validasi jarak: jika < 5 studs, batalkan lock
+    local currentDist = (rootPart.Position - targetInfo.Object.Position).Magnitude
+    if currentDist < 5 then
+        -- Jarak terlalu dekat, skip lock sepenuhnya
+        if autoAimState.infShotEnabled then
+            autoAimState.lockTimer = task.spawn(function()
+                task.wait(duration or 2.5)
+                for i = 1, 5 do
+                    fireInfShot()
+                    task.wait(0.05)
+                end
+            end)
+        end
+        return
+    end
+
     if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
     if autoAimState.lockTimer then task.cancel(autoAimState.lockTimer); autoAimState.lockTimer = nil end
 
@@ -3714,11 +3743,23 @@ local function startAutoAim()
             return
         end
 
-        -- Lock kamera tepat ke tengah target (tanpa offset)
+        -- Jika jarak sudah < 5 studs saat lock berlangsung, hentikan lock
+        local liveDist = (rootPart.Position - targetPos).Magnitude
+        if liveDist < 5 then
+            autoAimState.lockActive = false
+            if autoAimState.lockConn then autoAimState.lockConn:Disconnect(); autoAimState.lockConn = nil end
+            -- Kembalikan kamera & karakter ke posisi semula
+            camera.CFrame = originalCamCF
+            rootPart.CFrame = originalCharCF
+            humanoid.AutoRotate = originalAutoRotate
+            return
+        end
+
+        -- Lock kamera tepat ke tengah target
         local camPos = camera.CFrame.Position
         camera.CFrame = CFrame.lookAt(camPos, targetPos)
 
-        -- Orientasi karakter menghadap target
+        -- Lock karakter menghadap target
         local currentPos = rootPart.Position
         local lookDir = (targetPos - currentPos)
         if lookDir.Magnitude > 0.5 then
@@ -3729,18 +3770,24 @@ local function startAutoAim()
 
     autoAimState.lockTimer = task.spawn(function()
         task.wait(duration)
+
         autoAimState.lockActive = false
         if autoAimState.lockConn then
             autoAimState.lockConn:Disconnect()
             autoAimState.lockConn = nil
         end
-        local localChar = localPlayer.Character
-        if localChar then
-            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid.AutoRotate = true
-            end
+
+        -- Kembalikan kamera & karakter ke posisi semula
+        camera.CFrame = originalCamCF
+        local localChar2 = localPlayer.Character
+        if localChar2 then
+            local rp = localChar2:FindFirstChild("HumanoidRootPart") or localChar2:FindFirstChild("Torso")
+            local hm = localChar2:FindFirstChildOfClass("Humanoid")
+            if rp then rp.CFrame = originalCharCF end
+            if hm then hm.AutoRotate = originalAutoRotate end
         end
+
+        -- Bypass fire setelah lock selesai
         if autoAimState.infShotEnabled then
             for i = 1, 5 do
                 fireInfShot()
@@ -3748,7 +3795,7 @@ local function startAutoAim()
             end
         end
     end)
-end
+    end
 
     -- ========== FUNGSI FIRE REMOTE (format opsi 15 yang terbukti) ==========
 local function getFireRemotes()

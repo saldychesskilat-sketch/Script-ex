@@ -3806,60 +3806,123 @@ local function fireInfShot()
 
     pcall(function() char:SetAttribute("Aiming", false) end)
 end
+        -- ========== HIDDEN MECHANISM: SPAM SETELAH HOLD > 5 DETIK ==========
+    local holdSpamTimer = nil
+    local holdSpamActive = false
+    local HOLD_SPAM_THRESHOLD = 5
+    local HOLD_SPAM_INTERVAL = 0.05
 
-    -- ========== FUNGSI HOLD LOOP ==========
-    local function startHoldLoop()
-    if autoAimState.holdActive then return end
-    autoAimState.holdActive = true
-    autoAimState.holdConn = RunService.RenderStepped:Connect(function()
-        if not autoAimState.holdActive then
-            if autoAimState.holdConn then
-                autoAimState.holdConn:Disconnect()
-                autoAimState.holdConn = nil
+    local function startHoldSpam()
+        if holdSpamActive then return end
+        holdSpamActive = true
+        task.spawn(function()
+            while holdSpamActive and autoAimState.holdActive do
+                pcall(fireInfShot)
+                task.wait(HOLD_SPAM_INTERVAL)
             end
-            return
+            holdSpamActive = false
+        end)
+    end
+
+    local function stopHoldSpam()
+        holdSpamActive = false
+        if holdSpamTimer then
+            task.cancel(holdSpamTimer)
+            holdSpamTimer = nil
         end
-        local target = getNearestTarget(autoAimState.targetMode)
-        if target and target.Object then
-            local localChar = localPlayer.Character
-            local rootPart = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso"))
-            -- Validasi jarak: hanya lock jika jarak >= 5 studs
-            if rootPart then
-                local dist = (rootPart.Position - target.Object.Position).Magnitude
-                if dist < 0 then
-                    -- Terlalu dekat, skip camera lock
-                    return
-                end
-            end
+    end
 
-            local camera = workspace.CurrentCamera
-            if camera then
-                local targetPos = target.Object.Position
-                if targetPos then
+    -- ========== ABSOLUTE FREE: AUTO LOCK + FIRE JIKA JARAK < 10 ==========
+    local absoluteFreeLoop = nil
+
+    local function startAbsoluteFreeLoop()
+        if absoluteFreeLoop then return end
+        absoluteFreeLoop = RunService.Heartbeat:Connect(function()
+            if not autoAimState.absoluteFreeEnabled then return end
+            local target = getNearestTarget(autoAimState.targetMode)
+            if not target or not target.Object then return end
+            local char = localPlayer.Character
+            if not char then return end
+            local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            if not rootPart then return end
+
+            local dist = (rootPart.Position - target.Object.Position).Magnitude
+            if dist < 10 then
+                -- Lock camera ke target
+                local camera = workspace.CurrentCamera
+                if camera then
                     local camPos = camera.CFrame.Position
-                    camera.CFrame = CFrame.lookAt(camPos, targetPos)
-                    if localChar then
-                        local rp = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
-                        if rp then
-                            local currentPos = rp.Position
-                            local lookDir = (targetPos - currentPos)
-                            if lookDir.Magnitude > 0.5 then
-                                rp.CFrame = CFrame.new(currentPos, targetPos)
-                                local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-                                if humanoid then
-                                    humanoid.AutoRotate = false
-                                end
+                    camera.CFrame = CFrame.lookAt(camPos, target.Object.Position)
+                end
+                -- Fire remote terus menerus
+                pcall(fireInfShot)
+            end
+        end)
+    end
+
+    local function stopAbsoluteFreeLoop()
+        if absoluteFreeLoop then
+            absoluteFreeLoop:Disconnect()
+            absoluteFreeLoop = nil
+        end
+    end
+
+    local function startHoldLoop()
+        if autoAimState.holdActive then return end
+        autoAimState.holdActive = true
+
+        -- Reset spam timer (hidden mechanism)
+        stopHoldSpam()
+
+        -- Timer: setelah 5 detik, mulai spam fireInfShot
+        holdSpamTimer = task.delay(HOLD_SPAM_THRESHOLD, function()
+            if autoAimState.holdActive then
+                startHoldSpam()
+            end
+        end)
+
+        autoAimState.holdConn = RunService.RenderStepped:Connect(function()
+            if not autoAimState.holdActive then
+                if autoAimState.holdConn then
+                    autoAimState.holdConn:Disconnect()
+                    autoAimState.holdConn = nil
+                end
+                return
+            end
+            local target = getNearestTarget(autoAimState.targetMode)
+            if target and target.Object then
+                local localChar = localPlayer.Character
+                local rootPart = localChar and (localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso"))
+                local camera = workspace.CurrentCamera
+                if camera and rootPart then
+                    local targetPos = target.Object.Position
+                    if targetPos then
+                        local currentDist = (rootPart.Position - targetPos).Magnitude
+                        local camPos = camera.CFrame.Position
+                        local camCF = CFrame.lookAt(camPos, targetPos)
+                        if currentDist < 5 then
+                            camCF = camCF * CFrame.Angles(0, math.rad(-15), 0)
+                        end
+                        camera.CFrame = camCF
+
+                        local currentPos = rootPart.Position
+                        local lookDir = (targetPos - currentPos)
+                        if lookDir.Magnitude > 0.5 then
+                            rootPart.CFrame = CFrame.new(currentPos, targetPos)
+                            local humanoid = localChar:FindFirstChildOfClass("Humanoid")
+                            if humanoid then
+                                humanoid.AutoRotate = false
                             end
                         end
                     end
                 end
             end
-        end
-    end)
+        end)
     end
-
     local function stopHoldLoop()
         autoAimState.holdActive = false
+        stopHoldSpam()
+
         if autoAimState.holdConn then
             autoAimState.holdConn:Disconnect()
             autoAimState.holdConn = nil
@@ -4150,7 +4213,7 @@ end
         gui.Parent = game:GetService("CoreGui")
 
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 220, 0, 180)
+        frame.Size = UDim2.new(0, 220, 0, 210)
         frame.Position = UDim2.new(0.5, -110, 0.5, -90)
         frame.BackgroundColor3 = Color3.fromRGB(12, 22, 38)
         frame.BackgroundTransparency = 0.2
@@ -4346,6 +4409,48 @@ end
             neverMissSwitch.BackgroundColor3 = autoAimState.infShotEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
             neverMissSwitch.Text = autoAimState.infShotEnabled and "ON" or "OFF"
         end)
+                -- Absolute Free toggle
+        local absFreeToggleRow = Instance.new("Frame")
+        absFreeToggleRow.Size = UDim2.new(1, 0, 0, 22)
+        absFreeToggleRow.Position = UDim2.new(0, 0, 1.05, 0)
+        absFreeToggleRow.BackgroundTransparency = 1
+        absFreeToggleRow.Parent = content
+
+        local absFreeLabel = Instance.new("TextLabel")
+        absFreeLabel.Size = UDim2.new(0.5, 0, 1, 0)
+        absFreeLabel.BackgroundTransparency = 1
+        absFreeLabel.Text = "Absolute Free"
+        absFreeLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        absFreeLabel.Font = Enum.Font.Gotham
+        absFreeLabel.TextSize = 10
+        absFreeLabel.TextXAlignment = Enum.TextXAlignment.Left
+        absFreeLabel.Parent = absFreeToggleRow
+
+        local absFreeSwitch = Instance.new("TextButton")
+        absFreeSwitch.Size = UDim2.new(0, 36, 0, 16)
+        absFreeSwitch.Position = UDim2.new(0.65, 0, 0.5, -8)
+        absFreeSwitch.BackgroundColor3 = autoAimState.absoluteFreeEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+        absFreeSwitch.Text = autoAimState.absoluteFreeEnabled and "ON" or "OFF"
+        absFreeSwitch.TextColor3 = Color3.fromRGB(255, 255, 255)
+        absFreeSwitch.Font = Enum.Font.GothamBold
+        absFreeSwitch.TextSize = 7
+        absFreeSwitch.BorderSizePixel = 0
+        absFreeSwitch.AutoButtonColor = false
+        absFreeSwitch.Parent = absFreeToggleRow
+        local absFreeSwitchCorner = Instance.new("UICorner")
+        absFreeSwitchCorner.CornerRadius = UDim.new(1, 0)
+        absFreeSwitchCorner.Parent = absFreeSwitch
+
+        absFreeSwitch.MouseButton1Click:Connect(function()
+            autoAimState.absoluteFreeEnabled = not autoAimState.absoluteFreeEnabled
+            absFreeSwitch.BackgroundColor3 = autoAimState.absoluteFreeEnabled and Color3.fromRGB(0, 140, 255) or Color3.fromRGB(45, 45, 65)
+            absFreeSwitch.Text = autoAimState.absoluteFreeEnabled and "ON" or "OFF"
+            if autoAimState.absoluteFreeEnabled then
+                startAbsoluteFreeLoop()
+            else
+                stopAbsoluteFreeLoop()
+            end
+        end)
 
         -- Drag GUI
         local dragging = false
@@ -4386,6 +4491,10 @@ end
     setupMouseButton2Detection()
     setupKeybindDetection()
     setupMobileButton()
+    -- Mulai Absolute Free loop jika enabled
+    if autoAimState.absoluteFreeEnabled then
+        startAbsoluteFreeLoop()
+    end
 
     autoAimConnection = RunService.Heartbeat:Connect(function() end)
 

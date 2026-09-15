@@ -3714,19 +3714,11 @@ local function startAutoAim()
             return
         end
 
-        -- Hitung jarak untuk menentukan offset kamera
-        local currentDist = (rootPart.Position - targetPos).Magnitude
+        -- Lock kamera tepat ke tengah target (tanpa offset)
         local camPos = camera.CFrame.Position
-        local camCF = CFrame.lookAt(camPos, targetPos)
+        camera.CFrame = CFrame.lookAt(camPos, targetPos)
 
-        -- Jika jarak < 5 studs, geser kamera ke kiri (target tampak di kiri layar)
-        if currentDist < 5 then
-            camCF = camCF * CFrame.Angles(0, math.rad(-15), 0)
-        end
-
-        camera.CFrame = camCF
-
-        -- Orientasi karakter tetap menghadap target
+        -- Orientasi karakter menghadap target
         local currentPos = rootPart.Position
         local lookDir = (targetPos - currentPos)
         if lookDir.Magnitude > 0.5 then
@@ -3756,7 +3748,7 @@ local function startAutoAim()
             end
         end
     end)
-    end
+end
 
     -- ========== FUNGSI FIRE REMOTE (format opsi 15 yang terbukti) ==========
 local function getFireRemotes()

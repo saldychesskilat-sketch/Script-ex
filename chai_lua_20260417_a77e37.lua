@@ -3907,10 +3907,13 @@ end
         end
     end
 
-        -- ========== ABSOLUTE FREE: AUTO LOCK + FIRE JIKA JARAK < 10 ==========
+            -- ========== ABSOLUTE FREE: AUTO LOCK + FIRE JIKA JARAK < 10 ==========
     local absoluteFreeLoop = nil
     local absFreeSavedAutoRotate = nil
     local absFreeSavedCharCF = nil
+    local absFreeLastTeleport = 0
+    local ABS_FREE_TELEPORT_COOLDOWN = 0.4   -- jeda antar teleport
+    local ABS_FREE_BEHIND_DISTANCE = 10      -- jarak teleport di belakang target
 
     local function startAbsoluteFreeLoop()
         if absoluteFreeLoop then return end
@@ -3936,15 +3939,38 @@ end
 
             -- Ambil posisi tengah badan target (HumanoidRootPart) supaya tidak flip
             local aimPos = target.Object.Position
+            local targetRoot = nil
             if target.Player and target.Player.Character then
-                local trp = target.Player.Character:FindFirstChild("HumanoidRootPart")
-                if trp then aimPos = trp.Position end
+                targetRoot = target.Player.Character:FindFirstChild("HumanoidRootPart")
+                if targetRoot then aimPos = targetRoot.Position end
+            else
+                -- Untuk SCP/model tanpa Player
+                targetRoot = target.Object
             end
 
             local dist = (rootPart.Position - aimPos).Magnitude
             if dist >= 10 then return end
 
-            -- 1) Rotasi karakter untuk arahkan tembakan (tetap jalan walau dekat)
+            -- ========== TELEPORT KE BELAKANG TARGET ==========
+            local now = tick()
+            if targetRoot and (now - absFreeLastTeleport) >= ABS_FREE_TELEPORT_COOLDOWN then
+                local targetLook = targetRoot.CFrame.LookVector
+                local behindPos = targetRoot.Position - targetLook * ABS_FREE_BEHIND_DISTANCE
+
+                -- Pastikan tidak jatuh ke void
+                if behindPos.Y > -50 then
+                    -- Cek jarak ke posisi sekarang (hindari teleport sia-sia kalau sudah di belakang)
+                    local distToBehind = (rootPart.Position - behindPos).Magnitude
+                    if distToBehind > 3 then
+                        rootPart.CFrame = CFrame.new(behindPos)
+                        rootPart.AssemblyLinearVelocity = Vector3.zero
+                        rootPart.AssemblyAngularVelocity = Vector3.zero
+                        absFreeLastTeleport = now
+                    end
+                end
+            end
+
+            -- ========== ROTASI KARAKTER ==========
             local currentPos = rootPart.Position
             local lookDir = aimPos - currentPos
             if lookDir.Magnitude > 0.5 then
@@ -3952,21 +3978,20 @@ end
                 if humanoid then humanoid.AutoRotate = false end
             end
 
-            -- 2) Camera lock hanya jika jarak >= 4 studs (hindari flip)
+            -- ========== CAMERA LOCK (jika jarak >= 4) ==========
             if dist >= 4 then
                 local camera = workspace.CurrentCamera
                 if camera then
                     local camPos = camera.CFrame.Position
                     local dir = aimPos - camPos
                     local flatDir = Vector3.new(dir.X, 0, dir.Z)
-                    -- Hanya update kalau arah horizontal cukup jelas
                     if flatDir.Magnitude > 0.5 then
                         camera.CFrame = CFrame.lookAt(camPos, aimPos, Vector3.new(0, 1, 0))
                     end
                 end
             end
 
-            -- 3) Fire remote terus menerus
+            -- ========== FIRE TERUS MENERUS ==========
             pcall(fireInfShot)
         end)
     end
@@ -3985,6 +4010,7 @@ end
             end
         end
         absFreeSavedAutoRotate = nil
+        absFreeLastTeleport = 0
     end
 
     local function startHoldLoop()

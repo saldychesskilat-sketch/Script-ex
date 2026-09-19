@@ -3388,6 +3388,7 @@ local function getCurrentRole()
 end
 
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
+-- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3401,6 +3402,12 @@ local function InitializeAutobuy()
         if not check then return end                    
         -- Jangan cache line dan goal secara permanen, ambil ulang saat dibutuhkan
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
+        
+        -- ===== KONFIGURASI SPEED UP SKILLCHECK =====
+        -- Tambahan rotasi per frame (derajat). Semakin besar semakin cepat.
+        -- 60 FPS * 2 = 120 derajat/detik ekstra.
+        local SPEED_BOOST = 2
+        -- ===========================================
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
@@ -3426,6 +3433,10 @@ local function InitializeAutobuy()
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
                     if not currentLine or not currentGoal then return end
+                    
+                    -- ===== SPEED UP: percepat rotasi Line =====
+                    currentLine.Rotation = (currentLine.Rotation + SPEED_BOOST) % 360
+                    -- ==========================================
                     
                     local lr = currentLine.Rotation % 360                    
                     local gr = currentGoal.Rotation % 360

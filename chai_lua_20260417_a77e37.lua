@@ -3389,6 +3389,7 @@ end
 
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3403,11 +3404,64 @@ local function InitializeAutobuy()
         -- Jangan cache line dan goal secara permanen, ambil ulang saat dibutuhkan
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
-        -- ===== KONFIGURASI SPEED UP SKILLCHECK =====
-        -- Tambahan rotasi per frame (derajat). Semakin besar semakin cepat.
-        -- 60 FPS * 2 = 120 derajat/detik ekstra.
-        local SPEED_BOOST = 2
-        -- ===========================================
+        -- ===== SKILLCHECK REMOTE SETUP =====
+        local cachedSkillCheckRemote = nil
+        
+        local function getSkillCheckRemote()
+            if cachedSkillCheckRemote and cachedSkillCheckRemote.Parent then
+                return cachedSkillCheckRemote
+            end
+            local r = ReplicatedStorage:FindFirstChild("Remotes")
+            if not r then return nil end
+            local g = r:FindFirstChild("Generator")
+            if not g then return nil end
+            local e = g:FindFirstChild("SkillCheckResultEvent")
+            if e and e:IsA("RemoteEvent") then
+                cachedSkillCheckRemote = e
+                return e
+            end
+            return nil
+        end
+        
+        -- Cari generator + GeneratorPoint terdekat dari karakter lokal
+        local function getNearestGeneratorAndPoint()
+            local char = localPlayer.Character
+            if not char then return nil, nil end
+            local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            if not hrp then return nil, nil end
+            
+            local map = workspace:FindFirstChild("Map")
+            local gens = map and map:FindFirstChild("Generators")
+            if not gens then return nil, nil end
+            
+            local bestGen, bestGP, bestDist = nil, nil, math.huge
+            for _, gen in ipairs(gens:GetChildren()) do
+                for i = 1, 4 do
+                    local gp = gen:FindFirstChild("GeneratorPoint" .. i)
+                    if gp and gp:IsA("BasePart") then
+                        local dist = (hrp.Position - gp.Position).Magnitude
+                        if dist < bestDist then
+                            bestDist = dist
+                            bestGen = gen
+                            bestGP = gp
+                        end
+                    end
+                end
+            end
+            return bestGen, bestGP
+        end
+        
+        -- Kirim remote SkillCheckResultEvent
+        local function fireSkillCheckSuccess()
+            local remote = getSkillCheckRemote()
+            if not remote then return end
+            local gen, gp = getNearestGeneratorAndPoint()
+            if not gen or not gp then return end
+            pcall(function()
+                remote:FireServer("success", 1, gen, gp)
+            end)
+        end
+        -- =====================================
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
@@ -3418,7 +3472,6 @@ local function InitializeAutobuy()
                 triggerCount = 0         
                 lastTriggerTime = 0
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
-                -- Gunakan RenderStepped untuk respons lebih cepat
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end    
@@ -3429,18 +3482,12 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- Ambil Line dan Goal secara real-time (tidak pakai cache)
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
                     if not currentLine or not currentGoal then return end
                     
-                    -- ===== SPEED UP: percepat rotasi Line =====
-                    currentLine.Rotation = (currentLine.Rotation + SPEED_BOOST) % 360
-                    -- ==========================================
-                    
                     local lr = currentLine.Rotation % 360                    
                     local gr = currentGoal.Rotation % 360
-                    -- Perlebar zone untuk sensitivitas lebih tinggi (102-120)
                     local ss = (gr + 102) % 360                    
                     local se = (gr + 120) % 360                    
                     local inRange = false                    
@@ -3455,7 +3502,10 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            TriggerMobileButton()                    
+                            TriggerMobileButton()
+                            -- ===== FIRE REMOTE SKILLCHECK SUCCESS =====
+                            fireSkillCheckSuccess()
+                            -- ===========================================
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                             end

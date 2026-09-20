@@ -3389,7 +3389,7 @@ end
 
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
--- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3407,6 +3407,7 @@ local function InitializeAutobuy()
         local cachedSkillCheckRemote = nil
         local cachedSkillcheckValidatedRemote = nil
         local cachedSkillCheckEventRemote = nil
+        local cachedPerfectionistRemote = nil
         
         local function getSkillCheckRemote()
             if cachedSkillCheckRemote and cachedSkillCheckRemote.Parent then
@@ -3455,6 +3456,24 @@ local function InitializeAutobuy()
             end
             return nil
         end
+        
+        -- ===== REMOTE BARU: perfectionistplanning =====
+        local function getPerfectionistRemote()
+            if cachedPerfectionistRemote and cachedPerfectionistRemote.Parent then
+                return cachedPerfectionistRemote
+            end
+            local r = ReplicatedStorage:FindFirstChild("Remotes")
+            if not r then return nil end
+            local p = r:FindFirstChild("Perks")
+            if not p then return nil end
+            local e = p:FindFirstChild("perfectionistplanning")
+            if e and e:IsA("RemoteEvent") then
+                cachedPerfectionistRemote = e
+                return e
+            end
+            return nil
+        end
+        -- =============================================
         
         -- ===== CARI GENERATOR + GENERATORPOINT TERDEKAT =====
         local function getNearestGeneratorAndPoint()
@@ -3512,18 +3531,35 @@ local function InitializeAutobuy()
                 remote:FireServer()
             end)
         end
+        
+        -- perfectionistplanning: applyBoost + fast
+        local function firePerfectionist()
+            local remote = getPerfectionistRemote()
+            if not remote then return end
+            pcall(function()
+                remote:FireServer("applyBoost", "fast")
+            end)
+        end
         -- ===================================================================
+        
+        -- ===== KONFIGURASI SPAM SKILLCHECKSUCCESS =====
+        local SKILLCHECK_SPAM_INTERVAL = 0.05  -- jeda antar spam (detik)
+        -- ==============================================
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
+        local lastSkillCheckSpam = 0
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
+                lastSkillCheckSpam = 0
                 -- ===== FIRE SKILLCHECKEVENT SAAT SKILLCHECK MUNCUL =====
                 fireSkillCheckEvent()
+                -- ===== FIRE PERFECTIONISTPLANNING SAAT SKILLCHECK MUNCUL =====
+                firePerfectionist()
                 -- =====================================================
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
@@ -3535,6 +3571,14 @@ local function InitializeAutobuy()
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                         return
                     end
+                    
+                    -- ===== SPAM SKILLCHECKSUCCESS SELAMA CHECK VISIBLE =====
+                    local nowSpam = tick()
+                    if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
+                        lastSkillCheckSpam = nowSpam
+                        fireSkillCheckSuccess()
+                    end
+                    -- ====================================================
                     
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
@@ -3574,6 +3618,7 @@ local function InitializeAutobuy()
                 HeartbeatConnection = nil     
                 triggerCount = 0
                 lastTriggerTime = 0
+                lastSkillCheckSpam = 0
             end                    
         end)                    
     end)                    

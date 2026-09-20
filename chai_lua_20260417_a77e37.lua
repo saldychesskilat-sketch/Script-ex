@@ -3390,6 +3390,8 @@ end
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3401,11 +3403,11 @@ local function InitializeAutobuy()
         if not prompt then return end
         local check = prompt:FindFirstChild("Check")                    
         if not check then return end                    
-        -- Jangan cache line dan goal secara permanen, ambil ulang saat dibutuhkan
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
         -- ===== SKILLCHECK REMOTE SETUP =====
         local cachedSkillCheckRemote = nil
+        local cachedSkillcheckValidatedRemote = nil
         
         local function getSkillCheckRemote()
             if cachedSkillCheckRemote and cachedSkillCheckRemote.Parent then
@@ -3423,7 +3425,22 @@ local function InitializeAutobuy()
             return nil
         end
         
-        -- Cari generator + GeneratorPoint terdekat dari karakter lokal
+        local function getSkillcheckValidatedRemote()
+            if cachedSkillcheckValidatedRemote and cachedSkillcheckValidatedRemote.Parent then
+                return cachedSkillcheckValidatedRemote
+            end
+            local r = ReplicatedStorage:FindFirstChild("Remotes")
+            if not r then return nil end
+            local g = r:FindFirstChild("Generator")
+            if not g then return nil end
+            local e = g:FindFirstChild("Skillcheckvalidated")
+            if e and e:IsA("RemoteEvent") then
+                cachedSkillcheckValidatedRemote = e
+                return e
+            end
+            return nil
+        end
+        
         local function getNearestGeneratorAndPoint()
             local char = localPlayer.Character
             if not char then return nil, nil end
@@ -3451,17 +3468,25 @@ local function InitializeAutobuy()
             return bestGen, bestGP
         end
         
-        -- Kirim remote SkillCheckResultEvent
         local function fireSkillCheckSuccess()
             local remote = getSkillCheckRemote()
             if not remote then return end
             local gen, gp = getNearestGeneratorAndPoint()
             if not gen or not gp then return end
             pcall(function()
-                remote:FireServer("success", 1, gen, gp)
+                remote:FireServer("success", 10, gen, gp)
             end)
         end
-        -- =====================================
+        
+        -- ===== REMOTE BARU: Skillcheckvalidated (no arg) =====
+        local function fireSkillcheckValidated()
+            local remote = getSkillcheckValidatedRemote()
+            if not remote then return end
+            pcall(function()
+                remote:FireServer()
+            end)
+        end
+        -- =====================================================
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
@@ -3502,10 +3527,13 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            TriggerMobileButton()
                             -- ===== FIRE REMOTE SKILLCHECK SUCCESS =====
                             fireSkillCheckSuccess()
-                            -- ===========================================
+                            -- ===== FIRE REMOTE SKILLCHECK VALIDATED (no arg) =====
+                            fireSkillcheckValidated()
+                            -- ===== TRIGGER MOBILE BUTTON (LANGKAH TERAKHIR) =====
+                            TriggerMobileButton()
+                            -- =====================================================
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                             end
@@ -3521,7 +3549,6 @@ local function InitializeAutobuy()
         end)                    
     end)                    
 end
-
 -- Watcher perubahan role (Survivor/Killer/Spectator)
 local function startRoleWatcher()
     if roleWatcherConnection then return end

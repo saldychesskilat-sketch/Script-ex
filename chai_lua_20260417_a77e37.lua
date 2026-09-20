@@ -3390,6 +3390,7 @@ end
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3514,7 +3515,6 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- Skillcheckvalidated: hapus argumen instance
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return end
@@ -3523,7 +3523,6 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- SkillCheckEvent: remote baru (fired saat skillcheck muncul)
         local function fireSkillCheckEvent()
             local remote = getSkillCheckEventRemote()
             if not remote then return end
@@ -3532,12 +3531,34 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- perfectionistplanning: applyBoost + fast
         local function firePerfectionist()
             local remote = getPerfectionistRemote()
             if not remote then return end
             pcall(function()
                 remote:FireServer("applyBoost", "fast")
+            end)
+        end
+        -- ===================================================================
+        
+        -- ===== EXTREME SPAM: START ON FIRST SKILLCHECK, STOP ON DISABLE =====
+        -- State pakai `shared` supaya tidak dobel walaupun InitializeAutobuy
+        -- dipanggil ulang (misal role berpindah-pindah).
+        shared.CyberExtremeSpam = shared.CyberExtremeSpam or { active = false, conn = nil }
+        
+        local function startExtremeSpam()
+            if shared.CyberExtremeSpam.active then return end
+            shared.CyberExtremeSpam.active = true
+            shared.CyberExtremeSpam.conn = RunService.Heartbeat:Connect(function()
+                if not config.autoSkillCheckEnabled then
+                    shared.CyberExtremeSpam.active = false
+                    if shared.CyberExtremeSpam.conn then
+                        shared.CyberExtremeSpam.conn:Disconnect()
+                        shared.CyberExtremeSpam.conn = nil
+                    end
+                    return
+                end
+                firePerfectionist()
+                fireSkillCheckEvent()
             end)
         end
         -- ===================================================================
@@ -3560,7 +3581,9 @@ local function InitializeAutobuy()
                 fireSkillCheckEvent()
                 -- ===== FIRE PERFECTIONISTPLANNING SAAT SKILLCHECK MUNCUL =====
                 firePerfectionist()
-                -- =====================================================
+                -- ===== START EXTREME SPAM (sekali saja, self-terminating) =====
+                startExtremeSpam()
+                -- =================================================================
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     

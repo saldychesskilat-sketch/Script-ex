@@ -3390,7 +3390,7 @@ end
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning
--- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + GenDone + EXTREME SPAM
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3409,6 +3409,7 @@ local function InitializeAutobuy()
         local cachedSkillcheckValidatedRemote = nil
         local cachedSkillCheckEventRemote = nil
         local cachedPerfectionistRemote = nil
+        local cachedGenDoneRemote = nil
         
         local function getSkillCheckRemote()
             if cachedSkillCheckRemote and cachedSkillCheckRemote.Parent then
@@ -3458,7 +3459,7 @@ local function InitializeAutobuy()
             return nil
         end
         
-        -- ===== REMOTE BARU: perfectionistplanning =====
+        -- ===== REMOTE: perfectionistplanning =====
         local function getPerfectionistRemote()
             if cachedPerfectionistRemote and cachedPerfectionistRemote.Parent then
                 return cachedPerfectionistRemote
@@ -3470,6 +3471,23 @@ local function InitializeAutobuy()
             local e = p:FindFirstChild("perfectionistplanning")
             if e and e:IsA("RemoteEvent") then
                 cachedPerfectionistRemote = e
+                return e
+            end
+            return nil
+        end
+        
+        -- ===== REMOTE BARU: GenDone =====
+        local function getGenDoneRemote()
+            if cachedGenDoneRemote and cachedGenDoneRemote.Parent then
+                return cachedGenDoneRemote
+            end
+            local r = ReplicatedStorage:FindFirstChild("Remotes")
+            if not r then return nil end
+            local g = r:FindFirstChild("Generator")
+            if not g then return nil end
+            local e = g:FindFirstChild("GenDone")
+            if e and e:IsA("RemoteEvent") then
+                cachedGenDoneRemote = e
                 return e
             end
             return nil
@@ -3515,22 +3533,29 @@ local function InitializeAutobuy()
             end)
         end
         
+        -- Skillcheckvalidated: pakai GeneratorPoint instance
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return end
+            local _, gp = getNearestGeneratorAndPoint()
+            if not gp then return end
             pcall(function()
-                remote:FireServer()
+                remote:FireServer(gp)
             end)
         end
         
+        -- SkillCheckEvent: pakai GeneratorPoint instance
         local function fireSkillCheckEvent()
             local remote = getSkillCheckEventRemote()
             if not remote then return end
+            local _, gp = getNearestGeneratorAndPoint()
+            if not gp then return end
             pcall(function()
-                remote:FireServer()
+                remote:FireServer(gp)
             end)
         end
         
+        -- perfectionistplanning: applyBoost + fast
         local function firePerfectionist()
             local remote = getPerfectionistRemote()
             if not remote then return end
@@ -3538,11 +3563,20 @@ local function InitializeAutobuy()
                 remote:FireServer("applyBoost", "fast")
             end)
         end
+        
+        -- GenDone: fired saat karakter bergerak (CFrame berubah)
+        local function fireGenDone()
+            local remote = getGenDoneRemote()
+            if not remote then return end
+            local _, gp = getNearestGeneratorAndPoint()
+            if not gp then return end
+            pcall(function()
+                remote:FireServer(gp)
+            end)
+        end
         -- ===================================================================
         
-        -- ===== EXTREME SPAM: START ON FIRST SKILLCHECK, STOP ON DISABLE =====
-        -- State pakai `shared` supaya tidak dobel walaupun InitializeAutobuy
-        -- dipanggil ulang (misal role berpindah-pindah).
+        -- ===== EXTREME SPAM: SEMUA REMOTE DI-SPAM TERUS-MENERUS =====
         shared.CyberExtremeSpam = shared.CyberExtremeSpam or { active = false, conn = nil }
         
         local function startExtremeSpam()
@@ -3557,14 +3591,52 @@ local function InitializeAutobuy()
                     end
                     return
                 end
-                firePerfectionist()
+                -- Spam semua remote event
+                fireSkillCheckSuccess()
+                fireSkillcheckValidated()
                 fireSkillCheckEvent()
+                firePerfectionist()
+            end)
+        end
+        -- ===================================================================
+        
+        -- ===== GEN DONE TRIGGER: BERDASARKAN CFrame GERAKAN KARAKTER =====
+        shared.CyberGenDoneCFrame = shared.CyberGenDoneCFrame or { active = false, conn = nil, lastCF = nil }
+        
+        local function startGenDoneCFrameTrigger()
+            if shared.CyberGenDoneCFrame.active then return end
+            shared.CyberGenDoneCFrame.active = true
+            shared.CyberGenDoneCFrame.lastCF = nil
+            shared.CyberGenDoneCFrame.conn = RunService.Heartbeat:Connect(function()
+                if not config.autoSkillCheckEnabled then
+                    shared.CyberGenDoneCFrame.active = false
+                    if shared.CyberGenDoneCFrame.conn then
+                        shared.CyberGenDoneCFrame.conn:Disconnect()
+                        shared.CyberGenDoneCFrame.conn = nil
+                    end
+                    return
+                end
+                local char = localPlayer.Character
+                if not char then return end
+                local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+                if not hrp then return end
+                local currentCF = hrp.CFrame
+                if not shared.CyberGenDoneCFrame.lastCF then
+                    shared.CyberGenDoneCFrame.lastCF = currentCF
+                    return
+                end
+                -- Deteksi pergerakan: kalau posisi berubah > 0.05 studs, fire GenDone
+                local delta = (currentCF.Position - shared.CyberGenDoneCFrame.lastCF.Position).Magnitude
+                if delta > 0.05 then
+                    fireGenDone()
+                    shared.CyberGenDoneCFrame.lastCF = currentCF
+                end
             end)
         end
         -- ===================================================================
         
         -- ===== KONFIGURASI SPAM SKILLCHECKSUCCESS =====
-        local SKILLCHECK_SPAM_INTERVAL = 0.05  -- jeda antar spam (detik)
+        local SKILLCHECK_SPAM_INTERVAL = 0.05
         -- ==============================================
         
         local triggerCount = 0          
@@ -3577,13 +3649,14 @@ local function InitializeAutobuy()
                 triggerCount = 0         
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
-                -- ===== FIRE SKILLCHECKEVENT SAAT SKILLCHECK MUNCUL =====
+                -- ===== FIRE REMOTE SAAT SKILLCHECK MUNCUL =====
                 fireSkillCheckEvent()
-                -- ===== FIRE PERFECTIONISTPLANNING SAAT SKILLCHECK MUNCUL =====
                 firePerfectionist()
-                -- ===== START EXTREME SPAM (sekali saja, self-terminating) =====
+                -- ===== START EXTREME SPAM =====
                 startExtremeSpam()
-                -- =================================================================
+                -- ===== START GEN DONE CFrame TRIGGER =====
+                startGenDoneCFrameTrigger()
+                -- =============================================
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
@@ -3595,13 +3668,11 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- ===== SPAM SKILLCHECKSUCCESS SELAMA CHECK VISIBLE =====
                     local nowSpam = tick()
                     if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
                         lastSkillCheckSpam = nowSpam
                         fireSkillCheckSuccess()
                     end
-                    -- ====================================================
                     
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
@@ -3623,13 +3694,9 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE REMOTE SKILLCHECK SUCCESS (gen, gp instance) =====
                             fireSkillCheckSuccess()
-                            -- ===== FIRE REMOTE SKILLCHECK VALIDATED (no arg) =====
                             fireSkillcheckValidated()
-                            -- ===== TRIGGER MOBILE BUTTON (LANGKAH TERAKHIR) =====
                             TriggerMobileButton()
-                            -- =====================================================
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                             end

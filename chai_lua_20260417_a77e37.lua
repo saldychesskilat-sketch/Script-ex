@@ -3389,7 +3389,6 @@ end
 
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
--- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent
 local function InitializeAutobuy()                    
     task.spawn(function()                    
@@ -3515,20 +3514,14 @@ local function InitializeAutobuy()
         end
         -- ===================================================================
         
-        -- ===== KONFIGURASI SPAM SKILLCHECKSUCCESS =====
-        local SKILLCHECK_SPAM_INTERVAL = 0.05  -- jeda antar spam (detik)
-        -- ==============================================
-        
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
-        local lastSkillCheckSpam = 0
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
-                lastSkillCheckSpam = 0
                 -- ===== FIRE SKILLCHECKEVENT SAAT SKILLCHECK MUNCUL =====
                 fireSkillCheckEvent()
                 -- =====================================================
@@ -3542,14 +3535,6 @@ local function InitializeAutobuy()
                         if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                         return
                     end
-                    
-                    -- ===== SPAM SKILLCHECKSUCCESS SELAMA CHECK VISIBLE =====
-                    local nowSpam = tick()
-                    if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
-                        lastSkillCheckSpam = nowSpam
-                        fireSkillCheckSuccess()
-                    end
-                    -- ====================================================
                     
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
@@ -3589,7 +3574,6 @@ local function InitializeAutobuy()
                 HeartbeatConnection = nil     
                 triggerCount = 0
                 lastTriggerTime = 0
-                lastSkillCheckSpam = 0
             end                    
         end)                    
     end)                    

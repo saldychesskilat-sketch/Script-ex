@@ -3398,7 +3398,7 @@ local function InitializeAutobuy()
         if not playerGui then return end                    
         local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")                    
         if not prompt then                    
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)                    
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 50)                    
         end                    
         if not prompt then return end
         local check = prompt:FindFirstChild("Check")                    
@@ -3474,7 +3474,7 @@ local function InitializeAutobuy()
             local gen, gp = getNearestGeneratorAndPoint()
             if not gen or not gp then return end
             pcall(function()
-                remote:FireServer("success", 10, gen, gp)
+                remote:FireServer("success", 1, gen, gp)
             end)
         end
         

@@ -3398,7 +3398,7 @@ local function InitializeAutobuy()
         if not playerGui then return end                    
         local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")                    
         if not prompt then                    
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 20)                    
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)                    
         end                    
         if not prompt then return end
         local check = prompt:FindFirstChild("Check")                    
@@ -3441,20 +3441,52 @@ local function InitializeAutobuy()
             return nil
         end
         
-        -- ===== REMOTE FIRE (argumen Generator/GeneratorPoint dihapus) =====
+        -- ===== CARI GENERATOR + GENERATORPOINT TERDEKAT =====
+        local function getNearestGeneratorAndPoint()
+            local char = localPlayer.Character
+            if not char then return nil, nil end
+            local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+            if not hrp then return nil, nil end
+            
+            local map = workspace:FindFirstChild("Map")
+            local gens = map and map:FindFirstChild("Generators")
+            if not gens then return nil, nil end
+            
+            local bestGen, bestGP, bestDist = nil, nil, math.huge
+            for _, gen in ipairs(gens:GetChildren()) do
+                for i = 1, 4 do
+                    local gp = gen:FindFirstChild("GeneratorPoint" .. i)
+                    if gp and gp:IsA("BasePart") then
+                        local dist = (hrp.Position - gp.Position).Magnitude
+                        if dist < bestDist then
+                            bestDist = dist
+                            bestGen = gen
+                            bestGP = gp
+                        end
+                    end
+                end
+            end
+            return bestGen, bestGP
+        end
+        
+        -- ===== REMOTE FIRE (argumen Generator/GeneratorPoint sebagai instance) =====
         local function fireSkillCheckSuccess()
             local remote = getSkillCheckRemote()
             if not remote then return end
+            local gen, gp = getNearestGeneratorAndPoint()
+            if not gen or not gp then return end
             pcall(function()
-                remote:FireServer("success", 50)
+                remote:FireServer("success", 1, gen, gp)
             end)
         end
         
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return end
+            local gen, gp = getNearestGeneratorAndPoint()
+            if not gen or not gp then return end
             pcall(function()
-                remote:FireServer()
+                remote:FireServer(gen, gp)
             end)
         end
         -- ===================================================================
@@ -3471,7 +3503,6 @@ local function InitializeAutobuy()
         end
         
         local function applyRepairBoost()
-            -- Hapus clone lama kalau ada
             if repairBoostClone then
                 pcall(function() repairBoostClone:Destroy() end)
                 repairBoostClone = nil
@@ -3481,14 +3512,11 @@ local function InitializeAutobuy()
             local ok, clone = pcall(function() return template:Clone() end)
             if not ok or not clone then return end
             clone.Name = "Repairboost_Active"
-            -- Coba masukkan ke beberapa lokasi umum supaya LocalScript game bisa mendeteksi
             local success = false
-            -- 1) PlayerGui
             pcall(function()
                 clone.Parent = playerGui
                 success = true
             end)
-            -- 2) Character (kalau ada)
             if not success then
                 local char = localPlayer.Character
                 if char then
@@ -3498,7 +3526,6 @@ local function InitializeAutobuy()
                     end)
                 end
             end
-            -- 3) Backpack (fallback terakhir)
             if not success then
                 local bp = localPlayer:FindFirstChild("Backpack")
                 if bp then
@@ -3561,9 +3588,9 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE REMOTE SKILLCHECK SUCCESS (no gen/gp) =====
+                            -- ===== FIRE REMOTE SKILLCHECK SUCCESS (gen, gp instance) =====
                             fireSkillCheckSuccess()
-                            -- ===== FIRE REMOTE SKILLCHECK VALIDATED (no arg) =====
+                            -- ===== FIRE REMOTE SKILLCHECK VALIDATED (gen, gp instance) =====
                             fireSkillcheckValidated()
                             -- ===== TRIGGER MOBILE BUTTON (LANGKAH TERAKHIR) =====
                             TriggerMobileButton()

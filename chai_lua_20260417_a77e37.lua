@@ -3391,14 +3391,14 @@ end
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated
--- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + Repairboost
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
         if not playerGui then return end                    
         local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")                    
         if not prompt then                    
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 50)                    
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)                    
         end                    
         if not prompt then return end
         local check = prompt:FindFirstChild("Check")                    
@@ -3441,44 +3441,15 @@ local function InitializeAutobuy()
             return nil
         end
         
-        local function getNearestGeneratorAndPoint()
-            local char = localPlayer.Character
-            if not char then return nil, nil end
-            local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-            if not hrp then return nil, nil end
-            
-            local map = workspace:FindFirstChild("Map")
-            local gens = map and map:FindFirstChild("Generators")
-            if not gens then return nil, nil end
-            
-            local bestGen, bestGP, bestDist = nil, nil, math.huge
-            for _, gen in ipairs(gens:GetChildren()) do
-                for i = 1, 4 do
-                    local gp = gen:FindFirstChild("GeneratorPoint" .. i)
-                    if gp and gp:IsA("BasePart") then
-                        local dist = (hrp.Position - gp.Position).Magnitude
-                        if dist < bestDist then
-                            bestDist = dist
-                            bestGen = gen
-                            bestGP = gp
-                        end
-                    end
-                end
-            end
-            return bestGen, bestGP
-        end
-        
+        -- ===== REMOTE FIRE (argumen Generator/GeneratorPoint dihapus) =====
         local function fireSkillCheckSuccess()
             local remote = getSkillCheckRemote()
             if not remote then return end
-            local gen, gp = getNearestGeneratorAndPoint()
-            if not gen or not gp then return end
             pcall(function()
-                remote:FireServer("success", 1, gen, gp)
+                remote:FireServer("success", 1)
             end)
         end
         
-        -- ===== REMOTE BARU: Skillcheckvalidated (no arg) =====
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return end
@@ -3486,7 +3457,67 @@ local function InitializeAutobuy()
                 remote:FireServer()
             end)
         end
-        -- =====================================================
+        -- ===================================================================
+        
+        -- ===== REPAIRBOOST IMAGE INJECTION =====
+        local repairBoostClone = nil
+        
+        local function getRepairBoostTemplate()
+            local values = ReplicatedStorage:FindFirstChild("Values")
+            if not values then return nil end
+            local attrs = values:FindFirstChild("attributes")
+            if not attrs then return nil end
+            return attrs:FindFirstChild("Repairboost")
+        end
+        
+        local function applyRepairBoost()
+            -- Hapus clone lama kalau ada
+            if repairBoostClone then
+                pcall(function() repairBoostClone:Destroy() end)
+                repairBoostClone = nil
+            end
+            local template = getRepairBoostTemplate()
+            if not template then return end
+            local ok, clone = pcall(function() return template:Clone() end)
+            if not ok or not clone then return end
+            clone.Name = "Repairboost_Active"
+            -- Coba masukkan ke beberapa lokasi umum supaya LocalScript game bisa mendeteksi
+            local success = false
+            -- 1) PlayerGui
+            pcall(function()
+                clone.Parent = playerGui
+                success = true
+            end)
+            -- 2) Character (kalau ada)
+            if not success then
+                local char = localPlayer.Character
+                if char then
+                    pcall(function()
+                        clone.Parent = char
+                        success = true
+                    end)
+                end
+            end
+            -- 3) Backpack (fallback terakhir)
+            if not success then
+                local bp = localPlayer:FindFirstChild("Backpack")
+                if bp then
+                    pcall(function()
+                        clone.Parent = bp
+                        success = true
+                    end)
+                end
+            end
+            repairBoostClone = success and clone or nil
+        end
+        
+        local function removeRepairBoost()
+            if repairBoostClone then
+                pcall(function() repairBoostClone:Destroy() end)
+                repairBoostClone = nil
+            end
+        end
+        -- =====================================
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
@@ -3496,6 +3527,9 @@ local function InitializeAutobuy()
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
+                -- ===== APPLY REPAIRBOOST SAAT SKILLCHECK MUNCUL =====
+                applyRepairBoost()
+                -- =====================================================
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
@@ -3527,7 +3561,7 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE REMOTE SKILLCHECK SUCCESS =====
+                            -- ===== FIRE REMOTE SKILLCHECK SUCCESS (no gen/gp) =====
                             fireSkillCheckSuccess()
                             -- ===== FIRE REMOTE SKILLCHECK VALIDATED (no arg) =====
                             fireSkillcheckValidated()
@@ -3545,6 +3579,9 @@ local function InitializeAutobuy()
                 HeartbeatConnection = nil     
                 triggerCount = 0
                 lastTriggerTime = 0
+                -- ===== REMOVE REPAIRBOOST SAAT SKILLCHECK HILANG =====
+                removeRepairBoost()
+                -- =====================================================
             end                    
         end)                    
     end)                    

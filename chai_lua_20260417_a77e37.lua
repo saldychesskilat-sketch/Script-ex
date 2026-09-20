@@ -3476,7 +3476,7 @@ local function InitializeAutobuy()
             return nil
         end
         
-        -- ===== REMOTE BARU: GenDone =====
+        -- ===== REMOTE: GenDone =====
         local function getGenDoneRemote()
             if cachedGenDoneRemote and cachedGenDoneRemote.Parent then
                 return cachedGenDoneRemote
@@ -3523,6 +3523,7 @@ local function InitializeAutobuy()
         end
         
         -- ===== REMOTE FIRE =====
+        -- 1) SkillCheckResultEvent: pakai GeneratorPoint instance
         local function fireSkillCheckSuccess()
             local remote = getSkillCheckRemote()
             if not remote then return end
@@ -3533,7 +3534,7 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- Skillcheckvalidated: pakai GeneratorPoint instance
+        -- 2) Skillcheckvalidated: pakai GeneratorPoint instance
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return end
@@ -3544,7 +3545,7 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- SkillCheckEvent: pakai GeneratorPoint instance
+        -- 3) SkillCheckEvent: pakai GeneratorPoint instance
         local function fireSkillCheckEvent()
             local remote = getSkillCheckEventRemote()
             if not remote then return end
@@ -3555,7 +3556,7 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- perfectionistplanning: applyBoost + fast
+        -- 4) perfectionistplanning: TANPA GeneratorPoint
         local function firePerfectionist()
             local remote = getPerfectionistRemote()
             if not remote then return end
@@ -3564,19 +3565,17 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- GenDone: fired saat karakter bergerak (CFrame berubah)
+        -- 5) GenDone: TANPA GeneratorPoint (hapus instance)
         local function fireGenDone()
             local remote = getGenDoneRemote()
             if not remote then return end
-            local _, gp = getNearestGeneratorAndPoint()
-            if not gp then return end
             pcall(function()
-                remote:FireServer(gp)
+                remote:FireServer()
             end)
         end
         -- ===================================================================
         
-        -- ===== EXTREME SPAM: SEMUA REMOTE DI-SPAM TERUS-MENERUS =====
+        -- ===== EXTREME SPAM: HANYA SPAM 2 REMOTE (SUCCESS + EVENT) =====
         shared.CyberExtremeSpam = shared.CyberExtremeSpam or { active = false, conn = nil }
         
         local function startExtremeSpam()
@@ -3591,11 +3590,9 @@ local function InitializeAutobuy()
                     end
                     return
                 end
-                -- Spam semua remote event
+                -- Spam HANYA 2 remote (skillcheckvalidated & perfectionist dikeluarkan)
                 fireSkillCheckSuccess()
-                fireSkillcheckValidated()
                 fireSkillCheckEvent()
-                firePerfectionist()
             end)
         end
         -- ===================================================================
@@ -3625,7 +3622,6 @@ local function InitializeAutobuy()
                     shared.CyberGenDoneCFrame.lastCF = currentCF
                     return
                 end
-                -- Deteksi pergerakan: kalau posisi berubah > 0.05 studs, fire GenDone
                 local delta = (currentCF.Position - shared.CyberGenDoneCFrame.lastCF.Position).Magnitude
                 if delta > 0.05 then
                     fireGenDone()

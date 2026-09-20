@@ -3927,6 +3927,20 @@ local function startAutoAim()
     local fireRemote = twist:FindFirstChild("Fire")
     local resultRemote = twist:FindFirstChild("Result")
 
+    -- ===== Ambil semua nama skin (dari folder Skins + fallback manual) =====
+    local skinNames = {}
+    local skinsFolder = twist:FindFirstChild("Skins")
+    if skinsFolder then
+        for _, skin in ipairs(skinsFolder:GetChildren()) do
+            skinNames[skin.Name:lower()] = true
+        end
+    end
+    -- Tambahan nama skin yang diberikan user
+    for _, n in ipairs({"Awp", "Default", "Emperor", "Golden Gun", "SCP-3108"}) do
+        skinNames[n:lower()] = true
+    end
+    -- ====================================================================
+
     local character = game:GetService("Players").LocalPlayer.Character
     local gun = nil
 
@@ -3935,21 +3949,40 @@ local function startAutoAim()
         if tool then
             local rightArm = tool:FindFirstChild("Right Arm")
 
-            -- Prioritas 1: cari langsung di "Right Arm" (nama apa saja, kecuali Motor6D/Weld/Attachment)
+            -- Prioritas 1: cari langsung di "Right Arm" yang namanya match dengan skin
             if rightArm then
                 for _, child in ipairs(rightArm:GetChildren()) do
-                    if (child:IsA("MeshPart") or child:IsA("Model") or child:IsA("Part"))
-                        and not child:IsA("Motor6D")
-                        and not child:IsA("Weld")
-                        and not child:IsA("Attachment")
-                    then
+                    if skinNames[child.Name:lower()] then
+                        gun = child
+                        break
+                    end
+                end
+                -- Fallback: ambil MeshPart/Model/Part pertama di Right Arm
+                if not gun then
+                    for _, child in ipairs(rightArm:GetChildren()) do
+                        if (child:IsA("MeshPart") or child:IsA("Model") or child:IsA("Part"))
+                            and not child:IsA("Motor6D")
+                            and not child:IsA("Weld")
+                            and not child:IsA("Attachment")
+                        then
+                            gun = child
+                            break
+                        end
+                    end
+                end
+            end
+
+            -- Prioritas 2: cari anak tool yang namanya match skin
+            if not gun then
+                for _, child in ipairs(tool:GetChildren()) do
+                    if skinNames[child.Name:lower()] then
                         gun = child
                         break
                     end
                 end
             end
 
-            -- Prioritas 2: cari di descendant tool kalau Right Arm kosong (skip bagian tubuh karakter)
+            -- Prioritas 3: cari anak tool yang MeshPart/Model/Part
             if not gun then
                 for _, child in ipairs(tool:GetChildren()) do
                     if (child:IsA("MeshPart") or child:IsA("Model") or child:IsA("Part")) then
@@ -3959,7 +3992,17 @@ local function startAutoAim()
                 end
             end
 
-            -- Prioritas 3: scan descendant, cari MeshPart/Model yang bukan bagian Right Arm / Left Arm
+            -- Prioritas 4: scan descendant yang namanya match skin
+            if not gun then
+                for _, obj in ipairs(tool:GetDescendants()) do
+                    if skinNames[obj.Name:lower()] then
+                        gun = obj
+                        break
+                    end
+                end
+            end
+
+            -- Prioritas 5: scan descendant MeshPart/Model
             if not gun then
                 for _, obj in ipairs(tool:GetDescendants()) do
                     if obj:IsA("MeshPart") or obj:IsA("Model") then
@@ -3989,15 +4032,15 @@ local function fireInfShot()
     pcall(function() char:SetAttribute("Aiming", true) end)
 
     local fireRemote, _, gun = getFireRemotes()
-    -- FORMAT OPSI 15: FireServer(gun, lookVector)
+    -- FORMAT: FireServer(gun, lookVector, "shoot")
     if fireRemote and fireRemote:IsA("RemoteEvent") and gun then
         pcall(function()
-            fireRemote:FireServer(gun, camera.CFrame.LookVector)
+            fireRemote:FireServer(gun, camera.CFrame.LookVector, "shoot")
         end)
     end
 
     pcall(function() char:SetAttribute("Aiming", false) end)
-end
+    end
         -- ========== HIDDEN MECHANISM: SPAM SETELAH HOLD > 5 DETIK ==========
     local holdSpamTimer = nil
     local holdSpamActive = false

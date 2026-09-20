@@ -3474,7 +3474,7 @@ local function InitializeAutobuy()
             local gen, gp = getNearestGeneratorAndPoint()
             if not gen or not gp then return end
             pcall(function()
-                remote:FireServer("success", 100, gen, gp)
+                remote:FireServer("success", 50, gen, gp)
             end)
         end
         

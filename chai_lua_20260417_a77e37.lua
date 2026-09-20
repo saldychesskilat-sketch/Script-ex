@@ -3398,7 +3398,7 @@ local function InitializeAutobuy()
         if not playerGui then return end                    
         local prompt = playerGui:FindFirstChild("SkillCheckPromptGui")                    
         if not prompt then                    
-            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 10)                    
+            prompt = playerGui:WaitForChild("SkillCheckPromptGui", 20)                    
         end                    
         if not prompt then return end
         local check = prompt:FindFirstChild("Check")                    
@@ -3446,7 +3446,7 @@ local function InitializeAutobuy()
             local remote = getSkillCheckRemote()
             if not remote then return end
             pcall(function()
-                remote:FireServer("success", 1)
+                remote:FireServer("success", 50)
             end)
         end
         

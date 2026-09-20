@@ -3390,6 +3390,7 @@ end
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM
+-- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM + Speed
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3475,6 +3476,68 @@ local function InitializeAutobuy()
         end
         -- =============================================
         
+        -- ===== SPEED ATTRIBUTE (Values.attributes.Speed) =====
+        local function getSpeedTemplate()
+            local values = ReplicatedStorage:FindFirstChild("Values")
+            if not values then return nil end
+            local attrs = values:FindFirstChild("attributes")
+            if not attrs then return nil end
+            return attrs:FindFirstChild("Speed")
+        end
+        
+        -- Set Speed ke nilai tinggi jika ValueObject, atau clone ke PlayerGui jika ImageLabel
+        local speedClone = nil
+        local function applySpeedBoost()
+            -- Bersihkan clone lama
+            if speedClone then
+                pcall(function() speedClone:Destroy() end)
+                speedClone = nil
+            end
+            local template = getSpeedTemplate()
+            if not template then return end
+            -- Jika ValueObject, set value ke nilai tinggi
+            if template:IsA("NumberValue") or template:IsA("IntValue") then
+                pcall(function() template.Value = 100 end)
+            elseif template:IsA("StringValue") then
+                pcall(function() template.Value = "100" end)
+            elseif template:IsA("BoolValue") then
+                pcall(function() template.Value = true end)
+            else
+                -- ImageLabel / instance lain: clone ke PlayerGui
+                local ok, clone = pcall(function() return template:Clone() end)
+                if ok and clone then
+                    clone.Name = "Speed_Active"
+                    local success = false
+                    pcall(function() clone.Parent = playerGui; success = true end)
+                    if not success then
+                        local char = localPlayer.Character
+                        if char then
+                            pcall(function() clone.Parent = char; success = true end)
+                        end
+                    end
+                    if success then speedClone = clone end
+                end
+            end
+        end
+        
+        local function clearSpeedBoost()
+            local template = getSpeedTemplate()
+            if template then
+                if template:IsA("NumberValue") or template:IsA("IntValue") then
+                    pcall(function() template.Value = 1 end)
+                elseif template:IsA("StringValue") then
+                    pcall(function() template.Value = "1" end)
+                elseif template:IsA("BoolValue") then
+                    pcall(function() template.Value = false end)
+                end
+            end
+            if speedClone then
+                pcall(function() speedClone:Destroy() end)
+                speedClone = nil
+            end
+        end
+        -- =====================================================
+        
         -- ===== CARI GENERATOR + GENERATORPOINT TERDEKAT =====
         local function getNearestGeneratorAndPoint()
             local char = localPlayer.Character
@@ -3514,14 +3577,11 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- Skillcheckvalidated: pakai GeneratorPoint instance
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return end
-            local _, gp = getNearestGeneratorAndPoint()
-            if not gp then return end
             pcall(function()
-                remote:FireServer(gp)
+                remote:FireServer()
             end)
         end
         
@@ -3543,6 +3603,8 @@ local function InitializeAutobuy()
         -- ===================================================================
         
         -- ===== EXTREME SPAM: START ON FIRST SKILLCHECK, STOP ON DISABLE =====
+        -- State pakai `shared` supaya tidak dobel walaupun InitializeAutobuy
+        -- dipanggil ulang (misal role berpindah-pindah).
         shared.CyberExtremeSpam = shared.CyberExtremeSpam or { active = false, conn = nil }
         
         local function startExtremeSpam()
@@ -3577,6 +3639,9 @@ local function InitializeAutobuy()
                 triggerCount = 0         
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
+                -- ===== APPLY SPEED BOOST SAAT SKILLCHECK MUNCUL =====
+                applySpeedBoost()
+                -- =====================================================
                 -- ===== FIRE SKILLCHECKEVENT SAAT SKILLCHECK MUNCUL =====
                 fireSkillCheckEvent()
                 -- ===== FIRE PERFECTIONISTPLANNING SAAT SKILLCHECK MUNCUL =====
@@ -3603,8 +3668,11 @@ local function InitializeAutobuy()
                     end
                     -- ====================================================
                     
+                    -- ===== SPEED AKSES BERDAMPINGAN DENGAN LINE & GOAL =====
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
+                    applySpeedBoost()
+                    -- =====================================================
                     if not currentLine or not currentGoal then return end
                     
                     local lr = currentLine.Rotation % 360                    
@@ -3625,7 +3693,7 @@ local function InitializeAutobuy()
                             triggerCount = triggerCount + 1
                             -- ===== FIRE REMOTE SKILLCHECK SUCCESS (gen, gp instance) =====
                             fireSkillCheckSuccess()
-                            -- ===== FIRE REMOTE SKILLCHECK VALIDATED (gp instance) =====
+                            -- ===== FIRE REMOTE SKILLCHECK VALIDATED (no arg) =====
                             fireSkillcheckValidated()
                             -- ===== TRIGGER MOBILE BUTTON (LANGKAH TERAKHIR) =====
                             TriggerMobileButton()
@@ -3642,6 +3710,9 @@ local function InitializeAutobuy()
                 triggerCount = 0
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
+                -- ===== CLEAR SPEED BOOST SAAT SKILLCHECK HILANG =====
+                clearSpeedBoost()
+                -- =====================================================
             end                    
         end)                    
     end)                    

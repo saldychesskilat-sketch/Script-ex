@@ -3392,7 +3392,9 @@ end
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM + Speed
 -- Modifikasi InitializeAutobuy - REVAMP
+-- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: Skillcheckvalidated (variasi kombinasi argumen)
+-- Remote utama kedua: SkillCheckResultEvent (variasi kombinasi argumen sama)
 -- Remote pendukung: perfectionistplanning (firePerfectionist)
 -- Mobile button: fallback jika remote gagal kirim
 local function InitializeAutobuy()                    
@@ -3411,6 +3413,7 @@ local function InitializeAutobuy()
         -- ===== SKILLCHECK REMOTE SETUP =====
         local cachedSkillcheckValidatedRemote = nil
         local cachedPerfectionistRemote = nil
+        local cachedSkillCheckRemote = nil
         
         local function getSkillcheckValidatedRemote()
             if cachedSkillcheckValidatedRemote and cachedSkillcheckValidatedRemote.Parent then
@@ -3423,6 +3426,22 @@ local function InitializeAutobuy()
             local e = g:FindFirstChild("Skillcheckvalidated")
             if e and e:IsA("RemoteEvent") then
                 cachedSkillcheckValidatedRemote = e
+                return e
+            end
+            return nil
+        end
+        
+        local function getSkillCheckRemote()
+            if cachedSkillCheckRemote and cachedSkillCheckRemote.Parent then
+                return cachedSkillCheckRemote
+            end
+            local r = ReplicatedStorage:FindFirstChild("Remotes")
+            if not r then return nil end
+            local g = r:FindFirstChild("Generator")
+            if not g then return nil end
+            local e = g:FindFirstChild("SkillCheckResultEvent")
+            if e and e:IsA("RemoteEvent") then
+                cachedSkillCheckRemote = e
                 return e
             end
             return nil
@@ -3510,7 +3529,53 @@ local function InitializeAutobuy()
             
             local anySent = false
             for _, args in ipairs(variants) do
-                -- Validasi tidak ada nil di dalam args
+                local valid = true
+                for _, v in ipairs(args) do
+                    if v == nil then valid = false break end
+                end
+                if valid then
+                    local ok = pcall(function()
+                        if #args == 0 then
+                            remote:FireServer()
+                        else
+                            remote:FireServer(unpack(args))
+                        end
+                    end)
+                    if ok then anySent = true end
+                end
+            end
+            return anySent
+        end
+        
+        -- SkillCheckResultEvent: kirim semua variasi kombinasi argumen
+        -- (instance & argumen sama dengan fireSkillcheckValidated)
+        local function fireSkillCheckResult()
+            local remote = getSkillCheckRemote()
+            if not remote then return false end
+            local gen, gp = getNearestGeneratorAndPoint()
+            
+            -- Daftar variasi argumen
+            local variants = {}
+            -- Tanpa GeneratorPoint
+            table.insert(variants, {true})
+            table.insert(variants, {"success"})
+            table.insert(variants, {"success", 1})
+            table.insert(variants, {})
+            -- Dengan GeneratorPoint
+            if gp then
+                table.insert(variants, {gp})
+                table.insert(variants, {gp, true})
+                table.insert(variants, {true, gp})
+            end
+            -- Dengan Generator + GeneratorPoint
+            if gen and gp then
+                table.insert(variants, {gen, gp})
+                table.insert(variants, {"success", 1, gen, gp})
+                table.insert(variants, {true, gen, gp})
+            end
+            
+            local anySent = false
+            for _, args in ipairs(variants) do
                 local valid = true
                 for _, v in ipairs(args) do
                     if v == nil then valid = false break end
@@ -3558,13 +3623,14 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- ===== SPAM SKILLCHECKVALIDATED (SEMUA VARIAN) =====
+                    -- ===== SPAM SEMUA VARIAN REMOTE =====
                     local nowSpam = tick()
                     if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
                         lastSkillCheckSpam = nowSpam
-                        local sent = fireSkillcheckValidated()
-                        -- Fallback: jika remote gagal kirim, gunakan mobile button
-                        if not sent then
+                        local sent1 = fireSkillcheckValidated()
+                        local sent2 = fireSkillCheckResult()
+                        -- Fallback: jika semua remote gagal kirim, gunakan mobile button
+                        if not sent1 and not sent2 then
                             TriggerMobileButton()
                         end
                     end
@@ -3590,10 +3656,11 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE SKILLCHECKVALIDATED (SEMUA VARIAN) =====
-                            local sent = fireSkillcheckValidated()
+                            -- ===== FIRE SEMUA VARIAN REMOTE =====
+                            local sent1 = fireSkillcheckValidated()
+                            local sent2 = fireSkillCheckResult()
                             -- ===== MOBILE BUTTON: FEEDBACK / FALLBACK =====
-                            if not sent then
+                            if not sent1 and not sent2 then
                                 TriggerMobileButton()
                             end
                             -- =====================================================

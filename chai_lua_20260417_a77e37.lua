@@ -3403,7 +3403,10 @@ end
 -- Remote pendukung: perfectionistplanning (firePerfectionist)
 -- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: Skillcheckvalidated (variasi kombinasi argumen + line/goal)
+-- Modifikasi InitializeAutobuy - REVAMP
+-- Remote utama: Skillcheckvalidated (variasi kombinasi argumen + line/goal)
 -- Force Line → Goal sebelum kirim remote
+-- Deteksi GOAL BARU: trigger validated setiap goal appearance (bisa >2x per skillcheck)
 -- Remote pendukung: perfectionistplanning (firePerfectionist)
 -- Mobile button: fallback jika remote gagal kirim
 local function InitializeAutobuy()                    
@@ -3561,6 +3564,8 @@ local function InitializeAutobuy()
         
         -- ===== KONFIGURASI SPAM SKILLCHECKVALIDATED =====
         local SKILLCHECK_SPAM_INTERVAL = 0.05  -- jeda antar spam (detik)
+        local GOAL_CHANGE_THRESHOLD = 5        -- derajat, untuk deteksi goal baru
+        local MAX_FIRE_PER_GOAL = 3            -- fire maksimal per goal appearance
         -- ==================================================
         
         local triggerCount = 0          
@@ -3568,11 +3573,18 @@ local function InitializeAutobuy()
         local lastTriggerTime = 0
         local lastSkillCheckSpam = 0
         
+        -- State untuk deteksi goal appearance berganda
+        local lastGoalRot = -999
+        local firedForCurrentGoal = 0
+        
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
+                -- Reset state goal appearance
+                lastGoalRot = -999
+                firedForCurrentGoal = 0
                 -- ===== FIRE PERFECTIONIST SAAT SKILLCHECK MUNCUL =====
                 firePerfectionist()
                 -- =====================================================
@@ -3587,17 +3599,31 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- ===== FORCE LINE BERTEMU DENGAN GOAL =====
+                    -- ===== DETEKSI GOAL APPEARANCE BARU =====
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
+                    local isNewGoal = false
                     if currentLine and currentGoal then
-                        -- Ambil posisi Goal, hitung titik tengah range (102..120) → 111
                         local gr = currentGoal.Rotation % 360
-                        local targetLineRotation = (gr + 111) % 360
-                        
-                        -- Set Line langsung ke tengah range Goal
-                        -- supaya "bertemu" dengan Goal, tidak perlu menunggu rotation natural
-                        currentLine.Rotation = targetLineRotation
+                        -- Jika rotasi Goal berubah > threshold → goal baru muncul
+                        if math.abs(gr - lastGoalRot) > GOAL_CHANGE_THRESHOLD then
+                            lastGoalRot = gr
+                            firedForCurrentGoal = 0
+                            isNewGoal = true
+                        end
+                        -- Force Line ke tengah range Goal
+                        currentLine.Rotation = (gr + 111) % 360
+                    end
+                    -- =========================================
+                    
+                    -- ===== FIRE UNTUK GOAL BARU =====
+                    if isNewGoal then
+                        -- Kirim validated untuk goal baru (langsung)
+                        local sentNew = fireSkillcheckValidated()
+                        if not sentNew then
+                            TriggerMobileButton()
+                        end
+                        firedForCurrentGoal = firedForCurrentGoal + 1
                     end
                     -- =========================================
                     
@@ -3605,10 +3631,16 @@ local function InitializeAutobuy()
                     local nowSpam = tick()
                     if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
                         lastSkillCheckSpam = nowSpam
-                        local sent = fireSkillcheckValidated()
-                        -- Fallback: jika remote gagal kirim, gunakan mobile button
-                        if not sent then
-                            TriggerMobileButton()
+                        -- Limit per goal untuk cegah over-fire, tapi reset setiap goal baru
+                        if firedForCurrentGoal < MAX_FIRE_PER_GOAL then
+                            local sent = fireSkillcheckValidated()
+                            if sent then
+                                firedForCurrentGoal = firedForCurrentGoal + 1
+                            end
+                            -- Fallback: jika remote gagal kirim, gunakan mobile button
+                            if not sent then
+                                TriggerMobileButton()
+                            end
                         end
                     end
                     -- ====================================================
@@ -3632,10 +3664,15 @@ local function InitializeAutobuy()
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
                             -- ===== FIRE SKILLCHECKVALIDATED (SEMUA VARIAN) =====
-                            local sent = fireSkillcheckValidated()
-                            -- ===== MOBILE BUTTON: FEEDBACK / FALLBACK =====
-                            if not sent then
-                                TriggerMobileButton()
+                            if firedForCurrentGoal < MAX_FIRE_PER_GOAL then
+                                local sent = fireSkillcheckValidated()
+                                if sent then
+                                    firedForCurrentGoal = firedForCurrentGoal + 1
+                                end
+                                -- ===== MOBILE BUTTON: FEEDBACK / FALLBACK =====
+                                if not sent then
+                                    TriggerMobileButton()
+                                end
                             end
                             -- =====================================================
                             if triggerCount >= MAX_TRIGGER then
@@ -3650,11 +3687,12 @@ local function InitializeAutobuy()
                 triggerCount = 0
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
+                lastGoalRot = -999
+                firedForCurrentGoal = 0
             end                    
         end)                    
     end)                    
 end
-
 -- Watcher perubahan role (Survivor/Killer/Spectator)
 local function startRoleWatcher()
     if roleWatcherConnection then return end

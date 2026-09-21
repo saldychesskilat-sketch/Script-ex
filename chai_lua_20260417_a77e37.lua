@@ -3410,8 +3410,7 @@ end
 -- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: Skillcheckvalidated (mekanisme sama seperti mobile button — spam tiap frame inRange)
 -- Switch trigger: >=89% progress → TriggerMobileButton, <89% → fireSkillcheckValidated
--- Remote pendukung: perfectionistplanning (firePerfectionist)
--- Mobile button: fallback jika remote gagal kirim
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3425,163 +3424,6 @@ local function InitializeAutobuy()
         if not check then return end                    
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
-        -- ===== SKILLCHECK REMOTE SETUP =====
-        local cachedSkillcheckValidatedRemote = nil
-        local cachedPerfectionistRemote = nil
-        
-        local function getSkillcheckValidatedRemote()
-            if cachedSkillcheckValidatedRemote and cachedSkillcheckValidatedRemote.Parent then
-                return cachedSkillcheckValidatedRemote
-            end
-            local r = ReplicatedStorage:FindFirstChild("Remotes")
-            if not r then return nil end
-            local g = r:FindFirstChild("Generator")
-            if not g then return nil end
-            local e = g:FindFirstChild("Skillcheckvalidated")
-            if e and e:IsA("RemoteEvent") then
-                cachedSkillcheckValidatedRemote = e
-                return e
-            end
-            return nil
-        end
-        
-        local function getPerfectionistRemote()
-            if cachedPerfectionistRemote and cachedPerfectionistRemote.Parent then
-                return cachedPerfectionistRemote
-            end
-            local r = ReplicatedStorage:FindFirstChild("Remotes")
-            if not r then return nil end
-            local p = r:FindFirstChild("Perks")
-            if not p then return nil end
-            local e = p:FindFirstChild("perfectionistplanning")
-            if e and e:IsA("RemoteEvent") then
-                cachedPerfectionistRemote = e
-                return e
-            end
-            return nil
-        end
-        
-        -- ===== CARI GENERATOR + GENERATORPOINT TERDEKAT =====
-        local function getNearestGeneratorAndPoint()
-            local char = localPlayer.Character
-            if not char then return nil, nil end
-            local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-            if not hrp then return nil, nil end
-            
-            local map = workspace:FindFirstChild("Map")
-            local gens = map and map:FindFirstChild("Generators")
-            if not gens then return nil, nil end
-            
-            local bestGen, bestGP, bestDist = nil, nil, math.huge
-            for _, gen in ipairs(gens:GetChildren()) do
-                for i = 1, 4 do
-                    local gp = gen:FindFirstChild("GeneratorPoint" .. i)
-                    if gp and gp:IsA("BasePart") then
-                        local dist = (hrp.Position - gp.Position).Magnitude
-                        if dist < bestDist then
-                            bestDist = dist
-                            bestGen = gen
-                            bestGP = gp
-                        end
-                    end
-                end
-            end
-            return bestGen, bestGP
-        end
-        
-        -- ===== GET GENERATOR PROGRESS =====
-        local function getGameValue(obj, name)
-            if not obj then return nil end
-            local attr = obj:GetAttribute(name)
-            if attr ~= nil then return attr end
-            local child = obj:FindFirstChild(name)
-            if child then
-                local ok, val = pcall(function() return child.Value end)
-                if ok then return val end
-            end
-            return nil
-        end
-        
-        local function getGeneratorProgress(generator)
-            if not generator or not generator.Parent then return 0 end
-            local percent = getGameValue(generator, "RepairProgress") 
-                         or getGameValue(generator, "Progress") 
-                         or 0
-            return tonumber(percent) or 0
-        end
-        -- =====================================
-        
-        -- ===== REMOTE FIRE =====
-        local function firePerfectionist()
-            local remote = getPerfectionistRemote()
-            if not remote then return end
-            pcall(function()
-                remote:FireServer("applyBoost", "fast")
-            end)
-        end
-        
-        -- Skillcheckvalidated: kirim semua variasi kombinasi argumen
-        local function fireSkillcheckValidated()
-            local remote = getSkillcheckValidatedRemote()
-            if not remote then return false end
-            local gen, gp = getNearestGeneratorAndPoint()
-            
-            local line = check:FindFirstChild("Line")
-            local goal = check:FindFirstChild("Goal")
-            
-            local baseVariants = {}
-            table.insert(baseVariants, {true})
-            table.insert(baseVariants, {"success"})
-            table.insert(baseVariants, {"success", 1})
-            table.insert(baseVariants, {})
-            if gp then
-                table.insert(baseVariants, {gp})
-                table.insert(baseVariants, {gp, true})
-                table.insert(baseVariants, {true, gp})
-            end
-            if gen and gp then
-                table.insert(baseVariants, {gen, gp})
-                table.insert(baseVariants, {"success", 1, gen, gp})
-                table.insert(baseVariants, {true, gen, gp})
-            end
-            
-            local variants = {}
-            for _, base in ipairs(baseVariants) do
-                if line then
-                    local withLine = {}
-                    for _, v in ipairs(base) do table.insert(withLine, v) end
-                    table.insert(withLine, line)
-                    table.insert(variants, withLine)
-                end
-                if goal then
-                    local withGoal = {}
-                    for _, v in ipairs(base) do table.insert(withGoal, v) end
-                    table.insert(withGoal, goal)
-                    table.insert(variants, withGoal)
-                end
-            end
-            
-            local anySent = false
-            for _, args in ipairs(variants) do
-                local valid = true
-                for _, v in ipairs(args) do
-                    if v == nil then valid = false break end
-                end
-                if valid then
-                    local ok = pcall(function()
-                        if #args == 0 then
-                            remote:FireServer()
-                        else
-                            remote:FireServer(unpack(args))
-                        end
-                    end)
-                    if ok then anySent = true end
-                end
-            end
-            return anySent
-        end
-        -- ===================================================================
-        
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
@@ -3590,9 +3432,6 @@ local function InitializeAutobuy()
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
-                -- ===== FIRE PERFECTIONIST SAAT SKILLCHECK MUNCUL =====
-                firePerfectionist()
-                -- =====================================================
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
@@ -3608,11 +3447,10 @@ local function InitializeAutobuy()
                     local currentGoal = check:FindFirstChild("Goal")
                     if not currentLine or not currentGoal then return end
                     
+                    -- ===== FORCE LINE BERTEMU DENGAN GOAL (konstan di tengah range) =====
                     local gr = currentGoal.Rotation % 360
-                    
-                    -- ===== FORCE LINE BERTEMU DENGAN GOAL (setiap frame) =====
                     currentLine.Rotation = (gr + 111) % 360
-                    -- =========================================================
+                    -- =====================================================================
                     
                     local lr = currentLine.Rotation % 360
                     local ss = (gr + 102) % 360                    
@@ -3624,35 +3462,19 @@ local function InitializeAutobuy()
                         if lr >= ss and lr <= se then inRange = true end                    
                     end                    
                     
-                    -- ===== MEKANISME SAMA DENGAN MOBILE BUTTON: SPAM SETIAP FRAME SAAT inRange =====
+                    -- ===== TRIGGER MOBILE BUTTON SAAT inRange =====
                     if inRange then
                         local now = tick()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            
-                            -- ===== CEK PROGRESS GENERATOR =====
-                            local gen, gp = getNearestGeneratorAndPoint()
-                            local progress = getGeneratorProgress(gen)
-                            
-                            if progress >= 89 then
-                                -- Progress >= 89% → langsung trigger mobile button
-                                TriggerMobileButton()
-                            else
-                                -- Progress < 89% → jalur normal (remote + fallback mobile)
-                                local sent = fireSkillcheckValidated()
-                                if not sent then
-                                    TriggerMobileButton()
-                                end
-                            end
-                            -- ===================================
-                            
+                            TriggerMobileButton()
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                             end
                         end
                     end
-                    -- ================================================================================
+                    -- =============================================
                 end)                    
             elseif HeartbeatConnection then     
                 HeartbeatConnection:Disconnect();     

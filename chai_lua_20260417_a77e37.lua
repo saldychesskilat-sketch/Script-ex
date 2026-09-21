@@ -3401,6 +3401,10 @@ end
 -- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: SkillCheckResultEvent (dulu) → Skillcheckvalidated (kemudian)
 -- Remote pendukung: perfectionistplanning (firePerfectionist)
+-- Modifikasi InitializeAutobuy - REVAMP
+-- Remote utama: Skillcheckvalidated (variasi kombinasi argumen + line/goal)
+-- Force Line → Goal sebelum kirim remote
+-- Remote pendukung: perfectionistplanning (firePerfectionist)
 -- Mobile button: fallback jika remote gagal kirim
 local function InitializeAutobuy()                    
     task.spawn(function()                    
@@ -3417,7 +3421,6 @@ local function InitializeAutobuy()
         
         -- ===== SKILLCHECK REMOTE SETUP =====
         local cachedSkillcheckValidatedRemote = nil
-        local cachedSkillCheckResultRemote = nil
         local cachedPerfectionistRemote = nil
         
         local function getSkillcheckValidatedRemote()
@@ -3431,22 +3434,6 @@ local function InitializeAutobuy()
             local e = g:FindFirstChild("Skillcheckvalidated")
             if e and e:IsA("RemoteEvent") then
                 cachedSkillcheckValidatedRemote = e
-                return e
-            end
-            return nil
-        end
-        
-        local function getSkillCheckResultRemote()
-            if cachedSkillCheckResultRemote and cachedSkillCheckResultRemote.Parent then
-                return cachedSkillCheckResultRemote
-            end
-            local r = ReplicatedStorage:FindFirstChild("Remotes")
-            if not r then return nil end
-            local g = r:FindFirstChild("Generator")
-            if not g then return nil end
-            local e = g:FindFirstChild("SkillCheckEvent")
-            if e and e:IsA("RemoteEvent") then
-                cachedSkillCheckResultRemote = e
                 return e
             end
             return nil
@@ -3505,12 +3492,19 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- Helper: bangun variants untuk remote yang menerima line/goal combos
-        local function buildVariants()
+        -- Skillcheckvalidated: kirim semua variasi kombinasi argumen
+        -- Setiap variasi hanya boleh ada salah satu: Line ATAU Goal (tidak bersamaan)
+        -- Return true kalau minimal 1 varian berhasil dikirim
+        local function fireSkillcheckValidated()
+            local remote = getSkillcheckValidatedRemote()
+            if not remote then return false end
             local gen, gp = getNearestGeneratorAndPoint()
+            
+            -- Ambil Line & Goal real-time dari check
             local line = check:FindFirstChild("Line")
             local goal = check:FindFirstChild("Goal")
             
+            -- Base variants (tanpa Line/Goal) → akan diduplikasi 2x dengan Line & Goal
             local baseVariants = {}
             table.insert(baseVariants, {true})
             table.insert(baseVariants, {"success"})
@@ -3527,6 +3521,7 @@ local function InitializeAutobuy()
                 table.insert(baseVariants, {true, gen, gp})
             end
             
+            -- Duplikasi: setiap base variant jadi 2 → satu pakai Line, satu pakai Goal
             local variants = {}
             for _, base in ipairs(baseVariants) do
                 if line then
@@ -3542,12 +3537,7 @@ local function InitializeAutobuy()
                     table.insert(variants, withGoal)
                 end
             end
-            return variants
-        end
-        
-        -- Helper: kirim variants ke remote tertentu
-        local function sendVariantsToRemote(remote, variants)
-            if not remote then return false end
+            
             local anySent = false
             for _, args in ipairs(variants) do
                 local valid = true
@@ -3567,22 +3557,6 @@ local function InitializeAutobuy()
             end
             return anySent
         end
-        
-        -- SkillCheckResultEvent: kirim semua variasi
-        local function fireSkillCheckResult()
-            local remote = getSkillCheckResultRemote()
-            if not remote then return false end
-            local variants = buildVariants()
-            return sendVariantsToRemote(remote, variants)
-        end
-        
-        -- Skillcheckvalidated: kirim semua variasi
-        local function fireSkillcheckValidated()
-            local remote = getSkillcheckValidatedRemote()
-            if not remote then return false end
-            local variants = buildVariants()
-            return sendVariantsToRemote(remote, variants)
-        end
         -- ===================================================================
         
         -- ===== KONFIGURASI SPAM SKILLCHECKVALIDATED =====
@@ -3593,13 +3567,6 @@ local function InitializeAutobuy()
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
         local lastSkillCheckSpam = 0
-        
-        -- Mekanisme: Result dulu, baru Validated (urutan tetap sama setiap trigger)
-        local function fireResultThenValidated()
-            local sent1 = fireSkillCheckResult()      -- Result pertama
-            local sent2 = fireSkillcheckValidated()   -- Validated kedua
-            return sent1 or sent2
-        end
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
@@ -3620,20 +3587,32 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- ===== SPAM: RESULT DULU, LALU VALIDATED =====
+                    -- ===== FORCE LINE BERTEMU DENGAN GOAL =====
+                    local currentLine = check:FindFirstChild("Line")
+                    local currentGoal = check:FindFirstChild("Goal")
+                    if currentLine and currentGoal then
+                        -- Ambil posisi Goal, hitung titik tengah range (102..120) → 111
+                        local gr = currentGoal.Rotation % 360
+                        local targetLineRotation = (gr + 111) % 360
+                        
+                        -- Set Line langsung ke tengah range Goal
+                        -- supaya "bertemu" dengan Goal, tidak perlu menunggu rotation natural
+                        currentLine.Rotation = targetLineRotation
+                    end
+                    -- =========================================
+                    
+                    -- ===== SPAM SKILLCHECKVALIDATED (SEMUA VARIAN) =====
                     local nowSpam = tick()
                     if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
                         lastSkillCheckSpam = nowSpam
-                        local sent = fireResultThenValidated()
-                        -- Fallback: jika kedua remote gagal kirim, gunakan mobile button
+                        local sent = fireSkillcheckValidated()
+                        -- Fallback: jika remote gagal kirim, gunakan mobile button
                         if not sent then
                             TriggerMobileButton()
                         end
                     end
                     -- ====================================================
                     
-                    local currentLine = check:FindFirstChild("Line")
-                    local currentGoal = check:FindFirstChild("Goal")
                     if not currentLine or not currentGoal then return end
                     
                     local lr = currentLine.Rotation % 360                    
@@ -3652,8 +3631,8 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE: RESULT DULU, LALU VALIDATED =====
-                            local sent = fireResultThenValidated()
+                            -- ===== FIRE SKILLCHECKVALIDATED (SEMUA VARIAN) =====
+                            local sent = fireSkillcheckValidated()
                             -- ===== MOBILE BUTTON: FEEDBACK / FALLBACK =====
                             if not sent then
                                 TriggerMobileButton()

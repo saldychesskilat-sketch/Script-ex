@@ -3409,6 +3409,7 @@ end
 -- Force Line → Goal + Deteksi Goal Berganti (multiple goal per skillcheck)
 -- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: Skillcheckvalidated (mekanisme sama seperti mobile button — spam tiap frame inRange)
+-- Switch trigger: >=89% progress → TriggerMobileButton, <89% → fireSkillcheckValidated
 -- Remote pendukung: perfectionistplanning (firePerfectionist)
 -- Mobile button: fallback jika remote gagal kirim
 local function InitializeAutobuy()                    
@@ -3487,6 +3488,28 @@ local function InitializeAutobuy()
             end
             return bestGen, bestGP
         end
+        
+        -- ===== GET GENERATOR PROGRESS =====
+        local function getGameValue(obj, name)
+            if not obj then return nil end
+            local attr = obj:GetAttribute(name)
+            if attr ~= nil then return attr end
+            local child = obj:FindFirstChild(name)
+            if child then
+                local ok, val = pcall(function() return child.Value end)
+                if ok then return val end
+            end
+            return nil
+        end
+        
+        local function getGeneratorProgress(generator)
+            if not generator or not generator.Parent then return 0 end
+            local percent = getGameValue(generator, "RepairProgress") 
+                         or getGameValue(generator, "Progress") 
+                         or 0
+            return tonumber(percent) or 0
+        end
+        -- =====================================
         
         -- ===== REMOTE FIRE =====
         local function firePerfectionist()
@@ -3607,12 +3630,23 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- Eksekusi: fireSkillcheckValidated (beda dari mobile button yang FireClick)
-                            local sent = fireSkillcheckValidated()
-                            -- Fallback ke mobile button jika remote gagal kirim
-                            if not sent then
+                            
+                            -- ===== CEK PROGRESS GENERATOR =====
+                            local gen, gp = getNearestGeneratorAndPoint()
+                            local progress = getGeneratorProgress(gen)
+                            
+                            if progress >= 89 then
+                                -- Progress >= 89% → langsung trigger mobile button
                                 TriggerMobileButton()
+                            else
+                                -- Progress < 89% → jalur normal (remote + fallback mobile)
+                                local sent = fireSkillcheckValidated()
+                                if not sent then
+                                    TriggerMobileButton()
+                                end
                             end
+                            -- ===================================
+                            
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                             end
@@ -3629,6 +3663,7 @@ local function InitializeAutobuy()
         end)                    
     end)                    
 end
+
 -- Watcher perubahan role (Survivor/Killer/Spectator)
 local function startRoleWatcher()
     if roleWatcherConnection then return end

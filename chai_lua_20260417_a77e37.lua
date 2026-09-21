@@ -3404,9 +3404,9 @@ end
 -- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: Skillcheckvalidated (variasi kombinasi argumen + line/goal)
 -- Modifikasi InitializeAutobuy - REVAMP
+-- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: Skillcheckvalidated (variasi kombinasi argumen + line/goal)
--- Force Line → Goal sebelum kirim remote
--- Deteksi GOAL BARU: trigger validated setiap goal appearance (bisa >2x per skillcheck)
+-- Force Line → Goal + Deteksi Goal Berganti (multiple goal per skillcheck)
 -- Remote pendukung: perfectionistplanning (firePerfectionist)
 -- Mobile button: fallback jika remote gagal kirim
 local function InitializeAutobuy()                    
@@ -3496,18 +3496,14 @@ local function InitializeAutobuy()
         end
         
         -- Skillcheckvalidated: kirim semua variasi kombinasi argumen
-        -- Setiap variasi hanya boleh ada salah satu: Line ATAU Goal (tidak bersamaan)
-        -- Return true kalau minimal 1 varian berhasil dikirim
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return false end
             local gen, gp = getNearestGeneratorAndPoint()
             
-            -- Ambil Line & Goal real-time dari check
             local line = check:FindFirstChild("Line")
             local goal = check:FindFirstChild("Goal")
             
-            -- Base variants (tanpa Line/Goal) → akan diduplikasi 2x dengan Line & Goal
             local baseVariants = {}
             table.insert(baseVariants, {true})
             table.insert(baseVariants, {"success"})
@@ -3524,7 +3520,6 @@ local function InitializeAutobuy()
                 table.insert(baseVariants, {true, gen, gp})
             end
             
-            -- Duplikasi: setiap base variant jadi 2 → satu pakai Line, satu pakai Goal
             local variants = {}
             for _, base in ipairs(baseVariants) do
                 if line then
@@ -3564,8 +3559,7 @@ local function InitializeAutobuy()
         
         -- ===== KONFIGURASI SPAM SKILLCHECKVALIDATED =====
         local SKILLCHECK_SPAM_INTERVAL = 0.05  -- jeda antar spam (detik)
-        local GOAL_CHANGE_THRESHOLD = 5        -- derajat, untuk deteksi goal baru
-        local MAX_FIRE_PER_GOAL = 3            -- fire maksimal per goal appearance
+        local GOAL_CHANGE_THRESHOLD = 2        -- derajat perubahan goal untuk dianggap "goal baru"
         -- ==================================================
         
         local triggerCount = 0          
@@ -3573,18 +3567,16 @@ local function InitializeAutobuy()
         local lastTriggerTime = 0
         local lastSkillCheckSpam = 0
         
-        -- State untuk deteksi goal appearance berganda
-        local lastGoalRot = -999
-        local firedForCurrentGoal = 0
+        -- ===== STATE DETEKSI GOAL BERGANDA =====
+        local lastGoalRotation = nil  -- track posisi goal terakhir
+        -- =======================================
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
-                -- Reset state goal appearance
-                lastGoalRot = -999
-                firedForCurrentGoal = 0
+                lastGoalRotation = nil  -- reset deteksi goal
                 -- ===== FIRE PERFECTIONIST SAAT SKILLCHECK MUNCUL =====
                 firePerfectionist()
                 -- =====================================================
@@ -3599,56 +3591,48 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- ===== DETEKSI GOAL APPEARANCE BARU =====
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
-                    local isNewGoal = false
-                    if currentLine and currentGoal then
-                        local gr = currentGoal.Rotation % 360
-                        -- Jika rotasi Goal berubah > threshold → goal baru muncul
-                        if math.abs(gr - lastGoalRot) > GOAL_CHANGE_THRESHOLD then
-                            lastGoalRot = gr
-                            firedForCurrentGoal = 0
-                            isNewGoal = true
-                        end
-                        -- Force Line ke tengah range Goal
-                        currentLine.Rotation = (gr + 111) % 360
-                    end
-                    -- =========================================
+                    if not currentLine or not currentGoal then return end
                     
-                    -- ===== FIRE UNTUK GOAL BARU =====
-                    if isNewGoal then
-                        -- Kirim validated untuk goal baru (langsung)
-                        local sentNew = fireSkillcheckValidated()
-                        if not sentNew then
+                    local gr = currentGoal.Rotation % 360
+                    
+                    -- ===== DETEKSI GOAL BARU (goal berganti posisi = trigger baru) =====
+                    if lastGoalRotation == nil or math.abs(gr - lastGoalRotation) > GOAL_CHANGE_THRESHOLD then
+                        -- Goal baru muncul (bisa ke-2, ke-3, dst. dalam 1x skillcheck)
+                        lastGoalRotation = gr
+                        
+                        -- Reset gating → izinkan fire lagi
+                        lastTriggerTime = 0
+                        lastSkillCheckSpam = 0
+                        
+                        -- Force line langsung ke goal (tengah range)
+                        currentLine.Rotation = (gr + 111) % 360
+                        
+                        -- Langsung fire di goal baru ini
+                        local sent = fireSkillcheckValidated()
+                        if not sent then
                             TriggerMobileButton()
                         end
-                        firedForCurrentGoal = firedForCurrentGoal + 1
                     end
-                    -- =========================================
+                    -- ====================================================================
+                    
+                    -- ===== FORCE LINE BERTEMU DENGAN GOAL (setiap frame) =====
+                    currentLine.Rotation = (gr + 111) % 360
+                    -- =========================================================
                     
                     -- ===== SPAM SKILLCHECKVALIDATED (SEMUA VARIAN) =====
                     local nowSpam = tick()
                     if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
                         lastSkillCheckSpam = nowSpam
-                        -- Limit per goal untuk cegah over-fire, tapi reset setiap goal baru
-                        if firedForCurrentGoal < MAX_FIRE_PER_GOAL then
-                            local sent = fireSkillcheckValidated()
-                            if sent then
-                                firedForCurrentGoal = firedForCurrentGoal + 1
-                            end
-                            -- Fallback: jika remote gagal kirim, gunakan mobile button
-                            if not sent then
-                                TriggerMobileButton()
-                            end
+                        local sent = fireSkillcheckValidated()
+                        if not sent then
+                            TriggerMobileButton()
                         end
                     end
                     -- ====================================================
                     
-                    if not currentLine or not currentGoal then return end
-                    
-                    local lr = currentLine.Rotation % 360                    
-                    local gr = currentGoal.Rotation % 360
+                    local lr = currentLine.Rotation % 360
                     local ss = (gr + 102) % 360                    
                     local se = (gr + 120) % 360                    
                     local inRange = false                    
@@ -3663,18 +3647,10 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE SKILLCHECKVALIDATED (SEMUA VARIAN) =====
-                            if firedForCurrentGoal < MAX_FIRE_PER_GOAL then
-                                local sent = fireSkillcheckValidated()
-                                if sent then
-                                    firedForCurrentGoal = firedForCurrentGoal + 1
-                                end
-                                -- ===== MOBILE BUTTON: FEEDBACK / FALLBACK =====
-                                if not sent then
-                                    TriggerMobileButton()
-                                end
+                            local sent = fireSkillcheckValidated()
+                            if not sent then
+                                TriggerMobileButton()
                             end
-                            -- =====================================================
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                             end
@@ -3687,8 +3663,7 @@ local function InitializeAutobuy()
                 triggerCount = 0
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
-                lastGoalRot = -999
-                firedForCurrentGoal = 0
+                lastGoalRotation = nil
             end                    
         end)                    
     end)                    

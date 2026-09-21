@@ -3391,6 +3391,10 @@ end
 -- Modifikasi InitializeAutobuy agar tidak menyimpan cache Line/Goal secara permanen
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM
 -- Modifikasi InitializeAutobuy + integrasi SkillCheckResultEvent + Skillcheckvalidated + SkillCheckEvent + perfectionistplanning + EXTREME SPAM + Speed
+-- Modifikasi InitializeAutobuy - REVAMP
+-- Remote utama: Skillcheckvalidated (variasi kombinasi argumen)
+-- Remote pendukung: perfectionistplanning (firePerfectionist)
+-- Mobile button: fallback jika remote gagal kirim
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3405,26 +3409,8 @@ local function InitializeAutobuy()
         if VisibilityConnection then VisibilityConnection:Disconnect() end                    
         
         -- ===== SKILLCHECK REMOTE SETUP =====
-        local cachedSkillCheckRemote = nil
         local cachedSkillcheckValidatedRemote = nil
-        local cachedSkillCheckEventRemote = nil
         local cachedPerfectionistRemote = nil
-        
-        local function getSkillCheckRemote()
-            if cachedSkillCheckRemote and cachedSkillCheckRemote.Parent then
-                return cachedSkillCheckRemote
-            end
-            local r = ReplicatedStorage:FindFirstChild("Remotes")
-            if not r then return nil end
-            local g = r:FindFirstChild("Generator")
-            if not g then return nil end
-            local e = g:FindFirstChild("SkillCheckResultEvent")
-            if e and e:IsA("RemoteEvent") then
-                cachedSkillCheckRemote = e
-                return e
-            end
-            return nil
-        end
         
         local function getSkillcheckValidatedRemote()
             if cachedSkillcheckValidatedRemote and cachedSkillcheckValidatedRemote.Parent then
@@ -3442,23 +3428,6 @@ local function InitializeAutobuy()
             return nil
         end
         
-        local function getSkillCheckEventRemote()
-            if cachedSkillCheckEventRemote and cachedSkillCheckEventRemote.Parent then
-                return cachedSkillCheckEventRemote
-            end
-            local r = ReplicatedStorage:FindFirstChild("Remotes")
-            if not r then return nil end
-            local g = r:FindFirstChild("Generator")
-            if not g then return nil end
-            local e = g:FindFirstChild("SkillCheckEvent")
-            if e and e:IsA("RemoteEvent") then
-                cachedSkillCheckEventRemote = e
-                return e
-            end
-            return nil
-        end
-        
-        -- ===== REMOTE BARU: perfectionistplanning =====
         local function getPerfectionistRemote()
             if cachedPerfectionistRemote and cachedPerfectionistRemote.Parent then
                 return cachedPerfectionistRemote
@@ -3474,69 +3443,6 @@ local function InitializeAutobuy()
             end
             return nil
         end
-        -- =============================================
-        
-        -- ===== SPEED ATTRIBUTE (Values.attributes.Speed) =====
-        local function getSpeedTemplate()
-            local values = ReplicatedStorage:FindFirstChild("Values")
-            if not values then return nil end
-            local attrs = values:FindFirstChild("attributes")
-            if not attrs then return nil end
-            return attrs:FindFirstChild("Speed")
-        end
-        
-        -- Set Speed ke nilai tinggi jika ValueObject, atau clone ke PlayerGui jika ImageLabel
-        local speedClone = nil
-        local function applySpeedBoost()
-            -- Bersihkan clone lama
-            if speedClone then
-                pcall(function() speedClone:Destroy() end)
-                speedClone = nil
-            end
-            local template = getSpeedTemplate()
-            if not template then return end
-            -- Jika ValueObject, set value ke nilai tinggi
-            if template:IsA("NumberValue") or template:IsA("IntValue") then
-                pcall(function() template.Value = 100 end)
-            elseif template:IsA("StringValue") then
-                pcall(function() template.Value = "100" end)
-            elseif template:IsA("BoolValue") then
-                pcall(function() template.Value = true end)
-            else
-                -- ImageLabel / instance lain: clone ke PlayerGui
-                local ok, clone = pcall(function() return template:Clone() end)
-                if ok and clone then
-                    clone.Name = "Speed_Active"
-                    local success = false
-                    pcall(function() clone.Parent = playerGui; success = true end)
-                    if not success then
-                        local char = localPlayer.Character
-                        if char then
-                            pcall(function() clone.Parent = char; success = true end)
-                        end
-                    end
-                    if success then speedClone = clone end
-                end
-            end
-        end
-        
-        local function clearSpeedBoost()
-            local template = getSpeedTemplate()
-            if template then
-                if template:IsA("NumberValue") or template:IsA("IntValue") then
-                    pcall(function() template.Value = 1 end)
-                elseif template:IsA("StringValue") then
-                    pcall(function() template.Value = "1" end)
-                elseif template:IsA("BoolValue") then
-                    pcall(function() template.Value = false end)
-                end
-            end
-            if speedClone then
-                pcall(function() speedClone:Destroy() end)
-                speedClone = nil
-            end
-        end
-        -- =====================================================
         
         -- ===== CARI GENERATOR + GENERATORPOINT TERDEKAT =====
         local function getNearestGeneratorAndPoint()
@@ -3567,32 +3473,6 @@ local function InitializeAutobuy()
         end
         
         -- ===== REMOTE FIRE =====
-        local function fireSkillCheckSuccess()
-            local remote = getSkillCheckRemote()
-            if not remote then return end
-            local gen, gp = getNearestGeneratorAndPoint()
-            if not gen or not gp then return end
-            pcall(function()
-                remote:FireServer("success", 1, gen, gp)
-            end)
-        end
-        
-        local function fireSkillcheckValidated()
-            local remote = getSkillcheckValidatedRemote()
-            if not remote then return end
-            pcall(function()
-                remote:FireServer()
-            end)
-        end
-        
-        local function fireSkillCheckEvent()
-            local remote = getSkillCheckEventRemote()
-            if not remote then return end
-            pcall(function()
-                remote:FireServer()
-            end)
-        end
-        
         local function firePerfectionist()
             local remote = getPerfectionistRemote()
             if not remote then return end
@@ -3600,34 +3480,59 @@ local function InitializeAutobuy()
                 remote:FireServer("applyBoost", "fast")
             end)
         end
-        -- ===================================================================
         
-        -- ===== EXTREME SPAM: START ON FIRST SKILLCHECK, STOP ON DISABLE =====
-        -- State pakai `shared` supaya tidak dobel walaupun InitializeAutobuy
-        -- dipanggil ulang (misal role berpindah-pindah).
-        shared.CyberExtremeSpam = shared.CyberExtremeSpam or { active = false, conn = nil }
-        
-        local function startExtremeSpam()
-            if shared.CyberExtremeSpam.active then return end
-            shared.CyberExtremeSpam.active = true
-            shared.CyberExtremeSpam.conn = RunService.Heartbeat:Connect(function()
-                if not config.autoSkillCheckEnabled then
-                    shared.CyberExtremeSpam.active = false
-                    if shared.CyberExtremeSpam.conn then
-                        shared.CyberExtremeSpam.conn:Disconnect()
-                        shared.CyberExtremeSpam.conn = nil
-                    end
-                    return
+        -- Skillcheckvalidated: kirim semua variasi kombinasi argumen
+        -- Return true kalau minimal 1 varian berhasil dikirim
+        local function fireSkillcheckValidated()
+            local remote = getSkillcheckValidatedRemote()
+            if not remote then return false end
+            local gen, gp = getNearestGeneratorAndPoint()
+            
+            -- Daftar variasi argumen
+            local variants = {}
+            -- Tanpa GeneratorPoint
+            table.insert(variants, {true})
+            table.insert(variants, {"success"})
+            table.insert(variants, {"success", 1})
+            table.insert(variants, {})
+            -- Dengan GeneratorPoint
+            if gp then
+                table.insert(variants, {gp})
+                table.insert(variants, {gp, true})
+                table.insert(variants, {true, gp})
+            end
+            -- Dengan Generator + GeneratorPoint
+            if gen and gp then
+                table.insert(variants, {gen, gp})
+                table.insert(variants, {"success", 1, gen, gp})
+                table.insert(variants, {true, gen, gp})
+            end
+            
+            local anySent = false
+            for _, args in ipairs(variants) do
+                -- Validasi tidak ada nil di dalam args
+                local valid = true
+                for _, v in ipairs(args) do
+                    if v == nil then valid = false break end
                 end
-                firePerfectionist()
-                fireSkillCheckEvent()
-            end)
+                if valid then
+                    local ok = pcall(function()
+                        if #args == 0 then
+                            remote:FireServer()
+                        else
+                            remote:FireServer(unpack(args))
+                        end
+                    end)
+                    if ok then anySent = true end
+                end
+            end
+            return anySent
         end
         -- ===================================================================
         
-        -- ===== KONFIGURASI SPAM SKILLCHECKSUCCESS =====
+        -- ===== KONFIGURASI SPAM SKILLCHECKVALIDATED =====
         local SKILLCHECK_SPAM_INTERVAL = 0.05  -- jeda antar spam (detik)
-        -- ==============================================
+        -- ==================================================
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
@@ -3639,16 +3544,9 @@ local function InitializeAutobuy()
                 triggerCount = 0         
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
-                -- ===== APPLY SPEED BOOST SAAT SKILLCHECK MUNCUL =====
-                applySpeedBoost()
-                -- =====================================================
-                -- ===== FIRE SKILLCHECKEVENT SAAT SKILLCHECK MUNCUL =====
-                fireSkillCheckEvent()
-                -- ===== FIRE PERFECTIONISTPLANNING SAAT SKILLCHECK MUNCUL =====
+                -- ===== FIRE PERFECTIONIST SAAT SKILLCHECK MUNCUL =====
                 firePerfectionist()
-                -- ===== START EXTREME SPAM (sekali saja, self-terminating) =====
-                startExtremeSpam()
-                -- =================================================================
+                -- =====================================================
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
@@ -3660,19 +3558,20 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- ===== SPAM SKILLCHECKSUCCESS SELAMA CHECK VISIBLE =====
+                    -- ===== SPAM SKILLCHECKVALIDATED (SEMUA VARIAN) =====
                     local nowSpam = tick()
                     if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
                         lastSkillCheckSpam = nowSpam
-                        fireSkillCheckSuccess()
+                        local sent = fireSkillcheckValidated()
+                        -- Fallback: jika remote gagal kirim, gunakan mobile button
+                        if not sent then
+                            TriggerMobileButton()
+                        end
                     end
                     -- ====================================================
                     
-                    -- ===== SPEED AKSES BERDAMPINGAN DENGAN LINE & GOAL =====
                     local currentLine = check:FindFirstChild("Line")
                     local currentGoal = check:FindFirstChild("Goal")
-                    applySpeedBoost()
-                    -- =====================================================
                     if not currentLine or not currentGoal then return end
                     
                     local lr = currentLine.Rotation % 360                    
@@ -3691,12 +3590,12 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE REMOTE SKILLCHECK SUCCESS (gen, gp instance) =====
-                            fireSkillCheckSuccess()
-                            -- ===== FIRE REMOTE SKILLCHECK VALIDATED (no arg) =====
-                            fireSkillcheckValidated()
-                            -- ===== TRIGGER MOBILE BUTTON (LANGKAH TERAKHIR) =====
-                            TriggerMobileButton()
+                            -- ===== FIRE SKILLCHECKVALIDATED (SEMUA VARIAN) =====
+                            local sent = fireSkillcheckValidated()
+                            -- ===== MOBILE BUTTON: FEEDBACK / FALLBACK =====
+                            if not sent then
+                                TriggerMobileButton()
+                            end
                             -- =====================================================
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
@@ -3710,9 +3609,6 @@ local function InitializeAutobuy()
                 triggerCount = 0
                 lastTriggerTime = 0
                 lastSkillCheckSpam = 0
-                -- ===== CLEAR SPEED BOOST SAAT SKILLCHECK HILANG =====
-                clearSpeedBoost()
-                -- =====================================================
             end                    
         end)                    
     end)                    

@@ -3395,6 +3395,8 @@ end
 -- Modifikasi InitializeAutobuy - REVAMP
 -- Remote utama: Skillcheckvalidated (variasi kombinasi argumen)
 -- Remote utama kedua: SkillCheckResultEvent (variasi kombinasi argumen sama)
+-- Modifikasi InitializeAutobuy - REVAMP
+-- Remote utama: Skillcheckvalidated (variasi kombinasi argumen + line/goal)
 -- Remote pendukung: perfectionistplanning (firePerfectionist)
 -- Mobile button: fallback jika remote gagal kirim
 local function InitializeAutobuy()                    
@@ -3413,7 +3415,6 @@ local function InitializeAutobuy()
         -- ===== SKILLCHECK REMOTE SETUP =====
         local cachedSkillcheckValidatedRemote = nil
         local cachedPerfectionistRemote = nil
-        local cachedSkillCheckRemote = nil
         
         local function getSkillcheckValidatedRemote()
             if cachedSkillcheckValidatedRemote and cachedSkillcheckValidatedRemote.Parent then
@@ -3426,22 +3427,6 @@ local function InitializeAutobuy()
             local e = g:FindFirstChild("Skillcheckvalidated")
             if e and e:IsA("RemoteEvent") then
                 cachedSkillcheckValidatedRemote = e
-                return e
-            end
-            return nil
-        end
-        
-        local function getSkillCheckRemote()
-            if cachedSkillCheckRemote and cachedSkillCheckRemote.Parent then
-                return cachedSkillCheckRemote
-            end
-            local r = ReplicatedStorage:FindFirstChild("Remotes")
-            if not r then return nil end
-            local g = r:FindFirstChild("Generator")
-            if not g then return nil end
-            local e = g:FindFirstChild("SkillCheckResultEvent")
-            if e and e:IsA("RemoteEvent") then
-                cachedSkillCheckRemote = e
                 return e
             end
             return nil
@@ -3501,77 +3486,51 @@ local function InitializeAutobuy()
         end
         
         -- Skillcheckvalidated: kirim semua variasi kombinasi argumen
+        -- Setiap variasi hanya boleh ada salah satu: Line ATAU Goal (tidak bersamaan)
         -- Return true kalau minimal 1 varian berhasil dikirim
         local function fireSkillcheckValidated()
             local remote = getSkillcheckValidatedRemote()
             if not remote then return false end
             local gen, gp = getNearestGeneratorAndPoint()
             
-            -- Daftar variasi argumen
-            local variants = {}
-            -- Tanpa GeneratorPoint
-            table.insert(variants, {true})
-            table.insert(variants, {"success"})
-            table.insert(variants, {"success", 1})
-            table.insert(variants, {})
-            -- Dengan GeneratorPoint
+            -- Ambil Line & Goal real-time dari check
+            local line = check:FindFirstChild("Line")
+            local goal = check:FindFirstChild("Goal")
+            
+            -- Base variants (tanpa Line/Goal) → akan diduplikasi 2x dengan Line & Goal
+            local baseVariants = {}
+            table.insert(baseVariants, {true})
+            table.insert(baseVariants, {"success"})
+            table.insert(baseVariants, {"success", 1})
+            table.insert(baseVariants, {})
             if gp then
-                table.insert(variants, {gp})
-                table.insert(variants, {gp, true})
-                table.insert(variants, {true, gp})
+                table.insert(baseVariants, {gp})
+                table.insert(baseVariants, {gp, true})
+                table.insert(baseVariants, {true, gp})
             end
-            -- Dengan Generator + GeneratorPoint
             if gen and gp then
-                table.insert(variants, {gen, gp})
-                table.insert(variants, {"success", 1, gen, gp})
-                table.insert(variants, {true, gen, gp})
+                table.insert(baseVariants, {gen, gp})
+                table.insert(baseVariants, {"success", 1, gen, gp})
+                table.insert(baseVariants, {true, gen, gp})
             end
             
-            local anySent = false
-            for _, args in ipairs(variants) do
-                local valid = true
-                for _, v in ipairs(args) do
-                    if v == nil then valid = false break end
-                end
-                if valid then
-                    local ok = pcall(function()
-                        if #args == 0 then
-                            remote:FireServer()
-                        else
-                            remote:FireServer(unpack(args))
-                        end
-                    end)
-                    if ok then anySent = true end
-                end
-            end
-            return anySent
-        end
-        
-        -- SkillCheckResultEvent: kirim semua variasi kombinasi argumen
-        -- (instance & argumen sama dengan fireSkillcheckValidated)
-        local function fireSkillCheckResult()
-            local remote = getSkillCheckRemote()
-            if not remote then return false end
-            local gen, gp = getNearestGeneratorAndPoint()
-            
-            -- Daftar variasi argumen
+            -- Duplikasi: setiap base variant jadi 2 → satu pakai Line, satu pakai Goal
             local variants = {}
-            -- Tanpa GeneratorPoint
-            table.insert(variants, {true})
-            table.insert(variants, {"success"})
-            table.insert(variants, {"success", 1})
-            table.insert(variants, {})
-            -- Dengan GeneratorPoint
-            if gp then
-                table.insert(variants, {gp})
-                table.insert(variants, {gp, true})
-                table.insert(variants, {true, gp})
-            end
-            -- Dengan Generator + GeneratorPoint
-            if gen and gp then
-                table.insert(variants, {gen, gp})
-                table.insert(variants, {"success", 1, gen, gp})
-                table.insert(variants, {true, gen, gp})
+            for _, base in ipairs(baseVariants) do
+                -- Varian dengan Line
+                if line then
+                    local withLine = {}
+                    for _, v in ipairs(base) do table.insert(withLine, v) end
+                    table.insert(withLine, line)
+                    table.insert(variants, withLine)
+                end
+                -- Varian dengan Goal
+                if goal then
+                    local withGoal = {}
+                    for _, v in ipairs(base) do table.insert(withGoal, v) end
+                    table.insert(withGoal, goal)
+                    table.insert(variants, withGoal)
+                end
             end
             
             local anySent = false
@@ -3623,14 +3582,13 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- ===== SPAM SEMUA VARIAN REMOTE =====
+                    -- ===== SPAM SKILLCHECKVALIDATED (SEMUA VARIAN) =====
                     local nowSpam = tick()
                     if nowSpam - lastSkillCheckSpam >= SKILLCHECK_SPAM_INTERVAL then
                         lastSkillCheckSpam = nowSpam
-                        local sent1 = fireSkillcheckValidated()
-                        local sent2 = fireSkillCheckResult()
-                        -- Fallback: jika semua remote gagal kirim, gunakan mobile button
-                        if not sent1 and not sent2 then
+                        local sent = fireSkillcheckValidated()
+                        -- Fallback: jika remote gagal kirim, gunakan mobile button
+                        if not sent then
                             TriggerMobileButton()
                         end
                     end
@@ -3656,11 +3614,10 @@ local function InitializeAutobuy()
                         if now - lastTriggerTime > 0 then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
-                            -- ===== FIRE SEMUA VARIAN REMOTE =====
-                            local sent1 = fireSkillcheckValidated()
-                            local sent2 = fireSkillCheckResult()
+                            -- ===== FIRE SKILLCHECKVALIDATED (SEMUA VARIAN) =====
+                            local sent = fireSkillcheckValidated()
                             -- ===== MOBILE BUTTON: FEEDBACK / FALLBACK =====
-                            if not sent1 and not sent2 then
+                            if not sent then
                                 TriggerMobileButton()
                             end
                             -- =====================================================
@@ -3680,6 +3637,7 @@ local function InitializeAutobuy()
         end)                    
     end)                    
 end
+
 -- Watcher perubahan role (Survivor/Killer/Spectator)
 local function startRoleWatcher()
     if roleWatcherConnection then return end

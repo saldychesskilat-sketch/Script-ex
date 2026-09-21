@@ -3444,7 +3444,7 @@ local function InitializeAutobuy()
             if not r then return nil end
             local g = r:FindFirstChild("Generator")
             if not g then return nil end
-            local e = g:FindFirstChild("SkillCheckResultEvent")
+            local e = g:FindFirstChild("SkillCheckEvent")
             if e and e:IsA("RemoteEvent") then
                 cachedSkillCheckResultRemote = e
                 return e

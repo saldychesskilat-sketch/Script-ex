@@ -3411,7 +3411,7 @@ end
 -- Remote utama: Skillcheckvalidated (mekanisme sama seperti mobile button — spam tiap frame inRange)
 -- Switch trigger: >=89% progress → TriggerMobileButton, <89% → fireSkillcheckValidated
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Rotation Delay
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3429,16 +3429,15 @@ local function InitializeAutobuy()
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
         
-        -- ===== STATE ROTATION DELAY (aktif setelah trigger pertama) =====
-        local rotationLockUntil = 0
-        local ROTATION_LOCK_DELAY = 0.05   -- jeda sebelum rotate ke goal baru (detik)
-        -- ================================================================
+        -- ===== STATE TRIGGER INTERVAL (bukan rotation lock) =====
+        -- Jeda minimum antar trigger supaya game bisa consume event
+        local TRIGGER_INTERVAL = 0.05
+        -- ========================================================
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
-                rotationLockUntil = 0   -- reset lock saat skillcheck baru
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
@@ -3457,13 +3456,10 @@ local function InitializeAutobuy()
                     local gr = currentGoal.Rotation % 360
                     local now = tick()
                     
-                    -- ===== ROTATION DENGAN DELAY =====
-                    -- Trigger pertama: langsung rotate ke goal
-                    -- Trigger kedua+: tunggu ROTATION_LOCK_DELAY dulu, baru rotate ke goal baru
-                    if now >= rotationLockUntil then
-                        currentLine.Rotation = (gr + 111) % 360
-                    end
-                    -- ==================================
+                    -- ===== FORCE LINE BERTEMU DENGAN GOAL (setiap frame, tanpa lock) =====
+                    -- Goal bisa berubah kapan saja, jadi Line di-update terus
+                    currentLine.Rotation = (gr + 111) % 360
+                    -- ======================================================================
                     
                     local lr = currentLine.Rotation % 360
                     local ss = (gr + 102) % 360                    
@@ -3475,19 +3471,13 @@ local function InitializeAutobuy()
                         if lr >= ss and lr <= se then inRange = true end                    
                     end                    
                     
-                    -- ===== TRIGGER MOBILE BUTTON (hanya setelah rotation lock habis) =====
-                    if inRange and now >= rotationLockUntil then
-                        if now - lastTriggerTime > 0 then
+                    -- ===== TRIGGER MOBILE BUTTON DENGAN INTERVAL =====
+                    -- Bukan rotation lock, tapi trigger lock: tiap 0.05s boleh trigger lagi
+                    if inRange then
+                        if now - lastTriggerTime >= TRIGGER_INTERVAL then
                             lastTriggerTime = now
                             triggerCount = triggerCount + 1
                             TriggerMobileButton()
-                            
-                            -- ===== SET ROTATION LOCK SETELAH TRIGGER =====
-                            -- Setelah trigger, tahan rotation selama ROTATION_LOCK_DELAY
-                            -- sehingga goal baru punya waktu "settle" dulu
-                            rotationLockUntil = now + ROTATION_LOCK_DELAY
-                            -- =================================================
-                            
                             if triggerCount >= MAX_TRIGGER then
                                 if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
                             end
@@ -3500,12 +3490,10 @@ local function InitializeAutobuy()
                 HeartbeatConnection = nil     
                 triggerCount = 0
                 lastTriggerTime = 0
-                rotationLockUntil = 0
             end                    
         end)                    
     end)                    
 end
-
 -- Watcher perubahan role (Survivor/Killer/Spectator)
 local function startRoleWatcher()
     if roleWatcherConnection then return end

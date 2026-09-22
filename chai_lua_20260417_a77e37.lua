@@ -3431,7 +3431,7 @@ local function InitializeAutobuy()
         
         -- ===== STATE TRIGGER INTERVAL (bukan rotation lock) =====
         -- Jeda minimum antar trigger supaya game bisa consume event
-        local TRIGGER_INTERVAL = 0.05
+        local TRIGGER_INTERVAL = 0.85
         -- ========================================================
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    

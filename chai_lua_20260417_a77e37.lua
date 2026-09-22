@@ -3431,7 +3431,7 @@ local function InitializeAutobuy()
         
         -- ===== STATE ROTATION DELAY (aktif setelah trigger pertama) =====
         local rotationLockUntil = 0
-        local ROTATION_LOCK_DELAY = 0.12   -- jeda sebelum rotate ke goal baru (detik)
+        local ROTATION_LOCK_DELAY = 1   -- jeda sebelum rotate ke goal baru (detik)
         -- ================================================================
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    

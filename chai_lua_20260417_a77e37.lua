@@ -3412,6 +3412,7 @@ end
 -- Switch trigger: >=89% progress → TriggerMobileButton, <89% → fireSkillcheckValidated
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
+-- Modifikasi InitializeAutobuy - Mobile Button + Force Line→Goal (Shortest-Path + Goal Detection)
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3429,15 +3430,22 @@ local function InitializeAutobuy()
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
         
-        -- ===== STATE TRIGGER INTERVAL (bukan rotation lock) =====
-        -- Jeda minimum antar trigger supaya game bisa consume event
-        local TRIGGER_INTERVAL = 0.12
-        -- ========================================================
+        -- ===== STATE TRIGGER INTERVAL =====
+        local TRIGGER_INTERVAL = 0.05
+        -- ====================================
+        
+        -- ===== STATE ROTATION / GOAL DETECTION =====
+        local ROTATION_SPEED = 25              -- derajat/frame untuk smooth rotate
+        local GOAL_SNAP_THRESHOLD = 8          -- kalau line sudah dalam 8° dari target → snap
+        local GOAL_CHANGE_THRESHOLD = 3        -- kalau goal geser > 3° → dianggap goal baru
+        local lastGoalRotation = nil
+        -- =============================================
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0         
                 lastTriggerTime = 0
+                lastGoalRotation = nil
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
                 HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
                     if not check.Visible then     
@@ -3454,14 +3462,40 @@ local function InitializeAutobuy()
                     if not currentLine or not currentGoal then return end
                     
                     local gr = currentGoal.Rotation % 360
+                    local lr = currentLine.Rotation % 360
                     local now = tick()
                     
-                    -- ===== FORCE LINE BERTEMU DENGAN GOAL (setiap frame, tanpa lock) =====
-                    -- Goal bisa berubah kapan saja, jadi Line di-update terus
-                    currentLine.Rotation = (gr + 110) % 360
-                    -- ======================================================================
+                    -- ===== DETEKSI GOAL BARU =====
+                    -- Kalau goal bergeser dari posisi sebelumnya, catat sebagai goal baru
+                    if lastGoalRotation == nil or math.abs(gr - lastGoalRotation) > GOAL_CHANGE_THRESHOLD then
+                        lastGoalRotation = gr
+                    end
+                    -- ===========================
                     
-                    local lr = currentLine.Rotation % 360
+                    -- ===== HITUNG TARGET: tengah range goal (gr + 111) =====
+                    local targetRot = (gr + 111) % 360
+                    -- =====================================================
+                    
+                    -- ===== HITUNG DELTA TERPENDEK (maju / mundur) =====
+                    -- Kalau delta > 180 → lebih dekat mundur, kalau < -180 → lebih dekat maju
+                    local delta = targetRot - lr
+                    if delta > 180 then delta = delta - 360 end
+                    if delta < -180 then delta = delta + 360 end
+                    -- ==================================================
+                    
+                    -- ===== ROTATE LINE KE TARGET (shortest path) =====
+                    if math.abs(delta) <= GOAL_SNAP_THRESHOLD then
+                        -- Sudah dekat, snap ke target
+                        currentLine.Rotation = targetRot
+                    else
+                        -- Rotate smooth, arah terpendek
+                        local step = math.clamp(delta, -ROTATION_SPEED, ROTATION_SPEED)
+                        currentLine.Rotation = (lr + step) % 360
+                    end
+                    -- ================================================
+                    
+                    -- ===== CEK inRange =====
+                    lr = currentLine.Rotation % 360
                     local ss = (gr + 102) % 360                    
                     local se = (gr + 120) % 360                    
                     local inRange = false                    
@@ -3470,9 +3504,9 @@ local function InitializeAutobuy()
                     else                    
                         if lr >= ss and lr <= se then inRange = true end                    
                     end                    
+                    -- =====================
                     
                     -- ===== TRIGGER MOBILE BUTTON DENGAN INTERVAL =====
-                    -- Bukan rotation lock, tapi trigger lock: tiap 0.05s boleh trigger lagi
                     if inRange then
                         if now - lastTriggerTime >= TRIGGER_INTERVAL then
                             lastTriggerTime = now
@@ -3483,13 +3517,14 @@ local function InitializeAutobuy()
                             end
                         end
                     end
-                    -- ====================================================================
+                    -- =================================================
                 end)                    
             elseif HeartbeatConnection then     
                 HeartbeatConnection:Disconnect();     
                 HeartbeatConnection = nil     
                 triggerCount = 0
                 lastTriggerTime = 0
+                lastGoalRotation = nil
             end                    
         end)                    
     end)                    

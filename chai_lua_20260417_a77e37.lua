@@ -3413,7 +3413,7 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
 -- Modifikasi InitializeAutobuy - Mobile Button + Force Line→Goal (Shortest-Path + Goal Detection)
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + BindToRenderStep
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3430,24 +3430,38 @@ local function InitializeAutobuy()
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
-        
-        -- ===== STATE TRIGGER INTERVAL (bukan rotation lock) =====
-        -- Jeda minimum antar trigger supaya game bisa consume event
         local TRIGGER_INTERVAL = 0.05
-        -- ========================================================
+        local lastGoalRotation = nil
+        
+        -- Nama binding unik supaya tidak tabrakan dengan binding lain
+        local BIND_NAME = "CyberForceSkillCheckLine"
+        
+        -- Helper: pastikan binding lama dibersihkan
+        local function clearBinding()
+            pcall(function()
+                RunService:UnbindFromRenderStep(BIND_NAME)
+            end)
+        end
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
-                triggerCount = 0         
+                triggerCount = 0           
                 lastTriggerTime = 0
-                if HeartbeatConnection then HeartbeatConnection:Disconnect() end                    
-                HeartbeatConnection = RunService.RenderStepped:Connect(function()                    
-                    if not check.Visible then     
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end    
-                        return     
-                    end    
-                    if triggerCount >= MAX_TRIGGER then 
-                        if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
+                lastGoalRotation = nil
+                
+                -- Hapus binding lama (kalau masih ada)
+                clearBinding()
+                
+                -- ===== BINDING PRIORITY TERTINGGI: JALAN PALING AKHIR FRAME =====
+                RunService:BindToRenderStep(BIND_NAME, Enum.RenderPriority.Last.Value, function()
+                    -- Cek visibility
+                    if not check or not check.Parent or not check.Visible then
+                        clearBinding()
+                        return
+                    end
+                    
+                    if triggerCount >= MAX_TRIGGER then
+                        clearBinding()
                         return
                     end
                     
@@ -3458,40 +3472,43 @@ local function InitializeAutobuy()
                     local gr = currentGoal.Rotation % 360
                     local now = tick()
                     
-                    -- ===== FORCE LINE BERTEMU DENGAN GOAL (setiap frame, tanpa lock) =====
-                    -- Goal bisa berubah kapan saja, jadi Line di-update terus
-                    currentLine.Rotation = (gr + 110) % 360
-                    -- ======================================================================
-                    
-                    local lr = currentLine.Rotation % 360
-                    local ss = (gr + 102) % 360                    
-                    local se = (gr + 120) % 360                    
-                    local inRange = false                    
-                    if ss > se then                    
-                        if lr >= ss or lr <= se then inRange = true end                    
-                    else                    
-                        if lr >= ss and lr <= se then inRange = true end                    
-                    end                    
-                    
-                    -- ===== TRIGGER MOBILE BUTTON DENGAN INTERVAL =====
-                    -- Bukan rotation lock, tapi trigger lock: tiap 0.05s boleh trigger lagi
-                    if inRange then
-                        if now - lastTriggerTime >= TRIGGER_INTERVAL then
-                            lastTriggerTime = now
-                            triggerCount = triggerCount + 1
-                            TriggerMobileButton()
-                            if triggerCount >= MAX_TRIGGER then
-                                if HeartbeatConnection then HeartbeatConnection:Disconnect(); HeartbeatConnection = nil end
-                            end
-                        end
+                    -- ===== DETEKSI GOAL BARU =====
+                    -- Kalau goal bergeser signifikan, reset trigger gating
+                    if lastGoalRotation == nil or math.abs(gr - lastGoalRotation) > 2 then
+                        lastGoalRotation = gr
+                        lastTriggerTime = 0  -- reset gating supaya bisa fire di goal baru
                     end
-                    -- ====================================================================
-                end)                    
-            elseif HeartbeatConnection then     
-                HeartbeatConnection:Disconnect();     
-                HeartbeatConnection = nil     
+                    
+                    -- ===== FORCE LINE KE GOAL (paling akhir frame) =====
+                    -- Karena priority = Last, write kita dijamin setelah game write
+                    currentLine.Rotation = (gr + 111) % 360
+                    
+                    -- ===== TRIGGER DI FRAME YANG SAMA =====
+                    local lr = currentLine.Rotation % 360
+                    local ss = (gr + 102) % 360
+                    local se = (gr + 120) % 360
+                    local inRange = false
+                    if ss > se then
+                        if lr >= ss or lr <= se then inRange = true end
+                    else
+                        if lr >= ss and lr <= se then inRange = true end
+                    end
+                    
+                    if inRange and (now - lastTriggerTime >= TRIGGER_INTERVAL) then
+                        lastTriggerTime = now
+                        triggerCount = triggerCount + 1
+                        TriggerMobileButton()
+                    end
+                    -- =================================================
+                end)
+                -- ======================================================================
+                
+            else
+                -- Skillcheck hilang → bersihkan binding
+                clearBinding()
                 triggerCount = 0
                 lastTriggerTime = 0
+                lastGoalRotation = nil
             end                    
         end)                    
     end)                    

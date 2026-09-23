@@ -3413,7 +3413,7 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
 -- Modifikasi InitializeAutobuy - Mobile Button + Force Line→Goal (Shortest-Path + Goal Detection)
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + BindToRenderStep
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force/Release Cycle
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3430,13 +3430,19 @@ local function InitializeAutobuy()
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
-        local TRIGGER_INTERVAL = 0.25
-        local lastGoalRotation = nil
+        local TRIGGER_INTERVAL = 0.05
         
-        -- Nama binding unik supaya tidak tabrakan dengan binding lain
+        -- ===== FORCE / RELEASE CYCLE =====
+        -- Setelah trigger, kita LEPAS Line dari force selama RELEASE_DURATION
+        -- supaya script game bisa update Line & state internalnya kembali sinkron.
+        -- Baru setelah itu kita force lagi ke Goal baru.
+        local RELEASE_DURATION = 0.15  -- 150 ms release phase (tuning)
+        local forceActive = false      -- true = kita overwrite Line
+        local releaseUntil = 0         -- kapan boleh force lagi
+        -- ==================================
+        
         local BIND_NAME = "CyberForceSkillCheckLine"
         
-        -- Helper: pastikan binding lama dibersihkan
         local function clearBinding()
             pcall(function()
                 RunService:UnbindFromRenderStep(BIND_NAME)
@@ -3447,14 +3453,13 @@ local function InitializeAutobuy()
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
                 lastTriggerTime = 0
-                lastGoalRotation = nil
+                -- State awal: force aktif (langsung kejar Goal pertama)
+                forceActive = true
+                releaseUntil = 0
                 
-                -- Hapus binding lama (kalau masih ada)
                 clearBinding()
                 
-                -- ===== BINDING PRIORITY TERTINGGI: JALAN PALING AKHIR FRAME =====
                 RunService:BindToRenderStep(BIND_NAME, Enum.RenderPriority.Last.Value, function()
-                    -- Cek visibility
                     if not check or not check.Parent or not check.Visible then
                         clearBinding()
                         return
@@ -3469,21 +3474,26 @@ local function InitializeAutobuy()
                     local currentGoal = check:FindFirstChild("Goal")
                     if not currentLine or not currentGoal then return end
                     
-                    local gr = currentGoal.Rotation % 360
                     local now = tick()
+                    local gr = currentGoal.Rotation % 360
                     
-                    -- ===== DETEKSI GOAL BARU =====
-                    -- Kalau goal bergeser signifikan, reset trigger gating
-                    if lastGoalRotation == nil or math.abs(gr - lastGoalRotation) > 2 then
-                        lastGoalRotation = gr
-                        lastTriggerTime = 0  -- reset gating supaya bisa fire di goal baru
+                    -- ===== CEK RELEASE PHASE =====
+                    -- Kalau sedang release dan waktu release belum habis → jangan sentuh Line
+                    if not forceActive then
+                        if now >= releaseUntil then
+                            -- Release habis → masuk force phase lagi
+                            forceActive = true
+                        else
+                            -- Masih release → biarkan game update Line
+                            return
+                        end
                     end
+                    -- ===========================
                     
-                    -- ===== FORCE LINE KE GOAL (paling akhir frame) =====
-                    -- Karena priority = Last, write kita dijamin setelah game write
+                    -- ===== FORCE PHASE: overwrite Line ke Goal =====
                     currentLine.Rotation = (gr + 111) % 360
                     
-                    -- ===== TRIGGER DI FRAME YANG SAMA =====
+                    -- Cek inRange
                     local lr = currentLine.Rotation % 360
                     local ss = (gr + 102) % 360
                     local se = (gr + 120) % 360
@@ -3494,21 +3504,26 @@ local function InitializeAutobuy()
                         if lr >= ss and lr <= se then inRange = true end
                     end
                     
+                    -- ===== TRIGGER =====
                     if inRange and (now - lastTriggerTime >= TRIGGER_INTERVAL) then
                         lastTriggerTime = now
                         triggerCount = triggerCount + 1
                         TriggerMobileButton()
+                        
+                        -- Setelah trigger → LEPAS Line sebentar supaya game sinkron
+                        forceActive = false
+                        releaseUntil = now + RELEASE_DURATION
                     end
-                    -- =================================================
+                    -- ================================
                 end)
-                -- ======================================================================
                 
             else
-                -- Skillcheck hilang → bersihkan binding
+                -- Skillcheck hilang → bersihkan
                 clearBinding()
                 triggerCount = 0
                 lastTriggerTime = 0
-                lastGoalRotation = nil
+                forceActive = false
+                releaseUntil = 0
             end                    
         end)                    
     end)                    

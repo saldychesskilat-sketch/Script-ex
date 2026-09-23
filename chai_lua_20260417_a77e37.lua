@@ -3458,7 +3458,7 @@ local function InitializeAutobuy()
                     
                     -- ===== FORCE LINE BERTEMU DENGAN GOAL (setiap frame, tanpa lock) =====
                     -- Goal bisa berubah kapan saja, jadi Line di-update terus
-                    currentLine.Rotation = (gr + 111) % 360
+                    currentLine.Rotation = (gr + 110) % 360
                     -- ======================================================================
                     
                     local lr = currentLine.Rotation % 360

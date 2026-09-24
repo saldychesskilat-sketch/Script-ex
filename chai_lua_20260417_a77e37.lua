@@ -3412,8 +3412,7 @@ end
 -- Switch trigger: >=89% progress → TriggerMobileButton, <89% → fireSkillcheckValidated
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
--- Modifikasi InitializeAutobuy - Mobile Button + Force Line→Goal (Shortest-Path + Goal Detection)
--- Modifikasi InitializeAutobuy - Natural Wait + Rotate On Miss
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck (Rotate/Trigger Terpisah)
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3429,14 +3428,19 @@ local function InitializeAutobuy()
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
-        local lastTriggerTime = 0
-        local TRIGGER_INTERVAL = 0.05
         
-        -- ===== STATE =====
-        local wasInRange = false       -- track apakah line pernah masuk range
-        local lastGoalRotation = nil   -- track posisi goal (deteksi goal baru)
-        local GOAL_CHANGE_THRESHOLD = 5
-        -- =================
+        -- ===== STATE MACHINE: ROTATE → TRIGGER → COOLDOWN =====
+        -- Rotate dan Trigger dipisah ke state berbeda supaya tidak bentrok.
+        local STATE_ROTATE = "ROTATE"
+        local STATE_TRIGGER = "TRIGGER"
+        local STATE_COOLDOWN = "COOLDOWN"
+        
+        local currentState = STATE_ROTATE
+        local stateEnteredAt = 0
+        
+        local SETTLE_AFTER_ROTATE = 0.03       -- tunggu kecil setelah rotate sebelum cek trigger
+        local COOLDOWN_AFTER_TRIGGER = 0.20    -- jeda panjang setelah trigger, sebelum rotate lagi
+        -- =======================================================
         
         local BIND_NAME = "CyberForceSkillCheckLine"
         
@@ -3446,28 +3450,21 @@ local function InitializeAutobuy()
             end)
         end
         
-        -- Normalisasi sudut ke -180..180 untuk hitung jarak terpendek
-        local function normalizeAngle(a)
-            a = a % 360
-            if a > 180 then a = a - 360 end
-            return a
-        end
-        
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
-                lastTriggerTime = 0
-                wasInRange = false
-                lastGoalRotation = nil
+                -- Reset state
+                currentState = STATE_ROTATE
+                stateEnteredAt = tick()
                 
                 clearBinding()
                 
                 RunService:BindToRenderStep(BIND_NAME, Enum.RenderPriority.Last.Value, function()
+                    -- ===== Guard =====
                     if not check or not check.Parent or not check.Visible then
                         clearBinding()
                         return
                     end
-                    
                     if triggerCount >= MAX_TRIGGER then
                         clearBinding()
                         return
@@ -3479,49 +3476,64 @@ local function InitializeAutobuy()
                     
                     local now = tick()
                     local gr = currentGoal.Rotation % 360
-                    local lr = currentLine.Rotation % 360
                     
-                    -- ===== DETEKSI GOAL BARU (reset state) =====
-                    if lastGoalRotation == nil 
-                       or math.abs(normalizeAngle(gr - lastGoalRotation)) > GOAL_CHANGE_THRESHOLD then
-                        lastGoalRotation = gr
-                        wasInRange = false  -- goal baru → tunggu natural lagi, jangan rotate dulu
+                    -- ===== STATE: ROTATE =====
+                    -- Paksa Line ke tengah range Goal.
+                    -- Setelah rotate selesai, LANGSUNG pindah ke STATE_TRIGGER
+                    -- tapi TIDAK trigger di frame yang sama (return).
+                    if currentState == STATE_ROTATE then
+                        currentLine.Rotation = (gr + 111) % 360
+                        currentState = STATE_TRIGGER
+                        stateEnteredAt = now
+                        return  -- penting: keluar dari frame ini biar game consume rotate
                     end
-                    -- ==============================================
+                    -- =====================
                     
-                    -- ===== HITUNG JARAK LINE KE TENGAH RANGE GOAL =====
-                    local midGoal = (gr + 111) % 360
-                    local deltaToMid = normalizeAngle(midGoal - lr)
-                    local inRange = math.abs(deltaToMid) <= 9
-                    -- =================================================
-                    
-                    -- ===== LOGIKA UTAMA: NATURAL WAIT + ROTATE ON MISS =====
-                    if inRange then
-                        -- Line di dalam range → trigger natural
-                        wasInRange = true
-                        if now - lastTriggerTime >= TRIGGER_INTERVAL then
-                            lastTriggerTime = now
-                            triggerCount = triggerCount + 1
-                            TriggerMobileButton()
+                    -- ===== STATE: TRIGGER =====
+                    -- Setelah SETTLE_AFTER_ROTATE, baru cek range dan trigger.
+                    -- Rotate tidak dilakukan di sini.
+                    if currentState == STATE_TRIGGER then
+                        if now - stateEnteredAt >= SETTLE_AFTER_ROTATE then
+                            local lr = currentLine.Rotation % 360
+                            local ss = (gr + 102) % 360
+                            local se = (gr + 120) % 360
+                            local inRange = false
+                            if ss > se then
+                                if lr >= ss or lr <= se then inRange = true end
+                            else
+                                if lr >= ss and lr <= se then inRange = true end
+                            end
+                            
+                            if inRange then
+                                TriggerMobileButton()
+                                triggerCount = triggerCount + 1
+                                currentState = STATE_COOLDOWN
+                                stateEnteredAt = now
+                            end
                         end
-                    else
-                        -- Line tidak di range
-                        if wasInRange then
-                            -- Baru keluar range → berarti LEWAT goal → rotate mundur
-                            currentLine.Rotation = midGoal
-                            wasInRange = false
-                        end
-                        -- Kalau belum pernah masuk range → TUNGGU natural (jangan rotate)
+                        return  -- jangan lanjut ke cooldown di frame yang sama
                     end
-                    -- ====================================================
+                    -- =====================
+                    
+                    -- ===== STATE: COOLDOWN =====
+                    -- Setelah trigger, tunggu COOLDOWN_AFTER_TRIGGER sebelum rotate lagi.
+                    -- Ini memberi waktu animasi game untuk selesai & spawn goal berikutnya.
+                    if currentState == STATE_COOLDOWN then
+                        if now - stateEnteredAt >= COOLDOWN_AFTER_TRIGGER then
+                            currentState = STATE_ROTATE
+                            stateEnteredAt = now
+                        end
+                        return
+                    end
+                    -- =====================
                 end)
                 
             else
+                -- Skillcheck hilang → bersihkan semua
                 clearBinding()
                 triggerCount = 0
-                lastTriggerTime = 0
-                wasInRange = false
-                lastGoalRotation = nil
+                currentState = STATE_ROTATE
+                stateEnteredAt = 0
             end                    
         end)                    
     end)                    

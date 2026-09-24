@@ -3414,6 +3414,7 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck (Rotate/Trigger Terpisah)
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force/Release Cycle
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Separate ROTATE/TRIGGER Systems
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3432,20 +3433,21 @@ local function InitializeAutobuy()
         local lastTriggerTime = 0
         local TRIGGER_INTERVAL = 0.05
         
-        -- ===== FORCE / RELEASE CYCLE =====
-        -- Setelah trigger, kita LEPAS Line dari force selama RELEASE_DURATION
-        -- supaya script game bisa update Line & state internalnya kembali sinkron.
-        -- Baru setelah itu kita force lagi ke Goal baru.
-        local RELEASE_DURATION = 0.30  -- 150 ms release phase (tuning)
-        local forceActive = false      -- true = kita overwrite Line
-        local releaseUntil = 0         -- kapan boleh force lagi
-        -- ==================================
+        -- ===== FORCE / RELEASE CYCLE (shared state antara ROTATE dan TRIGGER) =====
+        local RELEASE_DURATION = 0.15
+        local forceActive = false
+        local releaseUntil = 0
+        -- ==========================================================================
         
-        local BIND_NAME = "CyberForceSkillCheckLine"
+        local BIND_NAME_ROTATE = "CyberForceSkillCheckLine"
+        local BIND_NAME_TRIGGER = "CyberTriggerSkillCheckLine"
         
-        local function clearBinding()
+        local function clearBindings()
             pcall(function()
-                RunService:UnbindFromRenderStep(BIND_NAME)
+                RunService:UnbindFromRenderStep(BIND_NAME_ROTATE)
+            end)
+            pcall(function()
+                RunService:UnbindFromRenderStep(BIND_NAME_TRIGGER)
             end)
         end
         
@@ -3453,20 +3455,19 @@ local function InitializeAutobuy()
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
                 lastTriggerTime = 0
-                -- State awal: force aktif (langsung kejar Goal pertama)
                 forceActive = true
                 releaseUntil = 0
                 
-                clearBinding()
+                clearBindings()
                 
-                RunService:BindToRenderStep(BIND_NAME, Enum.RenderPriority.Last.Value, function()
+                -- =============================================================
+                -- ROTATE SYSTEM
+                -- Tugas: hanya mengatur Line.Rotation terhadap Goal
+                -- Menangani FORCE / RELEASE cycle
+                -- TIDAK memanggil TriggerMobileButton
+                -- =============================================================
+                RunService:BindToRenderStep(BIND_NAME_ROTATE, Enum.RenderPriority.Last.Value - 1, function()
                     if not check or not check.Parent or not check.Visible then
-                        clearBinding()
-                        return
-                    end
-                    
-                    if triggerCount >= MAX_TRIGGER then
-                        clearBinding()
                         return
                     end
                     
@@ -3475,51 +3476,82 @@ local function InitializeAutobuy()
                     if not currentLine or not currentGoal then return end
                     
                     local now = tick()
-                    local gr = currentGoal.Rotation % 360
                     
-                    -- ===== CEK RELEASE PHASE =====
-                    -- Kalau sedang release dan waktu release belum habis → jangan sentuh Line
+                    -- FORCE / RELEASE CYCLE
                     if not forceActive then
                         if now >= releaseUntil then
-                            -- Release habis → masuk force phase lagi
+                            -- Release selesai → kembali FORCE
                             forceActive = true
                         else
-                            -- Masih release → biarkan game update Line
+                            -- Masih RELEASE → ROTATE tidak menyentuh Line
+                            -- Biarkan game memperbarui Line sendiri
                             return
                         end
                     end
-                    -- ===========================
                     
-                    -- ===== FORCE PHASE: overwrite Line ke Goal =====
-                    currentLine.Rotation = (gr + 109) % 360
+                    -- FORCE phase: atur Line ke Goal
+                    local gr = currentGoal.Rotation % 360
+                    currentLine.Rotation = (gr + 111) % 360
+                end)
+                
+                -- =============================================================
+                -- TRIGGER SYSTEM
+                -- Tugas: memantau Line & Goal secara independen
+                -- Cek inRange dan panggil TriggerMobileButton
+                -- Tidak melakukan assignment Line.Rotation
+                -- =============================================================
+                RunService:BindToRenderStep(BIND_NAME_TRIGGER, Enum.RenderPriority.Last.Value, function()
+                    if not check or not check.Parent or not check.Visible then
+                        return
+                    end
                     
-                    -- Cek inRange
+                    if triggerCount >= MAX_TRIGGER then
+                        return
+                    end
+                    
+                    -- Hanya aktif pada FORCE phase (bukan RELEASE)
+                    if not forceActive then
+                        return
+                    end
+                    
+                    local currentLine = check:FindFirstChild("Line")
+                    local currentGoal = check:FindFirstChild("Goal")
+                    if not currentLine or not currentGoal then return end
+                    
+                    local now = tick()
                     local lr = currentLine.Rotation % 360
+                    local gr = currentGoal.Rotation % 360
                     local ss = (gr + 102) % 360
                     local se = (gr + 120) % 360
                     local inRange = false
+                    
                     if ss > se then
-                        if lr >= ss or lr <= se then inRange = true end
+                        if lr >= ss or lr <= se then
+                            inRange = true
+                        end
                     else
-                        if lr >= ss and lr <= se then inRange = true end
+                        if lr >= ss and lr <= se then
+                            inRange = true
+                        end
                     end
                     
-                    -- ===== TRIGGER =====
                     if inRange and (now - lastTriggerTime >= TRIGGER_INTERVAL) then
                         lastTriggerTime = now
                         triggerCount = triggerCount + 1
+                        
+                        -- Eksekusi trigger
                         TriggerMobileButton()
                         
-                        -- Setelah trigger → LEPAS Line sebentar supaya game sinkron
+                        -- Signal ke ROTATE system untuk masuk RELEASE phase
                         forceActive = false
                         releaseUntil = now + RELEASE_DURATION
                     end
-                    -- ================================
                 end)
+                -- =============================================================
                 
             else
-                -- Skillcheck hilang → bersihkan
-                clearBinding()
+                -- Skillcheck hilang → bersihkan semuanya
+                clearBindings()
                 triggerCount = 0
                 lastTriggerTime = 0
                 forceActive = false

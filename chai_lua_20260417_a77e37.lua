@@ -3413,7 +3413,7 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
 -- Modifikasi InitializeAutobuy - Mobile Button + Force Line→Goal (Shortest-Path + Goal Detection)
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force/Release Cycle
+-- Modifikasi InitializeAutobuy - Natural Wait + Rotate On Miss
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3430,16 +3430,13 @@ local function InitializeAutobuy()
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
-        local TRIGGER_INTERVAL = 0
+        local TRIGGER_INTERVAL = 0.05
         
-        -- ===== FORCE / RELEASE CYCLE =====
-        -- Setelah trigger, kita LEPAS Line dari force selama RELEASE_DURATION
-        -- supaya script game bisa update Line & state internalnya kembali sinkron.
-        -- Baru setelah itu kita force lagi ke Goal baru.
-        local RELEASE_DURATION = 0.15  -- 150 ms release phase (tuning)
-        local forceActive = false      -- true = kita overwrite Line
-        local releaseUntil = 0         -- kapan boleh force lagi
-        -- ==================================
+        -- ===== STATE =====
+        local wasInRange = false       -- track apakah line pernah masuk range
+        local lastGoalRotation = nil   -- track posisi goal (deteksi goal baru)
+        local GOAL_CHANGE_THRESHOLD = 5
+        -- =================
         
         local BIND_NAME = "CyberForceSkillCheckLine"
         
@@ -3449,13 +3446,19 @@ local function InitializeAutobuy()
             end)
         end
         
+        -- Normalisasi sudut ke -180..180 untuk hitung jarak terpendek
+        local function normalizeAngle(a)
+            a = a % 360
+            if a > 180 then a = a - 360 end
+            return a
+        end
+        
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
                 lastTriggerTime = 0
-                -- State awal: force aktif (langsung kejar Goal pertama)
-                forceActive = true
-                releaseUntil = 0
+                wasInRange = false
+                lastGoalRotation = nil
                 
                 clearBinding()
                 
@@ -3476,54 +3479,49 @@ local function InitializeAutobuy()
                     
                     local now = tick()
                     local gr = currentGoal.Rotation % 360
-                    
-                    -- ===== CEK RELEASE PHASE =====
-                    -- Kalau sedang release dan waktu release belum habis → jangan sentuh Line
-                    if not forceActive then
-                        if now >= releaseUntil then
-                            -- Release habis → masuk force phase lagi
-                            forceActive = true
-                        else
-                            -- Masih release → biarkan game update Line
-                            return
-                        end
-                    end
-                    -- ===========================
-                    
-                    -- ===== FORCE PHASE: overwrite Line ke Goal =====
-                    currentLine.Rotation = (gr + 111) % 360
-                    
-                    -- Cek inRange
                     local lr = currentLine.Rotation % 360
-                    local ss = (gr + 102) % 360
-                    local se = (gr + 120) % 360
-                    local inRange = false
-                    if ss > se then
-                        if lr >= ss or lr <= se then inRange = true end
-                    else
-                        if lr >= ss and lr <= se then inRange = true end
-                    end
                     
-                    -- ===== TRIGGER =====
-                    if inRange and (now - lastTriggerTime >= TRIGGER_INTERVAL) then
-                        lastTriggerTime = now
-                        triggerCount = triggerCount + 1
-                        TriggerMobileButton()
-                        
-                        -- Setelah trigger → LEPAS Line sebentar supaya game sinkron
-                        forceActive = false
-                        releaseUntil = now + RELEASE_DURATION
+                    -- ===== DETEKSI GOAL BARU (reset state) =====
+                    if lastGoalRotation == nil 
+                       or math.abs(normalizeAngle(gr - lastGoalRotation)) > GOAL_CHANGE_THRESHOLD then
+                        lastGoalRotation = gr
+                        wasInRange = false  -- goal baru → tunggu natural lagi, jangan rotate dulu
                     end
-                    -- ================================
+                    -- ==============================================
+                    
+                    -- ===== HITUNG JARAK LINE KE TENGAH RANGE GOAL =====
+                    local midGoal = (gr + 111) % 360
+                    local deltaToMid = normalizeAngle(midGoal - lr)
+                    local inRange = math.abs(deltaToMid) <= 9
+                    -- =================================================
+                    
+                    -- ===== LOGIKA UTAMA: NATURAL WAIT + ROTATE ON MISS =====
+                    if inRange then
+                        -- Line di dalam range → trigger natural
+                        wasInRange = true
+                        if now - lastTriggerTime >= TRIGGER_INTERVAL then
+                            lastTriggerTime = now
+                            triggerCount = triggerCount + 1
+                            TriggerMobileButton()
+                        end
+                    else
+                        -- Line tidak di range
+                        if wasInRange then
+                            -- Baru keluar range → berarti LEWAT goal → rotate mundur
+                            currentLine.Rotation = midGoal
+                            wasInRange = false
+                        end
+                        -- Kalau belum pernah masuk range → TUNGGU natural (jangan rotate)
+                    end
+                    -- ====================================================
                 end)
                 
             else
-                -- Skillcheck hilang → bersihkan
                 clearBinding()
                 triggerCount = 0
                 lastTriggerTime = 0
-                forceActive = false
-                releaseUntil = 0
+                wasInRange = false
+                lastGoalRotation = nil
             end                    
         end)                    
     end)                    

@@ -3491,7 +3491,7 @@ local function InitializeAutobuy()
                     -- ===========================
                     
                     -- ===== FORCE PHASE: overwrite Line ke Goal =====
-                    currentLine.Rotation = (gr + 111) % 360
+                    currentLine.Rotation = (gr + 109) % 360
                     
                     -- Cek inRange
                     local lr = currentLine.Rotation % 360

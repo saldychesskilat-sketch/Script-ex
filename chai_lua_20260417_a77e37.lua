@@ -3430,7 +3430,7 @@ local function InitializeAutobuy()
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         local lastTriggerTime = 0
-        local TRIGGER_INTERVAL = 0.05
+        local TRIGGER_INTERVAL = 0
         
         -- ===== FORCE / RELEASE CYCLE =====
         -- Setelah trigger, kita LEPAS Line dari force selama RELEASE_DURATION

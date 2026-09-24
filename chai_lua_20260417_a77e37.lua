@@ -3413,6 +3413,7 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck (Rotate/Trigger Terpisah)
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Continuous Rotate Until Meet
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3429,18 +3430,11 @@ local function InitializeAutobuy()
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
         
-        -- ===== STATE MACHINE: ROTATE → TRIGGER → COOLDOWN =====
-        -- Rotate dan Trigger dipisah ke state berbeda supaya tidak bentrok.
-        local STATE_ROTATE = "ROTATE"
-        local STATE_TRIGGER = "TRIGGER"
-        local STATE_COOLDOWN = "COOLDOWN"
-        
-        local currentState = STATE_ROTATE
-        local stateEnteredAt = 0
-        
-        local SETTLE_AFTER_ROTATE = 0.03       -- tunggu kecil setelah rotate sebelum cek trigger
-        local COOLDOWN_AFTER_TRIGGER = 0.20    -- jeda panjang setelah trigger, sebelum rotate lagi
-        -- =======================================================
+        -- ===== STATE EDGE DETECTION =====
+        -- Trigger hanya saat transisi "di luar range" → "di dalam range"
+        -- Bukan tiap frame, jadi tidak spam, dan tidak overwrite state game tiap frame
+        local wasInRange = false
+        -- ==================================
         
         local BIND_NAME = "CyberForceSkillCheckLine"
         
@@ -3453,18 +3447,16 @@ local function InitializeAutobuy()
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
-                -- Reset state
-                currentState = STATE_ROTATE
-                stateEnteredAt = tick()
+                wasInRange = false
                 
                 clearBinding()
                 
                 RunService:BindToRenderStep(BIND_NAME, Enum.RenderPriority.Last.Value, function()
-                    -- ===== Guard =====
                     if not check or not check.Parent or not check.Visible then
                         clearBinding()
                         return
                     end
+                    
                     if triggerCount >= MAX_TRIGGER then
                         clearBinding()
                         return
@@ -3474,66 +3466,41 @@ local function InitializeAutobuy()
                     local currentGoal = check:FindFirstChild("Goal")
                     if not currentLine or not currentGoal then return end
                     
-                    local now = tick()
                     local gr = currentGoal.Rotation % 360
                     
-                    -- ===== STATE: ROTATE =====
-                    -- Paksa Line ke tengah range Goal.
-                    -- Setelah rotate selesai, LANGSUNG pindah ke STATE_TRIGGER
-                    -- tapi TIDAK trigger di frame yang sama (return).
-                    if currentState == STATE_ROTATE then
-                        currentLine.Rotation = (gr + 111) % 360
-                        currentState = STATE_TRIGGER
-                        stateEnteredAt = now
-                        return  -- penting: keluar dari frame ini biar game consume rotate
-                    end
-                    -- =====================
+                    -- ===== ROTATE TERUS MENERUS KE GOAL =====
+                    -- Setiap frame, paksa Line ke posisi goal
+                    -- Efek visual: "patah-patah" karena Line selalu di-update
+                    currentLine.Rotation = (gr + 111) % 360
+                    -- =========================================
                     
-                    -- ===== STATE: TRIGGER =====
-                    -- Setelah SETTLE_AFTER_ROTATE, baru cek range dan trigger.
-                    -- Rotate tidak dilakukan di sini.
-                    if currentState == STATE_TRIGGER then
-                        if now - stateEnteredAt >= SETTLE_AFTER_ROTATE then
-                            local lr = currentLine.Rotation % 360
-                            local ss = (gr + 102) % 360
-                            local se = (gr + 120) % 360
-                            local inRange = false
-                            if ss > se then
-                                if lr >= ss or lr <= se then inRange = true end
-                            else
-                                if lr >= ss and lr <= se then inRange = true end
-                            end
-                            
-                            if inRange then
-                                TriggerMobileButton()
-                                triggerCount = triggerCount + 1
-                                currentState = STATE_COOLDOWN
-                                stateEnteredAt = now
-                            end
-                        end
-                        return  -- jangan lanjut ke cooldown di frame yang sama
+                    -- Cek inRange
+                    local lr = currentLine.Rotation % 360
+                    local ss = (gr + 102) % 360
+                    local se = (gr + 120) % 360
+                    local inRange = false
+                    if ss > se then
+                        if lr >= ss or lr <= se then inRange = true end
+                    else
+                        if lr >= ss and lr <= se then inRange = true end
                     end
-                    -- =====================
                     
-                    -- ===== STATE: COOLDOWN =====
-                    -- Setelah trigger, tunggu COOLDOWN_AFTER_TRIGGER sebelum rotate lagi.
-                    -- Ini memberi waktu animasi game untuk selesai & spawn goal berikutnya.
-                    if currentState == STATE_COOLDOWN then
-                        if now - stateEnteredAt >= COOLDOWN_AFTER_TRIGGER then
-                            currentState = STATE_ROTATE
-                            stateEnteredAt = now
-                        end
-                        return
+                    -- ===== TRIGGER HANYA SAAT TRANSISI (EDGE DETECTION) =====
+                    -- Bukan tiap frame, jadi tidak menimpa trigger yang belum selesai
+                    -- dan tidak corrupt state internal game.
+                    if inRange and not wasInRange then
+                        triggerCount = triggerCount + 1
+                        TriggerMobileButton()
                     end
-                    -- =====================
+                    wasInRange = inRange
+                    -- ==================================================
                 end)
                 
             else
-                -- Skillcheck hilang → bersihkan semua
+                -- Skillcheck hilang → bersihkan
                 clearBinding()
                 triggerCount = 0
-                currentState = STATE_ROTATE
-                stateEnteredAt = 0
+                wasInRange = false
             end                    
         end)                    
     end)                    

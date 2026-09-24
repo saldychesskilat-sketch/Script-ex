@@ -3413,7 +3413,7 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck (Rotate/Trigger Terpisah)
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Continuous Rotate Until Meet
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force/Release Cycle
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3429,11 +3429,16 @@ local function InitializeAutobuy()
         
         local triggerCount = 0          
         local MAX_TRIGGER = 99999999999           
+        local lastTriggerTime = 0
+        local TRIGGER_INTERVAL = 0.05
         
-        -- ===== STATE EDGE DETECTION =====
-        -- Trigger hanya saat transisi "di luar range" → "di dalam range"
-        -- Bukan tiap frame, jadi tidak spam, dan tidak overwrite state game tiap frame
-        local wasInRange = false
+        -- ===== FORCE / RELEASE CYCLE =====
+        -- Setelah trigger, kita LEPAS Line dari force selama RELEASE_DURATION
+        -- supaya script game bisa update Line & state internalnya kembali sinkron.
+        -- Baru setelah itu kita force lagi ke Goal baru.
+        local RELEASE_DURATION = 0.30  -- 150 ms release phase (tuning)
+        local forceActive = false      -- true = kita overwrite Line
+        local releaseUntil = 0         -- kapan boleh force lagi
         -- ==================================
         
         local BIND_NAME = "CyberForceSkillCheckLine"
@@ -3447,7 +3452,10 @@ local function InitializeAutobuy()
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
-                wasInRange = false
+                lastTriggerTime = 0
+                -- State awal: force aktif (langsung kejar Goal pertama)
+                forceActive = true
+                releaseUntil = 0
                 
                 clearBinding()
                 
@@ -3466,13 +3474,24 @@ local function InitializeAutobuy()
                     local currentGoal = check:FindFirstChild("Goal")
                     if not currentLine or not currentGoal then return end
                     
+                    local now = tick()
                     local gr = currentGoal.Rotation % 360
                     
-                    -- ===== ROTATE TERUS MENERUS KE GOAL =====
-                    -- Setiap frame, paksa Line ke posisi goal
-                    -- Efek visual: "patah-patah" karena Line selalu di-update
+                    -- ===== CEK RELEASE PHASE =====
+                    -- Kalau sedang release dan waktu release belum habis → jangan sentuh Line
+                    if not forceActive then
+                        if now >= releaseUntil then
+                            -- Release habis → masuk force phase lagi
+                            forceActive = true
+                        else
+                            -- Masih release → biarkan game update Line
+                            return
+                        end
+                    end
+                    -- ===========================
+                    
+                    -- ===== FORCE PHASE: overwrite Line ke Goal =====
                     currentLine.Rotation = (gr + 111) % 360
-                    -- =========================================
                     
                     -- Cek inRange
                     local lr = currentLine.Rotation % 360
@@ -3485,22 +3504,26 @@ local function InitializeAutobuy()
                         if lr >= ss and lr <= se then inRange = true end
                     end
                     
-                    -- ===== TRIGGER HANYA SAAT TRANSISI (EDGE DETECTION) =====
-                    -- Bukan tiap frame, jadi tidak menimpa trigger yang belum selesai
-                    -- dan tidak corrupt state internal game.
-                    if inRange and not wasInRange then
+                    -- ===== TRIGGER =====
+                    if inRange and (now - lastTriggerTime >= TRIGGER_INTERVAL) then
+                        lastTriggerTime = now
                         triggerCount = triggerCount + 1
                         TriggerMobileButton()
+                        
+                        -- Setelah trigger → LEPAS Line sebentar supaya game sinkron
+                        forceActive = false
+                        releaseUntil = now + RELEASE_DURATION
                     end
-                    wasInRange = inRange
-                    -- ==================================================
+                    -- ================================
                 end)
                 
             else
                 -- Skillcheck hilang → bersihkan
                 clearBinding()
                 triggerCount = 0
-                wasInRange = false
+                lastTriggerTime = 0
+                forceActive = false
+                releaseUntil = 0
             end                    
         end)                    
     end)                    

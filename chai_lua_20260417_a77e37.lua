@@ -3514,7 +3514,7 @@ local function InitializeAutobuy()
                     
                     -- FORCE phase: atur Line ke Goal
                     local gr = currentGoal.Rotation % 360
-                    currentLine.Rotation = (gr + 111) % 360
+                    currentLine.Rotation = (gr + 109) % 360
                 end)
                 
                 -- =============================================================

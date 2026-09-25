@@ -3411,10 +3411,7 @@ end
 -- Remote utama: Skillcheckvalidated (mekanisme sama seperti mobile button — spam tiap frame inRange)
 -- Switch trigger: >=89% progress → TriggerMobileButton, <89% → fireSkillcheckValidated
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal + Trigger Interval
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck (Rotate/Trigger Terpisah)
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force/Release Cycle
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Separate ROTATE/TRIGGER Systems
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Separate ROTATE/TRIGGER + Goal Change Detection
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3433,11 +3430,16 @@ local function InitializeAutobuy()
         local lastTriggerTime = 0
         local TRIGGER_INTERVAL = 0.05
         
-        -- ===== FORCE / RELEASE CYCLE (shared state antara ROTATE dan TRIGGER) =====
+        -- ===== FORCE / RELEASE CYCLE (shared state) =====
         local RELEASE_DURATION = 0.15
         local forceActive = false
         local releaseUntil = 0
-        -- ==========================================================================
+        -- =================================================
+        
+        -- ===== DOUBLE SKILLCHECK TRACKING =====
+        local lastGoalObject = nil
+        local lastGoalRotation = nil
+        -- ========================================
         
         local BIND_NAME_ROTATE = "CyberForceSkillCheckLine"
         local BIND_NAME_TRIGGER = "CyberTriggerSkillCheckLine"
@@ -3457,14 +3459,13 @@ local function InitializeAutobuy()
                 lastTriggerTime = 0
                 forceActive = true
                 releaseUntil = 0
+                lastGoalObject = nil
+                lastGoalRotation = nil
                 
                 clearBindings()
                 
                 -- =============================================================
                 -- ROTATE SYSTEM
-                -- Tugas: hanya mengatur Line.Rotation terhadap Goal
-                -- Menangani FORCE / RELEASE cycle
-                -- TIDAK memanggil TriggerMobileButton
                 -- =============================================================
                 RunService:BindToRenderStep(BIND_NAME_ROTATE, Enum.RenderPriority.Last.Value - 1, function()
                     if not check or not check.Parent or not check.Visible then
@@ -3477,14 +3478,36 @@ local function InitializeAutobuy()
                     
                     local now = tick()
                     
+                    -- ===== DETEKSI GOAL BARU =====
+                    local goalChanged = false
+                    
+                    if currentGoal ~= lastGoalObject then
+                        goalChanged = true
+                    elseif lastGoalRotation ~= nil then
+                        local rotationDifference = math.abs(currentGoal.Rotation - lastGoalRotation)
+                        if rotationDifference > 5 then
+                            goalChanged = true
+                        end
+                    end
+                    
+                    if goalChanged then
+                        lastGoalObject = currentGoal
+                        lastGoalRotation = currentGoal.Rotation
+                        
+                        -- Goal baru → force langsung, reset trigger cooldown
+                        forceActive = true
+                        releaseUntil = 0
+                        lastTriggerTime = 0     -- <-- PERBAIKAN: reset agar goal 2 bisa trigger langsung
+                    else
+                        lastGoalRotation = currentGoal.Rotation
+                    end
+                    -- =================================
+                    
                     -- FORCE / RELEASE CYCLE
                     if not forceActive then
                         if now >= releaseUntil then
-                            -- Release selesai → kembali FORCE
                             forceActive = true
                         else
-                            -- Masih RELEASE → ROTATE tidak menyentuh Line
-                            -- Biarkan game memperbarui Line sendiri
                             return
                         end
                     end
@@ -3496,9 +3519,6 @@ local function InitializeAutobuy()
                 
                 -- =============================================================
                 -- TRIGGER SYSTEM
-                -- Tugas: memantau Line & Goal secara independen
-                -- Cek inRange dan panggil TriggerMobileButton
-                -- Tidak melakukan assignment Line.Rotation
                 -- =============================================================
                 RunService:BindToRenderStep(BIND_NAME_TRIGGER, Enum.RenderPriority.Last.Value, function()
                     if not check or not check.Parent or not check.Visible then
@@ -3509,7 +3529,6 @@ local function InitializeAutobuy()
                         return
                     end
                     
-                    -- Hanya aktif pada FORCE phase (bukan RELEASE)
                     if not forceActive then
                         return
                     end
@@ -3526,36 +3545,29 @@ local function InitializeAutobuy()
                     local inRange = false
                     
                     if ss > se then
-                        if lr >= ss or lr <= se then
-                            inRange = true
-                        end
+                        if lr >= ss or lr <= se then inRange = true end
                     else
-                        if lr >= ss and lr <= se then
-                            inRange = true
-                        end
+                        if lr >= ss and lr <= se then inRange = true end
                     end
                     
                     if inRange and (now - lastTriggerTime >= TRIGGER_INTERVAL) then
                         lastTriggerTime = now
                         triggerCount = triggerCount + 1
-                        
-                        -- Eksekusi trigger
                         TriggerMobileButton()
                         
-                        -- Signal ke ROTATE system untuk masuk RELEASE phase
                         forceActive = false
                         releaseUntil = now + RELEASE_DURATION
                     end
                 end)
-                -- =============================================================
                 
             else
-                -- Skillcheck hilang → bersihkan semuanya
                 clearBindings()
                 triggerCount = 0
                 lastTriggerTime = 0
                 forceActive = false
                 releaseUntil = 0
+                lastGoalObject = nil
+                lastGoalRotation = nil
             end                    
         end)                    
     end)                    

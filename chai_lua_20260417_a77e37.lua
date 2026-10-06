@@ -3411,7 +3411,8 @@ end
 -- Remote utama: Skillcheckvalidated (mekanisme sama seperti mobile button — spam tiap frame inRange)
 -- Switch trigger: >=89% progress → TriggerMobileButton, <89% → fireSkillcheckValidated
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Force Line→Goal
--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck + Separate ROTATE/TRIGGER + Goal Change Detection
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
+-- Separate ROTATE/TRIGGER + Feedback Correction + Object-based Goal Detection
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3436,10 +3437,14 @@ local function InitializeAutobuy()
         local releaseUntil = 0
         -- =================================================
         
-        -- ===== DOUBLE SKILLCHECK TRACKING =====
+        -- ===== DOUBLE SKILLCHECK TRACKING (hanya object) =====
         local lastGoalObject = nil
-        local lastGoalRotation = nil
-        -- ========================================
+        -- =====================================================
+        
+        -- ===== FEEDBACK CORRECTION PARAMS =====
+        local ROTATE_SPEED = 360   -- derajat per detik (360 = 6°/frame @60fps)
+        local DEADZONE = 2         -- toleransi sudut dianggap "sudah pas"
+        -- =======================================
         
         local BIND_NAME_ROTATE = "CyberForceSkillCheckLine"
         local BIND_NAME_TRIGGER = "CyberTriggerSkillCheckLine"
@@ -3453,6 +3458,11 @@ local function InitializeAutobuy()
             end)
         end
         
+        -- Helper: selisih sudut terpendek (-180..180)
+        local function shortestAngle(a, b)
+            return (b - a + 180) % 360 - 180
+        end
+        
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
@@ -3460,14 +3470,13 @@ local function InitializeAutobuy()
                 forceActive = true
                 releaseUntil = 0
                 lastGoalObject = nil
-                lastGoalRotation = nil
                 
                 clearBindings()
                 
                 -- =============================================================
                 -- ROTATE SYSTEM
                 -- =============================================================
-                RunService:BindToRenderStep(BIND_NAME_ROTATE, Enum.RenderPriority.Last.Value - 1, function()
+                RunService:BindToRenderStep(BIND_NAME_ROTATE, Enum.RenderPriority.Last.Value - 1, function(dt)
                     if not check or not check.Parent or not check.Visible then
                         return
                     end
@@ -3478,30 +3487,14 @@ local function InitializeAutobuy()
                     
                     local now = tick()
                     
-                    -- ===== DETEKSI GOAL BARU =====
-                    local goalChanged = false
-                    
+                    -- ===== DETEKSI GOAL BARU (object-based saja) =====
                     if currentGoal ~= lastGoalObject then
-                        goalChanged = true
-                    elseif lastGoalRotation ~= nil then
-                        local rotationDifference = math.abs(currentGoal.Rotation - lastGoalRotation)
-                        if rotationDifference > 5 then
-                            goalChanged = true
-                        end
-                    end
-                    
-                    if goalChanged then
                         lastGoalObject = currentGoal
-                        lastGoalRotation = currentGoal.Rotation
-                        
-                        -- Goal baru → force langsung, reset trigger cooldown
                         forceActive = true
                         releaseUntil = 0
-                        lastTriggerTime = 0     -- <-- PERBAIKAN: reset agar goal 2 bisa trigger langsung
-                    else
-                        lastGoalRotation = currentGoal.Rotation
+                        lastTriggerTime = 0
                     end
-                    -- =================================
+                    -- ==================================================
                     
                     -- FORCE / RELEASE CYCLE
                     if not forceActive then
@@ -3512,9 +3505,26 @@ local function InitializeAutobuy()
                         end
                     end
                     
-                    -- FORCE phase: atur Line ke Goal
-                    local gr = currentGoal.Rotation % 360
-                    currentLine.Rotation = (gr + 109) % 360
+                    -- ===== FEEDBACK CORRECTION =====
+                    local goalRotation = currentGoal.Rotation % 360
+                    local targetRotation = (goalRotation + 109) % 360
+                    local currentRotation = currentLine.Rotation % 360
+                    
+                    local difference = shortestAngle(currentRotation, targetRotation)
+                    
+                    -- Sudah dalam deadzone → jangan koreksi
+                    if math.abs(difference) <= DEADZONE then
+                        return
+                    end
+                    
+                    -- Koreksi bertahap
+                    local maxStep = ROTATE_SPEED * (dt or (1/60))
+                    if math.abs(difference) <= maxStep then
+                        currentLine.Rotation = targetRotation
+                    else
+                        currentLine.Rotation = currentRotation + math.sign(difference) * maxStep
+                    end
+                    -- =================================
                 end)
                 
                 -- =============================================================
@@ -3567,7 +3577,6 @@ local function InitializeAutobuy()
                 forceActive = false
                 releaseUntil = 0
                 lastGoalObject = nil
-                lastGoalRotation = nil
             end                    
         end)                    
     end)                    

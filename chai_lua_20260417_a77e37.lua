@@ -3414,6 +3414,9 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
 -- Separate ROTATE/TRIGGER + Circular Diff Goal Detection (threshold 20°)
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
+-- Separate ROTATE/TRIGGER + Circular Diff Goal Detection
+-- + Double Skillcheck: Multi-Write + Max Priority Binding
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3443,8 +3446,16 @@ local function InitializeAutobuy()
         local lastGoalRotation = nil
         -- ========================================
         
+        -- ===== DOUBLE MODE (aktif saat goal berubah) =====
+        local doubleMode = false
+        -- ===================================================
+        
         local BIND_NAME_ROTATE = "CyberForceSkillCheckLine"
         local BIND_NAME_TRIGGER = "CyberTriggerSkillCheckLine"
+        local BIND_NAME_DOUBLE = "CyberForceSkillCheckLineDouble"
+        
+        -- Prioritas tertinggi (max int) untuk double mode
+        local MAX_PRIORITY = 2147483647
         
         local function clearBindings()
             pcall(function()
@@ -3452,6 +3463,9 @@ local function InitializeAutobuy()
             end)
             pcall(function()
                 RunService:UnbindFromRenderStep(BIND_NAME_TRIGGER)
+            end)
+            pcall(function()
+                RunService:UnbindFromRenderStep(BIND_NAME_DOUBLE)
             end)
         end
         
@@ -3463,11 +3477,12 @@ local function InitializeAutobuy()
                 releaseUntil = 0
                 lastGoalObject = nil
                 lastGoalRotation = nil
+                doubleMode = false   -- reset: skillcheck pertama pakai snap biasa
                 
                 clearBindings()
                 
                 -- =============================================================
-                -- ROTATE SYSTEM
+                -- ROTATE SYSTEM (skillcheck pertama: snap biasa)
                 -- =============================================================
                 RunService:BindToRenderStep(BIND_NAME_ROTATE, Enum.RenderPriority.Last.Value - 1, function()
                     if not check or not check.Parent or not check.Visible then
@@ -3485,14 +3500,11 @@ local function InitializeAutobuy()
                     local currentRotation = currentGoal.Rotation % 360
                     
                     if currentGoal ~= lastGoalObject then
-                        -- Goal object benar-benar baru
                         goalChanged = true
                     elseif lastGoalRotation ~= nil then
-                        -- Hitung perubahan rotation secara melingkar (0° → 360°)
                         local diff = math.abs(
                             ((currentRotation - lastGoalRotation + 180) % 360) - 180
                         )
-                        -- Perubahan besar (>20°) kemungkinan menandakan Goal di-reset
                         if diff > 20 then
                             goalChanged = true
                         end
@@ -3505,6 +3517,11 @@ local function InitializeAutobuy()
                         forceActive = true
                         releaseUntil = 0
                         lastTriggerTime = 0
+                        
+                        -- ===== AKTIFKAN DOUBLE MODE =====
+                        -- Mulai frame ini, binding prioritas max akan aktif
+                        doubleMode = true
+                        -- ==================================
                     else
                         lastGoalRotation = currentRotation
                     end
@@ -3519,10 +3536,42 @@ local function InitializeAutobuy()
                         end
                     end
                     
-                    -- FORCE phase: snap Line ke Goal (metode lama yang sudah bekerja)
+                    -- FORCE phase: snap Line ke Goal
                     local gr = currentGoal.Rotation % 360
                     currentLine.Rotation = (gr + 109) % 360
                 end)
+                
+                -- =============================================================
+                -- DOUBLE MODE SYSTEM (khusus double skillcheck)
+                -- Multi-Write + Priority Tertinggi
+                -- =============================================================
+                RunService:BindToRenderStep(BIND_NAME_DOUBLE, MAX_PRIORITY, function()
+                    -- Hanya aktif kalau double mode menyala
+                    if not doubleMode then return end
+                    
+                    if not check or not check.Parent or not check.Visible then
+                        return
+                    end
+                    
+                    if not forceActive then
+                        return
+                    end
+                    
+                    local currentLine = check:FindFirstChild("Line")
+                    local currentGoal = check:FindFirstChild("Goal")
+                    if not currentLine or not currentGoal then return end
+                    
+                    local gr = currentGoal.Rotation % 360
+                    local target = (gr + 109) % 360
+                    
+                    -- ===== MULTI-WRITE dalam 1 frame =====
+                    -- Set 3x berturut-turut untuk memastikan write terakhir = kita
+                    currentLine.Rotation = target
+                    currentLine.Rotation = target
+                    currentLine.Rotation = target
+                    -- =====================================
+                end)
+                -- =============================================================
                 
                 -- =============================================================
                 -- TRIGGER SYSTEM
@@ -3575,6 +3624,7 @@ local function InitializeAutobuy()
                 releaseUntil = 0
                 lastGoalObject = nil
                 lastGoalRotation = nil
+                doubleMode = false
             end                    
         end)                    
     end)                    

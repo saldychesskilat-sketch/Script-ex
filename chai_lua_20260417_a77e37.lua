@@ -3415,6 +3415,7 @@ end
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
 -- Separate ROTATE/TRIGGER + Circular Diff Goal Detection (threshold 20°)
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
+--- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
 -- Separate ROTATE/TRIGGER + Circular Diff Goal Detection
 -- + Double Skillcheck: Multi-Write + Max Priority Binding
 local function InitializeAutobuy()                    
@@ -3566,6 +3567,8 @@ local function InitializeAutobuy()
                     
                     -- ===== MULTI-WRITE dalam 1 frame =====
                     -- Set 3x berturut-turut untuk memastikan write terakhir = kita
+                    currentLine.Rotation = target
+                    currentLine.Rotation = target
                     currentLine.Rotation = target
                     currentLine.Rotation = target
                     currentLine.Rotation = target

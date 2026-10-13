@@ -3416,8 +3416,8 @@ end
 -- Separate ROTATE/TRIGGER + Circular Diff Goal Detection (threshold 20°)
 -- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
 --- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
--- Separate ROTATE/TRIGGER + Circular Diff Goal Detection
--- + Double Skillcheck: Multi-Write + Max Priority Binding
+-- Modifikasi InitializeAutobuy - Mobile Button Auto Skillcheck
+-- Single-Snap saat muncul + Trigger Detection Only
 local function InitializeAutobuy()                    
     task.spawn(function()                    
         local playerGui = localPlayer:FindFirstChild("PlayerGui")                    
@@ -3436,148 +3436,40 @@ local function InitializeAutobuy()
         local lastTriggerTime = 0
         local TRIGGER_INTERVAL = 0.05
         
-        -- ===== FORCE / RELEASE CYCLE (shared state) =====
-        local RELEASE_DURATION = 0.15
-        local forceActive = false
-        local releaseUntil = 0
-        -- =================================================
-        
-        -- ===== DOUBLE SKILLCHECK TRACKING =====
-        local lastGoalObject = nil
-        local lastGoalRotation = nil
-        -- ========================================
-        
-        -- ===== DOUBLE MODE (aktif saat goal berubah) =====
-        local doubleMode = false
-        -- ===================================================
-        
-        local BIND_NAME_ROTATE = "CyberForceSkillCheckLine"
         local BIND_NAME_TRIGGER = "CyberTriggerSkillCheckLine"
-        local BIND_NAME_DOUBLE = "CyberForceSkillCheckLineDouble"
         
-        -- Prioritas tertinggi (max int) untuk double mode
-        local MAX_PRIORITY = 2147483647
-        
-        local function clearBindings()
-            pcall(function()
-                RunService:UnbindFromRenderStep(BIND_NAME_ROTATE)
-            end)
+        local function clearBinding()
             pcall(function()
                 RunService:UnbindFromRenderStep(BIND_NAME_TRIGGER)
             end)
-            pcall(function()
-                RunService:UnbindFromRenderStep(BIND_NAME_DOUBLE)
-            end)
+        end
+        
+        -- Helper: single snap Line ke Goal + 109
+        local function snapLineOnce()
+            local line = check:FindFirstChild("Line")
+            local goal = check:FindFirstChild("Goal")
+            if not line or not goal then return end
+            local gr = goal.Rotation % 360
+            line.Rotation = (gr + 109) % 360
         end
         
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()                    
             if localPlayer.Team and localPlayer.Team.Name == "Survivors" and check.Visible then                    
                 triggerCount = 0           
                 lastTriggerTime = 0
-                forceActive = true
-                releaseUntil = 0
-                lastGoalObject = nil
-                lastGoalRotation = nil
-                doubleMode = false   -- reset: skillcheck pertama pakai snap biasa
                 
-                clearBindings()
+                clearBinding()
                 
-                -- =============================================================
-                -- ROTATE SYSTEM (skillcheck pertama: snap biasa)
-                -- =============================================================
-                RunService:BindToRenderStep(BIND_NAME_ROTATE, Enum.RenderPriority.Last.Value - 1, function()
-                    if not check or not check.Parent or not check.Visible then
-                        return
-                    end
-                    
-                    local currentLine = check:FindFirstChild("Line")
-                    local currentGoal = check:FindFirstChild("Goal")
-                    if not currentLine or not currentGoal then return end
-                    
-                    local now = tick()
-                    
-                    -- ===== DETEKSI GOAL BARU / DOUBLE SKILLCHECK =====
-                    local goalChanged = false
-                    local currentRotation = currentGoal.Rotation % 360
-                    
-                    if currentGoal ~= lastGoalObject then
-                        goalChanged = true
-                    elseif lastGoalRotation ~= nil then
-                        local diff = math.abs(
-                            ((currentRotation - lastGoalRotation + 180) % 360) - 180
-                        )
-                        if diff > 20 then
-                            goalChanged = true
-                        end
-                    end
-                    
-                    if goalChanged then
-                        lastGoalObject = currentGoal
-                        lastGoalRotation = currentRotation
-                        
-                        forceActive = true
-                        releaseUntil = 0
-                        lastTriggerTime = 0
-                        
-                        -- ===== AKTIFKAN DOUBLE MODE =====
-                        -- Mulai frame ini, binding prioritas max akan aktif
-                        doubleMode = true
-                        -- ==================================
-                    else
-                        lastGoalRotation = currentRotation
-                    end
-                    -- ==================================================
-                    
-                    -- FORCE / RELEASE CYCLE
-                    if not forceActive then
-                        if now >= releaseUntil then
-                            forceActive = true
-                        else
-                            return
-                        end
-                    end
-                    
-                    -- FORCE phase: snap Line ke Goal
-                    local gr = currentGoal.Rotation % 360
-                    currentLine.Rotation = (gr + 109) % 360
-                end)
-                
-                -- =============================================================
-                -- DOUBLE MODE SYSTEM (khusus double skillcheck)
-                -- Multi-Write + Priority Tertinggi
-                -- =============================================================
-                RunService:BindToRenderStep(BIND_NAME_DOUBLE, MAX_PRIORITY, function()
-                    -- Hanya aktif kalau double mode menyala
-                    if not doubleMode then return end
-                    
-                    if not check or not check.Parent or not check.Visible then
-                        return
-                    end
-                    
-                    if not forceActive then
-                        return
-                    end
-                    
-                    local currentLine = check:FindFirstChild("Line")
-                    local currentGoal = check:FindFirstChild("Goal")
-                    if not currentLine or not currentGoal then return end
-                    
-                    local gr = currentGoal.Rotation % 360
-                    local target = (gr + 109) % 360
-                    
-                    -- ===== MULTI-WRITE dalam 1 frame =====
-                    -- Set 3x berturut-turut untuk memastikan write terakhir = kita
-                    currentLine.Rotation = target
-                    currentLine.Rotation = target
-                    currentLine.Rotation = target
-                    currentLine.Rotation = target
-                    currentLine.Rotation = target
-                    -- =====================================
-                end)
-                -- =============================================================
+                -- ===== SINGLE SNAP saat skillcheck muncul =====
+                -- Cukup sekali di awal, setelah itu biarkan game animasi normal.
+                -- Kalau game mengubah Goal di tengah, Line akan tetap natural
+                -- karena kita tidak memaksa lagi.
+                snapLineOnce()
+                -- ================================================
                 
                 -- =============================================================
                 -- TRIGGER SYSTEM
+                -- Hanya memantau, tidak mengubah Line
                 -- =============================================================
                 RunService:BindToRenderStep(BIND_NAME_TRIGGER, Enum.RenderPriority.Last.Value, function()
                     if not check or not check.Parent or not check.Visible then
@@ -3585,10 +3477,6 @@ local function InitializeAutobuy()
                     end
                     
                     if triggerCount >= MAX_TRIGGER then
-                        return
-                    end
-                    
-                    if not forceActive then
                         return
                     end
                     
@@ -3613,21 +3501,13 @@ local function InitializeAutobuy()
                         lastTriggerTime = now
                         triggerCount = triggerCount + 1
                         TriggerMobileButton()
-                        
-                        forceActive = false
-                        releaseUntil = now + RELEASE_DURATION
                     end
                 end)
                 
             else
-                clearBindings()
+                clearBinding()
                 triggerCount = 0
                 lastTriggerTime = 0
-                forceActive = false
-                releaseUntil = 0
-                lastGoalObject = nil
-                lastGoalRotation = nil
-                doubleMode = false
             end                    
         end)                    
     end)                    

@@ -7635,6 +7635,286 @@ local function createGUI()
     screenGui.Parent = CoreGui
     screenGui.ResetOnSpawn = false
 
+    -- =========================================================================
+    -- ===== [NEW: SMART FEATURE NOTIFICATION SYSTEM] =====
+    -- =========================================================================
+    local notifGui = Instance.new("ScreenGui")
+    notifGui.Name = "CyberHeroes_Notifications"
+    notifGui.ResetOnSpawn = false
+    notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    notifGui.DisplayOrder = 999
+    notifGui.Parent = CoreGui
+
+    local notifContainer = Instance.new("Frame")
+    notifContainer.Name = "NotifContainer"
+    notifContainer.AnchorPoint = Vector2.new(1, 0)
+    notifContainer.Position = UDim2.new(1, -12, 0, 12)
+    notifContainer.Size = UDim2.new(0, 260, 1, -24)
+    notifContainer.BackgroundTransparency = 1
+    notifContainer.Parent = notifGui
+
+    local notifLayout = Instance.new("UIListLayout")
+    notifLayout.Padding = UDim.new(0, 8)
+    notifLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    notifLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    notifLayout.Parent = notifContainer
+
+    -- Metadata per fitur (verified = sesuai implementasi yang bisa diverifikasi)
+    local FEATURE_META = {
+        autoWinEnabled        = { title = "AUTO WIN",        desc = "Mekanisme auto win sesuai implementasi fitur.", verified = false },
+        autoTaskEnabled       = { title = "AIM ATTACK",      desc = "Mengunci kamera ke survivor terdekat di depan POV selama tombol attack ditahan.", verified = true },
+        espEnabled            = { title = "ESP ALL",         desc = "Menampilkan highlight, jarak, dan garis koneksi ke seluruh pemain.", verified = true },
+        speedBoostEnabled     = { title = "PLAY AI",         desc = "Fitur ini belum dapat gunakan karena masih dalam tahap perkembangan.", verified = false },
+        stealthEnabled        = { title = "STEALTH",         desc = "Mode stealth / penyamaran terhadap pembacaan posisi.", verified = false },
+        godModeEnabled        = { title = "GOD MODE",        desc = "Mode kebal / regen kesehatan otomatis.", verified = false },
+        infiniteAmmoEnabled   = { title = "DAGGER",          desc = "menangkis serangan killer secara otomatis .", verified = true },
+        shieldEnabled         = { title = "AUTO ATTACK",     desc = "Fitur ini belum dapat diverifikasi dari kode yang diberikan.", verified = false },
+        tpwalkEnabled         = { title = "TP WALK",         desc = "Teleport walk menggunakan CFrame per frame.", verified = false },
+        noCollideEnabled      = { title = "NO COLLIDE",      desc = "Menonaktifkan collision pada karakter pemain.", verified = false },
+        massKillEnabled       = { title = "MASS KILL",       desc = "Mekanisme kill masal sesuai implementasi fitur.", verified = false },
+        autoGeneratorEnabled  = { title = "BREAK GEN",       desc = "fitur masih dalam tahap perkembangan", verified = true },
+        autoSkillCheckEnabled = { title = "SKILL CHECK",     desc = "melewati skillcheck secara otomatis.", verified = true },
+        autoAimEnabled        = { title = "AUTO AIM",        desc = "Mengunci kamera ke target sesuai mode Killer / Survivor / SCP.", verified = true },
+        povMode               = { title = "POV",             desc = "Mode kamera POV yang dapat di-toggle terpisah.", verified = false },
+    }
+
+    local activeNotifs = {}
+    local MAX_NOTIFS = 4
+    local NOTIF_DURATION = 4
+
+    local function destroyNotif(entry)
+        if not entry or entry.destroyed then return end
+        entry.destroyed = true
+        for i, e in ipairs(activeNotifs) do
+            if e == entry then table.remove(activeNotifs, i) break end
+        end
+        if entry.gui and entry.gui.Parent then
+            pcall(function() entry.gui:Destroy() end)
+        end
+    end
+
+    local function showFeatureNotification(featureKey, isEnabled)
+        local meta = FEATURE_META[featureKey]
+        if not meta then
+            meta = { title = tostring(featureKey), desc = "Fitur ini belum dapat diverifikasi.", verified = false }
+        end
+
+        -- enforce max (destroy oldest)
+        if #activeNotifs >= MAX_NOTIFS then
+            destroyNotif(activeNotifs[1])
+        end
+
+        local accentColor = isEnabled and Color3.fromRGB(0, 255, 180) or Color3.fromRGB(255, 90, 90)
+        local statusText  = isEnabled and "ACTIVATED" or "DEACTIVATED"
+
+        local card = Instance.new("Frame")
+        card.Name = "NotifCard"
+        card.Size = UDim2.new(1, 0, 0, 86)
+        card.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+        card.BackgroundTransparency = 1
+        card.BorderSizePixel = 0
+        card.ClipsDescendants = false
+        card.Parent = notifContainer
+
+        local cardCorner = Instance.new("UICorner")
+        cardCorner.CornerRadius = UDim.new(0, 8)
+        cardCorner.Parent = card
+
+        local cardStroke = Instance.new("UIStroke")
+        cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        cardStroke.Color = config.guiThemeColor
+        cardStroke.Thickness = 1.4
+        cardStroke.Transparency = 1
+        cardStroke.Parent = card
+
+        -- Accent bar kiri
+        local accent = Instance.new("Frame")
+        accent.Name = "Accent"
+        accent.Size = UDim2.new(0, 3, 1, -12)
+        accent.Position = UDim2.new(0, 0, 0, 6)
+        accent.BackgroundColor3 = accentColor
+        accent.BackgroundTransparency = 1
+        accent.BorderSizePixel = 0
+        accent.Parent = card
+        local accentCorner = Instance.new("UICorner")
+        accentCorner.CornerRadius = UDim.new(1, 0)
+        accentCorner.Parent = accent
+
+        -- Header
+        local header = Instance.new("TextLabel")
+        header.Size = UDim2.new(1, -16, 0, 16)
+        header.Position = UDim2.new(0, 10, 0, 6)
+        header.BackgroundTransparency = 1
+        header.Text = "CYBERHEROES // FEATURE SYSTEM"
+        header.TextColor3 = config.guiThemeColor
+        header.Font = Enum.Font.GothamBold
+        header.TextSize = 10
+        header.TextXAlignment = Enum.TextXAlignment.Left
+        header.TextTransparency = 1
+        header.Parent = card
+
+        -- Title
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Size = UDim2.new(1, -16, 0, 18)
+        titleLbl.Position = UDim2.new(0, 10, 0, 22)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Text = meta.title
+        titleLbl.TextColor3 = Color3.fromRGB(240, 240, 240)
+        titleLbl.Font = Enum.Font.GothamBold
+        titleLbl.TextSize = 14
+        titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+        titleLbl.TextTransparency = 1
+        titleLbl.Parent = card
+
+        -- Status badge
+        local statusLbl = Instance.new("TextLabel")
+        statusLbl.Size = UDim2.new(0, 110, 0, 14)
+        statusLbl.Position = UDim2.new(1, -120, 0, 24)
+        statusLbl.BackgroundTransparency = 1
+        statusLbl.Text = "STATUS: " .. statusText
+        statusLbl.TextColor3 = accentColor
+        statusLbl.Font = Enum.Font.GothamBold
+        statusLbl.TextSize = 10
+        statusLbl.TextXAlignment = Enum.TextXAlignment.Right
+        statusLbl.TextTransparency = 1
+        statusLbl.Parent = card
+
+        -- Description
+        local descLbl = Instance.new("TextLabel")
+        descLbl.Size = UDim2.new(1, -20, 0, 34)
+        descLbl.Position = UDim2.new(0, 10, 0, 44)
+        descLbl.BackgroundTransparency = 1
+        descLbl.Text = meta.desc
+        descLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+        descLbl.Font = Enum.Font.Gotham
+        descLbl.TextSize = 11
+        descLbl.TextWrapped = true
+        descLbl.TextXAlignment = Enum.TextXAlignment.Left
+        descLbl.TextYAlignment = Enum.TextYAlignment.Top
+        descLbl.TextTransparency = 1
+        descLbl.Parent = card
+
+        -- Status dot indicator
+        local dot = Instance.new("Frame")
+        dot.Size = UDim2.new(0, 6, 0, 6)
+        dot.Position = UDim2.new(1, -14, 0, 8)
+        dot.BackgroundColor3 = accentColor
+        dot.BackgroundTransparency = 1
+        dot.BorderSizePixel = 0
+        dot.Parent = card
+        local dotCorner = Instance.new("UICorner")
+        dotCorner.CornerRadius = UDim.new(1, 0)
+        dotCorner.Parent = dot
+
+        local entry = { gui = card, destroyed = false }
+        table.insert(activeNotifs, entry)
+
+        -- ===== ANIMASI MASUK =====
+        local startPos = UDim2.new(1, 40, 0, 86 * (#activeNotifs - 1))
+        card.Position = startPos
+
+        local slideIn = TweenService:Create(card,
+            TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+            { Position = UDim2.new(0, 0, 0, 86 * (#activeNotifs - 1)) }
+        )
+        slideIn:Play()
+
+        local fadeIn = TweenService:Create(card,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+            { BackgroundTransparency = 0.08 }
+        )
+        fadeIn:Play()
+
+        TweenService:Create(cardStroke,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+            { Transparency = 0.25 }
+        ):Play()
+        TweenService:Create(header,
+            TweenInfo.new(0.3), { TextTransparency = 0 }
+        ):Play()
+        TweenService:Create(titleLbl,
+            TweenInfo.new(0.3), { TextTransparency = 0 }
+        ):Play()
+        TweenService:Create(statusLbl,
+            TweenInfo.new(0.3), { TextTransparency = 0 }
+        ):Play()
+        TweenService:Create(descLbl,
+            TweenInfo.new(0.3), { TextTransparency = 0 }
+        ):Play()
+        TweenService:Create(accent,
+            TweenInfo.new(0.3), { BackgroundTransparency = 0.1 }
+        ):Play()
+        TweenService:Create(dot,
+            TweenInfo.new(0.3), { BackgroundTransparency = 0 }
+        ):Play()
+
+        -- ===== AUTO DISMISS =====
+        task.delay(NOTIF_DURATION, function()
+            if entry.destroyed or not card.Parent then return end
+
+            local slideOut = TweenService:Create(card,
+                TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In),
+                { Position = UDim2.new(1, 40, 0, card.Position.Y.Offset) }
+            )
+            local fadeOut = TweenService:Create(card,
+                TweenInfo.new(0.25), { BackgroundTransparency = 1 }
+            )
+            TweenService:Create(cardStroke, TweenInfo.new(0.25), { Transparency = 1 }):Play()
+            TweenService:Create(header, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+            TweenService:Create(titleLbl, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+            TweenService:Create(statusLbl, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+            TweenService:Create(descLbl, TweenInfo.new(0.25), { TextTransparency = 1 }):Play()
+            TweenService:Create(accent, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
+            TweenService:Create(dot, TweenInfo.new(0.25), { BackgroundTransparency = 1 }):Play()
+
+            slideOut:Play()
+            fadeOut:Play()
+
+            slideOut.Completed:Connect(function()
+                destroyNotif(entry)
+            end)
+        end)
+    end
+
+    -- Poller: deteksi perubahan config → tampilkan notifikasi
+    local FEATURE_KEYS = {
+        "autoWinEnabled", "autoTaskEnabled", "espEnabled", "speedBoostEnabled",
+        "stealthEnabled", "godModeEnabled", "infiniteAmmoEnabled", "shieldEnabled",
+        "tpwalkEnabled", "noCollideEnabled", "massKillEnabled", "autoGeneratorEnabled",
+        "autoSkillCheckEnabled", "autoAimEnabled", "povMode",
+    }
+    local lastState = {}
+    for _, k in ipairs(FEATURE_KEYS) do
+        lastState[k] = config[k]
+    end
+
+    task.spawn(function()
+        while screenGui and screenGui.Parent do
+            for _, k in ipairs(FEATURE_KEYS) do
+                local current = config[k]
+                if current ~= lastState[k] then
+                    lastState[k] = current
+                    -- Hanya notifikasi untuk nilai boolean (skip nilai aneh)
+                    if type(current) == "boolean" then
+                        pcall(showFeatureNotification, k, current)
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+        -- Cleanup notifikasi saat GUI dihancurkan
+        for _, entry in ipairs(activeNotifs) do
+            if entry.gui and entry.gui.Parent then
+                pcall(function() entry.gui:Destroy() end)
+            end
+        end
+        activeNotifs = {}
+        if notifGui and notifGui.Parent then
+            pcall(function() notifGui:Destroy() end)
+        end
+    end)
+
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
     mainFrame.Size = UDim2.new(0, 360, 0, 240)

@@ -5916,7 +5916,7 @@ local function createInfoContent()
     discordText.Size=UDim2.new(0.45,0,1,0)
     discordText.Position=UDim2.new(0,52,0,0)
     discordText.BackgroundTransparency=1
-    discordText.Text="Discord Server"
+    discordText.Text="cyber community"
     discordText.TextColor3=Color3.fromRGB(220,220,220)
     discordText.Font=Enum.Font.GothamBold
     discordText.TextSize=12
@@ -6052,7 +6052,7 @@ local function createInfoContent()
 
     discordButton.MouseButton1Click:Connect(function()
         if setclipboard then
-            setclipboard("https://discord.gg/blumbuat")
+            setclipboard("https://chat.whatsapp.com/FIXHNqW3dz0Lgx9FYEDitV?s=cl&p=a&mlu=4&ilr=4")
             discordButton.Text="COPIED"
             task.wait(1)
             discordButton.Text="COPY LINK"

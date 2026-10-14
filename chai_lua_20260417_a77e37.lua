@@ -824,25 +824,67 @@ end
 -- ============================================================================
 -- PLAYER ESP (dengan Custom ESP support)
 -- ============================================================================
+-- ============================================================================
+-- GLOBAL ESP LOOP (singleton) — 1 RenderStepped + 1 Heartbeat untuk SEMUA player
+-- ============================================================================
+local CyberESPLoop = _G.CyberESPLoop
+if not CyberESPLoop then
+    CyberESPLoop = { running = false, renderConn = nil, slowConn = nil }
+    _G.CyberESPLoop = CyberESPLoop
+end
+
+local function ensureCyberESPLoop()
+    if CyberESPLoop.running then return end
+    CyberESPLoop.running = true
+
+    -- FAST (60fps): update warna beam / highlight / visibility
+    CyberESPLoop.renderConn = RunService.RenderStepped:Connect(function()
+        for _, entry in pairs(espHighlights) do
+            if entry and entry._fastUpdate and not entry._destroyed then
+                pcall(entry._fastUpdate)
+            end
+        end
+    end)
+
+    -- SLOW (4Hz): text jarak + integrity check (recreate kalau hilang)
+    local lastSlow = 0
+    CyberESPLoop.slowConn = RunService.Heartbeat:Connect(function()
+        local now = tick()
+        if now - lastSlow < 0.25 then return end
+        lastSlow = now
+        for _, entry in pairs(espHighlights) do
+            if entry and entry._slowUpdate and not entry._destroyed then
+                pcall(entry._slowUpdate)
+            end
+        end
+    end)
+end
+
+-- ============================================================================
+-- CREATE HIGHLIGHT FOR PLAYER
+-- ============================================================================
 local function createHighlightForPlayer(player)
+    -- ===== CLEANUP ENTRY LAMA (tidak diubah) =====
     if espHighlights[player.UserId] then
-        if espHighlights[player.UserId].Highlight then espHighlights[player.UserId].Highlight:Destroy() end
-        if espHighlights[player.UserId].Billboard then espHighlights[player.UserId].Billboard:Destroy() end
-        if espHighlights[player.UserId].TeamChanged then espHighlights[player.UserId].TeamChanged:Disconnect() end
-        if espHighlights[player.UserId].DistanceUpdate then espHighlights[player.UserId].DistanceUpdate:Disconnect() end
-        if espHighlights[player.UserId].Beam then espHighlights[player.UserId].Beam:Destroy() end
-        if espHighlights[player.UserId].StartAttachment then espHighlights[player.UserId].StartAttachment:Destroy() end
-        if espHighlights[player.UserId].EndAttachment then espHighlights[player.UserId].EndAttachment:Destroy() end
-        if espHighlights[player.UserId].TargetCharAdded then espHighlights[player.UserId].TargetCharAdded:Disconnect() end
-        if espHighlights[player.UserId].LocalCharAdded then espHighlights[player.UserId].LocalCharAdded:Disconnect() end
-        if espHighlights[player.UserId].IntegrityConn then espHighlights[player.UserId].IntegrityConn:Disconnect() end
+        local old = espHighlights[player.UserId]
+        old._destroyed = true
+        if old.Highlight then old.Highlight:Destroy() end
+        if old.Billboard then old.Billboard:Destroy() end
+        if old.TeamChanged then old.TeamChanged:Disconnect() end
+        if old.Beam then old.Beam:Destroy() end
+        if old.StartAttachment then old.StartAttachment:Destroy() end
+        if old.EndAttachment then old.EndAttachment:Destroy() end
+        if old.TargetCharAdded then old.TargetCharAdded:Disconnect() end
+        if old.LocalCharAdded then old.LocalCharAdded:Disconnect() end
         espHighlights[player.UserId] = nil
     end
+
     local character = player.Character
     if not character then return end
 
     local MAX_DISTANCE = 2000
 
+    -- ===== HELPER FUNCTIONS (tidak diubah) =====
     local function getTargetRole()
         if player.Team then
             local teamName = player.Team.Name:lower()
@@ -879,7 +921,6 @@ local function createHighlightForPlayer(player)
         return teamName == "survivors" or teamName == "killers" or teamName:find("survivor") or teamName:find("killer")
     end
 
-    -- ===== FIX: cek local player apakah spectator =====
     local function isLocalPlayerSpectator()
         local team = localPlayer.Team
         if not team then return true end
@@ -889,7 +930,6 @@ local function createHighlightForPlayer(player)
         end
         return false
     end
-    -- ====================================================
 
     local function getDistanceToPlayer()
         local lRoot = localRootPart or (localPlayer.Character and (localPlayer.Character:FindFirstChild("HumanoidRootPart") or localPlayer.Character:FindFirstChild("Torso")))
@@ -900,31 +940,26 @@ local function createHighlightForPlayer(player)
     end
 
     local function shouldBeamActive()
-        -- ===== FIX: spectator boleh lihat semua =====
         local isSpectator = isLocalPlayerSpectator()
         if not isSpectator and not isLocalPlayerInGame() then return false end
-
         if not localPlayer.Character or not player.Character then return false end
         local targetRoot = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Torso")
         if not targetRoot then return false end
-
         local role = getTargetRole()
         if role == "Spectator" then return false end
-
-        -- Kalau local spectator: tampilkan semua role (killer & survivor)
         if isSpectator then
             local dist = getDistanceToPlayer()
             return dist <= MAX_DISTANCE
         end
-
-        -- Non-spectator: filter sesuai role yang enabled
         if role == "Killer" and not config.espCustom.killer.enabled then return false end
         if role == "Survivor" and not config.espCustom.survivor.enabled then return false end
         local dist = getDistanceToPlayer()
         return dist <= MAX_DISTANCE
     end
 
+    -- ===== BUAT OBJECT ESP =====
     local currentColor = getCurrentColor()
+
     local highlight = Instance.new("Highlight")
     highlight.Name = "CyberHeroes_ESP"
     highlight.FillColor = currentColor
@@ -957,6 +992,7 @@ local function createHighlightForPlayer(player)
     local startAttachment = Instance.new("Attachment")
     startAttachment.Name = "CyberHeroes_LineStart"
     startAttachment.Position = Vector3.new(0, 0.5, 0)
+
     local endAttachment = Instance.new("Attachment")
     endAttachment.Name = "CyberHeroes_LineEnd"
     endAttachment.Position = Vector3.new(0, 0.5, 0)
@@ -985,146 +1021,113 @@ local function createHighlightForPlayer(player)
     beam.Parent = workspace
     beam.Enabled = shouldBeamActive() and config.espCustom.line.enabled
 
-    local function updateVisibility()
-        local active = shouldBeamActive()
-        if beam then
-            beam.Enabled = active and config.espCustom.line.enabled
-        end
-        if highlight then
-            -- ===== FIX: tampilkan highlight untuk spectator =====
-            local isSpectator = isLocalPlayerSpectator()
-            highlight.Enabled = active or (isSpectator and getTargetRole() ~= "Spectator")
-        end
-        if billboard then
-            billboard.Enabled = active
-        end
-    end
+    -- ===== ENTRY TABLE =====
+    local entry = {
+        Highlight = highlight,
+        Billboard = billboard,
+        DistLabel = distLabel,
+        Beam = beam,
+        StartAttachment = startAttachment,
+        EndAttachment = endAttachment,
+        TeamChanged = nil,
+        BeamUpdate = nil,
+        DistanceUpdate = nil,
+        IntegrityConn = nil,
+        _destroyed = false,
+    }
+    espHighlights[player.UserId] = entry
 
-    local function updateBeamColor()
+    -- ===== FAST UPDATE CLOSURE (dipanggil global loop 60fps) =====
+    local cachedCSColor = ColorSequence.new(getCurrentColor())
+    local cachedCSValue = getCurrentColor()
+
+    entry._fastUpdate = function()
+        local hl = entry.Highlight
+        local bb = entry.Billboard
+        local bm = entry.Beam
+        local dl = entry.DistLabel
+        if not (hl and bb and bm and dl) then return end
+
         local newColor = getCurrentColor()
-        if highlight.FillColor ~= newColor then
-            highlight.FillColor = newColor
-            highlight.OutlineColor = newColor
+
+        -- Cek perubahan warna dulu sebelum tween
+        if hl.FillColor ~= newColor then
+            hl.FillColor = newColor
+            hl.OutlineColor = newColor
         end
-        if distLabel.TextColor3 ~= newColor then
-            distLabel.TextColor3 = newColor
+        if dl.TextColor3 ~= newColor then
+            dl.TextColor3 = newColor
         end
-        if beam.Color ~= ColorSequence.new(newColor) then
-            beam.Color = ColorSequence.new(newColor)
+        if cachedCSValue ~= newColor then
+            cachedCSValue = newColor
+            cachedCSColor = ColorSequence.new(newColor)
+            bm.Color = cachedCSColor
         end
-        updateVisibility()
+
+        -- Visibility
+        local active = shouldBeamActive()
+        bm.Enabled = active and config.espCustom.line.enabled
+        local isSpec = isLocalPlayerSpectator()
+        hl.Enabled = active or (isSpec and getTargetRole() ~= "Spectator")
+        bb.Enabled = active
     end
 
-    local beamUpdateConn = RunService.RenderStepped:Connect(updateBeamColor)
-    updateBeamColor()
+    -- ===== SLOW UPDATE CLOSURE (dipanggil global loop 4Hz) =====
+    entry._slowUpdate = function()
+        local hl = entry.Highlight
+        local bb = entry.Billboard
+        local bm = entry.Beam
+        local dl = entry.DistLabel
 
-    local function updateDistance()
-        local dist = getDistanceToPlayer()
-        local role = getTargetRole()
-        if role == "Spectator" then
-            distLabel.Text = "Spectator"
-        elseif dist <= MAX_DISTANCE then
-            distLabel.Text = string.format("%.1f Studs", dist)
-        else
-            distLabel.Text = ">2000 Studs"
-        end
-    end
-    local distUpdateConn = RunService.Heartbeat:Connect(updateDistance)
-    updateDistance()
-
-    local function onCharacterRespawn()
-        task.wait(0.5)
-        updateAttachments()
-        -- ===== FIX: jangan set adornee ke nil kalau character belum siap =====
-        local newChar = player.Character
-        if newChar then
-            billboard.Adornee = newChar:FindFirstChild("Head") or newChar:FindFirstChild("HumanoidRootPart")
-            highlight.Adornee = newChar
-        end
-        updateBeamColor()
-    end
-    local targetCharAddedConn = player.CharacterAdded:Connect(onCharacterRespawn)
-
-    local function onLocalCharacterChanged()
-        task.wait(0.5)
-        updateAttachments()
-        updateBeamColor()
-    end
-    local localCharAddedConn = localPlayer.CharacterAdded:Connect(onLocalCharacterChanged)
-
-    local teamChangedConn
-    if player.Team then
-        teamChangedConn = player:GetPropertyChangedSignal("Team"):Connect(function()
-            createHighlightForPlayer(player)
-        end)
-    end
-
-    -- =========================================================================
-    -- SELF-HEALING LOOP: cek tiap frame apakah ESP masih utuh
-    -- Re-create kalau Highlight/Billboard hancur, atau adornee hilang.
-    -- =========================================================================
-    local integrityConn = RunService.Heartbeat:Connect(function()
-        -- Kalau entry ini sudah dibersihkan, stop
-        if espHighlights[player.UserId] == nil then
-            integrityConn:Disconnect()
-            return
+        -- 1) Update text jarak
+        if dl then
+            local dist = getDistanceToPlayer()
+            local role = getTargetRole()
+            if role == "Spectator" then
+                dl.Text = "Spectator"
+            elseif dist <= MAX_DISTANCE then
+                dl.Text = string.format("%.1f Studs", dist)
+            else
+                dl.Text = ">2000 Studs"
+            end
         end
 
-        local entry = espHighlights[player.UserId]
-        if not entry then
-            integrityConn:Disconnect()
-            return
-        end
-
+        -- 2) Integrity check
         local char = player.Character
         if not char then
-            -- Character sementara tidak ada (respawn). Hide dulu.
-            if entry.Highlight then entry.Highlight.Enabled = false end
-            if entry.Billboard then entry.Billboard.Enabled = false end
-            if entry.Beam then entry.Beam.Enabled = false end
+            if hl then hl.Enabled = false end
+            if bb then bb.Enabled = false end
+            if bm then bm.Enabled = false end
             return
         end
 
-        -- Kalau highlight hancur atau parent pindah, recreate
-        local function needsRecreate(instance, expectedParent)
-            if not instance then return true end
-            if not instance.Parent then return true end
-            if expectedParent and instance.Parent ~= expectedParent then return true end
-            return false
-        end
-
-        if needsRecreate(entry.Highlight) then
-            if entry.Highlight then entry.Highlight:Destroy() end
-            local hl = Instance.new("Highlight")
-            hl.Name = "CyberHeroes_ESP"
-            hl.FillColor = getCurrentColor()
-            hl.OutlineColor = getCurrentColor()
-            hl.FillTransparency = 1
-            hl.OutlineTransparency = 0.2
-            hl.Adornee = char
-            hl.Parent = char
-            entry.Highlight = hl
-            highlight = hl
+        -- Recreate Highlight kalau hancur / parent pindah
+        if not hl or not hl.Parent then
+            if hl then hl:Destroy() end
+            local n = Instance.new("Highlight")
+            n.Name = "CyberHeroes_ESP"
+            n.FillColor = getCurrentColor()
+            n.OutlineColor = getCurrentColor()
+            n.FillTransparency = 1
+            n.OutlineTransparency = 0.2
+            n.Adornee = char
+            n.Parent = char
+            entry.Highlight = n
         else
-            -- Highlight masih ada, cek adornee
-            if entry.Highlight.Adornee ~= char then
-                entry.Highlight.Adornee = char
-            end
-            -- Cek parent
-            if entry.Highlight.Parent ~= char then
-                entry.Highlight.Parent = char
-            end
+            if hl.Adornee ~= char then hl.Adornee = char end
+            if hl.Parent ~= char then hl.Parent = char end
         end
 
-        if needsRecreate(entry.Billboard) then
-            if entry.Billboard then entry.Billboard:Destroy() end
-            local bb = Instance.new("BillboardGui")
-            bb.Name = "CyberHeroes_DistanceTag"
-            bb.Adornee = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-            bb.Size = UDim2.new(0, 15, 0, 15)
-            bb.StudsOffset = Vector3.new(0, 2.5, 0)
-            bb.AlwaysOnTop = true
-            bb.Parent = char
+        -- Recreate Billboard kalau hancur
+        if not bb or not bb.Parent then
+            if bb then bb:Destroy() end
+            local n = Instance.new("BillboardGui")
+            n.Name = "CyberHeroes_DistanceTag"
+            n.Adornee = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+            n.Size = UDim2.new(0, 15, 0, 15)
+            n.StudsOffset = Vector3.new(0, 2.5, 0)
+            n.AlwaysOnTop = true
+            n.Parent = char
             local lbl = Instance.new("TextLabel")
             lbl.Size = UDim2.new(1, 0, 1, 0)
             lbl.BackgroundTransparency = 1
@@ -1133,23 +1136,18 @@ local function createHighlightForPlayer(player)
             lbl.TextStrokeTransparency = 0.5
             lbl.TextScaled = true
             lbl.Font = Enum.Font.GothamBold
-            lbl.Parent = bb
-            entry.Billboard = bb
+            lbl.Parent = n
+            entry.Billboard = n
             entry.DistLabel = lbl
-            billboard = bb
-            distLabel = lbl
         else
-            if entry.Billboard.Adornee ~= (char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")) then
-                entry.Billboard.Adornee = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
-            end
-            if entry.Billboard.Parent ~= char then
-                entry.Billboard.Parent = char
-            end
+            local adornee = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+            if bb.Adornee ~= adornee then bb.Adornee = adornee end
+            if bb.Parent ~= char then bb.Parent = char end
         end
 
-        -- Beam: kalau hancur atau parent pindah, recreate
-        if needsRecreate(entry.Beam) then
-            if entry.Beam then entry.Beam:Destroy() end
+        -- Recreate Beam kalau hancur
+        if not bm or not bm.Parent then
+            if bm then bm:Destroy() end
             if entry.StartAttachment then entry.StartAttachment:Destroy() end
             if entry.EndAttachment then entry.EndAttachment:Destroy() end
 
@@ -1165,51 +1163,62 @@ local function createHighlightForPlayer(player)
             if lRoot then sAtt.Parent = lRoot end
             eAtt.Parent = char
 
-            local bm = Instance.new("Beam")
-            bm.Name = "CyberHeroes_Line"
-            bm.Attachment0 = sAtt
-            bm.Attachment1 = eAtt
-            bm.Color = ColorSequence.new(getCurrentColor())
-            bm.Transparency = NumberSequence.new(0.5)
-            bm.Width0 = 0.2
-            bm.Width1 = 0.2
-            bm.FaceCamera = false
-            bm.Parent = workspace
-            bm.Enabled = shouldBeamActive() and config.espCustom.line.enabled
+            local nbm = Instance.new("Beam")
+            nbm.Name = "CyberHeroes_Line"
+            nbm.Attachment0 = sAtt
+            nbm.Attachment1 = eAtt
+            nbm.Color = ColorSequence.new(getCurrentColor())
+            nbm.Transparency = NumberSequence.new(0.5)
+            nbm.Width0 = 0.2
+            nbm.Width1 = 0.2
+            nbm.FaceCamera = false
+            nbm.Parent = workspace
+            nbm.Enabled = shouldBeamActive() and config.espCustom.line.enabled
 
-            entry.Beam = bm
+            entry.Beam = nbm
             entry.StartAttachment = sAtt
             entry.EndAttachment = eAtt
-            beam = bm
-            startAttachment = sAtt
-            endAttachment = eAtt
         else
-            -- Attachment parent cek
             local lRoot = localRootPart or (localPlayer.Character and (localPlayer.Character:FindFirstChild("HumanoidRootPart") or localPlayer.Character:FindFirstChild("Torso")))
-            if lRoot and entry.StartAttachment.Parent ~= lRoot then
+            if lRoot and entry.StartAttachment and entry.StartAttachment.Parent ~= lRoot then
                 entry.StartAttachment.Parent = lRoot
             end
-            if entry.EndAttachment.Parent ~= char then
+            if entry.EndAttachment and entry.EndAttachment.Parent ~= char then
                 entry.EndAttachment.Parent = char
             end
         end
-    end)
-    -- =========================================================================
+    end
 
-    espHighlights[player.UserId] = {
-        Highlight = highlight,
-        Billboard = billboard,
-        DistLabel = distLabel,
-        TeamChanged = teamChangedConn,
-        DistanceUpdate = distUpdateConn,
-        Beam = beam,
-        StartAttachment = startAttachment,
-        EndAttachment = endAttachment,
-        BeamUpdate = beamUpdateConn,
-        TargetCharAdded = targetCharAddedConn,
-        LocalCharAdded = localCharAddedConn,
-        IntegrityConn = integrityConn,
-    }
+    -- ===== EVENT HANDLERS (tetap per-player, event-based bukan loop) =====
+    local targetCharAddedConn = player.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        local newChar = player.Character
+        if newChar then
+            if entry.Billboard then
+                entry.Billboard.Adornee = newChar:FindFirstChild("Head") or newChar:FindFirstChild("HumanoidRootPart")
+            end
+            if entry.Highlight then
+                entry.Highlight.Adornee = newChar
+            end
+        end
+        updateAttachments()
+    end)
+    entry.TargetCharAdded = targetCharAddedConn
+
+    local localCharAddedConn = localPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        updateAttachments()
+    end)
+    entry.LocalCharAdded = localCharAddedConn
+
+    if player.Team then
+        entry.TeamChanged = player:GetPropertyChangedSignal("Team"):Connect(function()
+            createHighlightForPlayer(player)
+        end)
+    end
+
+    -- ===== START GLOBAL LOOP (kalau belum jalan) =====
+    ensureCyberESPLoop()
 end
 -- ============================================================================
 -- OBJECT ESP (dengan Custom ESP support)

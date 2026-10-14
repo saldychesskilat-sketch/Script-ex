@@ -292,53 +292,50 @@ end
 -- ============================================================================
 -- FEATURE 2: ATTACK AIM (Tombol Lock Survivor di Depan POV)
 -- ============================================================================
-
 -- ============================================================================
--- FEATURE 2: ATTACK AIM LOCK (Non-Blocking, Observer Pattern)
--- Prinsip:
---   - Tidak ada overlay TextButton (menghalangi input tombol game)
---   - Deteksi via UserInputService (observer pasif, tidak konsumsi input)
---   - Cek posisi sentuhan terhadap region tombol attack game
---   - Input tetap diteruskan ke tombol attack game
+-- FEATURE 2: ATTACK AIM (Lock Survivor via Touch Area Tombol Attack)
+-- Non-blocking: UserInputService sebagai observer pasif (tidak mengonsumsi input)
+-- Semua state disimpan di state.attackAim (global), tidak ada local state baru
 -- ============================================================================
 
-local attackAimButton = nil
-local attackAimButtonGui = nil
-local attackAimInputBeganConn = nil
-local attackAimInputEndedConn = nil
-local attackAimHoldActive = false
-local attackAimLockConn = nil
-local attackAimTarget = nil
+-- Lazy-init state attackAim (kalau belum ada di initializer)
+state.attackAim = state.attackAim or {}
+do
+    local a = state.attackAim
+    a.inputBeganConn   = a.inputBeganConn   or nil
+    a.inputEndedConn   = a.inputEndedConn   or nil
+    a.lockConn         = a.lockConn         or nil
+    a.charAddedConn    = a.charAddedConn    or nil
+    a.charRemovingConn = a.charRemovingConn or nil
+    a.holdActive       = a.holdActive       or false
+    a.activeInput      = a.activeInput      or nil
+    a.target           = a.target           or nil
+    a.savedAutoRotate  = a.savedAutoRotate  or nil
+    a.buttonCandidates = a.buttonCandidates or {
+        "Survivor-mob.Controls.action",
+        "Survivor-mob.Controls.check",
+        "Survivor-mob.Controls.attack",
+        "Survivor-mob.Controls.action.check",
+        "Survivor-mob.Controls.putdown",
+    }
+    a.fallbackPosition = a.fallbackPosition or UDim2.new(0.63, 160, 0.73, -55)
+    a.fallbackSize     = a.fallbackSize     or UDim2.new(0, 100, 0, 100)
+end
 
--- State tambahan untuk pairing input dan restore AutoRotate
-local attackAimActiveInputRef = nil
-local attackAimActiveInputType = nil
-local attackAimSavedAutoRotate = nil
-local attackAimCharAddedConn = nil
-local attackAimCharRemovingConn = nil
-
--- Kandidat path tombol attack game di PlayerGui (untuk deteksi region)
-local ATTACK_BUTTON_CANDIDATES = {
-    "Survivor-mob.Controls.action",
-    "Survivor-mob.Controls.action.check",
-    "Survivor-mob.Controls.attack",
-    "Survivor-mob.Controls.putdown",
-}
-
--- Fallback region jika tombol game tidak ditemukan
-local ATTACK_FALLBACK_POSITION = UDim2.new(0.63, 160, 0.73, -55)
-local ATTACK_FALLBACK_SIZE     = UDim2.new(0, 100, 0, 100)
-
--- Helper: cari tombol attack game di PlayerGui
-local function findGameAttackButton()
+-- ============================================================================
+-- HELPER: cari tombol attack asli milik game (PlayerGui)
+-- ============================================================================
+local function attackAimFindGameButton()
     local pg = localPlayer:FindFirstChild("PlayerGui")
     if not pg then return nil end
-    for _, path in ipairs(ATTACK_BUTTON_CANDIDATES) do
+    for _, path in ipairs(state.attackAim.buttonCandidates) do
         local cur = pg
+        local ok = true
         for seg in string.gmatch(path, "[^%.]+") do
             cur = cur and cur:FindFirstChild(seg)
+            if not cur then ok = false break end
         end
-        if cur and cur:IsA("GuiObject") and cur.Visible then
+        if ok and cur and cur:IsA("GuiObject") and cur.Visible then
             local sz = cur.AbsoluteSize
             if sz.X > 0 and sz.Y > 0 then
                 return cur
@@ -348,41 +345,49 @@ local function findGameAttackButton()
     return nil
 end
 
--- Ambil region tombol attack (AbsolutePosition, AbsoluteSize)
-local function getAttackRegion()
-    local btn = findGameAttackButton()
+-- ============================================================================
+-- HELPER: hitung region tombol (AbsolutePosition, AbsoluteSize)
+-- ============================================================================
+local function attackAimGetRegion()
+    local btn = attackAimFindGameButton()
     if btn then
         return btn.AbsolutePosition, btn.AbsoluteSize
     end
-    -- Fallback: hitung dari UDim2 dan viewport
     local cam = workspace.CurrentCamera
     if not cam then return nil, nil end
     local vp = cam.ViewportSize
-    local fx = ATTACK_FALLBACK_POSITION.X.Scale * vp.X + ATTACK_FALLBACK_POSITION.X.Offset
-    local fy = ATTACK_FALLBACK_POSITION.Y.Scale * vp.Y + ATTACK_FALLBACK_POSITION.Y.Offset
-    local sw = ATTACK_FALLBACK_SIZE.X.Scale * vp.X + ATTACK_FALLBACK_SIZE.X.Offset
-    local sh = ATTACK_FALLBACK_SIZE.Y.Scale * vp.Y + ATTACK_FALLBACK_SIZE.Y.Offset
+    local pos = state.attackAim.fallbackPosition
+    local size = state.attackAim.fallbackSize
+    local fx = pos.X.Scale * vp.X + pos.X.Offset
+    local fy = pos.Y.Scale * vp.Y + pos.Y.Offset
+    local sw = size.X.Scale * vp.X + size.X.Offset
+    local sh = size.Y.Scale * vp.Y + size.Y.Offset
     return Vector2.new(fx, fy), Vector2.new(sw, sh)
 end
 
--- Cek apakah posisi berada di dalam region tombol attack
-local function isInAttackRegion(x, y)
-    local ap, sz = getAttackRegion()
+-- ============================================================================
+-- HELPER: cek posisi di dalam region tombol
+-- ============================================================================
+local function attackAimIsInRegion(posX, posY)
+    local ap, sz = attackAimGetRegion()
     if not ap or not sz then return false end
     if sz.X <= 0 or sz.Y <= 0 then return false end
-    return x >= ap.X and x <= ap.X + sz.X
-       and y >= ap.Y and y <= ap.Y + sz.Y
+    return posX >= ap.X and posX <= ap.X + sz.X
+       and posY >= ap.Y and posY <= ap.Y + sz.Y
 end
 
--- Cari survivor terdekat yang berada di depan kamera (POV)
+-- ============================================================================
+-- HELPER: cari survivor valid terdekat di depan kamera
+-- ============================================================================
 local function getNearestSurvivorInFront()
     local char = localPlayer.Character
     if not char then return nil end
     local rootPart = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
     if not rootPart then return nil end
     local localPos = rootPart.Position
-    local camera = workspace.CurrentCamera
-    if not camera then return nil end
+
+    local cam = workspace.CurrentCamera
+    if not cam then return nil end
 
     local nearest = nil
     local minDist = math.huge
@@ -391,7 +396,7 @@ local function getNearestSurvivorInFront()
         if player ~= localPlayer then
             local pChar = player.Character
             if pChar then
-                -- Deteksi killer via Team
+                -- Tentukan killer via Team saja (hindari dependensi Tool)
                 local isKiller = false
                 if player.Team then
                     local t = player.Team.Name:lower()
@@ -399,22 +404,12 @@ local function getNearestSurvivorInFront()
                         isKiller = true
                     end
                 end
-                -- Fallback: deteksi killer via tool (bukan satu-satunya indikator)
-                if not isKiller then
-                    local tool = pChar:FindFirstChildWhichIsA("Tool")
-                    if tool then
-                        local tn = tool.Name:lower()
-                        if tn:find("knife") or tn:find("weapon") or tn:find("blade") then
-                            isKiller = true
-                        end
-                    end
-                end
                 if not isKiller then
                     local targetRoot = pChar:FindFirstChild("HumanoidRootPart") or pChar:FindFirstChild("Torso")
                     local hum = pChar:FindFirstChildOfClass("Humanoid")
                     if targetRoot and hum and hum.Health > 0 then
-                        local dirToTarget = (targetRoot.Position - camera.CFrame.Position).Unit
-                        local dot = camera.CFrame.LookVector:Dot(dirToTarget)
+                        local dirToTarget = (targetRoot.Position - cam.CFrame.Position).Unit
+                        local dot = cam.CFrame.LookVector:Dot(dirToTarget)
                         if dot > 0 then
                             local dist = (localPos - targetRoot.Position).Magnitude
                             if dist < minDist then
@@ -430,302 +425,243 @@ local function getNearestSurvivorInFront()
     return nearest
 end
 
--- Stop lock loop dan restore AutoRotate
-local function stopAttackAimLock()
-    if attackAimLockConn then
-        attackAimLockConn:Disconnect()
-        attackAimLockConn = nil
+-- ============================================================================
+-- HELPER: stop lock loop + restore AutoRotate
+-- ============================================================================
+local function attackAimStopLock()
+    if state.attackAim.lockConn then
+        pcall(function()
+            RunService:UnbindFromRenderStep("CyberAttackAimLock")
+        end)
+        state.attackAim.lockConn = nil
     end
-    -- Restore AutoRotate ke nilai awal
-    local localChar = localPlayer.Character
-    if localChar then
-        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-        if humanoid and attackAimSavedAutoRotate ~= nil then
-            humanoid.AutoRotate = attackAimSavedAutoRotate
+    local lChar = localPlayer.Character
+    if lChar then
+        local hum = lChar:FindFirstChildOfClass("Humanoid")
+        if hum and state.attackAim.savedAutoRotate ~= nil then
+            hum.AutoRotate = state.attackAim.savedAutoRotate
         end
     end
-    attackAimSavedAutoRotate = nil
+    state.attackAim.savedAutoRotate = nil
 end
 
--- Lock kamera ke survivor
+-- ============================================================================
+-- HELPER: lock kamera + karakter ke target
+-- ============================================================================
 local function lockToSurvivor(target)
     if not target or not target.Parent then
-        stopAttackAimLock()
+        attackAimStopLock()
         return
     end
-    local camera = workspace.CurrentCamera
-    if not camera then return end
 
-    -- Simpan AutoRotate awal sebelum dimatikan
-    local localChar = localPlayer.Character
-    if localChar then
-        local humanoid = localChar:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            attackAimSavedAutoRotate = humanoid.AutoRotate
-            humanoid.AutoRotate = false
+    -- Simpan nilai awal AutoRotate
+    local lChar = localPlayer.Character
+    if lChar then
+        local hum = lChar:FindFirstChildOfClass("Humanoid")
+        if hum then
+            state.attackAim.savedAutoRotate = hum.AutoRotate
+            hum.AutoRotate = false
         end
     end
+    state.attackAim.target = target
 
-    attackAimTarget = target
-
-    -- Hentikan koneksi lama jika ada (hindari duplicate)
-    if attackAimLockConn then
-        attackAimLockConn:Disconnect()
-        attackAimLockConn = nil
+    -- Bersihkan binding lama (hindari duplikat)
+    if state.attackAim.lockConn then
+        pcall(function()
+            RunService:UnbindFromRenderStep("CyberAttackAimLock")
+        end)
+        state.attackAim.lockConn = nil
     end
 
-    -- Bind ke RenderStep camera phase
-    attackAimLockConn = RunService:BindToRenderStep(
-        "AttackAimLock",
+    state.attackAim.lockConn = RunService:BindToRenderStep(
+        "CyberAttackAimLock",
         Enum.RenderPriority.Camera.Value,
         function()
-            -- Cek hold masih aktif
-            if not attackAimHoldActive then
-                stopAttackAimLock()
+            if not state.attackAim.holdActive then
+                attackAimStopLock()
                 return
             end
-            -- Cek fitur masih aktif
             if not config.autoTaskEnabled then
-                attackAimHoldActive = false
-                stopAttackAimLock()
-                return
-            end
-            -- Cek karakter lokal
-            local lChar = localPlayer.Character
-            if not lChar then
-                attackAimHoldActive = false
-                stopAttackAimLock()
-                return
-            end
-            local lRoot = lChar:FindFirstChild("HumanoidRootPart") or lChar:FindFirstChild("Torso")
-            if not lRoot then
-                attackAimHoldActive = false
-                stopAttackAimLock()
+                state.attackAim.holdActive = false
+                attackAimStopLock()
                 return
             end
 
-            -- Cek target masih valid
-            local tgt = attackAimTarget
-            local tgtValid = tgt and tgt.Parent
-                and tgt.Parent:FindFirstChildOfClass("Humanoid")
-                and tgt.Parent:FindFirstChildOfClass("Humanoid").Health > 0
+            local localChar = localPlayer.Character
+            if not localChar then
+                state.attackAim.holdActive = false
+                attackAimStopLock()
+                return
+            end
+            local localRoot = localChar:FindFirstChild("HumanoidRootPart") or localChar:FindFirstChild("Torso")
+            if not localRoot then
+                state.attackAim.holdActive = false
+                attackAimStopLock()
+                return
+            end
+
+            -- Validasi target; kalau tidak valid → cari baru
+            local tgt = state.attackAim.target
+            local tgtHum = tgt and tgt.Parent and tgt.Parent:FindFirstChildOfClass("Humanoid")
+            local tgtValid = tgt and tgt.Parent and tgtHum and tgtHum.Health > 0
             if not tgtValid then
-                -- Cari target baru
                 tgt = getNearestSurvivorInFront()
-                attackAimTarget = tgt
+                state.attackAim.target = tgt
             end
             if not tgt then return end
 
-            -- Ambil camera terbaru setiap frame
+            -- Selalu ambil camera terbaru
             local cam = workspace.CurrentCamera
             if not cam then return end
 
             local targetPos = tgt.Position
             if not targetPos then return end
 
-            -- Rotasi kamera
-            local camPos = cam.CFrame.Position
-            cam.CFrame = CFrame.lookAt(camPos, targetPos)
+            -- Rotasi kamera menghadap target
+            cam.CFrame = CFrame.lookAt(cam.CFrame.Position, targetPos)
 
-            -- Orientasi karakter
-            local currentPos = lRoot.Position
+            -- Orientasi karakter menghadap target
+            local currentPos = localRoot.Position
             local lookDir = targetPos - currentPos
             if lookDir.Magnitude > 0.5 then
-                lRoot.CFrame = CFrame.new(currentPos, targetPos)
+                localRoot.CFrame = CFrame.new(currentPos, targetPos)
             end
         end
     )
 end
 
--- Mulai hold
-local function startAttackAimHold(inputRef, inputType)
-    if attackAimHoldActive then return end
+-- ============================================================================
+-- HELPER: start/stop hold
+-- ============================================================================
+local function startAttackAimHold(inputRef)
+    if state.attackAim.holdActive then return end
     local target = getNearestSurvivorInFront()
     if not target then return end
 
-    attackAimHoldActive = true
-    attackAimActiveInputRef = inputRef
-    attackAimActiveInputType = inputType
+    state.attackAim.holdActive = true
+    state.attackAim.activeInput = inputRef
     lockToSurvivor(target)
 end
 
--- Stop hold
 local function stopAttackAimHold()
-    attackAimHoldActive = false
-    attackAimActiveInputRef = nil
-    attackAimActiveInputType = nil
-    attackAimTarget = nil
-    stopAttackAimLock()
+    state.attackAim.holdActive = false
+    state.attackAim.activeInput = nil
+    state.attackAim.target = nil
+    attackAimStopLock()
 end
 
 -- ============================================================================
--- INPUT HANDLERS (Observer — tidak konsumsi input)
+-- HELPER: setup input observer pasif
 -- ============================================================================
-local function setupAttackAimInput()
-    if attackAimInputBeganConn then
-        attackAimInputBeganConn:Disconnect()
-        attackAimInputBeganConn = nil
+local function attackAimSetupInput()
+    if state.attackAim.inputBeganConn then
+        state.attackAim.inputBeganConn:Disconnect()
+        state.attackAim.inputBeganConn = nil
     end
-    if attackAimInputEndedConn then
-        attackAimInputEndedConn:Disconnect()
-        attackAimInputEndedConn = nil
+    if state.attackAim.inputEndedConn then
+        state.attackAim.inputEndedConn:Disconnect()
+        state.attackAim.inputEndedConn = nil
     end
 
-    attackAimInputBeganConn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        -- Tidak skip berdasarkan gameProcessed — kita observer pasif
+    state.attackAim.inputBeganConn = UserInputService.InputBegan:Connect(function(input)
         if not config.autoTaskEnabled then return end
-        if attackAimHoldActive then return end
+        if state.attackAim.holdActive then return end
 
         local isMouse = (input.UserInputType == Enum.UserInputType.MouseButton1)
         local isTouch = (input.UserInputType == Enum.UserInputType.Touch)
         if not (isMouse or isTouch) then return end
 
-        local pos = input.Position
-        if not isInAttackRegion(pos.X, pos.Y) then return end
+        if not attackAimIsInRegion(input.Position.X, input.Position.Y) then return end
 
-        startAttackAimHold(input, isTouch and "Touch" or "Mouse")
+        startAttackAimHold(input)
+        -- Tidak ada `return true`, tidak mengonsumsi input
     end)
 
-    attackAimInputEndedConn = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-        -- Selalu cek pelepasan — jangan skip karena gameProcessed
-        if not attackAimHoldActive then return end
-        if attackAimActiveInputRef == nil then return end
-
-        -- Cek apakah input yang dilepas = input yang memulai lock
-        -- Priority 1: identity check
-        if input == attackAimActiveInputRef then
-            stopAttackAimHold()
-            return
-        end
-
-        -- Fallback: match by type (kalau identity tidak match karena UI intercept)
-        local isMouse = (input.UserInputType == Enum.UserInputType.MouseButton1)
-        local isTouch = (input.UserInputType == Enum.UserInputType.Touch)
-        local matchType = (isMouse and attackAimActiveInputType == "Mouse")
-                       or (isTouch and attackAimActiveInputType == "Touch")
-        if matchType then
+    state.attackAim.inputEndedConn = UserInputService.InputEnded:Connect(function(input)
+        -- Jangan skip berdasarkan gameProcessed
+        if not state.attackAim.holdActive then return end
+        if state.attackAim.activeInput == nil then return end
+        -- Hanya stop kalau input yang dilepas adalah input yang memulai lock
+        if input == state.attackAim.activeInput then
             stopAttackAimHold()
         end
     end)
 end
 
 -- ============================================================================
--- CHARACTER RESPAWN HANDLERS
+-- HELPER: setup respawn handling
 -- ============================================================================
-local function setupAttackAimCharEvents()
-    if attackAimCharAddedConn then
-        attackAimCharAddedConn:Disconnect()
-        attackAimCharAddedConn = nil
+local function attackAimSetupCharEvents()
+    if state.attackAim.charAddedConn then
+        state.attackAim.charAddedConn:Disconnect()
+        state.attackAim.charAddedConn = nil
     end
-    if attackAimCharRemovingConn then
-        attackAimCharRemovingConn:Disconnect()
-        attackAimCharRemovingConn = nil
+    if state.attackAim.charRemovingConn then
+        state.attackAim.charRemovingConn:Disconnect()
+        state.attackAim.charRemovingConn = nil
     end
 
-    attackAimCharAddedConn = localPlayer.CharacterAdded:Connect(function()
-        if attackAimHoldActive then
+    state.attackAim.charAddedConn = localPlayer.CharacterAdded:Connect(function()
+        if state.attackAim.holdActive then
             stopAttackAimHold()
         end
-        attackAimSavedAutoRotate = nil
+        state.attackAim.savedAutoRotate = nil
     end)
 
-    attackAimCharRemovingConn = localPlayer.CharacterRemoving:Connect(function()
-        if attackAimHoldActive then
+    state.attackAim.charRemovingConn = localPlayer.CharacterRemoving:Connect(function()
+        if state.attackAim.holdActive then
             stopAttackAimHold()
         end
-        attackAimSavedAutoRotate = nil
+        state.attackAim.savedAutoRotate = nil
     end)
 end
 
 -- ============================================================================
--- BUAT REFERENCE FRAME (visual opsional, Active=false — tidak konsumsi input)
+-- HELPER: cleanup semua koneksi & state
 -- ============================================================================
-local function createAttackAimButton()
-    -- Bersihkan GUI lama jika ada
-    if attackAimButtonGui then
-        attackAimButtonGui:Destroy()
-        attackAimButtonGui = nil
-    end
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "AttackAimButton"
-    gui.ResetOnSpawn = false
-    gui.Parent = game:GetService("CoreGui")
-
-    -- Frame (bukan TextButton) — Active = false default, tidak konsumsi input
-    local frame = Instance.new("Frame")
-    frame.Name = "AttackAimReference"
-    frame.Size = ATTACK_FALLBACK_SIZE
-    frame.Position = ATTACK_FALLBACK_POSITION
-    frame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    frame.BackgroundTransparency = 1  -- transparan
-    frame.BorderSizePixel = 0
-    frame.Active = false              -- penting: TIDAK konsumsi input
-    frame.Visible = true
-    frame.Parent = gui
-
-    -- Opsional: border visual untuk debug
-    -- local stroke = Instance.new("UIStroke")
-    -- stroke.Color = Color3.fromRGB(0, 255, 0)
-    -- stroke.Thickness = 1
-    -- stroke.Transparency = 0.5
-    -- stroke.Parent = frame
-
-    attackAimButton = frame
-    attackAimButtonGui = gui
-
-    -- Setup input observer & respawn handler
-    setupAttackAimInput()
-    setupAttackAimCharEvents()
-
-    print("[AttackAim] Reference frame created (Active=false), input via UserInputService")
-end
-
--- Hapus GUI dan koneksi
 local function destroyAttackAimButton()
-    if attackAimInputBeganConn then
-        attackAimInputBeganConn:Disconnect()
-        attackAimInputBeganConn = nil
+    if state.attackAim.inputBeganConn then
+        state.attackAim.inputBeganConn:Disconnect()
+        state.attackAim.inputBeganConn = nil
     end
-    if attackAimInputEndedConn then
-        attackAimInputEndedConn:Disconnect()
-        attackAimInputEndedConn = nil
+    if state.attackAim.inputEndedConn then
+        state.attackAim.inputEndedConn:Disconnect()
+        state.attackAim.inputEndedConn = nil
     end
-    if attackAimCharAddedConn then
-        attackAimCharAddedConn:Disconnect()
-        attackAimCharAddedConn = nil
+    if state.attackAim.charAddedConn then
+        state.attackAim.charAddedConn:Disconnect()
+        state.attackAim.charAddedConn = nil
     end
-    if attackAimCharRemovingConn then
-        attackAimCharRemovingConn:Disconnect()
-        attackAimCharRemovingConn = nil
+    if state.attackAim.charRemovingConn then
+        state.attackAim.charRemovingConn:Disconnect()
+        state.attackAim.charRemovingConn = nil
     end
-
-    stopAttackAimLock()
-
-    if attackAimButtonGui then
-        attackAimButtonGui:Destroy()
-        attackAimButtonGui = nil
+    if state.attackAim.lockConn then
+        pcall(function()
+            RunService:UnbindFromRenderStep("CyberAttackAimLock")
+        end)
+        state.attackAim.lockConn = nil
     end
-    attackAimButton = nil
-    attackAimHoldActive = false
-    attackAimActiveInputRef = nil
-    attackAimActiveInputType = nil
-    attackAimTarget = nil
+    state.attackAim.holdActive = false
+    state.attackAim.activeInput = nil
+    state.attackAim.target = nil
+    state.attackAim.savedAutoRotate = nil
 end
 
 -- ============================================================================
--- START / STOP (signature tetap sama seperti sebelumnya)
+-- ENTRY POINTS (dipanggil oleh toggle fitur)
 -- ============================================================================
 local function startAutoTask()
     if currentTaskConnection then return end
     if not config.autoTaskEnabled then return end
 
-    createAttackAimButton()
+    attackAimSetupInput()
+    attackAimSetupCharEvents()
 
-    -- Placeholder agar start/stop konsisten
+    -- Placeholder agar konsisten dengan mekanisme start/stop
     currentTaskConnection = RunService.Heartbeat:Connect(function() end)
 
-    print("[AttackAim] Started - touch on attack button area to lock to nearest survivor in front")
+    print("[AttackAim] Started - hold in attack area to lock survivor")
 end
 
 local function stopAutoTask()
@@ -735,6 +671,15 @@ local function stopAutoTask()
     end
 
     destroyAttackAimButton()
+
+    -- Kembalikan AutoRotate jika masih false
+    local lChar = localPlayer.Character
+    if lChar then
+        local hum = lChar:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.AutoRotate = true
+        end
+    end
 
     print("[AttackAim] Stopped")
 end

@@ -7674,21 +7674,21 @@ local function createGUI()
 
     -- Metadata per fitur (verified = sesuai implementasi yang bisa diverifikasi)
     local FEATURE_META = {
-        autoWinEnabled        = { title = "AUTO WIN",        desc = "Mekanisme auto win sesuai implementasi fitur.", verified = false },
-        autoTaskEnabled       = { title = "AIM ATTACK",      desc = "Mengunci kamera ke survivor terdekat di depan POV selama tombol attack ditahan.", verified = true },
-        espEnabled            = { title = "ESP ALL",         desc = "Menampilkan highlight, jarak, dan garis koneksi ke seluruh pemain.", verified = true },
-        speedBoostEnabled     = { title = "PLAY AI",         desc = "Fitur ini belum dapat gunakan karena masih dalam tahap perkembangan.", verified = false },
-        stealthEnabled        = { title = "STEALTH",         desc = "Mode stealth / penyamaran terhadap pembacaan posisi.", verified = false },
-        godModeEnabled        = { title = "GOD MODE",        desc = "Mode kebal / regen kesehatan otomatis.", verified = false },
-        infiniteAmmoEnabled   = { title = "DAGGER",          desc = "menangkis serangan killer secara otomatis .", verified = true },
-        shieldEnabled         = { title = "AUTO ATTACK",     desc = "Fitur ini belum dapat diverifikasi dari kode yang diberikan.", verified = false },
-        tpwalkEnabled         = { title = "TP WALK",         desc = "Teleport walk menggunakan CFrame per frame.", verified = false },
-        noCollideEnabled      = { title = "NO COLLIDE",      desc = "Menonaktifkan collision pada karakter pemain.", verified = false },
-        massKillEnabled       = { title = "MASS KILL",       desc = "Mekanisme kill masal sesuai implementasi fitur.", verified = false },
-        autoGeneratorEnabled  = { title = "BREAK GEN",       desc = "fitur masih dalam tahap perkembangan", verified = true },
-        autoSkillCheckEnabled = { title = "SKILL CHECK",     desc = "melewati skillcheck secara otomatis.", verified = true },
-        autoAimEnabled        = { title = "AUTO AIM",        desc = "Mengunci kamera ke target sesuai mode Killer / Survivor / SCP.", verified = true },
-        povMode               = { title = "POV",             desc = "Mode kamera POV yang dapat di-toggle terpisah.", verified = false },
+    autoWinEnabled        = { title = "AUTO WIN",        desc = "Automatically triggers the win mechanism according to the feature implementation.", verified = false },
+    autoTaskEnabled       = { title = "AIM ATTACK",      desc = "Locks the camera onto the nearest survivor in front of the POV while the attack button is held.", verified = true },
+    espEnabled            = { title = "ESP ALL",         desc = "Displays highlights, player distances, and connection lines for all players.", verified = true },
+    speedBoostEnabled     = { title = "PLAY AI",         desc = "This feature is currently unavailable and is still under development.", verified = false },
+    stealthEnabled        = { title = "STEALTH",         desc = "Activates stealth or concealment mode to hide position information.", verified = false },
+    godModeEnabled        = { title = "GOD MODE",        desc = "Activates invulnerability mode or automatic health regeneration.", verified = false },
+    infiniteAmmoEnabled   = { title = "DAGGER",          desc = "Automatically parries attacks from the killer.", verified = true },
+    shieldEnabled         = { title = "AUTO ATTACK",     desc = "The functionality of this feature has not yet been verified in the provided code.", verified = false },
+    tpwalkEnabled         = { title = "TP WALK",         desc = "Moves the character using CFrame-based teleportation on each frame.", verified = false },
+    noCollideEnabled      = { title = "NO COLLIDE",      desc = "Disables collision for the player's character.", verified = false },
+    massKillEnabled       = { title = "MASS KILL",       desc = "Performs mass-kill actions according to the feature implementation.", verified = false },
+    autoGeneratorEnabled  = { title = "BREAK GEN",       desc = "This feature is still under development.", verified = true },
+    autoSkillCheckEnabled = { title = "SKILL CHECK",     desc = "Automatically completes skill checks.", verified = true },
+    autoAimEnabled        = { title = "AUTO AIM",        desc = "Locks the camera onto a target based on the Killer, Survivor, or SCP mode.", verified = true },
+    povMode               = { title = "POV",             desc = "Toggles the POV camera mode independently.", verified = false },
     }
 
     local activeNotifs = {}

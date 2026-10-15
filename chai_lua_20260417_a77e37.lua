@@ -844,6 +844,25 @@ local function createHighlightForPlayer(player)
 
     local MAX_DISTANCE = 2000
 
+    -- ===== [NEW: OCCLUSION DETECTION CONSTANTS] =====
+    -- Sample points on target body untuk deteksi "setengah terhalang"
+    local OCCLUSION_SAMPLE_NAMES = {
+        "Head", "UpperTorso", "LowerTorso", "Torso",
+        "LeftUpperArm", "RightUpperArm",
+        "LeftUpperLeg", "RightUpperLeg",
+    }
+    -- Transparansi outline normal (tidak terhalang)
+    local OUTLINE_VISIBLE = 0.2
+    -- Transparansi outline saat terhalang penuh
+    local OUTLINE_OCCLUDED = 0.5
+    -- Fill transparansi normal (fully invisible)
+    local FILL_VISIBLE = 1
+    -- Fill transparansi saat terhalang penuh (terlihat samar)
+    local FILL_OCCLUDED = 0.5
+    -- Throttle occlusion check (per second)
+    local OCCLUSION_CHECK_INTERVAL = 0.1
+    -- ================================================
+
     local function getTargetRole()
         if player.Team then
             local teamName = player.Team.Name:lower()
@@ -919,6 +938,57 @@ local function createHighlightForPlayer(player)
         local dist = getDistanceToPlayer()
         return dist <= MAX_DISTANCE
     end
+
+    -- ===== [NEW: OCCLUSION COMPUTATION] =====
+    -- Return rasio (0.0 = sepenuhnya terlihat, 1.0 = sepenuhnya terhalang)
+    local function computeOcclusionRatio()
+        local char = player.Character
+        if not char then return 0 end
+        local cam = workspace.CurrentCamera
+        if not cam then return 0 end
+
+        -- Kumpulkan sample parts
+        local samples = {}
+        for _, name in ipairs(OCCLUSION_SAMPLE_NAMES) do
+            local part = char:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
+                table.insert(samples, part)
+            end
+        end
+        if #samples == 0 then
+            -- fallback ke HumanoidRootPart
+            local rp = char:FindFirstChild("HumanoidRootPart")
+            if rp then table.insert(samples, rp) end
+        end
+        if #samples == 0 then return 0 end
+
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.IgnoreWater = true
+        -- Abaikan karakter target itu sendiri DAN karakter lokal
+        local filterList = { char }
+        if localPlayer.Character then table.insert(filterList, localPlayer.Character) end
+        rayParams.FilterDescendantsInstances = filterList
+
+        local camPos = cam.CFrame.Position
+        local total = 0
+        local occluded = 0
+
+        for _, part in ipairs(samples) do
+            local dir = part.Position - camPos
+            if dir.Magnitude > 0.01 then
+                total = total + 1
+                local hit = workspace:Raycast(camPos, dir, rayParams)
+                if hit then
+                    occluded = occluded + 1
+                end
+            end
+        end
+
+        if total == 0 then return 0 end
+        return occluded / total
+    end
+    -- ================================================
 
     local currentColor = getCurrentColor()
     local highlight = Instance.new("Highlight")
@@ -1053,12 +1123,16 @@ local function createHighlightForPlayer(player)
     -- =========================================================================
     -- [OPTIMASI] Konsolidasi 3 koneksi (color, distance, integrity) → 1 Heartbeat
     -- dengan throttle per task.
+    -- [NEW] Tambah occlusion check — set FillTransparency & OutlineTransparency
+    --       berdasarkan rasio body yang terhalang objek.
     -- =========================================================================
     local lastColorCheck = 0
     local lastDistCheck = 0
     local lastIntegrityCheck = 0
+    local lastOcclusionCheck = 0
     local cachedRole = nil
     local cachedDistText = nil
+    local cachedOcclusionRatio = -1  -- -1 = belum pernah dihitung
 
     local consolidatedConn
     consolidatedConn = RunService.Heartbeat:Connect(function()
@@ -1103,6 +1177,24 @@ local function createHighlightForPlayer(player)
             end
         end
 
+        -- ===== [NEW] OCCLUSION CHECK: throttle per OCCLUSION_CHECK_INTERVAL =====
+        if now - lastOcclusionCheck >= OCCLUSION_CHECK_INTERVAL then
+            lastOcclusionCheck = now
+
+            local h = entry.Highlight
+            if h and h.Parent and h.Enabled and charNow then
+                local ratio = computeOcclusionRatio()
+                if ratio ~= cachedOcclusionRatio then
+                    cachedOcclusionRatio = ratio
+                    -- Interpolasi linear antara transparansi normal dan terhalang
+                    local fillT = FILL_VISIBLE + (FILL_OCCLUDED - FILL_VISIBLE) * ratio
+                    local outlineT = OUTLINE_VISIBLE + (OUTLINE_OCCLUDED - OUTLINE_VISIBLE) * ratio
+                    h.FillTransparency = fillT
+                    h.OutlineTransparency = outlineT
+                end
+            end
+        end
+
         -- ===== INTEGRITY CHECK: throttle 1s =====
         if now - lastIntegrityCheck >= 1 then
             lastIntegrityCheck = now
@@ -1126,6 +1218,7 @@ local function createHighlightForPlayer(player)
                     entry.Highlight = hl
                     highlight = hl
                     lastAppliedColor = nil
+                    cachedOcclusionRatio = -1  -- reset occlusion cache
                 else
                     if entry.Highlight.Parent ~= charNow then entry.Highlight.Parent = charNow end
                     if entry.Highlight.Adornee ~= charNow then entry.Highlight.Adornee = charNow end
@@ -1223,6 +1316,7 @@ local function createHighlightForPlayer(player)
         IntegrityConn = consolidatedConn,
     }
 end
+                        
 -- ============================================================================
 -- OBJECT ESP (dengan Custom ESP support)
 -- ============================================================================

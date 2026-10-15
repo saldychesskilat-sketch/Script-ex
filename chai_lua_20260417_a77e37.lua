@@ -824,6 +824,7 @@ end
 -- ============================================================================
 -- PLAYER ESP (dengan Custom ESP support)
 -- ============================================================================
+-- ============================================================================
 local function createHighlightForPlayer(player)
     if espHighlights[player.UserId] then
         if espHighlights[player.UserId].Highlight then espHighlights[player.UserId].Highlight:Destroy() end
@@ -844,23 +845,27 @@ local function createHighlightForPlayer(player)
 
     local MAX_DISTANCE = 2000
 
-    -- ===== [NEW: OCCLUSION DETECTION CONSTANTS] =====
-    -- Sample points on target body untuk deteksi "setengah terhalang"
+    -- ===== [OCCLUSION DETECTION CONSTANTS] =====
+    -- Sample points on target body
     local OCCLUSION_SAMPLE_NAMES = {
-        "Head", "UpperTorso", "LowerTorso", "Torso",
+        "Head", "UpperTorso", "LowerTorso",
         "LeftUpperArm", "RightUpperArm",
         "LeftUpperLeg", "RightUpperLeg",
     }
-    -- Transparansi outline normal (tidak terhalang)
-    local OUTLINE_VISIBLE = 0.2
-    -- Transparansi outline saat terhalang penuh
+    -- Transparency: visible vs full-occluded
+    local OUTLINE_VISIBLE  = 0.2
     local OUTLINE_OCCLUDED = 0.5
-    -- Fill transparansi normal (fully invisible)
-    local FILL_VISIBLE = 1
-    -- Fill transparansi saat terhalang penuh (terlihat samar)
-    local FILL_OCCLUDED = 0.5
-    -- Throttle occlusion check (per second)
+    local FILL_VISIBLE     = 1
+    local FILL_OCCLUDED    = 0.5
+    -- Throttle
     local OCCLUSION_CHECK_INTERVAL = 0.1
+    -- Multi-ray per sample point (fan cast) → cegah tipis (tiang/jendela berlubang) dianggap occluded penuh
+    local RAYS_PER_POINT = 5    -- 1 center + 4 offset
+    local RAY_SPREAD     = 1.1  -- studs, offset perpendicular untuk corner rays
+    -- Brightness dim saat occluded (2x lebih redup di full occluded)
+    local OCCLUSION_BRIGHTNESS_DIM = 0.5
+    -- Smoothing rasio untuk transisi halus antar frame
+    local OCCLUSION_SMOOTHING = 0.35
     -- ================================================
 
     local function getTargetRole()
@@ -939,15 +944,17 @@ local function createHighlightForPlayer(player)
         return dist <= MAX_DISTANCE
     end
 
-    -- ===== [NEW: OCCLUSION COMPUTATION] =====
-    -- Return rasio (0.0 = sepenuhnya terlihat, 1.0 = sepenuhnya terhalang)
+    -- ===== [OCCLUSION COMPUTATION — MULTI-RAY FAN CAST] =====
+    -- Setiap sample point di-test dengan 5 ray (1 center + 4 offset perpendicular).
+    -- Nilai occluded per point = jumlah ray yang hit / total ray.
+    -- Hasil akhir = rata-rata across semua sample points.
+    -- Ini bikin objek tipis (tiang/jendela) tidak dianggap occluded penuh.
     local function computeOcclusionRatio()
         local char = player.Character
         if not char then return 0 end
         local cam = workspace.CurrentCamera
         if not cam then return 0 end
 
-        -- Kumpulkan sample parts
         local samples = {}
         for _, name in ipairs(OCCLUSION_SAMPLE_NAMES) do
             local part = char:FindFirstChild(name)
@@ -956,7 +963,6 @@ local function createHighlightForPlayer(player)
             end
         end
         if #samples == 0 then
-            -- fallback ke HumanoidRootPart
             local rp = char:FindFirstChild("HumanoidRootPart")
             if rp then table.insert(samples, rp) end
         end
@@ -965,28 +971,71 @@ local function createHighlightForPlayer(player)
         local rayParams = RaycastParams.new()
         rayParams.FilterType = Enum.RaycastFilterType.Blacklist
         rayParams.IgnoreWater = true
-        -- Abaikan karakter target itu sendiri DAN karakter lokal
         local filterList = { char }
         if localPlayer.Character then table.insert(filterList, localPlayer.Character) end
         rayParams.FilterDescendantsInstances = filterList
 
         local camPos = cam.CFrame.Position
+        local camRight = cam.CFrame.RightVector
+        local camUp = cam.CFrame.UpVector
+        local spread = RAY_SPREAD
+
+        -- Pre-compute offsets (center + 4 corners)
+        local offsets = {
+            Vector3.zero,
+            camRight * spread,
+            -camRight * spread,
+            camUp * spread,
+            -camUp * spread,
+        }
+
+        local totalOcclusion = 0
         local total = 0
-        local occluded = 0
 
         for _, part in ipairs(samples) do
-            local dir = part.Position - camPos
-            if dir.Magnitude > 0.01 then
-                total = total + 1
-                local hit = workspace:Raycast(camPos, dir, rayParams)
-                if hit then
-                    occluded = occluded + 1
+            local partPos = part.Position
+            if (partPos - camPos).Magnitude > 0.01 then
+                local hitCount = 0
+                for _, off in ipairs(offsets) do
+                    local targetPos = partPos + off
+                    local rayDir = targetPos - camPos
+                    if rayDir.Magnitude > 0.01 then
+                        local hit = workspace:Raycast(camPos, rayDir, rayParams)
+                        if hit then
+                            hitCount = hitCount + 1
+                        end
+                    end
                 end
+                totalOcclusion = totalOcclusion + (hitCount / RAYS_PER_POINT)
+                total = total + 1
             end
         end
 
         if total == 0 then return 0 end
-        return occluded / total
+        return totalOcclusion / total
+    end
+    -- ================================================
+
+    -- ===== [APPLY HIGHLIGHT STATE (color + occlusion)] =====
+    -- Menyatukan base color + occlusion ratio → set Fill/Outline color & transparency.
+    -- Brightness diredupkan saat occluded (2x lebih redup di full occluded).
+    local function applyHighlightState(h, baseColor, ratio)
+        if not h then return end
+        -- Transparency interpolation
+        local fillT    = FILL_VISIBLE    + (FILL_OCCLUDED    - FILL_VISIBLE)    * ratio
+        local outlineT = OUTLINE_VISIBLE + (OUTLINE_OCCLUDED - OUTLINE_VISIBLE) * ratio
+        h.FillTransparency = fillT
+        h.OutlineTransparency = outlineT
+
+        -- Brightness dim: ratio 0 → 1.0 (normal), ratio 1 → OCCLUSION_BRIGHTNESS_DIM (lebih redup)
+        local dim = 1 - (1 - OCCLUSION_BRIGHTNESS_DIM) * ratio
+        local dimColor = Color3.new(
+            baseColor.R * dim,
+            baseColor.G * dim,
+            baseColor.B * dim
+        )
+        h.FillColor = dimColor
+        h.OutlineColor = dimColor
     end
     -- ================================================
 
@@ -1065,14 +1114,18 @@ local function createHighlightForPlayer(player)
         end
     end
 
-    -- ===== [OPTIMASI] Cache warna terakhir agar ColorSequence.new tidak dipanggil tiap frame =====
+    -- ===== [APPLIED STATE CACHE] =====
+    -- Simpan base color + ratio terakhir untuk menghindari re-apply sia-sia
     local lastAppliedColor = nil
+    local currentOcclusionRatio = 0
+    -- ===================================
+
     local function updateBeamColor()
         local newColor = getCurrentColor()
         if lastAppliedColor ~= newColor then
             lastAppliedColor = newColor
-            highlight.FillColor = newColor
-            highlight.OutlineColor = newColor
+            -- Apply color dengan occlusion ratio saat ini
+            applyHighlightState(highlight, newColor, currentOcclusionRatio)
             distLabel.TextColor3 = newColor
             beam.Color = ColorSequence.new(newColor)
         end
@@ -1121,10 +1174,7 @@ local function createHighlightForPlayer(player)
     end
 
     -- =========================================================================
-    -- [OPTIMASI] Konsolidasi 3 koneksi (color, distance, integrity) → 1 Heartbeat
-    -- dengan throttle per task.
-    -- [NEW] Tambah occlusion check — set FillTransparency & OutlineTransparency
-    --       berdasarkan rasio body yang terhalang objek.
+    -- Consolidated Heartbeat: color, distance, occlusion, integrity
     -- =========================================================================
     local lastColorCheck = 0
     local lastDistCheck = 0
@@ -1132,7 +1182,6 @@ local function createHighlightForPlayer(player)
     local lastOcclusionCheck = 0
     local cachedRole = nil
     local cachedDistText = nil
-    local cachedOcclusionRatio = -1  -- -1 = belum pernah dihitung
 
     local consolidatedConn
     consolidatedConn = RunService.Heartbeat:Connect(function()
@@ -1150,14 +1199,14 @@ local function createHighlightForPlayer(player)
         local role = getTargetRole()
         local charNow = player.Character
 
-        -- ===== COLOR + VISIBILITY: throttle 0.2s atau saat role berubah =====
+        -- ===== COLOR + VISIBILITY =====
         if now - lastColorCheck >= 0.2 or cachedRole ~= role then
             lastColorCheck = now
             cachedRole = role
             updateBeamColor()
         end
 
-        -- ===== DISTANCE TEXT: throttle 0.15s + cache text =====
+        -- ===== DISTANCE TEXT =====
         if now - lastDistCheck >= 0.15 then
             lastDistCheck = now
             local dist = getDistanceToPlayer()
@@ -1177,25 +1226,24 @@ local function createHighlightForPlayer(player)
             end
         end
 
-        -- ===== [NEW] OCCLUSION CHECK: throttle per OCCLUSION_CHECK_INTERVAL =====
+        -- ===== OCCLUSION CHECK (smooth + multi-ray) =====
         if now - lastOcclusionCheck >= OCCLUSION_CHECK_INTERVAL then
             lastOcclusionCheck = now
 
             local h = entry.Highlight
             if h and h.Parent and h.Enabled and charNow then
-                local ratio = computeOcclusionRatio()
-                if ratio ~= cachedOcclusionRatio then
-                    cachedOcclusionRatio = ratio
-                    -- Interpolasi linear antara transparansi normal dan terhalang
-                    local fillT = FILL_VISIBLE + (FILL_OCCLUDED - FILL_VISIBLE) * ratio
-                    local outlineT = OUTLINE_VISIBLE + (OUTLINE_OCCLUDED - OUTLINE_VISIBLE) * ratio
-                    h.FillTransparency = fillT
-                    h.OutlineTransparency = outlineT
-                end
+                local rawRatio = computeOcclusionRatio()
+                -- Smoothing: lerp ratio lama → baru untuk transisi halus
+                currentOcclusionRatio = currentOcclusionRatio
+                    + (rawRatio - currentOcclusionRatio) * OCCLUSION_SMOOTHING
+
+                -- Apply color + occlusion secara bersamaan
+                local baseColor = getCurrentColor()
+                applyHighlightState(h, baseColor, currentOcclusionRatio)
             end
         end
 
-        -- ===== INTEGRITY CHECK: throttle 1s =====
+        -- ===== INTEGRITY CHECK =====
         if now - lastIntegrityCheck >= 1 then
             lastIntegrityCheck = now
 
@@ -1218,7 +1266,7 @@ local function createHighlightForPlayer(player)
                     entry.Highlight = hl
                     highlight = hl
                     lastAppliedColor = nil
-                    cachedOcclusionRatio = -1  -- reset occlusion cache
+                    currentOcclusionRatio = 0
                 else
                     if entry.Highlight.Parent ~= charNow then entry.Highlight.Parent = charNow end
                     if entry.Highlight.Adornee ~= charNow then entry.Highlight.Adornee = charNow end

@@ -7672,16 +7672,6 @@ local function createGUI()
     notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
     notifLayout.Parent = notifContainer
 
-    -- ===== [NEW: ROUND NOTIFICATION CONTAINER — posisi di tengah layar] =====
-    local roundNotifContainer = Instance.new("Frame")
-    roundNotifContainer.Name = "RoundNotifContainer"
-    roundNotifContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-    roundNotifContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
-    roundNotifContainer.Size = UDim2.new(0, 340, 0, 0)
-    roundNotifContainer.BackgroundTransparency = 1
-    roundNotifContainer.Parent = notifGui
-    -- =====================================================================
-
     -- Metadata per fitur (verified = sesuai implementasi yang bisa diverifikasi)
     local FEATURE_META = {
     autoWinEnabled        = { title = "AUTO WIN",        desc = "Automatically triggers the win mechanism according to the feature implementation.", verified = false },
@@ -7901,88 +7891,19 @@ local function createGUI()
     end
 
     -- =========================================================================
-    -- ===== [NEW: ROUND CHANGE NOTIFICATION (Center, Killer + Perks)] =====
+    -- ===== [NEW: NEXT KILLER DISPLAY — small, persistent, only when no killer] =====
     -- =========================================================================
-    -- Helper: ambil daftar perks dari seorang player (max 3)
-    -- Sumber perk bisa berbeda antar game, jadi kita cek beberapa sumber sekaligus:
-    --   1. Player attribute "Perks" / "EquippedPerks" / "SelectedPerks"
-    --   2. Character attribute "Perks" / "EquippedPerks"
-    --   3. Instance child di Player bernama "Perks" (folder dengan child = perk)
-    --   4. PlayerGui child dengan attribute "Perk"
-    local function getPlayerPerks(player)
-        local perks = {}
-
-        local function pushPerk(v)
-            if v == nil then return end
-            if #perks >= 3 then return end
-            local s = tostring(v)
-            if s == "" then return end
-            -- hindari duplikat
-            for _, existing in ipairs(perks) do
-                if existing == s then return end
-            end
-            table.insert(perks, s)
+    -- Helper: ambil nilai dari attribute atau ValueObject
+    local function getVal(obj, name)
+        if not obj then return nil end
+        local attr = obj:GetAttribute(name)
+        if attr ~= nil then return attr end
+        local child = obj:FindFirstChild(name)
+        if child then
+            local ok, val = pcall(function() return child.Value end)
+            if ok then return val end
         end
-
-        -- 1) Player attributes
-        for _, attrName in ipairs({"Perks", "EquippedPerks", "SelectedPerks", "Perk"}) do
-            local v = player:GetAttribute(attrName)
-            if type(v) == "table" then
-                for _, item in ipairs(v) do pushPerk(item) end
-            elseif v ~= nil then
-                pushPerk(v)
-            end
-        end
-
-        -- 2) Character attributes
-        local char = player.Character
-        if char then
-            for _, attrName in ipairs({"Perks", "EquippedPerks", "SelectedPerks", "Perk"}) do
-                local v = char:GetAttribute(attrName)
-                if type(v) == "table" then
-                    for _, item in ipairs(v) do pushPerk(item) end
-                elseif v ~= nil then
-                    pushPerk(v)
-                end
-            end
-        end
-
-        -- 3) Child folder "Perks" / "EquippedPerks"
-        if #perks < 3 then
-            for _, folderName in ipairs({"Perks", "EquippedPerks", "PerkLoadout"}) do
-                local folder = player:FindFirstChild(folderName) or (char and char:FindFirstChild(folderName))
-                if folder then
-                    for _, child in ipairs(folder:GetChildren()) do
-                        if #perks >= 3 then break end
-                        -- Ambil nama child, atau value kalau child adalah ValueObject
-                        if child:IsA("StringValue") or child:IsA("NumberValue") or child:IsA("IntValue") then
-                            pushPerk(child.Value)
-                        else
-                            pushPerk(child.Name)
-                        end
-                    end
-                end
-            end
-        end
-
-        return perks
-    end
-
-    -- Helper: ambil nama tampilan (selected killer name kalau ada, fallback DisplayName)
-    local function getKillerDisplayName(player)
-        -- Beberapa game menyimpan "SelectedKiller" attribute (nama karakter killer)
-        local sel = player:GetAttribute("SelectedKiller")
-        if sel ~= nil and tostring(sel) ~= "" then
-            return tostring(sel)
-        end
-        local char = player.Character
-        if char then
-            local sel2 = char:GetAttribute("SelectedKiller")
-            if sel2 ~= nil and tostring(sel2) ~= "" then
-                return tostring(sel2)
-            end
-        end
-        return player.DisplayName ~= "" and player.DisplayName or player.Name
+        return nil
     end
 
     -- Helper: cari player yang saat ini menjadi killer
@@ -7998,301 +7919,133 @@ local function createGUI()
         return nil
     end
 
-    -- Tampilkan notifikasi round di tengah layar
-    local ROUND_NOTIF_DURATION = 6
-    local activeRoundNotif = nil
-
-    local function destroyRoundNotif()
-        if activeRoundNotif and activeRoundNotif.gui and activeRoundNotif.gui.Parent then
-            pcall(function() activeRoundNotif.gui:Destroy() end)
+    -- Helper: ambil nama tampilan killer
+    local function getKillerName(player)
+        local sel = getVal(player, "SelectedKiller")
+        if sel ~= nil and tostring(sel) ~= "" then
+            return tostring(sel)
         end
-        activeRoundNotif = nil
+        return (player.DisplayName ~= "" and player.DisplayName) or player.Name
     end
 
-    local function showRoundNotification(killerPlayer)
-        if not killerPlayer then return end
+    -- Container kecil untuk Next Killer (top-center, berbeda dari notif lain)
+    local nextKillerContainer = Instance.new("Frame")
+    nextKillerContainer.Name = "NextKillerContainer"
+    nextKillerContainer.AnchorPoint = Vector2.new(0.5, 0)
+    nextKillerContainer.Position = UDim2.new(0.5, 0, 0, 12)
+    nextKillerContainer.Size = UDim2.new(0, 220, 0, 32)
+    nextKillerContainer.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+    nextKillerContainer.BackgroundTransparency = 1
+    nextKillerContainer.BorderSizePixel = 0
+    nextKillerContainer.Visible = false
+    nextKillerContainer.Parent = notifGui
 
-        -- Bersihkan round notif sebelumnya kalau masih ada
-        destroyRoundNotif()
+    local nkCorner = Instance.new("UICorner")
+    nkCorner.CornerRadius = UDim.new(0, 8)
+    nkCorner.Parent = nextKillerContainer
 
-        local killerName = getKillerDisplayName(killerPlayer)
-        local perks = getPlayerPerks(killerPlayer)
+    local nkStroke = Instance.new("UIStroke")
+    nkStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    nkStroke.Color = config.guiThemeColor
+    nkStroke.Thickness = 1.2
+    nkStroke.Transparency = 0.35
+    nkStroke.Parent = nextKillerContainer
 
-        -- Card ukuran tengah layar
-        local cardHeight = 120 + (math.max(#perks, 1) - 1) * 0 -- jika nanti mau dynamic
-        local card = Instance.new("Frame")
-        card.Name = "RoundNotifCard"
-        card.AnchorPoint = Vector2.new(0.5, 0.5)
-        card.Position = UDim2.new(0.5, 0, 0.5, 0)
-        card.Size = UDim2.new(0, 340, 0, 130)
-        card.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
-        card.BackgroundTransparency = 1
-        card.BorderSizePixel = 0
-        card.Parent = roundNotifContainer
+    local nkDot = Instance.new("Frame")
+    nkDot.Size = UDim2.new(0, 6, 0, 6)
+    nkDot.Position = UDim2.new(0, 10, 0.5, -3)
+    nkDot.BackgroundColor3 = Color3.fromRGB(255, 90, 90)
+    nkDot.BorderSizePixel = 0
+    nkDot.BackgroundTransparency = 1
+    nkDot.Parent = nextKillerContainer
+    local nkDotCorner = Instance.new("UICorner")
+    nkDotCorner.CornerRadius = UDim.new(1, 0)
+    nkDotCorner.Parent = nkDot
 
-        local cardCorner = Instance.new("UICorner")
-        cardCorner.CornerRadius = UDim.new(0, 12)
-        cardCorner.Parent = card
+    local nkLabel = Instance.new("TextLabel")
+    nkLabel.Size = UDim2.new(1, -30, 1, 0)
+    nkLabel.Position = UDim2.new(0, 24, 0, 0)
+    nkLabel.BackgroundTransparency = 1
+    nkLabel.Text = "NEXT KILLER: ..."
+    nkLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+    nkLabel.Font = Enum.Font.GothamBold
+    nkLabel.TextSize = 11
+    nkLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nkLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    nkLabel.TextTransparency = 1
+    nkLabel.Parent = nextKillerContainer
 
-        local cardStroke = Instance.new("UIStroke")
-        cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-        cardStroke.Color = config.guiThemeColor
-        cardStroke.Thickness = 1.5
-        cardStroke.Transparency = 1
-        cardStroke.Parent = card
-
-        -- Header strip atas
-        local topStrip = Instance.new("Frame")
-        topStrip.Size = UDim2.new(1, 0, 0, 24)
-        topStrip.BackgroundColor3 = Color3.fromRGB(30, 8, 15)
-        topStrip.BackgroundTransparency = 1
-        topStrip.BorderSizePixel = 0
-        topStrip.Parent = card
-        local topCorner = Instance.new("UICorner")
-        topCorner.CornerRadius = UDim.new(0, 12)
-        topCorner.Parent = topStrip
-
-        local headerLbl = Instance.new("TextLabel")
-        headerLbl.Size = UDim2.new(1, -20, 1, 0)
-        headerLbl.Position = UDim2.new(0, 10, 0, 0)
-        headerLbl.BackgroundTransparency = 1
-        headerLbl.Text = "CYBERHEROES // MATCH UPDATE"
-        headerLbl.TextColor3 = config.guiThemeColor
-        headerLbl.Font = Enum.Font.GothamBold
-        headerLbl.TextSize = 11
-        headerLbl.TextXAlignment = Enum.TextXAlignment.Left
-        headerLbl.TextTransparency = 1
-        headerLbl.Parent = topStrip
-
-        -- Label "NEW ROUND"
-        local roundLbl = Instance.new("TextLabel")
-        roundLbl.Size = UDim2.new(1, -20, 0, 20)
-        roundLbl.Position = UDim2.new(0, 10, 0, 32)
-        roundLbl.BackgroundTransparency = 1
-        roundLbl.Text = "NEW ROUND STARTED"
-        roundLbl.TextColor3 = Color3.fromRGB(255, 200, 100)
-        roundLbl.Font = Enum.Font.GothamBold
-        roundLbl.TextSize = 13
-        roundLbl.TextXAlignment = Enum.TextXAlignment.Left
-        roundLbl.TextTransparency = 1
-        roundLbl.Parent = card
-
-        -- Label killer
-        local killerTitleLbl = Instance.new("TextLabel")
-        killerTitleLbl.Size = UDim2.new(0, 60, 0, 14)
-        killerTitleLbl.Position = UDim2.new(0, 10, 0, 58)
-        killerTitleLbl.BackgroundTransparency = 1
-        killerTitleLbl.Text = "KILLER"
-        killerTitleLbl.TextColor3 = Color3.fromRGB(255, 90, 90)
-        killerTitleLbl.Font = Enum.Font.GothamBold
-        killerTitleLbl.TextSize = 9
-        killerTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
-        killerTitleLbl.TextTransparency = 1
-        killerTitleLbl.Parent = card
-
-        local killerNameLbl = Instance.new("TextLabel")
-        killerNameLbl.Size = UDim2.new(1, -20, 0, 18)
-        killerNameLbl.Position = UDim2.new(0, 10, 0, 72)
-        killerNameLbl.BackgroundTransparency = 1
-        killerNameLbl.Text = killerName
-        killerNameLbl.TextColor3 = Color3.fromRGB(240, 240, 240)
-        killerNameLbl.Font = Enum.Font.GothamBold
-        killerNameLbl.TextSize = 14
-        killerNameLbl.TextXAlignment = Enum.TextXAlignment.Left
-        killerNameLbl.TextTransparency = 1
-        killerNameLbl.Parent = card
-
-        -- Label perks
-        local perksTitleLbl = Instance.new("TextLabel")
-        perksTitleLbl.Size = UDim2.new(0, 120, 0, 14)
-        perksTitleLbl.Position = UDim2.new(0, 10, 0, 94)
-        perksTitleLbl.BackgroundTransparency = 1
-        perksTitleLbl.Text = "PERKS USED"
-        perksTitleLbl.TextColor3 = config.guiThemeColor
-        perksTitleLbl.Font = Enum.Font.GothamBold
-        perksTitleLbl.TextSize = 9
-        perksTitleLbl.TextXAlignment = Enum.TextXAlignment.Left
-        perksTitleLbl.TextTransparency = 1
-        perksTitleLbl.Parent = card
-
-        -- Render perks sebagai chips kecil horizontal (max 3)
-        local chipsHolder = Instance.new("Frame")
-        chipsHolder.Size = UDim2.new(1, -20, 0, 18)
-        chipsHolder.Position = UDim2.new(0, 10, 0, 108)
-        chipsHolder.BackgroundTransparency = 1
-        chipsHolder.Parent = card
-
-        local chipLayout = Instance.new("UIListLayout")
-        chipLayout.FillDirection = Enum.FillDirection.Horizontal
-        chipLayout.Padding = UDim.new(0, 6)
-        chipLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
-        chipLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-        chipLayout.Parent = chipsHolder
-
-        if #perks == 0 then
-            local noPerk = Instance.new("TextLabel")
-            noPerk.Size = UDim2.new(0, 200, 1, 0)
-            noPerk.BackgroundTransparency = 1
-            noPerk.Text = "(no perks detected)"
-            noPerk.TextColor3 = Color3.fromRGB(150, 150, 150)
-            noPerk.Font = Enum.Font.Gotham
-            noPerk.TextSize = 10
-            noPerk.TextXAlignment = Enum.TextXAlignment.Left
-            noPerk.TextTransparency = 1
-            noPerk.Parent = chipsHolder
-            TweenService:Create(noPerk, TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-        else
-            for _, perkName in ipairs(perks) do
-                local chip = Instance.new("Frame")
-                chip.Size = UDim2.new(0, 90, 1, 0)
-                chip.BackgroundColor3 = Color3.fromRGB(30, 50, 70)
-                chip.BackgroundTransparency = 1
-                chip.BorderSizePixel = 0
-                chip.Parent = chipsHolder
-
-                local chipCorner = Instance.new("UICorner")
-                chipCorner.CornerRadius = UDim.new(0, 6)
-                chipCorner.Parent = chip
-
-                local chipStroke = Instance.new("UIStroke")
-                chipStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-                chipStroke.Color = config.guiThemeColor
-                chipStroke.Thickness = 1
-                chipStroke.Transparency = 1
-                chipStroke.Parent = chip
-
-                local chipLbl = Instance.new("TextLabel")
-                chipLbl.Size = UDim2.new(1, -8, 1, 0)
-                chipLbl.Position = UDim2.new(0, 4, 0, 0)
-                chipLbl.BackgroundTransparency = 1
-                chipLbl.Text = perkName
-                chipLbl.TextColor3 = Color3.fromRGB(220, 240, 255)
-                chipLbl.Font = Enum.Font.GothamBold
-                chipLbl.TextSize = 9
-                chipLbl.TextTruncate = Enum.TextTruncate.AtEnd
-                chipLbl.TextXAlignment = Enum.TextXAlignment.Center
-                chipLbl.TextTransparency = 1
-                chipLbl.Parent = chip
-
-                TweenService:Create(chip, TweenInfo.new(0.4), { BackgroundTransparency = 0.3 }):Play()
-                TweenService:Create(chipStroke, TweenInfo.new(0.4), { Transparency = 0.35 }):Play()
-                TweenService:Create(chipLbl, TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-            end
-        end
-
-        -- Simpan referensi
-        activeRoundNotif = { gui = card, destroyed = false }
-
-        -- ===== ANIMASI MASUK =====
-        card.Position = UDim2.new(0.5, 0, 0.42, 0)
-        card.Size = UDim2.new(0, 300, 0, 110)
-
-        TweenService:Create(card,
-            TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-            {
-                Position = UDim2.new(0.5, 0, 0.5, 0),
-                Size = UDim2.new(0, 340, 0, 130),
-                BackgroundTransparency = 0.08,
-            }
-        ):Play()
-
-        TweenService:Create(cardStroke,
-            TweenInfo.new(0.4), { Transparency = 0.2 }):Play()
-        TweenService:Create(topStrip,
-            TweenInfo.new(0.4), { BackgroundTransparency = 0.2 }):Play()
-        TweenService:Create(headerLbl,
-            TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-        TweenService:Create(roundLbl,
-            TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-        TweenService:Create(killerTitleLbl,
-            TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-        TweenService:Create(killerNameLbl,
-            TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-        TweenService:Create(perksTitleLbl,
-            TweenInfo.new(0.4), { TextTransparency = 0 }):Play()
-
-        -- ===== AUTO DISMISS =====
-        task.delay(ROUND_NOTIF_DURATION, function()
-            if not activeRoundNotif or activeRoundNotif.destroyed or not card.Parent then return end
-            activeRoundNotif.destroyed = true
-
-            local fadeInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad)
-            TweenService:Create(card, fadeInfo, { BackgroundTransparency = 1 }):Play()
-            TweenService:Create(cardStroke, fadeInfo, { Transparency = 1 }):Play()
-            TweenService:Create(topStrip, fadeInfo, { BackgroundTransparency = 1 }):Play()
-            TweenService:Create(headerLbl, fadeInfo, { TextTransparency = 1 }):Play()
-            TweenService:Create(roundLbl, fadeInfo, { TextTransparency = 1 }):Play()
-            TweenService:Create(killerTitleLbl, fadeInfo, { TextTransparency = 1 }):Play()
-            TweenService:Create(killerNameLbl, fadeInfo, { TextTransparency = 1 }):Play()
-            TweenService:Create(perksTitleLbl, fadeInfo, { TextTransparency = 1 }):Play()
-            for _, c in ipairs(chipsHolder:GetChildren()) do
-                if c:IsA("Frame") then
-                    pcall(function() TweenService:Create(c, fadeInfo, { BackgroundTransparency = 1 }):Play() end)
-                    for _, sub in ipairs(c:GetDescendants()) do
-                        if sub:IsA("TextLabel") then
-                            pcall(function() TweenService:Create(sub, fadeInfo, { TextTransparency = 1 }):Play() end)
-                        elseif sub:IsA("UIStroke") then
-                            pcall(function() TweenService:Create(sub, fadeInfo, { Transparency = 1 }):Play() end)
-                        end
-                    end
-                elseif c:IsA("TextLabel") then
-                    pcall(function() TweenService:Create(c, fadeInfo, { TextTransparency = 1 }):Play() end)
-                end
-            end
-
-            task.wait(0.45)
-            destroyRoundNotif()
-        end)
-    end
-
-    -- ===== DETEKSI PERGANTIAN RONDE / MATCH =====
-    -- Trigger utama: perubahan team killer (dari tidak ada killer → ada killer baru,
-    -- atau killer berubah dari player A ke player B). Ini terjadi saat ronde baru mulai.
-    -- Trigger tambahan: perubahan attribute umum seperti "RoundActive" / "MatchState" kalau ada.
-    local lastKillerUserId = nil
-    local lastRoundActive = nil
-
+    -- Poll: update & show/hide berdasarkan keberadaan killer
+    local NEXT_KILLER_POLL = 0.5
     task.spawn(function()
-        -- delay awal 2 detik supaya data player/team sudah settle
-        task.wait(2)
+        task.wait(1.5)  -- delay awal supaya data player settle
+
+        local lastText = nil
+        local lastVisible = false
 
         while screenGui and screenGui.Parent do
-            local killer = findCurrentKiller()
-            local killerId = killer and killer.UserId or nil
+            local killerExists = findCurrentKiller()
+            local shouldShow = (killerExists == nil)
 
-            -- Cek attribute "RoundActive" / "MatchState" di workspace atau ServerStorage (opsional)
-            local roundActive = nil
-            do
-                local v = workspace:GetAttribute("RoundActive")
-                if v == nil then
-                    -- coba attribute di ReplicatedStorage
-                    local rv = ReplicatedStorage:GetAttribute("RoundActive")
-                    if rv ~= nil then v = rv end
+            if shouldShow then
+                -- Sort players: AllowKiller dulu, lalu KillerChance tertinggi
+                local players = Players:GetPlayers()
+                table.sort(players, function(a, b)
+                    local aA = getVal(a, "AllowKiller") or false
+                    local bA = getVal(b, "AllowKiller") or false
+                    if aA ~= bA then return aA == true end
+                    local aC = tonumber(getVal(a, "KillerChance")) or 0
+                    local bC = tonumber(getVal(b, "KillerChance")) or 0
+                    return aC > bC
+                end)
+
+                local nk = players[1]
+                local text
+                if nk then
+                    local name = getKillerName(nk)
+                    if nk == LocalPlayer then name = "YOU" end
+                    text = "NEXT KILLER: " .. name
+                else
+                    text = "NEXT KILLER: --"
                 end
-                if v ~= nil then roundActive = v end
-            end
 
-            local killerChanged = (killerId ~= nil and killerId ~= lastKillerUserId)
-            local roundStateChanged = (roundActive ~= nil and lastRoundActive ~= nil and roundActive ~= lastRoundActive)
+                if lastText ~= text then
+                    lastText = text
+                    nkLabel.Text = text
+                end
 
-            if killerChanged or roundStateChanged then
-                if killer then
-                    pcall(showRoundNotification, killer)
+                if lastVisible ~= true then
+                    lastVisible = true
+                    nextKillerContainer.Visible = true
+                    nextKillerContainer.BackgroundTransparency = 1
+                    nkLabel.TextTransparency = 1
+                    nkDot.BackgroundTransparency = 1
+                    nkStroke.Transparency = 1
+                    TweenService:Create(nextKillerContainer, TweenInfo.new(0.35), { BackgroundTransparency = 0.15 }):Play()
+                    TweenService:Create(nkLabel, TweenInfo.new(0.35), { TextTransparency = 0 }):Play()
+                    TweenService:Create(nkDot, TweenInfo.new(0.35), { BackgroundTransparency = 0 }):Play()
+                    TweenService:Create(nkStroke, TweenInfo.new(0.35), { Transparency = 0.35 }):Play()
+                end
+            else
+                if lastVisible ~= false then
+                    lastVisible = false
+                    TweenService:Create(nextKillerContainer, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
+                    TweenService:Create(nkLabel, TweenInfo.new(0.3), { TextTransparency = 1 }):Play()
+                    TweenService:Create(nkDot, TweenInfo.new(0.3), { BackgroundTransparency = 1 }):Play()
+                    TweenService:Create(nkStroke, TweenInfo.new(0.3), { Transparency = 1 }):Play()
+                    task.delay(0.35, function()
+                        if lastVisible == false and nextKillerContainer and nextKillerContainer.Parent then
+                            nextKillerContainer.Visible = false
+                        end
+                    end)
                 end
             end
 
-            lastKillerUserId = killerId
-            if roundActive ~= nil then
-                lastRoundActive = roundActive
-            end
-
-            task.wait(0.5)
+            task.wait(NEXT_KILLER_POLL)
         end
-
-        destroyRoundNotif()
     end)
     -- =========================================================================
-    -- ===== [END NEW: ROUND CHANGE NOTIFICATION] =====
+    -- ===== [END NEW: NEXT KILLER DISPLAY] =====
     -- =========================================================================
 
     -- Poller: deteksi perubahan config → tampilkan notifikasi
@@ -8328,11 +8081,11 @@ local function createGUI()
             end
         end
         activeNotifs = {}
-        destroyRoundNotif()
         if notifGui and notifGui.Parent then
             pcall(function() notifGui:Destroy() end)
         end
     end)
+
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainWindow"
     mainFrame.Size = UDim2.new(0, 360, 0, 240)

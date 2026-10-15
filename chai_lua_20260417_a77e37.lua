@@ -3690,7 +3690,7 @@ local function startAutoGeneratorLoop()
         return
     end
 
-    -- Cari remote event BreakGenEvent
+    -- Cari remote event BreakGenEvent (fallback BreakGenCommit)
     local function findBreakGenRemote()
         local replicatedStorage = game:GetService("ReplicatedStorage")
         local remotes = replicatedStorage:FindFirstChild("Remotes")
@@ -3718,29 +3718,167 @@ local function startAutoGeneratorLoop()
         return
     end
 
-    local thread = task.spawn(function()
-        local lastSpamTime = 0
-        local spamInterval = 0.05
+    -- Cari GeneratorPoint terdekat dengan karakter lokal
+    -- Path: workspace.Map.Generators.<Generator>.GeneratorPoint<N>
+    -- Jumlah tiap generator beda (min 2, max 4), jadi kita scan semua child
+    local function findNearestGeneratorPoint()
+        local char = localPlayer.Character
+        if not char then return nil end
+        local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
+        if not hrp then return nil end
+        local localPos = hrp.Position
 
-        while config.autoGeneratorEnabled do
-            if getLocalCharacter() then
-                local now = tick()
-                if now - lastSpamTime >= spamInterval then
-                    lastSpamTime = now
-                    pcall(function()
-                        breakGenRemote:FireServer()
-                    end)
+        local map = workspace:FindFirstChild("Map")
+        local gens = map and map:FindFirstChild("Generators")
+        if not gens then return nil end
+
+        local best, bestDist = nil, math.huge
+        for _, gen in ipairs(gens:GetChildren()) do
+            for _, child in ipairs(gen:GetChildren()) do
+                if child:IsA("BasePart") and child.Name:match("^GeneratorPoint%d+$") then
+                    local d = (localPos - child.Position).Magnitude
+                    if d < bestDist then
+                        bestDist = d
+                        best = child
+                    end
                 end
             end
-            task.wait(0.01)
+        end
+        return best
+    end
+
+    -- Cari action button di PlayerGui (fallback beberapa path)
+    local function findActionButton()
+        local pg = localPlayer:FindFirstChild("PlayerGui")
+        if not pg then return nil end
+        local survivorMob = pg:FindFirstChild("Survivor-mob")
+        if not survivorMob then return nil end
+        local controls = survivorMob:FindFirstChild("Controls")
+        if not controls then return nil end
+
+        -- Kandidat langsung
+        for _, name in ipairs({"action", "check", "attack"}) do
+            local btn = controls:FindFirstChild(name)
+            if btn and btn:IsA("GuiObject") then
+                return btn
+            end
+        end
+
+        -- Kandidat nested: action.check / action.button / action.click
+        local action = controls:FindFirstChild("action")
+        if action then
+            for _, childName in ipairs({"check", "button", "click"}) do
+                local c = action:FindFirstChild(childName)
+                if c and c:IsA("GuiObject") then
+                    return c
+                end
+            end
+        end
+        return nil
+    end
+
+    local actionButton = nil
+    local beginConn, endConn = nil, nil
+    local spamThread = nil
+
+    -- Mulai spam remote event dengan GeneratorPoint terdekat
+    local function startSpam()
+        if spamThread then return end
+        spamThread = task.spawn(function()
+            while config.autoGeneratorEnabled do
+                local gp = findNearestGeneratorPoint()
+                if gp then
+                    pcall(function()
+                        breakGenRemote:FireServer(gp)
+                    end)
+                end
+                task.wait(0.05)
+            end
+            spamThread = nil
+        end)
+    end
+
+    -- Stop spam saat tombol dilepas
+    local function stopSpam()
+        if spamThread then
+            task.cancel(spamThread)
+            spamThread = nil
+        end
+    end
+
+    -- Pasang handler ke action button
+    local function hookActionButton()
+        if beginConn then beginConn:Disconnect() beginConn = nil end
+        if endConn then endConn:Disconnect() endConn = nil end
+
+        actionButton = findActionButton()
+        if not actionButton then return false end
+
+        beginConn = actionButton.InputBegan:Connect(function(input)
+            if not config.autoGeneratorEnabled then return end
+            if input.UserInputType == Enum.UserInputType.Touch
+                or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                startSpam()
+            end
+        end)
+
+        endConn = actionButton.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch
+                or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                stopSpam()
+            end
+        end)
+
+        return true
+    end
+
+    -- Retry hook kalau button belum muncul (max 10 detik)
+    local hookThread = task.spawn(function()
+        for _ = 1, 40 do
+            if not config.autoGeneratorEnabled then return end
+            if hookActionButton() then
+                print("[AutoGenerator] Action button hooked")
+                return
+            end
+            task.wait(0.25)
+        end
+        print("[AutoGenerator] Action button not found, remote will not fire")
+    end)
+
+    -- Re-hook saat karakter respawn (button bisa di-recreate)
+    local charAddedConn = localPlayer.CharacterAdded:Connect(function()
+        task.wait(1)
+        if config.autoGeneratorEnabled then
+            hookActionButton()
         end
     end)
 
+    -- Main thread placeholder agar struktur sama dengan sebelumnya
+    local thread = task.spawn(function()
+        while config.autoGeneratorEnabled do
+            task.wait(0.5)
+        end
+    end)
+
+    -- Simpan fungsi cleanup di config supaya bisa dipanggil dari stopAutoGeneratorLoop
+    config.autoGeneratorCleanup = function()
+        stopSpam()
+        if beginConn then beginConn:Disconnect() beginConn = nil end
+        if endConn then endConn:Disconnect() endConn = nil end
+        if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
+        if hookThread then pcall(function() task.cancel(hookThread) end) end
+        actionButton = nil
+    end
+
     config.autoGeneratorThread = thread
-    print("[AutoGenerator] Started (spamming BreakGenEvent)")
+    print("[AutoGenerator] Started (fires BreakGenEvent on action press with nearest GeneratorPoint)")
 end
 
 local function stopAutoGeneratorLoop()
+    if config.autoGeneratorCleanup then
+        pcall(config.autoGeneratorCleanup)
+        config.autoGeneratorCleanup = nil
+    end
     if config.autoGeneratorThread then
         task.cancel(config.autoGeneratorThread)
         config.autoGeneratorThread = nil

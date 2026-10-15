@@ -5919,7 +5919,7 @@ local function createInfoContent()
     discordText.Text="cyber community"
     discordText.TextColor3=Color3.fromRGB(220,220,220)
     discordText.Font=Enum.Font.GothamBold
-    discordText.TextSize=12
+    discordText.TextSize=5
     discordText.TextXAlignment=Enum.TextXAlignment.Left
     discordText.Parent=discordFrame
 

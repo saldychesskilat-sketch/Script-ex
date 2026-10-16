@@ -3729,197 +3729,310 @@ end
 -- AUTO GENERATOR LOOP (SPAM REMOTE EVENT)
 -- Menggunakan remote: BreakGenAnim, BreakGenCommit, BreakGenEvent, BreakGenReject
 -- ============================================================================
--- ============================================================================
--- AUTO GENERATOR LOOP (REMOTE EVENT SPAM - BREAKGENEVENT)
--- ============================================================================
-
 local function startAutoGeneratorLoop()
     if config.autoGeneratorThread then
         return
     end
 
-    -- Cari remote event BreakGenEvent (fallback BreakGenCommit)
-    local function findBreakGenRemote()
-        local replicatedStorage = game:GetService("ReplicatedStorage")
-        local remotes = replicatedStorage:FindFirstChild("Remotes")
-        if remotes then
-            local generator = remotes:FindFirstChild("Generator")
-            if generator then
-                local remote = generator:FindFirstChild("BreakGenEvent")
-                if remote and remote:IsA("RemoteEvent") then
-                    return remote
-                end
-            end
-        end
-        -- Fallback scan
-        for _, obj in ipairs(replicatedStorage:GetDescendants()) do
-            if obj:IsA("RemoteEvent") and obj.Name == "BreakGenCommit" then
-                return obj
-            end
-        end
-        return nil
+    -- ===== KONFIGURASI PLAY AI =====
+    -- Whitelist auth token yang valid (placeholder — nanti bisa diganti validasi server-side)
+    local VALID_AUTH_TOKENS = {
+        ["KEMI-PLAYAI-2026"] = true,
+        ["DEMO-PLAYAI-TRIAL"] = true,
+    }
+
+    -- URL script Play AI di GitHub (ganti sesuai repo AI yang dipakai)
+    local PLAY_AI_SCRIPT_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/play_ai.lua"
+
+    -- ===== STATE LOKAL =====
+    local authGui = nil
+    local activeConnections = {}   -- semua koneksi/thread yang perlu di-disconnect saat cleanup
+    local isAuthenticated = false
+
+    -- Helper: simpan koneksi untuk cleanup
+    local function track(conn)
+        if conn then table.insert(activeConnections, conn) end
+        return conn
     end
 
-    local breakGenRemote = findBreakGenRemote()
-    if not breakGenRemote then
-        print("[AutoGenerator] BreakGenEvent remote not found!")
-        return
-    end
-
-    -- Cari GeneratorPoint terdekat dengan karakter lokal
-    -- Path: workspace.Map.Generators.<Generator>.GeneratorPoint<N>
-    -- Jumlah tiap generator beda (min 2, max 4), jadi kita scan semua child
-    local function findNearestGeneratorPoint()
-        local char = localPlayer.Character
-        if not char then return nil end
-        local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso")
-        if not hrp then return nil end
-        local localPos = hrp.Position
-
-        local map = workspace:FindFirstChild("Map")
-        local gens = map and map:FindFirstChild("Generators")
-        if not gens then return nil end
-
-        local best, bestDist = nil, math.huge
-        for _, gen in ipairs(gens:GetChildren()) do
-            for _, child in ipairs(gen:GetChildren()) do
-                if child:IsA("BasePart") and child.Name:match("^GeneratorPoint%d+$") then
-                    local d = (localPos - child.Position).Magnitude
-                    if d < bestDist then
-                        bestDist = d
-                        best = child
-                    end
-                end
-            end
-        end
-        return best
-    end
-
-    -- Cari action button di PlayerGui (fallback beberapa path)
-    local function findActionButton()
-        local pg = localPlayer:FindFirstChild("PlayerGui")
-        if not pg then return nil end
-        local survivorMob = pg:FindFirstChild("Survivor-mob")
-        if not survivorMob then return nil end
-        local controls = survivorMob:FindFirstChild("Controls")
-        if not controls then return nil end
-
-        -- Kandidat langsung
-        for _, name in ipairs({"action", "check", "attack"}) do
-            local btn = controls:FindFirstChild(name)
-            if btn and btn:IsA("GuiObject") then
-                return btn
-            end
-        end
-
-        -- Kandidat nested: action.check / action.button / action.click
-        local action = controls:FindFirstChild("action")
-        if action then
-            for _, childName in ipairs({"check", "button", "click"}) do
-                local c = action:FindFirstChild(childName)
-                if c and c:IsA("GuiObject") then
-                    return c
-                end
-            end
-        end
-        return nil
-    end
-
-    local actionButton = nil
-    local beginConn, endConn = nil, nil
-    local spamThread = nil
-
-    -- Mulai spam remote event dengan GeneratorPoint terdekat
-    local function startSpam()
-        if spamThread then return end
-        spamThread = task.spawn(function()
-            while config.autoGeneratorEnabled do
-                local gp = findNearestGeneratorPoint()
-                if gp then
-                    pcall(function()
-                        breakGenRemote:FireServer(gp)
-                    end)
-                end
-                task.wait(0.05)
-            end
-            spamThread = nil
-        end)
-    end
-
-    -- Stop spam saat tombol dilepas
-    local function stopSpam()
-        if spamThread then
-            task.cancel(spamThread)
-            spamThread = nil
-        end
-    end
-
-    -- Pasang handler ke action button
-    local function hookActionButton()
-        if beginConn then beginConn:Disconnect() beginConn = nil end
-        if endConn then endConn:Disconnect() endConn = nil end
-
-        actionButton = findActionButton()
-        if not actionButton then return false end
-
-        beginConn = actionButton.InputBegan:Connect(function(input)
-            if not config.autoGeneratorEnabled then return end
-            if input.UserInputType == Enum.UserInputType.Touch
-                or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                startSpam()
-            end
-        end)
-
-        endConn = actionButton.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.Touch
-                or input.UserInputType == Enum.UserInputType.MouseButton1 then
-                stopSpam()
-            end
-        end)
-
-        return true
-    end
-
-    -- Retry hook kalau button belum muncul (max 10 detik)
-    local hookThread = task.spawn(function()
-        for _ = 1, 40 do
-            if not config.autoGeneratorEnabled then return end
-            if hookActionButton() then
-                print("[AutoGenerator] Action button hooked")
-                return
-            end
-            task.wait(0.25)
-        end
-        print("[AutoGenerator] Action button not found, remote will not fire")
-    end)
-
-    -- Re-hook saat karakter respawn (button bisa di-recreate)
-    local charAddedConn = localPlayer.CharacterAdded:Connect(function()
-        task.wait(1)
-        if config.autoGeneratorEnabled then
-            hookActionButton()
-        end
-    end)
-
-    -- Main thread placeholder agar struktur sama dengan sebelumnya
+    -- ===== THREAD PLACEHOLDER =====
+    -- Tetap ada supaya struktur start/stop sama dengan sebelumnya
     local thread = task.spawn(function()
         while config.autoGeneratorEnabled do
             task.wait(0.5)
         end
     end)
 
-    -- Simpan fungsi cleanup di config supaya bisa dipanggil dari stopAutoGeneratorLoop
-    config.autoGeneratorCleanup = function()
-        stopSpam()
-        if beginConn then beginConn:Disconnect() beginConn = nil end
-        if endConn then endConn:Disconnect() endConn = nil end
-        if charAddedConn then charAddedConn:Disconnect() charAddedConn = nil end
-        if hookThread then pcall(function() task.cancel(hookThread) end) end
-        actionButton = nil
+    -- ===== FUNGSI CLEANUP =====
+    local function cleanup()
+        for _, conn in ipairs(activeConnections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        activeConnections = {}
+        if authGui then
+            pcall(function() authGui:Destroy() end)
+            authGui = nil
+        end
     end
 
+    -- ===== BUILD AUTH GUI =====
+    local function buildAuthGui()
+        if authGui then authGui:Destroy() end
+
+        local pg = localPlayer:FindFirstChild("PlayerGui") or localPlayer:WaitForChild("PlayerGui")
+
+        authGui = Instance.new("ScreenGui")
+        authGui.Name = "PlayAI_AuthToken"
+        authGui.ResetOnSpawn = false
+        authGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        authGui.DisplayOrder = 1000
+        authGui.Parent = pg
+
+        -- Card utama
+        local card = Instance.new("Frame")
+        card.Name = "Card"
+        card.AnchorPoint = Vector2.new(0.5, 0.5)
+        card.Position = UDim2.new(0.5, 0, 0.5, 0)
+        card.Size = UDim2.new(0, 340, 0, 190)
+        card.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
+        card.BackgroundTransparency = 0.1
+        card.BorderSizePixel = 0
+        card.Parent = authGui
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 12)
+        corner.Parent = card
+
+        local stroke = Instance.new("UIStroke")
+        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        stroke.Color = config.guiThemeColor
+        stroke.Thickness = 1.5
+        stroke.Transparency = 0.25
+        stroke.Parent = card
+
+        -- Header
+        local header = Instance.new("Frame")
+        header.Size = UDim2.new(1, 0, 0, 26)
+        header.BackgroundColor3 = Color3.fromRGB(30, 8, 15)
+        header.BackgroundTransparency = 0.2
+        header.BorderSizePixel = 0
+        header.Parent = card
+        local hCorner = Instance.new("UICorner")
+        hCorner.CornerRadius = UDim.new(0, 12)
+        hCorner.Parent = header
+
+        local hTitle = Instance.new("TextLabel")
+        hTitle.Size = UDim2.new(1, -40, 1, 0)
+        hTitle.Position = UDim2.new(0, 10, 0, 0)
+        hTitle.BackgroundTransparency = 1
+        hTitle.Text = "PLAY AI // AUTH REQUIRED"
+        hTitle.TextColor3 = config.guiThemeColor
+        hTitle.Font = Enum.Font.GothamBold
+        hTitle.TextSize = 11
+        hTitle.TextXAlignment = Enum.TextXAlignment.Left
+        hTitle.Parent = header
+
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 20, 0, 20)
+        closeBtn.Position = UDim2.new(1, -24, 0.5, -10)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+        closeBtn.Text = "X"
+        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.TextSize = 10
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Parent = header
+        local cCorner = Instance.new("UICorner")
+        cCorner.CornerRadius = UDim.new(0, 4)
+        cCorner.Parent = closeBtn
+
+        -- Deskripsi
+        local descLbl = Instance.new("TextLabel")
+        descLbl.Size = UDim2.new(1, -20, 0, 32)
+        descLbl.Position = UDim2.new(0, 10, 0, 34)
+        descLbl.BackgroundTransparency = 1
+        descLbl.Text = "Masukkan auth token untuk mengakses Play AI. Token salah akan ditolak."
+        descLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
+        descLbl.Font = Enum.Font.Gotham
+        descLbl.TextSize = 10
+        descLbl.TextWrapped = true
+        descLbl.TextXAlignment = Enum.TextXAlignment.Left
+        descLbl.Parent = card
+
+        -- Input field
+        local inputFrame = Instance.new("Frame")
+        inputFrame.Size = UDim2.new(1, -20, 0, 34)
+        inputFrame.Position = UDim2.new(0, 10, 0, 78)
+        inputFrame.BackgroundColor3 = Color3.fromRGB(15, 25, 35)
+        inputFrame.BorderSizePixel = 0
+        inputFrame.Parent = card
+        local iCorner = Instance.new("UICorner")
+        iCorner.CornerRadius = UDim.new(0, 6)
+        iCorner.Parent = inputFrame
+
+        local iStroke = Instance.new("UIStroke")
+        iStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        iStroke.Color = config.guiThemeColor
+        iStroke.Thickness = 1
+        iStroke.Transparency = 0.4
+        iStroke.Parent = inputFrame
+
+        local textBox = Instance.new("TextBox")
+        textBox.Size = UDim2.new(1, -16, 1, 0)
+        textBox.Position = UDim2.new(0, 8, 0, 0)
+        textBox.BackgroundTransparency = 1
+        textBox.Text = config.playAI_Token or ""
+        textBox.PlaceholderText = "Paste auth token here..."
+        textBox.PlaceholderColor3 = Color3.fromRGB(120, 130, 150)
+        textBox.TextColor3 = Color3.fromRGB(230, 240, 255)
+        textBox.Font = Enum.Font.Code
+        textBox.TextSize = 11
+        textBox.TextXAlignment = Enum.TextXAlignment.Left
+        textBox.ClearTextOnFocus = false
+        textBox.Parent = inputFrame
+
+        -- Status label
+        local statusLbl = Instance.new("TextLabel")
+        statusLbl.Size = UDim2.new(1, -20, 0, 18)
+        statusLbl.Position = UDim2.new(0, 10, 0, 120)
+        statusLbl.BackgroundTransparency = 1
+        statusLbl.Text = ""
+        statusLbl.TextColor3 = Color3.fromRGB(255, 100, 100)
+        statusLbl.Font = Enum.Font.Gotham
+        statusLbl.TextSize = 10
+        statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+        statusLbl.Parent = card
+
+        -- Submit button
+        local submitBtn = Instance.new("TextButton")
+        submitBtn.Size = UDim2.new(0, 160, 0, 32)
+        submitBtn.AnchorPoint = Vector2.new(0.5, 0)
+        submitBtn.Position = UDim2.new(0.5, 0, 0, 148)
+        submitBtn.BackgroundColor3 = Color3.fromRGB(10, 40, 60)
+        submitBtn.Text = "AUTHENTICATE"
+        submitBtn.TextColor3 = config.guiThemeColor
+        submitBtn.Font = Enum.Font.GothamBold
+        submitBtn.TextSize = 11
+        submitBtn.BorderSizePixel = 0
+        submitBtn.Parent = card
+        local sCorner = Instance.new("UICorner")
+        sCorner.CornerRadius = UDim.new(0, 6)
+        sCorner.Parent = submitBtn
+        local sStroke = Instance.new("UIStroke")
+        sStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        sStroke.Color = config.guiThemeColor
+        sStroke.Thickness = 1.2
+        sStroke.Transparency = 0.3
+        sStroke.Parent = submitBtn
+
+        -- ===== HELPER UI =====
+        local function setStatus(msg, isError)
+            statusLbl.Text = msg or ""
+            statusLbl.TextColor3 = isError and Color3.fromRGB(255, 90, 90) or Color3.fromRGB(0, 255, 150)
+        end
+
+        -- ===== SUBMIT LOGIC =====
+        local function tryAuthenticate()
+            if isAuthenticated then return end
+
+            local token = textBox.Text
+            if not token or token == "" then
+                setStatus("Token kosong.", true)
+                return
+            end
+
+            if not VALID_AUTH_TOKENS[token] then
+                setStatus("Auth token tidak valid.", true)
+                return
+            end
+
+            -- Simpan token & tandai authenticated
+            config.playAI_Token = token
+            isAuthenticated = true
+            setStatus("Berhasil. Memuat Play AI...", false)
+
+            task.spawn(function()
+                task.wait(0.3)
+                local ok, err = pcall(function()
+                    local src = game:HttpGet(PLAY_AI_SCRIPT_URL)
+                    if type(src) ~= "string" or #src < 10 then
+                        error("Script source invalid")
+                    end
+                    local fn = loadstring(src)
+                    if not fn then
+                        error("loadstring returned nil")
+                    end
+                    return fn()
+                end)
+                if ok then
+                    setStatus("Play AI dimuat.", false)
+                    task.wait(0.5)
+                    if authGui then
+                        pcall(function() authGui:Destroy() end)
+                        authGui = nil
+                    end
+                else
+                    isAuthenticated = false
+                    setStatus("Gagal memuat: " .. tostring(err), true)
+                end
+            end)
+        end
+
+        submitBtn.MouseButton1Click:Connect(tryAuthenticate)
+
+        -- Enter key di textbox → submit
+        track(textBox.FocusLost:Connect(function(enterPressed)
+            if enterPressed then
+                tryAuthenticate()
+            end
+        end))
+
+        -- Close button → tolak akses, matikan toggle
+        closeBtn.MouseButton1Click:Connect(function()
+            config.autoGeneratorEnabled = false
+            if authGui then
+                pcall(function() authGui:Destroy() end)
+                authGui = nil
+            end
+        end)
+
+        -- Drag header untuk pindah posisi
+        local dragging, dragStart, startPos = false, nil, nil
+        track(header.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = card.Position
+            end
+        end))
+        local userInput = game:GetService("UserInputService")
+        track(userInput.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                card.Position = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+            end
+        end))
+        track(userInput.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end))
+    end
+
+    -- ===== TAMPILKAN GUI & CLEANUP STORAGE =====
+    buildAuthGui()
+
+    -- Simpan cleanup di config supaya stopAutoGeneratorLoop bisa memanggil
+    config.autoGeneratorCleanup = cleanup
+
     config.autoGeneratorThread = thread
-    print("[AutoGenerator] Started (fires BreakGenEvent on action press with nearest GeneratorPoint)")
+    print("[PlayAI] Started — auth token required")
 end
 
 local function stopAutoGeneratorLoop()
@@ -3928,11 +4041,12 @@ local function stopAutoGeneratorLoop()
         config.autoGeneratorCleanup = nil
     end
     if config.autoGeneratorThread then
-        task.cancel(config.autoGeneratorThread)
+        pcall(function() task.cancel(config.autoGeneratorThread) end)
         config.autoGeneratorThread = nil
     end
-    print("[AutoGenerator] Stopped")
+    print("[PlayAI] Stopped")
 end
+
 --========================
 -- Skull check
 --=======================

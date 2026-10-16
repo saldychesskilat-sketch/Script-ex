@@ -4070,8 +4070,8 @@ local function InitializeAutobuy()
                     local now = tick()
                     local lr = currentLine.Rotation % 360
                     local gr = currentGoal.Rotation % 360
-                    local ss = (gr + 102) % 360
-                    local se = (gr + 120) % 360
+                    local ss = (gr + 104) % 360
+                    local se = (gr + 118) % 360
                     local inRange = false
                     
                     if ss > se then

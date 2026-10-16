@@ -3725,24 +3725,18 @@ end
 -- ============================================================================
 -- FEATURE 13: 
 -- ============================================================================
--- ============================================================================
--- AUTO GENERATOR LOOP (SPAM REMOTE EVENT)
--- Menggunakan remote: BreakGenAnim, BreakGenCommit, BreakGenEvent, BreakGenReject
--- ============================================================================
 local function startAutoGeneratorLoop()
     if config.autoGeneratorThread then
         return
     end
 
-    -- ===== KONFIGURASI PLAY AI =====
-    -- Whitelist auth token yang valid (placeholder — nanti bisa diganti validasi server-side)
-    local VALID_AUTH_TOKENS = {
-        ["KEMI-PLAYAI-2026"] = true,
-        ["DEMO-PLAYAI-TRIAL"] = true,
-    }
+    -- ===== KONFIGURASI PLAY AI (BACKEND MODE) =====
+    -- URL backend Render untuk verifikasi auth token.
+    -- Ganti dengan URL service Render kamu.
+    local AUTH_BACKEND_URL = "https://rapid-recipe-c724.saldychesskilat.workers.dev/verify"
 
-    -- URL script Play AI di GitHub (ganti sesuai repo AI yang dipakai)
-    local PLAY_AI_SCRIPT_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/play_ai.lua"
+    -- Timeout HTTP (detik) — Render free tier bisa cold start ~30 detik
+    local HTTP_TIMEOUT = 30
 
     -- ===== STATE LOKAL =====
     local authGui = nil
@@ -3753,6 +3747,50 @@ local function startAutoGeneratorLoop()
     local function track(conn)
         if conn then table.insert(activeConnections, conn) end
         return conn
+    end
+
+    -- ===== HTTP POST HELPER (dengan fallback & timeout) =====
+    local function httpPostJson(url, bodyTable, timeout)
+        timeout = timeout or HTTP_TIMEOUT
+        local http = game:GetService("HttpService")
+        local payload
+        local okEncode, encodeErr = pcall(function()
+            payload = http:JSONEncode(bodyTable)
+        end)
+        if not okEncode then
+            return nil, nil, "JSON encode failed: " .. tostring(encodeErr)
+        end
+
+        -- Coba request() dulu (lebih universal di executor, support timeout header)
+        if type(request) == "function" then
+            local ok, resp = pcall(function()
+                return request({
+                    Url = url,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json",
+                        ["Accept"] = "application/json",
+                    },
+                    Body = payload,
+                })
+            end)
+            if ok and resp and resp.StatusCode then
+                return resp.StatusCode, resp.Body, nil
+            elseif ok and resp then
+                -- sebagian executor return langsung body
+                return 200, resp.Body or tostring(resp), nil
+            end
+        end
+
+        -- Fallback ke HttpService:PostAsync
+        local ok, result = pcall(function()
+            return http:PostAsync(url, payload, Enum.HttpContentType.ApplicationJson)
+        end)
+        if ok and type(result) == "string" then
+            return 200, result, nil
+        end
+
+        return nil, nil, tostring(result)
     end
 
     -- ===== THREAD PLACEHOLDER =====
@@ -3851,7 +3889,7 @@ local function startAutoGeneratorLoop()
         descLbl.Size = UDim2.new(1, -20, 0, 32)
         descLbl.Position = UDim2.new(0, 10, 0, 34)
         descLbl.BackgroundTransparency = 1
-        descLbl.Text = "Masukkan auth token untuk mengakses Play AI. Token salah akan ditolak."
+        descLbl.Text = "Masukkan auth token untuk mengakses Play AI. Token akan diverifikasi oleh server."
         descLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         descLbl.Font = Enum.Font.Gotham
         descLbl.TextSize = 10
@@ -3931,7 +3969,13 @@ local function startAutoGeneratorLoop()
             statusLbl.TextColor3 = isError and Color3.fromRGB(255, 90, 90) or Color3.fromRGB(0, 255, 150)
         end
 
-        -- ===== SUBMIT LOGIC =====
+        local function setBusy(busy, text)
+            submitBtn.Active = not busy
+            submitBtn.Text = text or (busy and "VERIFYING..." or "AUTHENTICATE")
+            submitBtn.BackgroundColor3 = busy and Color3.fromRGB(15, 30, 45) or Color3.fromRGB(10, 40, 60)
+        end
+
+        -- ===== SUBMIT LOGIC (BACKEND MODE) =====
         local function tryAuthenticate()
             if isAuthenticated then return end
 
@@ -3941,39 +3985,99 @@ local function startAutoGeneratorLoop()
                 return
             end
 
-            if not VALID_AUTH_TOKENS[token] then
-                setStatus("Auth token tidak valid.", true)
-                return
-            end
-
-            -- Simpan token & tandai authenticated
-            config.playAI_Token = token
-            isAuthenticated = true
-            setStatus("Berhasil. Memuat Play AI...", false)
+            setStatus("Menghubungi server...", false)
+            setBusy(true)
 
             task.spawn(function()
-                task.wait(0.3)
-                local ok, err = pcall(function()
-                    local src = game:HttpGet(PLAY_AI_SCRIPT_URL)
-                    if type(src) ~= "string" or #src < 10 then
-                        error("Script source invalid")
+                -- POST ke backend
+                local status, body, err = httpPostJson(AUTH_BACKEND_URL, { token = token })
+
+                if not status then
+                    isAuthenticated = false
+                    setBusy(false)
+                    setStatus("Backend tidak terjangkau. Coba lagi.", true)
+                    return
+                end
+
+                -- Decode JSON
+                local okDecode, decoded = pcall(function()
+                    return game:GetService("HttpService"):JSONDecode(body)
+                end)
+
+                if not okDecode or type(decoded) ~= "table" then
+                    setBusy(false)
+                    setStatus("Response invalid dari server (HTTP " .. tostring(status) .. ").", true)
+                    return
+                end
+
+                -- Cek status code
+                if status == 429 then
+                    setBusy(false)
+                    setStatus(decoded.error or "Rate limit. Tunggu sebentar.", true)
+                    return
+                end
+
+                if status ~= 200 then
+                    setBusy(false)
+                    setStatus(decoded.error or ("Verifikasi gagal (HTTP " .. tostring(status) .. ")."), true)
+                    return
+                end
+
+                if not decoded.valid then
+                    isAuthenticated = false
+                    setBusy(false)
+                    setStatus(decoded.error or "Auth token tidak valid.", true)
+                    return
+                end
+
+                -- ===== TOKEN VALID =====
+                config.playAI_Token = token
+                isAuthenticated = true
+                setStatus("Akses diterima. Memuat AI...", false)
+
+                -- Ambil script source: prioritaskan `script` (content), fallback ke `script_url`
+                local scriptSrc = decoded.script
+
+                if (not scriptSrc or #scriptSrc < 10) and decoded.script_url then
+                    setStatus("Mengunduh script dari server...", false)
+                    local okFetch, fetched = pcall(function()
+                        return game:HttpGet(decoded.script_url)
+                    end)
+                    if okFetch and type(fetched) == "string" then
+                        scriptSrc = fetched
                     end
-                    local fn = loadstring(src)
+                end
+
+                if not scriptSrc or #scriptSrc < 10 then
+                    isAuthenticated = false
+                    setBusy(false)
+                    setStatus("Script source kosong dari server.", true)
+                    return
+                end
+
+                -- ===== LOAD & EXECUTE =====
+                setStatus("Menjalankan Play AI...", false)
+                task.wait(0.2)
+
+                local loadOk, loadErr = pcall(function()
+                    local fn = loadstring(scriptSrc)
                     if not fn then
                         error("loadstring returned nil")
                     end
                     return fn()
                 end)
-                if ok then
-                    setStatus("Play AI dimuat.", false)
-                    task.wait(0.5)
+
+                if loadOk then
+                    setStatus("Play AI aktif.", false)
+                    task.wait(0.6)
                     if authGui then
                         pcall(function() authGui:Destroy() end)
                         authGui = nil
                     end
                 else
                     isAuthenticated = false
-                    setStatus("Gagal memuat: " .. tostring(err), true)
+                    setBusy(false)
+                    setStatus("Gagal load: " .. tostring(loadErr), true)
                 end
             end)
         end
@@ -4032,7 +4136,7 @@ local function startAutoGeneratorLoop()
     config.autoGeneratorCleanup = cleanup
 
     config.autoGeneratorThread = thread
-    print("[PlayAI] Started — auth token required")
+    print("[PlayAI] Started — backend auth mode")
 end
 
 local function stopAutoGeneratorLoop()

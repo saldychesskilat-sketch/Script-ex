@@ -3731,25 +3731,23 @@ local function startAutoGeneratorLoop()
     end
 
     -- ===== KONFIGURASI PLAY AI (BACKEND MODE) =====
-    -- URL backend Render untuk verifikasi auth token.
-    -- Ganti dengan URL service Render kamu.
     local AUTH_BACKEND_URL = "https://rapid-recipe-c724.saldychesskilat.workers.dev/verify"
-
-    -- Timeout HTTP (detik) — Render free tier bisa cold start ~30 detik
     local HTTP_TIMEOUT = 30
+
+    -- ===== LINK GRUP WHATSAPP (untuk klaim token gratis) =====
+    local FREE_TOKEN_WHATSAPP_URL = "https://chat.whatsapp.com/FIXHNqW3dz0Lgx9FYEDitV?s=cl&p=a&mlu=4&ilr=4"
 
     -- ===== STATE LOKAL =====
     local authGui = nil
-    local activeConnections = {}   -- semua koneksi/thread yang perlu di-disconnect saat cleanup
+    local activeConnections = {}
     local isAuthenticated = false
 
-    -- Helper: simpan koneksi untuk cleanup
     local function track(conn)
         if conn then table.insert(activeConnections, conn) end
         return conn
     end
 
-    -- ===== HTTP POST HELPER (dengan fallback & timeout) =====
+    -- ===== HTTP POST HELPER =====
     local function httpPostJson(url, bodyTable, timeout)
         timeout = timeout or HTTP_TIMEOUT
         local http = game:GetService("HttpService")
@@ -3761,7 +3759,6 @@ local function startAutoGeneratorLoop()
             return nil, nil, "JSON encode failed: " .. tostring(encodeErr)
         end
 
-        -- Coba request() dulu (lebih universal di executor, support timeout header)
         if type(request) == "function" then
             local ok, resp = pcall(function()
                 return request({
@@ -3777,12 +3774,10 @@ local function startAutoGeneratorLoop()
             if ok and resp and resp.StatusCode then
                 return resp.StatusCode, resp.Body, nil
             elseif ok and resp then
-                -- sebagian executor return langsung body
                 return 200, resp.Body or tostring(resp), nil
             end
         end
 
-        -- Fallback ke HttpService:PostAsync
         local ok, result = pcall(function()
             return http:PostAsync(url, payload, Enum.HttpContentType.ApplicationJson)
         end)
@@ -3794,7 +3789,6 @@ local function startAutoGeneratorLoop()
     end
 
     -- ===== THREAD PLACEHOLDER =====
-    -- Tetap ada supaya struktur start/stop sama dengan sebelumnya
     local thread = task.spawn(function()
         while config.autoGeneratorEnabled do
             task.wait(0.5)
@@ -3826,12 +3820,12 @@ local function startAutoGeneratorLoop()
         authGui.DisplayOrder = 1000
         authGui.Parent = pg
 
-        -- Card utama
+        -- Card utama (diperbesar untuk ruang section token gratis)
         local card = Instance.new("Frame")
         card.Name = "Card"
         card.AnchorPoint = Vector2.new(0.5, 0.5)
         card.Position = UDim2.new(0.5, 0, 0.5, 0)
-        card.Size = UDim2.new(0, 340, 0, 190)
+        card.Size = UDim2.new(0, 340, 0, 262)
         card.BackgroundColor3 = Color3.fromRGB(20, 5, 10)
         card.BackgroundTransparency = 0.1
         card.BorderSizePixel = 0
@@ -3932,7 +3926,7 @@ local function startAutoGeneratorLoop()
         -- Status label
         local statusLbl = Instance.new("TextLabel")
         statusLbl.Size = UDim2.new(1, -20, 0, 18)
-        statusLbl.Position = UDim2.new(0, 10, 0, 120)
+        statusLbl.Position = UDim2.new(0, 10, 0, 118)
         statusLbl.BackgroundTransparency = 1
         statusLbl.Text = ""
         statusLbl.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -3945,7 +3939,7 @@ local function startAutoGeneratorLoop()
         local submitBtn = Instance.new("TextButton")
         submitBtn.Size = UDim2.new(0, 160, 0, 32)
         submitBtn.AnchorPoint = Vector2.new(0.5, 0)
-        submitBtn.Position = UDim2.new(0.5, 0, 0, 148)
+        submitBtn.Position = UDim2.new(0.5, 0, 0, 144)
         submitBtn.BackgroundColor3 = Color3.fromRGB(10, 40, 60)
         submitBtn.Text = "AUTHENTICATE"
         submitBtn.TextColor3 = config.guiThemeColor
@@ -3963,6 +3957,60 @@ local function startAutoGeneratorLoop()
         sStroke.Transparency = 0.3
         sStroke.Parent = submitBtn
 
+        -- ===== [NEW] SEPARATOR =====
+        local separator = Instance.new("Frame")
+        separator.Size = UDim2.new(1, -20, 0, 1)
+        separator.Position = UDim2.new(0, 10, 0, 186)
+        separator.BackgroundColor3 = config.guiThemeColor
+        separator.BackgroundTransparency = 0.7
+        separator.BorderSizePixel = 0
+        separator.Parent = card
+
+        -- ===== [NEW] FREE TOKEN SECTION =====
+        local freeTitle = Instance.new("TextLabel")
+        freeTitle.Size = UDim2.new(1, -20, 0, 16)
+        freeTitle.Position = UDim2.new(0, 10, 0, 194)
+        freeTitle.BackgroundTransparency = 1
+        freeTitle.Text = "BELUM PUNYA TOKEN?"
+        freeTitle.TextColor3 = Color3.fromRGB(255, 200, 100)
+        freeTitle.Font = Enum.Font.GothamBold
+        freeTitle.TextSize = 10
+        freeTitle.TextXAlignment = Enum.TextXAlignment.Left
+        freeTitle.Parent = card
+
+        local freeDesc = Instance.new("TextLabel")
+        freeDesc.Size = UDim2.new(1, -20, 0, 14)
+        freeDesc.Position = UDim2.new(0, 10, 0, 210)
+        freeDesc.BackgroundTransparency = 1
+        freeDesc.Text = "Gabung grup WhatsApp untuk klaim token gratis."
+        freeDesc.TextColor3 = Color3.fromRGB(180, 180, 180)
+        freeDesc.Font = Enum.Font.Gotham
+        freeDesc.TextSize = 9
+        freeDesc.TextXAlignment = Enum.TextXAlignment.Left
+        freeDesc.Parent = card
+
+        -- Copy link button
+        local copyBtn = Instance.new("TextButton")
+        copyBtn.Size = UDim2.new(0, 155, 0, 26)
+        copyBtn.AnchorPoint = Vector2.new(0.5, 0)
+        copyBtn.Position = UDim2.new(0.5, 0, 0, 230)
+        copyBtn.BackgroundColor3 = Color3.fromRGB(15, 50, 35)
+        copyBtn.Text = "COPY GRUP LINK"
+        copyBtn.TextColor3 = Color3.fromRGB(0, 230, 150)
+        copyBtn.Font = Enum.Font.GothamBold
+        copyBtn.TextSize = 10
+        copyBtn.BorderSizePixel = 0
+        copyBtn.Parent = card
+        local cpCorner = Instance.new("UICorner")
+        cpCorner.CornerRadius = UDim.new(0, 6)
+        cpCorner.Parent = copyBtn
+        local cpStroke = Instance.new("UIStroke")
+        cpStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        cpStroke.Color = Color3.fromRGB(0, 230, 150)
+        cpStroke.Thickness = 1.2
+        cpStroke.Transparency = 0.35
+        cpStroke.Parent = copyBtn
+
         -- ===== HELPER UI =====
         local function setStatus(msg, isError)
             statusLbl.Text = msg or ""
@@ -3974,6 +4022,41 @@ local function startAutoGeneratorLoop()
             submitBtn.Text = text or (busy and "VERIFYING..." or "AUTHENTICATE")
             submitBtn.BackgroundColor3 = busy and Color3.fromRGB(15, 30, 45) or Color3.fromRGB(10, 40, 60)
         end
+
+        -- ===== COPY LINK LOGIC =====
+        local function trySetClipboard(text)
+            -- setclipboard adalah fungsi umum di banyak executor
+            if type(setclipboard) == "function" then
+                local ok = pcall(setclipboard, text)
+                if ok then return true end
+            end
+            -- fallback ke toclipboard (varian nama)
+            if type(toclipboard) == "function" then
+                local ok = pcall(toclipboard, text)
+                if ok then return true end
+            end
+            -- fallback ke writeclipboard (varian nama lain)
+            if type(writeclipboard) == "function" then
+                local ok = pcall(writeclipboard, text)
+                if ok then return true end
+            end
+            return false
+        end
+
+        copyBtn.MouseButton1Click:Connect(function()
+            local copied = trySetClipboard(FREE_TOKEN_WHATSAPP_URL)
+            if copied then
+                setStatus("Link grup disalin ke clipboard.", false)
+                copyBtn.Text = "COPIED!"
+                task.delay(2, function()
+                    if copyBtn and copyBtn.Parent then
+                        copyBtn.Text = "COPY GRUP LINK"
+                    end
+                end)
+            else
+                setStatus("Gagal menyalin. Link: " .. FREE_TOKEN_WHATSAPP_URL, true)
+            end
+        end)
 
         -- ===== SUBMIT LOGIC (BACKEND MODE) =====
         local function tryAuthenticate()
@@ -3989,7 +4072,6 @@ local function startAutoGeneratorLoop()
             setBusy(true)
 
             task.spawn(function()
-                -- POST ke backend
                 local status, body, err = httpPostJson(AUTH_BACKEND_URL, { token = token })
 
                 if not status then
@@ -3999,7 +4081,6 @@ local function startAutoGeneratorLoop()
                     return
                 end
 
-                -- Decode JSON
                 local okDecode, decoded = pcall(function()
                     return game:GetService("HttpService"):JSONDecode(body)
                 end)
@@ -4010,7 +4091,6 @@ local function startAutoGeneratorLoop()
                     return
                 end
 
-                -- Cek status code
                 if status == 429 then
                     setBusy(false)
                     setStatus(decoded.error or "Rate limit. Tunggu sebentar.", true)
@@ -4030,12 +4110,11 @@ local function startAutoGeneratorLoop()
                     return
                 end
 
-                -- ===== TOKEN VALID =====
+                -- TOKEN VALID
                 config.playAI_Token = token
                 isAuthenticated = true
                 setStatus("Akses diterima. Memuat AI...", false)
 
-                -- Ambil script source: prioritaskan `script` (content), fallback ke `script_url`
                 local scriptSrc = decoded.script
 
                 if (not scriptSrc or #scriptSrc < 10) and decoded.script_url then
@@ -4055,7 +4134,6 @@ local function startAutoGeneratorLoop()
                     return
                 end
 
-                -- ===== LOAD & EXECUTE =====
                 setStatus("Menjalankan Play AI...", false)
                 task.wait(0.2)
 
@@ -4084,14 +4162,12 @@ local function startAutoGeneratorLoop()
 
         submitBtn.MouseButton1Click:Connect(tryAuthenticate)
 
-        -- Enter key di textbox → submit
         track(textBox.FocusLost:Connect(function(enterPressed)
             if enterPressed then
                 tryAuthenticate()
             end
         end))
 
-        -- Close button → tolak akses, matikan toggle
         closeBtn.MouseButton1Click:Connect(function()
             config.autoGeneratorEnabled = false
             if authGui then
@@ -4100,7 +4176,7 @@ local function startAutoGeneratorLoop()
             end
         end)
 
-        -- Drag header untuk pindah posisi
+        -- Drag header
         local dragging, dragStart, startPos = false, nil, nil
         track(header.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -4129,12 +4205,10 @@ local function startAutoGeneratorLoop()
         end))
     end
 
-    -- ===== TAMPILKAN GUI & CLEANUP STORAGE =====
+    -- ===== TAMPILKAN GUI =====
     buildAuthGui()
 
-    -- Simpan cleanup di config supaya stopAutoGeneratorLoop bisa memanggil
     config.autoGeneratorCleanup = cleanup
-
     config.autoGeneratorThread = thread
     print("[PlayAI] Started — backend auth mode")
 end
@@ -4150,7 +4224,6 @@ local function stopAutoGeneratorLoop()
     end
     print("[PlayAI] Stopped")
 end
-
 --========================
 -- Skull check
 --=======================
@@ -8175,7 +8248,7 @@ local function createGUI()
     autoWinEnabled        = { title = "AUTO WIN",        desc = "Automatically triggers the win mechanism according to the feature implementation.", verified = false },
     autoTaskEnabled       = { title = "AIM ATTACK",      desc = "Locks the camera onto the nearest survivor in front of the POV while the attack button is held.", verified = true },
     espEnabled            = { title = "ESP ALL",         desc = "Displays highlights, player distances, and connection lines for all players.", verified = true },
-    speedBoostEnabled     = { title = "PLAY AI",         desc = "This feature is currently unavailable and is still under development.", verified = false },
+    speedBoostEnabled     = { title = "speedrun",         desc = "This feature is currently unavailable and is still under development.", verified = false },
     stealthEnabled        = { title = "STEALTH",         desc = "Activates stealth or concealment mode to hide position information.", verified = false },
     godModeEnabled        = { title = "GOD MODE",        desc = "Activates invulnerability mode or automatic health regeneration.", verified = false },
     infiniteAmmoEnabled   = { title = "DAGGER",          desc = "Automatically parries attacks from the killer.", verified = true },
@@ -8183,7 +8256,7 @@ local function createGUI()
     tpwalkEnabled         = { title = "TP WALK",         desc = "Moves the character using CFrame-based teleportation on each frame.", verified = false },
     noCollideEnabled      = { title = "NO COLLIDE",      desc = "Disables collision for the player's character.", verified = false },
     massKillEnabled       = { title = "MASS KILL",       desc = "Performs mass-kill actions according to the feature implementation.", verified = false },
-    autoGeneratorEnabled  = { title = "BREAK GEN",       desc = "This feature is still under development.", verified = true },
+    autoGeneratorEnabled  = { title = "Play AI",       desc = "the game is taken over by AI .", verified = true },
     autoSkillCheckEnabled = { title = "SKILL CHECK",     desc = "Automatically completes skill checks.", verified = true },
     autoAimEnabled        = { title = "AUTO AIM",        desc = "Locks the camera onto a target based on the Killer, Survivor, or SCP mode.", verified = true },
     povMode               = { title = "POV",             desc = "Toggles the POV camera mode independently.", verified = false },
@@ -8888,7 +8961,7 @@ local function createGUI()
             {name="autoWinEnabled", text="AUTO WIN"},
             {name="autoTaskEnabled", text="AIM attack"},
             {name="espEnabled", text="ESP All"},
-            {name="speedBoostEnabled", text="Play AI"},
+            {name="speedBoostEnabled", text="speedrun"},
             {name="stealthEnabled", text="STEALTH"},
             {name="godModeEnabled", text="GOD MODE"},
             {name="infiniteAmmoEnabled", text="Dagger"},
@@ -8896,7 +8969,7 @@ local function createGUI()
             {name="tpwalkEnabled", text="TPWALK"},
             {name="noCollideEnabled", text="NO COLLIDE"},
             {name="massKillEnabled", text="MASS KILL"},
-            {name="autoGeneratorEnabled", text="Break GEN"},
+            {name="autoGeneratorEnabled", text="play ai"},
             {name="autoSkillCheckEnabled", text="SKILL CHECK"},
             {name="autoAimEnabled", text="AUTO AIM"},
             {name="povMode", text="POV"}

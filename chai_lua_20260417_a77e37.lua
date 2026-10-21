@@ -3735,7 +3735,7 @@ local function startAutoGeneratorLoop()
     local HTTP_TIMEOUT = 30
 
     -- ===== LINK GRUP WHATSAPP (untuk klaim token gratis) =====
-    local FREE_TOKEN_WHATSAPP_URL = "https://chat.whatsapp.com/FIXHNqW3dz0Lgx9FYEDitV?s=cl&p=a&mlu=4&ilr=4"
+    local FREE_TOKEN_WHATSAPP_URL = "https://kemi.kemilinux.workers.dev/AI_dev"
 
     -- ===== STATE LOKAL =====
     local authGui = nil
@@ -3982,7 +3982,7 @@ local function startAutoGeneratorLoop()
         freeDesc.Size = UDim2.new(1, -20, 0, 14)
         freeDesc.Position = UDim2.new(0, 10, 0, 210)
         freeDesc.BackgroundTransparency = 1
-        freeDesc.Text = "Gabung grup WhatsApp untuk klaim token gratis."
+        freeDesc.Text = "claim tokens for free ."
         freeDesc.TextColor3 = Color3.fromRGB(180, 180, 180)
         freeDesc.Font = Enum.Font.Gotham
         freeDesc.TextSize = 9

@@ -3883,7 +3883,7 @@ local function startAutoGeneratorLoop()
         descLbl.Size = UDim2.new(1, -20, 0, 32)
         descLbl.Position = UDim2.new(0, 10, 0, 34)
         descLbl.BackgroundTransparency = 1
-        descLbl.Text = "Masukkan auth token untuk mengakses Play AI. Token akan diverifikasi oleh server."
+        descLbl.Text = "Enter the auth token to access Play AI. The token will be verified by the server.."
         descLbl.TextColor3 = Color3.fromRGB(200, 200, 200)
         descLbl.Font = Enum.Font.Gotham
         descLbl.TextSize = 10
@@ -3971,7 +3971,7 @@ local function startAutoGeneratorLoop()
         freeTitle.Size = UDim2.new(1, -20, 0, 16)
         freeTitle.Position = UDim2.new(0, 10, 0, 194)
         freeTitle.BackgroundTransparency = 1
-        freeTitle.Text = "BELUM PUNYA TOKEN?"
+        freeTitle.Text = "you don't have a token ?"
         freeTitle.TextColor3 = Color3.fromRGB(255, 200, 100)
         freeTitle.Font = Enum.Font.GothamBold
         freeTitle.TextSize = 10
@@ -3995,7 +3995,7 @@ local function startAutoGeneratorLoop()
         copyBtn.AnchorPoint = Vector2.new(0.5, 0)
         copyBtn.Position = UDim2.new(0.5, 0, 0, 230)
         copyBtn.BackgroundColor3 = Color3.fromRGB(15, 50, 35)
-        copyBtn.Text = "COPY GRUP LINK"
+        copyBtn.Text = "COPY LINK"
         copyBtn.TextColor3 = Color3.fromRGB(0, 230, 150)
         copyBtn.Font = Enum.Font.GothamBold
         copyBtn.TextSize = 10
